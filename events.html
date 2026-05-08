@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Upcoming tournaments, league nights, and community events at Play2Win Games in Knoxville, TN.">
+    <title>Events | Play2Win Games</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="Play2Win Games home">
+        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
+      </a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="events.html" aria-current="page">Events</a>
+        <a href="contact.html">Contact</a>
+        <a class="nav-cta" href="https://playtowingames.crystalcommerce.com/">TCG Inventory</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="page-hero events-hero">
+        <p class="eyebrow">Tournaments &middot; Leagues &middot; Community Nights</p>
+        <h1>Upcoming Events</h1>
+        <p class="lead">Weekly tournaments, league nights, and special events for all skill levels. Register online or walk in &mdash; we&rsquo;ve got a seat for you.</p>
+        <a class="button secondary" href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">View All on Facebook</a>
+      </section>
+
+      <section class="events-section" aria-label="Upcoming events">
+        <div class="events-controls">
+          <div class="filter-tabs" id="filter-tabs" role="group" aria-label="Filter by game">
+            <button class="filter-btn active" data-filter="all">All Events</button>
+            <button class="filter-btn" data-filter="pokemon">Pok&eacute;mon</button>
+            <button class="filter-btn" data-filter="magic">Magic</button>
+            <button class="filter-btn" data-filter="yugioh">Yu-Gi-Oh!</button>
+            <button class="filter-btn" data-filter="lorcana">Lorcana</button>
+            <button class="filter-btn" data-filter="other">Other</button>
+          </div>
+        </div>
+
+        <div class="events-grid" id="events-grid" aria-live="polite"></div>
+        <p class="events-empty" id="events-empty" hidden>
+          No upcoming events in this category right now. Check back soon or
+          <a href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">follow us on Facebook</a>
+          for announcements.
+        </p>
+      </section>
+
+      <section class="events-cta">
+        <div>
+          <p class="eyebrow">Stay in the loop</p>
+          <h2>We announce events on Facebook first.</h2>
+          <p>Special tournaments, trade nights, new game releases, and community events get posted to our Facebook page. Give us a follow so you never miss a drop.</p>
+        </div>
+        <a class="button primary" href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">Follow Play2Win on Facebook</a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
+        <p>Whenever you play, Play 2 Win!</p>
+      </div>
+      <div>
+        <strong>Visit</strong>
+        <p>3903 Western Avenue<br>Knoxville, TN 37921</p>
+      </div>
+      <div>
+        <strong>Contact</strong>
+        <p><a href="tel:+18659108357">865-910-8357</a><br><a href="https://www.facebook.com/P2WGames/">Facebook</a></p>
+      </div>
+    </footer>
+
+    <script>
+      // ─── Event Data ─────────────────────────────────────────────────────────────
+      // To add or edit events, update this array.
+      // date format: "YYYY-MM-DD"  |  time24 format: "HH:MM" (24-hour, local)
+      const EVENTS = [
+        {
+          id: 1,
+          title: "Pokémon League Night",
+          game: "pokemon",
+          gameLabel: "Pokémon TCG",
+          date: "2026-05-09",
+          time: "6:00 PM",
+          time24: "18:00",
+          entry: "Free",
+          format: "Casual & Competitive Play",
+          capacity: null,
+          registered: null,
+          registerUrl: null,
+          recurring: "Every Saturday",
+          description: "Weekly Pokémon TCG league night. Earn league points, trade cards, and play at any skill level. All ages welcome — bring your deck or borrow one in-store."
+        },
+        {
+          id: 2,
+          title: "Friday Night Magic",
+          game: "magic",
+          gameLabel: "Magic: The Gathering",
+          date: "2026-05-15",
+          time: "7:00 PM",
+          time24: "19:00",
+          entry: "TBA",
+          format: "Check Facebook for Format",
+          capacity: null,
+          registered: null,
+          registerUrl: null,
+          recurring: "Every Friday",
+          description: "The classic FNM. Format rotates week to week — Draft, Standard, Commander, and more. Check our Facebook page or call the store for the current week’s format and prize structure."
+        },
+        {
+          id: 3,
+          title: "Yu-Gi-Oh! Local Tournament",
+          game: "yugioh",
+          gameLabel: "Yu-Gi-Oh!",
+          date: "2026-05-16",
+          time: "1:00 PM",
+          time24: "13:00",
+          entry: "TBA",
+          format: "Advanced Format • Swiss",
+          capacity: null,
+          registered: null,
+          registerUrl: null,
+          recurring: "Bi-weekly Saturdays",
+          description: "Competitive Yu-Gi-Oh! local in Advanced Format. Swiss rounds with top cut. Earn store credit and prizes. Bring your best legal deck and your game face."
+        },
+        {
+          id: 4,
+          title: "Lorcana Locals",
+          game: "lorcana",
+          gameLabel: "Disney Lorcana",
+          date: "2026-06-05",
+          time: "7:00 PM",
+          time24: "19:00",
+          entry: "$5.00",
+          format: "Core Constructed • Swiss",
+          capacity: 32,
+          registered: 0,
+          registerUrl: "https://tcg.ravensburgerplay.com/events/492859",
+          recurring: null,
+          description: "Disney Lorcana Core Constructed tournament. Build your best deck and compete in Swiss rounds for store prizes. 32-player cap — register online to lock in your spot."
+        }
+      ];
+
+      // ─── Utilities ──────────────────────────────────────────────────────────────
+      function daysUntil(dateStr) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const event = new Date(dateStr + "T00:00:00");
+        return Math.round((event - today) / 864e5);
+      }
+
+      function formatDate(dateStr) {
+        return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+          weekday: "long", month: "long", day: "numeric", year: "numeric"
+        });
+      }
+
+      function daysPill(days) {
+        if (days < 0)  return '<span class="days-pill past">Completed</span>';
+        if (days === 0) return '<span class="days-pill today">Today!</span>';
+        if (days === 1) return '<span class="days-pill soon">Tomorrow</span>';
+        if (days <= 7) return `<span class="days-pill soon">${days} days away</span>`;
+        return `<span class="days-pill upcoming">${days} days away</span>`;
+      }
+
+      function spotsHtml(capacity, registered) {
+        if (!capacity) return "";
+        const remaining = capacity - registered;
+        const pct = Math.round((registered / capacity) * 100);
+        const cls = remaining === 0 ? "full" : remaining <= 5 ? "limited" : "open";
+        const label = remaining === 0 ? "Event full" : `${remaining} of ${capacity} spots open`;
+        return `
+          <div class="spots-wrap">
+            <div class="spots-bar" role="progressbar" aria-valuenow="${registered}" aria-valuemax="${capacity}" aria-label="${label}">
+              <div class="spots-fill ${cls}" style="width:${pct}%"></div>
+            </div>
+            <span class="spots-label ${cls}">${label}</span>
+          </div>`;
+      }
+
+      function downloadICS(ev) {
+        const d = ev.date.replace(/-/g, "");
+        const [h, m] = ev.time24.split(":").map(Number);
+        const pad = n => String(n).padStart(2, "0");
+        const dtStart = `${d}T${pad(h)}${pad(m)}00`;
+        const dtEnd   = `${d}T${pad(h + 2)}${pad(m)}00`;
+        const uid     = `p2w-event-${ev.id}-${d}@play2wingames`;
+        const ics = [
+          "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Play2Win Games//Events//EN",
+          "BEGIN:VEVENT",
+          `UID:${uid}`,
+          `DTSTART:${dtStart}`,
+          `DTEND:${dtEnd}`,
+          `SUMMARY:${ev.title} @ Play2Win Games`,
+          "LOCATION:Play2Win Games\\, 3903 Western Avenue\\, Knoxville\\, TN 37921",
+          `DESCRIPTION:${ev.description.replace(/\n/g, "\\n")}`,
+          `URL:${ev.registerUrl || "https://www.facebook.com/P2WGames/"}`,
+          "END:VEVENT", "END:VCALENDAR"
+        ].join("\r\n");
+        const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement("a"), {
+          href: url, download: `${ev.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ics`
+        });
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      // ─── Card template ──────────────────────────────────────────────────────────
+      function renderCard(ev) {
+        const days   = daysUntil(ev.date);
+        const isPast = days < 0;
+        const hasFee = ev.entry !== "TBA" && ev.entry !== "Free";
+        return `
+          <article class="event-card${isPast ? " past" : ""}" data-game="${ev.game}">
+            <div class="event-card-top">
+              <span class="event-badge" data-game="${ev.game}">${ev.gameLabel}</span>
+              ${daysPill(days)}
+            </div>
+            <h3 class="event-card-title">${ev.title}</h3>
+            <ul class="event-meta">
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                <span>${formatDate(ev.date)}</span>
+              </li>
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span>${ev.time} EDT</span>
+              </li>
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                <span>${ev.format}</span>
+              </li>
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7" stroke-linecap="round" stroke-width="3"/></svg>
+                <span>${ev.entry === "Free" ? "Free entry" : ev.entry === "TBA" ? "Entry fee TBA — check Facebook" : ev.entry + " entry fee"}</span>
+              </li>
+              ${ev.recurring ? `
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+                <span>${ev.recurring}</span>
+              </li>` : ""}
+            </ul>
+            <p class="event-desc">${ev.description}</p>
+            ${spotsHtml(ev.capacity, ev.registered)}
+            <div class="event-card-footer">
+              ${ev.registerUrl
+                ? `<a class="button primary event-btn" href="${ev.registerUrl}" target="_blank" rel="noopener">Register Now</a>`
+                : `<a class="button secondary event-btn" href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">More Info</a>`
+              }
+              ${!isPast ? `<button class="cal-btn" data-id="${ev.id}" aria-label="Add ${ev.title} to calendar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+                Add to Calendar
+              </button>` : ""}
+            </div>
+          </article>`;
+      }
+
+      // ─── Render & filter ────────────────────────────────────────────────────────
+      const grid   = document.getElementById("events-grid");
+      const empty  = document.getElementById("events-empty");
+      let activeFilter = "all";
+
+      function render() {
+        const list = EVENTS
+          .filter(ev => activeFilter === "all" || ev.game === activeFilter)
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        grid.innerHTML = list.map(renderCard).join("");
+        empty.hidden = list.length > 0;
+        grid.hidden  = list.length === 0;
+      }
+
+      document.getElementById("filter-tabs").addEventListener("click", e => {
+        const btn = e.target.closest(".filter-btn");
+        if (!btn) return;
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeFilter = btn.dataset.filter;
+        render();
+      });
+
+      grid.addEventListener("click", e => {
+        const btn = e.target.closest(".cal-btn");
+        if (!btn) return;
+        const ev = EVENTS.find(ev => ev.id === Number(btn.dataset.id));
+        if (ev) downloadICS(ev);
+      });
+
+      render();
+    </script>
+  </body>
+</html>

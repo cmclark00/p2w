@@ -398,6 +398,276 @@ h3 {
   color: var(--ink);
 }
 
+/* ── Events page ────────────────────────────────────────────────────────── */
+
+.events-hero {
+  background:
+    linear-gradient(120deg, rgba(49, 94, 203, 0.32), rgba(156, 31, 166, 0.22), rgba(217, 31, 56, 0.22)),
+    var(--surface);
+}
+
+.events-hero .button {
+  margin-top: 8px;
+}
+
+.events-section {
+  padding: clamp(48px, 7vw, 90px) clamp(18px, 6vw, 72px);
+}
+
+.events-controls {
+  margin-bottom: 36px;
+}
+
+.filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 9px 20px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+
+.filter-btn:hover {
+  background: var(--surface-2);
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.filter-btn.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: white;
+}
+
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── Game color tokens ──────────────────────────────────────────────────── */
+
+[data-game="pokemon"]  { --game-color: #e3350d; }
+[data-game="magic"]    { --game-color: #9c1fa6; }
+[data-game="yugioh"]   { --game-color: #f1c84b; }
+[data-game="lorcana"]  { --game-color: #315ecb; }
+[data-game="smash"]    { --game-color: #d91f38; }
+[data-game="riftbound"]{ --game-color: #0db7d4; }
+[data-game="other"]    { --game-color: #c7c7ce; }
+
+/* ── Event card ─────────────────────────────────────────────────────────── */
+
+.event-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 22px 22px 24px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--game-color, var(--red));
+  border-radius: 8px;
+  background: var(--surface);
+  transition: transform 0.16s, box-shadow 0.16s;
+}
+
+.event-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+
+.event-card.past {
+  opacity: 0.46;
+  pointer-events: none;
+}
+
+.event-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.event-badge {
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--game-color, var(--muted));
+  border-color: var(--game-color, var(--line));
+  background: transparent;
+}
+
+.days-pill {
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.days-pill.today   { background: rgba(241, 200, 75, 0.18);  color: var(--gold); }
+.days-pill.soon    { background: rgba(74, 222, 128, 0.14);  color: #4ade80; }
+.days-pill.upcoming{ background: rgba(49, 94, 203, 0.2);    color: #7eb3ff; }
+.days-pill.past    { background: var(--surface-2);          color: var(--muted); }
+
+.event-card-title {
+  margin: 0;
+  font-size: 1.3rem;
+  line-height: 1.15;
+  color: var(--paper);
+}
+
+.event-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.event-meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.event-meta li svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--game-color, var(--muted));
+}
+
+.event-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.58;
+}
+
+/* ── Spots capacity bar ─────────────────────────────────────────────────── */
+
+.spots-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spots-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.spots-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.spots-fill.open    { background: #4ade80; }
+.spots-fill.limited { background: var(--gold); }
+.spots-fill.full    { background: var(--red); }
+
+.spots-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.spots-label.open    { color: #4ade80; }
+.spots-label.limited { color: var(--gold); }
+.spots-label.full    { color: var(--red); }
+
+/* ── Card footer ────────────────────────────────────────────────────────── */
+
+.event-card-footer {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.event-btn {
+  flex: 1;
+  min-width: 130px;
+  justify-content: center;
+}
+
+.cal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+
+.cal-btn:hover {
+  background: var(--surface-2);
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+.events-empty {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.events-empty a {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ── Events CTA band ────────────────────────────────────────────────────── */
+
+.events-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: clamp(38px, 6vw, 66px) clamp(18px, 6vw, 72px);
+  background:
+    linear-gradient(90deg, rgba(49, 94, 203, 0.28), rgba(156, 31, 166, 0.18)),
+    var(--surface-2);
+  border-block: 1px solid var(--line);
+}
+
+.events-cta div {
+  max-width: 720px;
+}
+
 @media (max-width: 920px) {
   .site-header {
     align-items: flex-start;
@@ -421,7 +691,8 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .inventory-band {
+  .inventory-band,
+  .events-cta {
     align-items: flex-start;
     flex-direction: column;
   }
