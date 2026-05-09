@@ -75,6 +75,11 @@ a {
   background: rgba(17, 18, 23, 0.08);
 }
 
+.nav a[aria-current="page"] {
+  background: rgba(17, 18, 23, 0.1);
+  color: var(--red);
+}
+
 .nav .nav-cta {
   background: var(--blue);
   color: white;
@@ -404,6 +409,25 @@ h3 {
 
 .site-footer a {
   color: var(--ink);
+}
+
+/* ── Map embed ──────────────────────────────────────────────────────────── */
+
+.map-section {
+  padding: 0 clamp(18px, 6vw, 72px) clamp(48px, 8vw, 84px);
+}
+
+.map-embed {
+  width: 100%;
+  height: 420px;
+  border: 0;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 560px) {
+  .map-embed { height: 280px; }
 }
 
 /* ── Events page ────────────────────────────────────────────────────────── */
