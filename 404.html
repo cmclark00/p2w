@@ -3,86 +3,208 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Page Not Found | Play2Win Games</title>
+    <title>I AM ERROR | Play2Win Games</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-      .not-found {
-        min-height: 60vh;
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: #000;
+        min-height: 100vh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        padding: 24px 16px;
+        font-family: 'Press Start 2P', monospace;
+        color: #fff;
+        overflow-x: hidden;
+      }
+
+      /* CRT scanlines */
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent 0px,
+          transparent 3px,
+          rgba(0, 0, 0, 0.18) 3px,
+          rgba(0, 0, 0, 0.18) 4px
+        );
+        pointer-events: none;
+        z-index: 999;
+      }
+
+      /* ── NES cartridge frame ─────────────────────────────── */
+      .nes-screen {
+        width: min(560px, 100%);
+        image-rendering: pixelated;
+        /* Outer bezel */
+        box-shadow:
+          0 0 0 4px #f8d748,
+          0 0 0 8px #7a4e00,
+          0 0 0 12px #f8d748,
+          0 0 60px rgba(248, 215, 72, 0.25);
+      }
+
+      /* ── Title banner ────────────────────────────────────── */
+      .title-bar {
+        background: #000;
+        border-bottom: 4px solid #f8d748;
+        padding: 10px 16px;
         text-align: center;
-        padding: clamp(48px, 10vw, 120px) clamp(18px, 6vw, 72px);
-        gap: 20px;
+        font-size: clamp(7px, 2.2vw, 11px);
+        color: #f8d748;
+        letter-spacing: 2px;
       }
-      .not-found img {
-        width: min(180px, 45vw);
-        opacity: 0.7;
-      }
-      .not-found h1 {
-        font-size: clamp(1.8rem, 5vw, 3rem);
-      }
-      .not-found p {
-        color: var(--muted);
-        max-width: 480px;
-      }
-      .not-found .button-row {
+
+      /* ── Room / scene ────────────────────────────────────── */
+      .room {
+        background: #5c3317;
+        position: relative;
         display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
+        align-items: flex-end;
         justify-content: center;
-        margin-top: 8px;
+        height: clamp(180px, 38vw, 280px);
+        overflow: hidden;
+      }
+
+      /* brick wall tiles */
+      .room::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(#4a2910 1px, transparent 1px),
+          linear-gradient(90deg, #4a2910 1px, transparent 1px);
+        background-size: 32px 20px;
+        opacity: 0.5;
+      }
+
+      /* wooden floor */
+      .room::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: clamp(28px, 8vw, 48px);
+        background: repeating-linear-gradient(
+          90deg,
+          #6b3d12 0px, #6b3d12 31px,
+          #54300e 31px, #54300e 32px
+        );
+      }
+
+      .bulky {
+        position: relative;
+        z-index: 1;
+        height: clamp(130px, 30vw, 210px);
+        width: auto;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+        /* pixel-bounce idle animation */
+        animation: idle 1.2s steps(2, end) infinite;
+        margin-bottom: clamp(28px, 8vw, 48px);
+        filter: drop-shadow(0 0 12px rgba(248, 215, 72, 0.3));
+      }
+
+      @keyframes idle {
+        0%   { transform: translateY(0); }
+        50%  { transform: translateY(-4px); }
+        100% { transform: translateY(0); }
+      }
+
+      /* ── Zelda-style text box ────────────────────────────── */
+      .textbox {
+        background: #0000bc;
+        border-top: 4px solid #f8d748;
+        padding: clamp(14px, 4vw, 24px) clamp(16px, 5vw, 28px) clamp(16px, 4vw, 24px);
+      }
+
+      .error-headline {
+        font-size: clamp(13px, 4.5vw, 22px);
+        color: #fff;
+        letter-spacing: 3px;
+        margin-bottom: clamp(10px, 3vw, 18px);
+      }
+
+      .error-headline .cursor {
+        animation: blink 0.8s step-end infinite;
+        color: #f8d748;
+      }
+
+      .error-sub {
+        font-size: clamp(5px, 1.8vw, 8px);
+        color: #8888ff;
+        line-height: 2.4;
+        margin-bottom: clamp(14px, 4vw, 22px);
+      }
+
+      .nes-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .nes-link {
+        font-size: clamp(5px, 1.8vw, 8px);
+        color: #f8d748;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: color 0.1s;
+      }
+
+      .nes-link:hover { color: #fff; }
+
+      .nes-link .arrow {
+        display: inline-block;
+        animation: blink 0.8s step-end infinite;
+      }
+
+      .nes-link:nth-child(2) .arrow { animation-delay: 0.4s; }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0; }
       }
     </style>
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="index.html" aria-label="Play2Win Games home">
-        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
-      </a>
-      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </button>
-      <nav class="nav" aria-label="Main navigation">
-        <a href="index.html">Home</a>
-        <a href="about.html">About</a>
-        <a href="events.html">Events</a>
-        <a href="contact.html">Contact</a>
-        <a class="nav-cta" href="https://playtowingames.crystalcommerce.com/">TCG Inventory</a>
-      </nav>
-    </header>
+    <div class="nes-screen">
 
-    <main>
-      <div class="not-found">
-        <img src="assets/shop-header.png" alt="Play2Win Games mascot">
-        <p class="eyebrow">404 &mdash; Page not found</p>
-        <h1>Wrong side of the board.</h1>
-        <p>That page doesn&rsquo;t exist &mdash; but we&rsquo;ve got plenty that do. Head back home or check out what&rsquo;s coming up at the shop.</p>
-        <div class="button-row">
-          <a class="button primary" href="index.html">Go Home</a>
-          <a class="button secondary" href="events.html">Upcoming Events</a>
-        </div>
-      </div>
-    </main>
+      <div class="title-bar">* THE ADVENTURE OF BULKY *</div>
 
-    <footer class="site-footer">
-      <div>
-        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
-        <p>Whenever you play, Play 2 Win!</p>
+      <div class="room">
+        <img class="bulky" src="assets/shop-header.png" alt="Bulky the Play2Win mascot">
       </div>
-      <div>
-        <strong>Visit</strong>
-        <p>3903 Western Avenue<br>Knoxville, TN 37921</p>
+
+      <div class="textbox">
+        <p class="error-headline">I AM ERROR.<span class="cursor">█</span></p>
+        <p class="error-sub">
+          THIS PAGE DOES NOT EXIST.<br>
+          PERHAPS YOU SEEK THE<br>
+          TRIFORCE OF GOOD DEALS.
+        </p>
+        <nav class="nes-actions" aria-label="Error page navigation">
+          <a class="nes-link" href="index.html">
+            <span class="arrow">▶</span> RETURN TO HYRULE (HOME)
+          </a>
+          <a class="nes-link" href="events.html">
+            <span class="arrow">▶</span> CHECK THE QUEST BOARD (EVENTS)
+          </a>
+        </nav>
       </div>
-      <div>
-        <strong>Contact</strong>
-        <p><a href="tel:+18659108357">865-910-8357</a><br><a href="https://www.facebook.com/P2WGames/">Facebook</a></p>
-      </div>
-    </footer>
-    <script src="nav.js"></script>
+
+    </div>
   </body>
 </html>
