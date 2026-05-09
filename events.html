@@ -75,75 +75,9 @@
     </footer>
 
     <script>
-      // ─── Event Data ─────────────────────────────────────────────────────────────
-      // To add or edit events, update this array.
-      // date format: "YYYY-MM-DD"  |  time24 format: "HH:MM" (24-hour, local)
-      const EVENTS = [
-        {
-          id: 1,
-          title: "Pokémon League Night",
-          game: "pokemon",
-          gameLabel: "Pokémon TCG",
-          date: "2026-05-09",
-          time: "6:00 PM",
-          time24: "18:00",
-          entry: "Free",
-          format: "Casual & Competitive Play",
-          capacity: null,
-          registered: null,
-          registerUrl: null,
-          recurring: "Every Saturday",
-          description: "Weekly Pokémon TCG league night. Earn league points, trade cards, and play at any skill level. All ages welcome — bring your deck or borrow one in-store."
-        },
-        {
-          id: 2,
-          title: "Friday Night Magic",
-          game: "magic",
-          gameLabel: "Magic: The Gathering",
-          date: "2026-05-15",
-          time: "7:00 PM",
-          time24: "19:00",
-          entry: "TBA",
-          format: "Check Facebook for Format",
-          capacity: null,
-          registered: null,
-          registerUrl: null,
-          recurring: "Every Friday",
-          description: "The classic FNM. Format rotates week to week — Draft, Standard, Commander, and more. Check our Facebook page or call the store for the current week’s format and prize structure."
-        },
-        {
-          id: 3,
-          title: "Yu-Gi-Oh! Local Tournament",
-          game: "yugioh",
-          gameLabel: "Yu-Gi-Oh!",
-          date: "2026-05-16",
-          time: "1:00 PM",
-          time24: "13:00",
-          entry: "TBA",
-          format: "Advanced Format • Swiss",
-          capacity: null,
-          registered: null,
-          registerUrl: null,
-          recurring: "Bi-weekly Saturdays",
-          description: "Competitive Yu-Gi-Oh! local in Advanced Format. Swiss rounds with top cut. Earn store credit and prizes. Bring your best legal deck and your game face."
-        },
-        {
-          id: 4,
-          title: "Lorcana Locals",
-          game: "lorcana",
-          gameLabel: "Disney Lorcana",
-          date: "2026-06-05",
-          time: "7:00 PM",
-          time24: "19:00",
-          entry: "$5.00",
-          format: "Core Constructed • Swiss",
-          capacity: 32,
-          registered: 0,
-          registerUrl: "https://tcg.ravensburgerplay.com/events/492859",
-          recurring: null,
-          description: "Disney Lorcana Core Constructed tournament. Build your best deck and compete in Swiss rounds for store prizes. 32-player cap — register online to lock in your spot."
-        }
-      ];
+      // Events are loaded from events.json, which is updated nightly by a GitHub Action
+      // that syncs from Google Calendar. To add an event, create it in Google Calendar.
+      let EVENTS = [];
 
       // ─── Utilities ──────────────────────────────────────────────────────────────
       function daysUntil(dateStr) {
@@ -290,7 +224,10 @@
         if (ev) downloadICS(ev);
       });
 
-      render();
+      fetch("events.json")
+        .then(r => r.json())
+        .then(data => { EVENTS = data; render(); })
+        .catch(() => { grid.hidden = true; empty.hidden = false; });
     </script>
   </body>
 </html>
