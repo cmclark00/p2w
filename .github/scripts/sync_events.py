@@ -18,6 +18,7 @@ GAME_PATTERNS = [
     (r"yu.?gi.?oh", "yugioh", "Yu-Gi-Oh!"),
     (r"lorcana", "lorcana", "Disney Lorcana"),
     (r"digimon", "digimon", "Digimon TCG"),
+    (r"gundam", "gundam", "Gundam Card Game"),
     (r"smash", "smash", "Super Smash Bros."),
     (r"riftbound", "riftbound", "Riftbound"),
 ]
