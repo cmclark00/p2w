@@ -286,6 +286,13 @@ h3 {
   object-fit: cover;
 }
 
+.mascot-img {
+  width: 100%;
+  max-width: 480px;
+  display: block;
+  margin: 0 auto;
+}
+
 .inventory-band {
   display: flex;
   align-items: center;
