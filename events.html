@@ -12,6 +12,9 @@
       <a class="brand" href="index.html" aria-label="Play2Win Games home">
         <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
       </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
       <nav class="nav" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
@@ -232,5 +235,6 @@
         .then(data => { EVENTS = data; render(); })
         .catch(() => { grid.hidden = true; empty.hidden = false; });
     </script>
+    <script src="nav.js"></script>
   </body>
 </html>

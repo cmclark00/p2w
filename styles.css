@@ -471,6 +471,8 @@ h3 {
 [data-game="yugioh"]   { --game-color: #f1c84b; }
 [data-game="lorcana"]  { --game-color: #315ecb; }
 [data-game="smash"]    { --game-color: #d91f38; }
+[data-game="digimon"]  { --game-color: #3b82f6; }
+[data-game="gundam"]   { --game-color: #f97316; }
 [data-game="riftbound"]{ --game-color: #0db7d4; }
 [data-game="other"]    { --game-color: #c7c7ce; }
 
@@ -676,27 +678,51 @@ h3 {
   max-width: 720px;
 }
 
+/* ── Hamburger toggle (hidden on desktop) ───────────────────────────────── */
+
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: transform 0.22s, opacity 0.22s;
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ── Tablet: stack grids, keep full nav visible ─────────────────────────── */
+
 @media (max-width: 920px) {
-  .site-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .nav {
-    justify-content: flex-start;
-  }
-
   .hero {
-    min-height: 640px;
+    min-height: 580px;
   }
 
   .quick-info,
-  .category-grid,
   .split-section,
   .about-story,
   .contact-grid,
   .site-footer {
     grid-template-columns: 1fr;
+  }
+
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .inventory-band,
@@ -706,19 +732,44 @@ h3 {
   }
 }
 
-@media (max-width: 560px) {
+/* ── Phone: hamburger replaces inline nav ───────────────────────────────── */
+
+@media (max-width: 680px) {
+  .site-header {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
+  .nav-toggle {
+    display: flex;
+  }
+
   .nav {
+    display: none;
     width: 100%;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0 12px;
+  }
+
+  .nav.nav-open {
+    display: flex;
   }
 
   .nav a {
-    flex: 1 1 calc(50% - 8px);
     justify-content: center;
+    width: 100%;
   }
+}
 
+/* ── Small phone: tighten spacing and sizes ─────────────────────────────── */
+
+@media (max-width: 560px) {
   .hero {
-    min-height: 620px;
-    padding-top: 60px;
+    min-height: 480px;
+    padding-top: 56px;
   }
 
   .hero-media::after {
@@ -729,10 +780,26 @@ h3 {
     width: 100%;
   }
 
-  .quick-info article,
+  .quick-info article {
+    min-height: unset;
+    padding: 20px;
+  }
+
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+
   .category-grid article,
   .contact-panel {
-    padding: 22px;
+    padding: 20px;
+  }
+
+  .split-section {
+    padding-block: clamp(36px, 8vw, 64px);
+  }
+
+  .mascot-img {
+    max-height: 280px;
   }
 
   .hours-list div {
@@ -742,5 +809,23 @@ h3 {
 
   .hours-list dd {
     text-align: left;
+  }
+
+  .filter-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+  }
+
+  .filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-btn {
+    flex-shrink: 0;
   }
 }
