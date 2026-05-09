@@ -17,6 +17,7 @@ GAME_PATTERNS = [
     (r"friday night magic|fnm|\bmagic\b|mtg", "magic", "Magic: The Gathering"),
     (r"yu.?gi.?oh", "yugioh", "Yu-Gi-Oh!"),
     (r"lorcana", "lorcana", "Disney Lorcana"),
+    (r"digimon", "digimon", "Digimon TCG"),
     (r"smash", "smash", "Super Smash Bros."),
     (r"riftbound", "riftbound", "Riftbound"),
 ]

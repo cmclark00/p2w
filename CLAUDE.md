@@ -24,7 +24,7 @@ Events are stored as a plain JS array at the bottom of `events.html`. To add or 
 {
   id: number,          // unique, increment from last
   title: string,
-  game: "pokemon" | "magic" | "yugioh" | "lorcana" | "smash" | "riftbound" | "other",
+  game: "pokemon" | "magic" | "yugioh" | "lorcana" | "digimon" | "smash" | "riftbound" | "other",
   gameLabel: string,   // display name for the badge
   date: "YYYY-MM-DD",
   time: "H:MM AM/PM",
