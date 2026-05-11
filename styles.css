@@ -1012,9 +1012,9 @@ h3 {
 
 .mod-images {
   position: relative;
-  aspect-ratio: 4 / 3;
   background: var(--surface-2);
   overflow: hidden;
+  line-height: 0;
 }
 
 .mod-placeholder {
@@ -1042,20 +1042,24 @@ h3 {
 }
 
 .mod-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
   transition: opacity 0.35s ease;
 }
 
 .mod-img--before {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
   opacity: 1;
   z-index: 1;
 }
 
 .mod-img--after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   opacity: 0;
   z-index: 2;
 }
