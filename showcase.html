@@ -45,26 +45,33 @@
       </section>
 
       <section class="showcase-section">
-        <div class="events-controls">
-          <div class="filter-tabs" id="filter-tabs" role="group" aria-label="Filter by category">
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="video-games">Video Games</button>
-            <button class="filter-btn" data-filter="tcg">Trading Cards</button>
+
+        <div class="showcase-category">
+          <div class="showcase-cat-label" data-cat="vg">
+            <span>Video Games</span>
+          </div>
+          <div class="showcase-grid">
+            <figure class="showcase-card"><img src="assets/showcase/vg-handhelds.jpg" alt="Spread of boxed Game Boys, GBA, DS, 3DS, PSP, PS Vita, and Pokémon Game Boy titles" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/vg-nintendo.jpg" alt="Boxed SNES, N64, GameCube, Wii, Wii U, and Switch consoles with games" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/vg-playstation.jpg" alt="PlayStation 1 through PS5 consoles and games" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/vg-xbox.jpg" alt="Original Xbox through Xbox Series X, all boxed" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/vg-retro.jpg" alt="ColecoVision, Sega, Dreamcast, Virtual Boy, and more retro consoles" loading="lazy"></figure>
           </div>
         </div>
 
-        <div class="showcase-grid" id="showcase-grid">
-          <figure class="showcase-card" data-category="video-games"><img src="assets/showcase/vg-handhelds.jpg" alt="Spread of boxed Game Boys, GBA, DS, 3DS, PSP, PS Vita, and Pokémon Game Boy titles" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="video-games"><img src="assets/showcase/vg-nintendo.jpg" alt="Boxed SNES, N64, GameCube, Wii, Wii U, and Switch consoles with games" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="video-games"><img src="assets/showcase/vg-playstation.jpg" alt="PlayStation 1 through PS5 consoles and games" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="video-games"><img src="assets/showcase/vg-xbox.jpg" alt="Original Xbox through Xbox Series X, all boxed" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="video-games"><img src="assets/showcase/vg-retro.jpg" alt="ColecoVision, Sega, Dreamcast, Virtual Boy, and more retro consoles" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="tcg"><img src="assets/showcase/tcg-pokemon-holos.jpg" alt="Rare modern Pokémon holofoil cards and graded slabs" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="tcg"><img src="assets/showcase/tcg-pokemon-vintage.jpg" alt="Vintage and e-Series Pokémon cards with a graded Mewtwo" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="tcg"><img src="assets/showcase/tcg-magic.jpg" alt="Rare Magic: The Gathering singles including a graded card" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="tcg"><img src="assets/showcase/tcg-yugioh.jpg" alt="Yu-Gi-Oh! cards including PSA-graded Blue-Eyes White Dragon and Dark Magician" loading="lazy"></figure>
-          <figure class="showcase-card" data-category="tcg"><img src="assets/showcase/tcg-sealed.jpg" alt="Pokémon 151 Ultra Premium Collection, TCG Classic, and Elite Trainer Boxes" loading="lazy"></figure>
+        <div class="showcase-category">
+          <div class="showcase-cat-label" data-cat="tcg">
+            <span>Trading Cards</span>
+          </div>
+          <div class="showcase-grid">
+            <figure class="showcase-card"><img src="assets/showcase/tcg-pokemon-holos.jpg" alt="Rare modern Pokémon holofoil cards and graded slabs" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/tcg-pokemon-vintage.jpg" alt="Vintage and e-Series Pokémon cards with a graded Mewtwo" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/tcg-magic.jpg" alt="Rare Magic: The Gathering singles including a graded card" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/tcg-yugioh.jpg" alt="Yu-Gi-Oh! cards including PSA-graded Blue-Eyes White Dragon and Dark Magician" loading="lazy"></figure>
+            <figure class="showcase-card"><img src="assets/showcase/tcg-sealed.jpg" alt="Pokémon 151 Ultra Premium Collection, TCG Classic, and Elite Trainer Boxes" loading="lazy"></figure>
+          </div>
         </div>
+
       </section>
 
       <section class="inventory-band showcase-cta">
@@ -100,22 +107,10 @@
     </footer>
 
     <script>
-      // ── Filter ──────────────────────────────────────────────────────────────
-      const cards = document.querySelectorAll('.showcase-card');
-      document.getElementById('filter-tabs').addEventListener('click', e => {
-        const btn = e.target.closest('.filter-btn');
-        if (!btn) return;
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const f = btn.dataset.filter;
-        cards.forEach(c => { c.hidden = f !== 'all' && c.dataset.category !== f; });
-      });
-
-      // ── Lightbox ────────────────────────────────────────────────────────────
       const lightbox    = document.getElementById('lightbox');
       const lightboxImg = document.getElementById('lightbox-img');
 
-      document.getElementById('showcase-grid').addEventListener('click', e => {
+      document.querySelector('.showcase-section').addEventListener('click', e => {
         const card = e.target.closest('.showcase-card');
         if (!card) return;
         const img = card.querySelector('img');

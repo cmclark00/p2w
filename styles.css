@@ -1150,13 +1150,59 @@ h3 {
 
 .showcase-section {
   padding: clamp(36px, 5vw, 64px) clamp(18px, 6vw, 72px) clamp(64px, 9vw, 110px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(40px, 6vw, 72px);
 }
+
+/* ── Section label ──────────────────────────────────────────────────────── */
+
+.showcase-cat-label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.showcase-cat-label span {
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  color: var(--red);
+}
+
+.showcase-cat-label[data-cat="tcg"] span {
+  color: var(--gold);
+}
+
+.showcase-cat-label::before {
+  content: '';
+  width: 28px;
+  height: 2px;
+  background: currentColor;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.showcase-cat-label[data-cat="vg"]::before  { background: var(--red); }
+.showcase-cat-label[data-cat="tcg"]::before { background: var(--gold); }
+
+.showcase-cat-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ── Magazine grid (featured + 2×2) ────────────────────────────────────── */
 
 .showcase-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: repeat(2, clamp(150px, 18vw, 240px));
   gap: 6px;
-  margin-top: 32px;
 }
 
 .showcase-card {
@@ -1164,9 +1210,12 @@ h3 {
   padding: 0;
   position: relative;
   overflow: hidden;
-  aspect-ratio: 4 / 3;
   cursor: pointer;
   background: var(--surface-2);
+}
+
+.showcase-card:first-child {
+  grid-row: span 2;
 }
 
 .showcase-card::after {
@@ -1176,12 +1225,14 @@ h3 {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--red);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.3s ease;
   z-index: 2;
 }
+
+.showcase-cat-label[data-cat="vg"]  ~ .showcase-grid .showcase-card::after { background: var(--red); }
+.showcase-cat-label[data-cat="tcg"] ~ .showcase-grid .showcase-card::after { background: var(--gold); }
 
 .showcase-card:hover::after {
   transform: scaleX(1);
@@ -1212,17 +1263,31 @@ h3 {
     var(--surface-2);
 }
 
-@media (max-width: 920px) {
+@media (max-width: 680px) {
   .showcase-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 5px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+  }
+
+  .showcase-card:first-child {
+    grid-column: span 2;
+    grid-row: span 1;
+    aspect-ratio: 16 / 9;
+  }
+
+  .showcase-card:not(:first-child) {
+    aspect-ratio: 4 / 3;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 400px) {
   .showcase-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
+    grid-template-columns: 1fr;
+  }
+
+  .showcase-card:first-child {
+    grid-column: span 1;
+    aspect-ratio: 4 / 3;
   }
 }
 
