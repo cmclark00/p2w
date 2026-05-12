@@ -68,9 +68,78 @@
   };
   const TYPES = Object.keys(PIECES);
 
+  // ── Global leaderboard (Firebase Firestore) ──────────────────────────
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAVf2_7vqQL--vt12udlpJ-EW0BSW_EjaM",
+    authDomain: "p2w-leaderboard.firebaseapp.com",
+    projectId: "p2w-leaderboard",
+    storageBucket: "p2w-leaderboard.firebasestorage.app",
+    messagingSenderId: "900204827002",
+    appId: "1:900204827002:web:4a3950730e0e79bce246c3"
+  };
+  const MAX_SCORES = 10;
+  const BLOCKED = new Set([
+    'ASS','FUC','FUK','FCK','SHT','SHI','BCH','CNT','DCK','PSS','JIZ','CUM','TIT','SEX','HOE','PNS','POO',
+    'FAG','FGT','GAY',
+    'NIG','NGR','KKK','NZI','NAZ','JAP','JEW','SPC','KYK','WOP','CHK','SLT','RTD',
+    'KYS','DIE','SCM','RPE','MOL','PED'
+  ]);
+
+  let fb = null, fbLoading = null;
+  async function loadFirebase() {
+    if (fb) return fb;
+    if (fbLoading) return fbLoading;
+    fbLoading = (async function () {
+      const [appMod, fsMod] = await Promise.all([
+        import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js')
+      ]);
+      const app = appMod.initializeApp(FIREBASE_CONFIG);
+      fb = {
+        db: fsMod.getFirestore(app),
+        collection: fsMod.collection,
+        addDoc: fsMod.addDoc,
+        query: fsMod.query,
+        orderBy: fsMod.orderBy,
+        limit: fsMod.limit,
+        getDocs: fsMod.getDocs,
+        serverTimestamp: fsMod.serverTimestamp
+      };
+      return fb;
+    })();
+    return fbLoading;
+  }
+
+  async function submitScore(name, sc, lv, ln) {
+    const f = await loadFirebase();
+    await f.addDoc(f.collection(f.db, 'scores'), {
+      name: name, score: sc, level: lv, lines: ln, ts: f.serverTimestamp()
+    });
+  }
+
+  async function getTopScores(n) {
+    const f = await loadFirebase();
+    const q = f.query(f.collection(f.db, 'scores'), f.orderBy('score', 'desc'), f.limit(n || MAX_SCORES));
+    const snap = await f.getDocs(q);
+    return snap.docs.map(function (d) { return d.data(); });
+  }
+
+  function isValidInitials(s) {
+    if (!/^[A-Z]{3}$/.test(s)) return false;
+    if (BLOCKED.has(s)) return false;
+    return true;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   let board, current, next, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
   let ctx, nextCtx, scoreEl, levelEl, linesEl;
   let overlay;
+  let initialsMode = false;
 
   function open() {
     if (isOpen) return;
@@ -236,6 +305,7 @@
 
   function handleKey(e) {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (initialsMode) return; // form handles its own keys
     if (gameOver) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideGameOver(); startGame(); }
       return;
@@ -390,11 +460,129 @@
   function hideGameOver() {
     const m = overlay.querySelector('#kn-overlay-msg');
     m.hidden = true;
+    initialsMode = false;
   }
 
-  function showGameOver() {
-    showMessage('GAME OVER',
-      'Score: ' + score.toLocaleString() + ' &middot; Lines: ' + lines +
-      '<br><br>Press ENTER or SPACE to play again, ESC to quit.');
+  async function showGameOver() {
+    const m = overlay.querySelector('#kn-overlay-msg');
+    m.hidden = false;
+    m.innerHTML =
+      '<h3>GAME OVER</h3>' +
+      '<p class="kn-final">Score: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
+      '<p class="kn-loading">Loading leaderboard&hellip;</p>';
+
+    let top;
+    try {
+      top = await getTopScores(MAX_SCORES);
+    } catch (err) {
+      console.warn('Leaderboard fetch failed', err);
+      m.innerHTML =
+        '<h3>GAME OVER</h3>' +
+        '<p class="kn-final">Score: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
+        '<p class="kn-error">Couldn\'t reach the leaderboard. Check your connection.</p>' +
+        '<p class="kn-tip">Press ENTER to play again &middot; ESC to quit</p>';
+      return;
+    }
+
+    const qualifies = score > 0 && (
+      top.length < MAX_SCORES ||
+      score > top[top.length - 1].score
+    );
+
+    if (qualifies) showInitialsPrompt(m, top);
+    else renderLeaderboard(m, top, null);
+  }
+
+  function showInitialsPrompt(m, currentTop) {
+    initialsMode = true;
+    m.innerHTML =
+      '<h3 class="kn-newhi">NEW HIGH SCORE!</h3>' +
+      '<p class="kn-final">Score: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
+      '<form class="kn-initials-form" novalidate>' +
+        '<label for="kn-initials">Your initials</label>' +
+        '<input id="kn-initials" type="text" maxlength="3" autocomplete="off" inputmode="latin" placeholder="___">' +
+        '<p class="kn-initials-error" hidden></p>' +
+        '<div class="kn-form-actions">' +
+          '<button type="submit" class="kn-btn kn-btn--primary">SUBMIT</button>' +
+          '<button type="button" class="kn-btn kn-btn--skip">SKIP</button>' +
+        '</div>' +
+      '</form>';
+
+    const input = m.querySelector('#kn-initials');
+    const form = m.querySelector('form');
+    const err = m.querySelector('.kn-initials-error');
+    const submitBtn = m.querySelector('button[type="submit"]');
+    const skipBtn = m.querySelector('.kn-btn--skip');
+
+    setTimeout(function () { input.focus(); }, 60);
+
+    input.addEventListener('input', function (e) {
+      const cleaned = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+      if (cleaned !== e.target.value) e.target.value = cleaned;
+      err.hidden = true;
+    });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const val = (input.value || '').trim().toUpperCase();
+      if (val.length !== 3) {
+        err.textContent = 'Need exactly 3 letters.';
+        err.hidden = false;
+        input.focus();
+        return;
+      }
+      if (!isValidInitials(val)) {
+        err.textContent = 'Try a different combo.';
+        err.hidden = false;
+        input.select();
+        return;
+      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'SUBMITTING…';
+      try {
+        await submitScore(val, score, level, lines);
+      } catch (sErr) {
+        console.warn('submit failed', sErr);
+        err.textContent = 'Submit failed — try again.';
+        err.hidden = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'SUBMIT';
+        return;
+      }
+      let fresh;
+      try { fresh = await getTopScores(MAX_SCORES); }
+      catch (e) { fresh = currentTop.concat([{ name: val, score: score, level: level, lines: lines }]).sort(function(a,b){return b.score-a.score;}).slice(0, MAX_SCORES); }
+      initialsMode = false;
+      renderLeaderboard(m, fresh, { name: val, score: score });
+    });
+
+    skipBtn.addEventListener('click', function () {
+      initialsMode = false;
+      renderLeaderboard(m, currentTop, null);
+    });
+  }
+
+  function renderLeaderboard(m, scores, justAdded) {
+    let rows;
+    if (!scores || !scores.length) {
+      rows = '<tr><td colspan="3" class="kn-empty">Be the first to score!</td></tr>';
+    } else {
+      rows = scores.map(function (s, i) {
+        const isMe = justAdded && s.name === justAdded.name && s.score === justAdded.score;
+        return '<tr class="' + (isMe ? 'kn-just-added' : '') + '">' +
+          '<td class="kn-rank">' + (i + 1) + '</td>' +
+          '<td class="kn-name">' + escapeHtml(s.name) + '</td>' +
+          '<td class="kn-score">' + (s.score || 0).toLocaleString() + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+    m.innerHTML =
+      '<h3>HIGH SCORES</h3>' +
+      '<p class="kn-final">Your run: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
+      '<table class="kn-leaderboard">' +
+        '<thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+      '<p class="kn-tip">ENTER to play again &middot; ESC to quit</p>';
   }
 })();
