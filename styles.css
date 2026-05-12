@@ -1377,14 +1377,39 @@ a:focus-visible {
 
 .showcase-card img {
   position: absolute;
-  inset: 0;
+  inset: 38px 0 0 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 38px);
   display: block;
   object-fit: cover;
   object-position: center;
   transition: transform 0.45s ease, filter 0.3s ease;
 }
+
+.showcase-label {
+  position: relative;
+  z-index: 3;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--paper);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.55));
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.showcase-grid[data-cat="vg"]  .showcase-label { color: #ffd2d8; }
+.showcase-grid[data-cat="tcg"] .showcase-label { color: #ffe89a; }
 
 @media (hover: hover) {
   .showcase-grid:hover .showcase-card img {
