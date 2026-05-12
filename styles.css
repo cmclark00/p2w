@@ -1205,17 +1205,13 @@ h3 {
 
 /* ── Gallery grids ──────────────────────────────────────────────────────── */
 
-/* VG: 3 columns, last image spans 2 to fill row 2 */
+/* VG: 2 columns, last image full-width hero */
 .showcase-grid[data-cat="vg"] {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: clamp(180px, 20vw, 300px);
   gap: 6px;
   margin-top: clamp(20px, 3vw, 32px);
-}
-
-.showcase-grid[data-cat="vg"] .showcase-card:nth-child(4) {
-  grid-column: 2;
 }
 
 .showcase-grid[data-cat="vg"] .showcase-card:last-child {
