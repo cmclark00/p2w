@@ -1234,8 +1234,11 @@ h3 {
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  background: var(--surface-2);
-  border: 2px solid var(--line);
+  border-radius: 3px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--surface-2), var(--surface-2)) padding-box,
+    linear-gradient(135deg, var(--red), var(--gold)) border-box;
 }
 
 .showcase-card::after {
