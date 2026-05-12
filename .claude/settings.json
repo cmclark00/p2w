@@ -15,7 +15,12 @@
       "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\Corey Clark\\\\p2w\\\\assets\\\\mods\" -Force)",
       "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\Corey Clark\\\\p2w\\\\assets\\\\mods\" -Force)",
       "PowerShell($src = \"c:\\\\Users\\\\Corey Clark\\\\p2w\\\\assets\"; $dst = \"c:\\\\Users\\\\Corey Clark\\\\p2w\\\\assets\\\\mods\"; \"1-before\",\"1-after\",\"2-before\",\"2-after\",\"3-before\",\"3-after\",\"4-before\",\"4-after\",\"5-before\",\"5-after\",\"6-before\",\"6-after\" | ForEach-Object { Move-Item \"$src\\\\$_.jpg\" \"$dst\\\\$_.jpg\" }; Move-Item \"$src\\\\7.jpg\" \"$dst\\\\7.jpg\"; Move-Item \"$src\\\\8.jpg\" \"$dst\\\\8.jpg\"; Get-ChildItem $dst)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(where magick *)",
+      "Bash(where convert *)",
+      "Bash(python -c \"from PIL import Image; print\\('Pillow available'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python)"
     ]
   }
 }
