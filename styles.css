@@ -1213,6 +1213,12 @@ h3 {
   margin-top: clamp(20px, 3vw, 32px);
 }
 
+/* TCG photos are portrait — display as 5 upright cards in a row */
+.showcase-grid[data-cat="tcg"] {
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: auto;
+}
+
 .showcase-card {
   margin: 0;
   padding: 0;
@@ -1224,6 +1230,11 @@ h3 {
 
 .showcase-card:first-child {
   grid-row: span 2;
+}
+
+.showcase-grid[data-cat="tcg"] .showcase-card {
+  aspect-ratio: 3 / 4;
+  grid-row: auto;
 }
 
 .showcase-card::after {
@@ -1286,6 +1297,15 @@ h3 {
   .showcase-card:not(:first-child) {
     aspect-ratio: 4 / 3;
   }
+
+  .showcase-grid[data-cat="tcg"] {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .showcase-grid[data-cat="tcg"] .showcase-card:first-child {
+    grid-column: auto;
+    aspect-ratio: 3 / 4;
+  }
 }
 
 @media (max-width: 400px) {
@@ -1296,6 +1316,10 @@ h3 {
   .showcase-card:first-child {
     grid-column: span 1;
     aspect-ratio: 4 / 3;
+  }
+
+  .showcase-grid[data-cat="tcg"] {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
