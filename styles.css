@@ -92,6 +92,39 @@ a {
   height: auto;
 }
 
+.header-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(217, 31, 56, 0.1);
+  color: var(--red);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.header-phone:hover,
+.header-phone:focus-visible {
+  background: var(--red);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.header-phone svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 880px) {
+  .header-phone-number { display: none; }
+  .header-phone { padding: 8px 10px; }
+}
+
 .nav {
   display: flex;
   align-items: center;
