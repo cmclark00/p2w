@@ -989,13 +989,17 @@ h3 {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-top: 36px;
+  width: 85%;
+  margin-inline: auto;
 }
 
 .mod-card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 2px solid transparent;
+  border-radius: 3px;
   overflow: hidden;
-  background: var(--surface);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--red), var(--gold)) border-box;
   cursor: pointer;
   transition: transform 0.16s, box-shadow 0.16s;
 }
