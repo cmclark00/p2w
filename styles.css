@@ -53,11 +53,17 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 14px clamp(18px, 4vw, 54px);
-  background: rgba(245, 244, 239, 0.96);
-  border-bottom: 4px solid var(--red);
+  padding: 12px clamp(18px, 4vw, 54px);
+  background: rgba(245, 244, 239, 0.86);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 3px solid var(--red);
   color: var(--ink);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .site-header { background: rgba(245, 244, 239, 0.98); }
 }
 
 .brand img {
