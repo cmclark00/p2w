@@ -1209,9 +1209,11 @@ h3 {
 .showcase-grid[data-cat="vg"] {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: clamp(180px, 20vw, 300px);
-  gap: 6px;
+  grid-auto-rows: clamp(198px, 22vw, 330px);
+  gap: 14px;
   margin-top: clamp(20px, 3vw, 32px);
+  width: 90%;
+  margin-inline: auto;
 }
 
 .showcase-grid[data-cat="vg"] .showcase-card:last-child {
@@ -1223,7 +1225,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-auto-rows: clamp(200px, 26vw, 380px);
-  gap: 6px;
+  gap: 14px;
   margin-top: clamp(20px, 3vw, 32px);
 }
 
