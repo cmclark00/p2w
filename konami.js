@@ -30,8 +30,8 @@
   // ── Tetris definitions ───────────────────────────────────────────────
   const COLS = 10, ROWS = 20, BLOCK = 24;
   const COLORS = {
-    I: '#00d4d4', O: '#f1c84b', T: '#9c1fa6',
-    S: '#4dca47', Z: '#d91f38', J: '#315ecb', L: '#ff8c2c'
+    I: '#00ffff', O: '#ffe600', T: '#e040ff',
+    S: '#00ff66', Z: '#ff2a55', J: '#5a8eff', L: '#ffa033'
   };
   const PIECES = {
     I: [
