@@ -81,8 +81,14 @@
     overlay.innerHTML =
       '<div class="konami-modal" role="dialog" aria-label="Bulky-Tris">' +
         '<button class="konami-close" aria-label="Close">×</button>' +
-        '<h2 class="konami-title">BULKY-TRIS</h2>' +
-        '<p class="konami-sub">Whenever you play, Play 2 Win!</p>' +
+        '<div class="konami-titlebar">' +
+          '<img class="kn-bulky" src="assets/shop-header.png" alt="" aria-hidden="true">' +
+          '<div>' +
+            '<h2 class="konami-title">BULKY-TRIS</h2>' +
+            '<p class="konami-sub">Whenever you play, Play 2 Win!</p>' +
+          '</div>' +
+          '<img class="kn-bulky kn-bulky--flip" src="assets/shop-header.png" alt="" aria-hidden="true">' +
+        '</div>' +
         '<div class="konami-game">' +
           '<canvas id="kn-board" width="' + (COLS*BLOCK) + '" height="' + (ROWS*BLOCK) + '"></canvas>' +
           '<div class="konami-side">' +
@@ -275,10 +281,10 @@
   }
 
   function drawBoard() {
-    ctx.fillStyle = '#0b0b12';
+    ctx.fillStyle = '#15132a';
     ctx.fillRect(0, 0, COLS*BLOCK, ROWS*BLOCK);
     // grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1;
     for (let i = 1; i < COLS; i++) {
       ctx.beginPath();
@@ -323,14 +329,18 @@
     const px = x * BLOCK, py = y * BLOCK;
     c.fillStyle = color;
     c.fillRect(px, py, BLOCK, BLOCK);
-    // highlight
-    c.fillStyle = 'rgba(255,255,255,0.18)';
-    c.fillRect(px, py, BLOCK, 3);
-    c.fillRect(px, py, 3, BLOCK);
+    // bright highlight
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    c.fillRect(px, py, BLOCK, 4);
+    c.fillRect(px, py, 4, BLOCK);
     // shadow
-    c.fillStyle = 'rgba(0,0,0,0.28)';
-    c.fillRect(px, py + BLOCK - 3, BLOCK, 3);
-    c.fillRect(px + BLOCK - 3, py, 3, BLOCK);
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.fillRect(px, py + BLOCK - 4, BLOCK, 4);
+    c.fillRect(px + BLOCK - 4, py, 4, BLOCK);
+    // subtle inner glow ring
+    c.strokeStyle = 'rgba(255,255,255,0.15)';
+    c.lineWidth = 1;
+    c.strokeRect(px + 0.5, py + 0.5, BLOCK - 1, BLOCK - 1);
   }
 
   function drawGhost(c, x, y, color) {
@@ -341,7 +351,7 @@
   }
 
   function drawNext() {
-    nextCtx.fillStyle = '#0b0b12';
+    nextCtx.fillStyle = '#15132a';
     nextCtx.fillRect(0, 0, 96, 96);
     const s = PIECES[next.type][0];
     const size = 18;
