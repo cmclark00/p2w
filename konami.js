@@ -12,15 +12,16 @@
   let buffer = [];
   let isOpen = false;
 
+  function normKey(k) { return k.length === 1 ? k.toLowerCase() : k; }
+
   document.addEventListener('keydown', function (e) {
     if (isOpen) return;
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    buffer.push(key);
+    buffer.push(normKey(e.key));
     if (buffer.length > KONAMI.length) buffer.shift();
     if (buffer.length === KONAMI.length &&
-        KONAMI.every((k, i) => k.toLowerCase() === buffer[i])) {
+        KONAMI.every((k, i) => normKey(k) === buffer[i])) {
       buffer = [];
       open();
     }
