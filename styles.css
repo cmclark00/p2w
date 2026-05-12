@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@600;700&display=swap');
+
 :root {
   --ink: #111217;
   --surface: #181a22;
@@ -9,6 +11,9 @@
   --purple: #9c1fa6;
   --gold: #f1c84b;
   --line: rgba(255, 255, 255, 0.14);
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -19,8 +24,16 @@ body {
   margin: 0;
   color: var(--paper);
   background: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+}
+
+h1, h2, h3, .eyebrow, .nav, .button, .filter-btn, .nav-cta {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 img {
