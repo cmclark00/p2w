@@ -188,29 +188,66 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 18px;
+  padding: 12px 22px;
   border: 2px solid transparent;
-  border-radius: 6px;
-  font-weight: 900;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
   text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+  will-change: transform;
 }
 
 .button.primary {
   background: var(--red);
   color: white;
+  box-shadow: 0 6px 18px rgba(217, 31, 56, 0.32);
+}
+
+.button.primary:hover,
+.button.primary:focus-visible {
+  background: #e8324a;
+  box-shadow: 0 10px 26px rgba(217, 31, 56, 0.44);
 }
 
 .button.secondary {
   border-color: var(--line);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   color: white;
+}
+
+.button.secondary:hover,
+.button.secondary:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .button:hover,
 .button:focus-visible,
 .text-link:hover,
 .text-link:focus-visible {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.text-link {
+  transition: transform 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.text-link:hover {
+  color: #ffd96a;
+}
+
+.nav a {
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .quick-info,
