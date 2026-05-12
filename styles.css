@@ -1495,3 +1495,196 @@ a:focus-visible {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.4);
 }
+
+/* ── Sell/Trade page ────────────────────────────────────────────────────── */
+
+.sell-hero {
+  background:
+    linear-gradient(120deg, rgba(217, 31, 56, 0.18), rgba(241, 200, 75, 0.14)),
+    var(--ink);
+}
+
+.how-it-works {
+  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  background: var(--surface);
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: clamp(20px, 3vw, 32px);
+}
+
+.step {
+  position: relative;
+  padding: clamp(22px, 3vw, 32px);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.step-number {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--gold);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.step h3 {
+  margin: 0 0 8px;
+}
+
+.step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 760px) {
+  .steps-grid { grid-template-columns: 1fr; }
+}
+
+.sell-tips .tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 12px;
+}
+
+.sell-tips .tips-list li {
+  position: relative;
+  padding: 14px 18px 14px 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.sell-tips .tips-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold);
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.sell-tips .tips-list strong {
+  color: var(--paper);
+}
+
+.sell-cta {
+  background:
+    linear-gradient(90deg, rgba(217, 31, 56, 0.22), rgba(241, 200, 75, 0.16)),
+    var(--surface-2);
+}
+
+/* ── FAQ page ────────────────────────────────────────────────────────────── */
+
+.faq-hero {
+  background:
+    linear-gradient(120deg, rgba(49, 94, 203, 0.18), rgba(156, 31, 166, 0.14)),
+    var(--ink);
+}
+
+.faq-section {
+  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.faq-group-title {
+  margin: 48px 0 18px;
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  color: var(--gold);
+}
+
+.faq-group-title:first-of-type {
+  margin-top: 0;
+}
+
+.faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.faq-item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.faq-item[open] {
+  border-color: rgba(241, 200, 75, 0.4);
+  background: var(--surface-2);
+}
+
+.faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 18px 56px 18px 22px;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  position: relative;
+  color: var(--paper);
+}
+
+.faq-item summary::-webkit-details-marker { display: none; }
+
+.faq-item summary::after {
+  content: '+';
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(241, 200, 75, 0.15);
+  color: var(--gold);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 0.25s var(--ease), background 0.25s var(--ease);
+}
+
+.faq-item[open] summary::after {
+  content: '−';
+  transform: translateY(-50%) rotate(180deg);
+  background: rgba(241, 200, 75, 0.3);
+}
+
+.faq-item p {
+  margin: 0;
+  padding: 0 22px 22px;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.faq-item p a {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.faq-cta {
+  background:
+    linear-gradient(90deg, rgba(49, 94, 203, 0.2), rgba(156, 31, 166, 0.14)),
+    var(--surface-2);
+}

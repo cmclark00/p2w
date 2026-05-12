@@ -28,6 +28,7 @@
       <nav class="nav" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
+        <a href="sell-trade.html">Sell/Trade</a>
         <a href="events.html" aria-current="page">Events</a>
         <a href="repairs.html">Repairs</a>
         <a href="mods.html">Upgrades</a>
@@ -85,11 +86,15 @@
       </div>
       <div>
         <strong>Visit</strong>
-        <p>3903 Western Avenue<br>Knoxville, TN 37921</p>
+        <p>3903 Western Avenue<br>Knoxville, TN 37921<br><br>Sun 11&ndash;7 &middot; Mon&ndash;Thu 11&ndash;9<br>Fri&ndash;Sat 11&ndash;11</p>
       </div>
       <div>
         <strong>Contact</strong>
         <p><a href="tel:+18659108357">865-910-8357</a><br><a href="https://www.facebook.com/P2WGames/">Facebook</a></p>
+      </div>
+      <div>
+        <strong>More</strong>
+        <p><a href="sell-trade.html">Sell/Trade</a><br><a href="faq.html">FAQ</a><br><a href="about.html">About</a></p>
       </div>
     </footer>
 
@@ -243,9 +248,57 @@
         if (ev) downloadICS(ev);
       });
 
+      function injectEventSchema(events) {
+        const upcoming = events.filter(ev => daysUntil(ev.date) >= 0);
+        if (!upcoming.length) return;
+        const schema = upcoming.map(ev => {
+          const [h, m] = ev.time24.split(":").map(Number);
+          const startISO = `${ev.date}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00-04:00`;
+          const endISO   = `${ev.date}T${String(h+2).padStart(2,"0")}:${String(m).padStart(2,"0")}:00-04:00`;
+          return {
+            "@context": "https://schema.org",
+            "@type": "Event",
+            "name": ev.title,
+            "startDate": startISO,
+            "endDate": endISO,
+            "eventStatus": "https://schema.org/EventScheduled",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "location": {
+              "@type": "Place",
+              "name": "Play2Win Games",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "3903 Western Avenue",
+                "addressLocality": "Knoxville",
+                "addressRegion": "TN",
+                "postalCode": "37921",
+                "addressCountry": "US"
+              }
+            },
+            "description": ev.description,
+            "offers": ev.entry && ev.entry !== "TBA" ? {
+              "@type": "Offer",
+              "price": ev.entry.replace(/[^0-9.]/g, "") || "0",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock",
+              "url": ev.registerUrl || "https://www.facebook.com/P2WGames/"
+            } : undefined,
+            "organizer": {
+              "@type": "Organization",
+              "name": "Play2Win Games",
+              "url": "https://cmclark00.github.io/p2w/"
+            }
+          };
+        });
+        const script = document.createElement("script");
+        script.type = "application/ld+json";
+        script.textContent = JSON.stringify(schema);
+        document.head.appendChild(script);
+      }
+
       fetch("events.json")
         .then(r => r.json())
-        .then(data => { EVENTS = data; render(); })
+        .then(data => { EVENTS = data; render(); injectEventSchema(data); })
         .catch(() => { grid.hidden = true; empty.hidden = false; });
     </script>
     <script src="nav.js"></script>

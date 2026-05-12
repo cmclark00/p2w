@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cmclark00.github.io/p2w/sitemap.xml
