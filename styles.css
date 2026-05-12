@@ -501,7 +501,7 @@ a:focus-visible {
 
 .site-footer {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
   gap: 24px;
   padding: 34px clamp(18px, 6vw, 72px);
   background: var(--paper);
