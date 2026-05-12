@@ -1209,7 +1209,7 @@ h3 {
 .showcase-grid[data-cat="vg"] {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: clamp(120px, 13vw, 200px);
+  grid-auto-rows: clamp(180px, 20vw, 300px);
   gap: 6px;
   margin-top: clamp(20px, 3vw, 32px);
 }
