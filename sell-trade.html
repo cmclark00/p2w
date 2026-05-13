@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Sell or trade your video games, consoles, TCG singles, and collections at Play2Win Games in Knoxville, TN. Same-day cash or store credit offers.">
-    <title>Sell or Trade | Play2Win Games</title>
+    <meta name="description" content="Sell or trade video games, consoles, TCG singles, and full collections at Play2Win Games in Knoxville, TN. Same-day cash or store credit — plus a look at notable trades and rare finds that have come through the shop.">
+    <title>Sell, Trade &amp; Notable Finds | Play2Win Games</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -36,7 +36,6 @@
         <a href="events.html">Events</a>
         <a href="repairs.html">Repairs</a>
         <a href="mods.html">Upgrades</a>
-        <a href="showcase.html">Showcase</a>
         <a href="contact.html">Contact</a>
         <a class="nav-cta" href="https://playtowingames.crystalcommerce.com/">TCG Inventory</a>
       </nav>
@@ -83,6 +82,70 @@
             <h3>Strategy &amp; Memorabilia</h3>
             <p>Strategy guides, manuals, promotional items, store displays, and gaming memorabilia from any era.</p>
           </article>
+        </div>
+      </section>
+
+      <section class="showcase-section" id="showcase">
+        <div class="section-heading">
+          <p class="eyebrow">Big trades &amp; notable finds</p>
+          <h2>Some of what&rsquo;s come through.</h2>
+          <p class="lead">A taste of the collections, rare hardware, and sealed product that&rsquo;s walked in the door. Bring yours in &mdash; you might end up here.</p>
+        </div>
+
+        <div class="showcase-band" data-cat="vg">
+          <p class="showcase-band-eyebrow">Retro &amp; Modern</p>
+          <h2>Video Games &amp; Consoles</h2>
+          <p>From Game Boys to Xbox Series X &mdash; complete collections, rare hardware, and sealed product that&rsquo;s passed through the shop.</p>
+        </div>
+        <div class="showcase-grid" data-cat="vg">
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Handhelds</figcaption>
+            <img src="assets/showcase/vg-handhelds.jpg" alt="Spread of boxed Game Boys, GBA, DS, 3DS, PSP, PS Vita, and Pokémon Game Boy titles" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Nintendo</figcaption>
+            <img src="assets/showcase/vg-nintendo.jpg" alt="Boxed SNES, N64, GameCube, Wii, Wii U, and Switch consoles with games" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">PlayStation</figcaption>
+            <img src="assets/showcase/vg-playstation.jpg" alt="PlayStation 1 through PS5 consoles and games" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Xbox</figcaption>
+            <img src="assets/showcase/vg-xbox.jpg" alt="Original Xbox through Xbox Series X, all boxed" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Retro Consoles</figcaption>
+            <img src="assets/showcase/vg-retro.jpg" alt="ColecoVision, Sega, Dreamcast, Virtual Boy, and more retro consoles" loading="lazy">
+          </figure>
+        </div>
+
+        <div class="showcase-band" data-cat="tcg">
+          <p class="showcase-band-eyebrow">Singles, Sealed &amp; Graded</p>
+          <h2>Trading Card Games</h2>
+          <p>Pok&eacute;mon, Magic: The Gathering, Yu-Gi-Oh! &mdash; vintage holos, PSA-graded slabs, and sealed product collectors dream about.</p>
+        </div>
+        <div class="showcase-grid" data-cat="tcg">
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Modern Pokémon</figcaption>
+            <img src="assets/showcase/tcg-pokemon-holos.jpg" alt="Rare modern Pokémon holofoil cards and graded slabs" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Vintage Pokémon</figcaption>
+            <img src="assets/showcase/tcg-pokemon-vintage.jpg" alt="Vintage and e-Series Pokémon cards with a graded Mewtwo" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Magic: The Gathering</figcaption>
+            <img src="assets/showcase/tcg-magic.jpg" alt="Rare Magic: The Gathering singles including a graded card" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Yu-Gi-Oh!</figcaption>
+            <img src="assets/showcase/tcg-yugioh.jpg" alt="Yu-Gi-Oh! cards including PSA-graded Blue-Eyes White Dragon and Dark Magician" loading="lazy">
+          </figure>
+          <figure class="showcase-card">
+            <figcaption class="showcase-label">Sealed Product</figcaption>
+            <img src="assets/showcase/tcg-sealed.jpg" alt="Pokémon 151 Ultra Premium Collection, TCG Classic, and Elite Trainer Boxes" loading="lazy">
+          </figure>
         </div>
       </section>
 
@@ -137,6 +200,13 @@
       </section>
     </main>
 
+    <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Full image view">
+      <button class="lightbox-close" id="lightbox-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <img class="lightbox-img" id="lightbox-img" src="" alt="">
+    </div>
+
     <footer class="site-footer">
       <div>
         <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
@@ -155,6 +225,37 @@
         <p><a href="faq.html">FAQ</a><br><a href="about.html">About Us</a></p>
       </div>
     </footer>
+    <script>
+      (function () {
+        const lightbox    = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const showcaseEl  = document.querySelector('.showcase-section');
+        if (!lightbox || !showcaseEl) return;
+
+        showcaseEl.addEventListener('click', function (e) {
+          const card = e.target.closest('.showcase-card');
+          if (!card) return;
+          const img = card.querySelector('img');
+          lightboxImg.src = img.src;
+          lightboxImg.alt = img.alt;
+          lightbox.hidden = false;
+          document.body.style.overflow = 'hidden';
+        });
+
+        function closeLightbox() {
+          lightbox.hidden = true;
+          document.body.style.overflow = '';
+        }
+
+        lightbox.addEventListener('click', function (e) {
+          if (e.target === lightbox || e.target.closest('.lightbox-close')) closeLightbox();
+        });
+
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
+        });
+      })();
+    </script>
     <script src="nav.js"></script>
     <script src="konami.js" defer></script>
   </body>
