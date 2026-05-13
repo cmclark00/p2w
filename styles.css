@@ -440,6 +440,22 @@ a:focus-visible {
   gap: 16px;
 }
 
+.category-grid.category-grid--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 720px) {
+  .category-grid.category-grid--three {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .category-grid.category-grid--three {
+    grid-template-columns: 1fr;
+  }
+}
+
 .category-grid article,
 .contact-panel {
   padding: 26px;
