@@ -958,6 +958,126 @@ a:focus-visible {
     var(--surface-2);
 }
 
+/* ── Meet the repair techs ──────────────────────────────────────────────── */
+
+.repair-techs {
+  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  background: var(--surface);
+}
+
+.techs-photo-frame {
+  max-width: 880px;
+  margin: clamp(20px, 3vw, 32px) auto 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.42);
+}
+
+.techs-photo-frame img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+.techs-photo-placeholder {
+  aspect-ratio: 16 / 9;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--gold);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(217, 31, 56, 0.14), transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(49, 94, 203, 0.14), transparent 60%),
+    linear-gradient(135deg, var(--surface-2), var(--surface));
+  overflow: hidden;
+}
+
+.techs-photo-placeholder::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+.techs-photo-placeholder svg,
+.techs-photo-text {
+  position: relative;
+  z-index: 1;
+}
+
+.techs-photo-placeholder svg {
+  opacity: 0.55;
+}
+
+.techs-photo-text {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.techs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  max-width: 880px;
+  margin: clamp(24px, 4vw, 40px) auto 0;
+}
+
+.tech-card {
+  padding: clamp(22px, 3vw, 32px);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+.tech-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(241, 200, 75, 0.4);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.4);
+}
+
+.tech-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+  color: var(--paper);
+}
+
+.tech-role {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.tech-bio {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 720px) {
+  .techs-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Hamburger toggle (hidden on desktop) ───────────────────────────────── */
 
 .nav-toggle {
