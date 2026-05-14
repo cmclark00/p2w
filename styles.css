@@ -2304,6 +2304,24 @@ a:focus-visible {
   line-height: 1.65;
 }
 
+.faq-item p + p { padding-top: 0; }
+
+.faq-list-inline {
+  margin: 0;
+  padding: 0 22px 6px 44px;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.7;
+}
+
+.faq-list-inline li {
+  margin-bottom: 4px;
+}
+
+.faq-list-inline strong {
+  color: var(--paper);
+}
+
 .faq-item p a {
   color: var(--gold);
   font-weight: 700;
