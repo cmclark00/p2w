@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Submit a handheld upgrade or mod request at Play2Win Games in Knoxville, TN. IPS screens, shell swaps, button mods, and custom builds.">
+    <title>Upgrade Request | Play2Win Games</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="assets/files/intake-form.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Play2Win Games">
+    <meta property="og:title" content="Upgrade Request | Play2Win Games">
+    <meta property="og:description" content="Submit a handheld upgrade or mod request at Play2Win Games in Knoxville, TN.">
+    <meta property="og:image" content="https://cmclark00.github.io/p2w/assets/play-to-win-logo.png">
+    <meta property="og:url" content="https://cmclark00.github.io/p2w/upgrade-request.html">
+    <meta name="twitter:card" content="summary_large_image">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="Play2Win Games home">
+        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
+      </a>
+      <a class="header-phone" href="tel:+18659108357" aria-label="Call Play2Win Games at 865-910-8357">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="header-phone-number">865-910-8357</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="sell-trade.html">Sell/Trade</a>
+        <a href="events.html">Events</a>
+        <a href="repairs.html">Repairs</a>
+        <a href="mods.html" aria-current="page">Upgrades</a>
+        <a href="contact.html">Contact</a>
+        <a class="nav-cta" href="https://playtowingames.crystalcommerce.com/">TCG Inventory</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="page-hero upgrade-request-hero">
+        <p class="eyebrow">Upgrade request</p>
+        <h1>Submit your handheld for an upgrade.</h1>
+        <p class="lead">Fill out the form below and a team member will follow up to confirm parts availability and pricing before any work begins. Prefer to talk it through? Call the shop at <a href="tel:+18659108357">865-910-8357</a> or stop in.</p>
+      </section>
+
+      <section class="upgrade-form-section">
+        <div class="ptw-form-page">
+          <form class="ptw-form-card" id="ptw-intake-form" novalidate>
+
+            <!-- ── Customer Info ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                Customer info
+              </span>
+              <div class="ptw-grid-2" style="margin-bottom:12px;">
+                <div class="ptw-field">
+                  <label for="ptw-name">First &amp; last name</label>
+                  <input type="text" id="ptw-name" name="name" placeholder="Jane Smith" required />
+                </div>
+                <div class="ptw-field">
+                  <label for="ptw-phone">Phone number</label>
+                  <input type="tel" id="ptw-phone" name="phone" placeholder="(865) 555-0100" required />
+                </div>
+              </div>
+              <div class="ptw-grid-2">
+                <div class="ptw-field">
+                  <label for="ptw-email">Email <span style="color:var(--ptw-text-hint);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                  <input type="email" id="ptw-email" name="email" placeholder="jane@example.com" />
+                </div>
+                <div class="ptw-field">
+                  <label for="ptw-contact-pref">Best way to reach you</label>
+                  <select id="ptw-contact-pref" name="contact_preference">
+                    <option>Text message</option>
+                    <option>Phone call</option>
+                    <option>Email</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Device ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 18h6"/></svg>
+                Device
+              </span>
+
+              <div class="ptw-device-tabs" id="ptw-device-tabs"></div>
+              <input type="hidden" id="ptw-device-value" name="device" />
+
+              <div id="ptw-color-wrap" class="hidden">
+                <div class="ptw-field" style="margin-bottom:10px;">
+                  <label>Shell / housing color</label>
+                  <div class="ptw-color-row" id="ptw-color-row"></div>
+                  <input type="hidden" id="ptw-color-value" name="shell_color" />
+                </div>
+              </div>
+
+              <div class="ptw-grid-2" style="margin-top:10px;">
+                <div class="ptw-field">
+                  <label for="ptw-model">Serial / model variant <span style="color:var(--ptw-text-hint);font-weight:400;text-transform:none;letter-spacing:0;">(if known)</span></label>
+                  <input type="text" id="ptw-model" name="model_variant" placeholder="e.g. AGB-001, AGS-001 vs 101" />
+                </div>
+                <div class="ptw-field">
+                  <label>Device condition</label>
+                  <div class="ptw-condition-row" id="ptw-condition-row">
+                    <button type="button" class="ptw-condition-btn" data-condition="Good">Good</button>
+                    <button type="button" class="ptw-condition-btn" data-condition="Fair">Fair</button>
+                    <button type="button" class="ptw-condition-btn" data-condition="Poor">Poor</button>
+                    <button type="button" class="ptw-condition-btn" data-condition="For parts">For parts</button>
+                  </div>
+                  <input type="hidden" id="ptw-condition-value" name="condition" />
+                </div>
+              </div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Requested Upgrades ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                Requested upgrades
+              </span>
+              <p style="font-size:0.84rem;color:var(--ptw-text-muted);margin-bottom:14px;">Select a device above, then check all that apply.</p>
+
+              <div id="ptw-upgrades-panels"></div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Customization ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="13" r="2"/><circle cx="6" cy="12" r="3"/><circle cx="12" cy="19" r="2.5"/></svg>
+                Customization &amp; specifics
+              </span>
+              <div class="ptw-grid-2" style="margin-bottom:12px;">
+                <div class="ptw-field">
+                  <label for="ptw-brightness">Screen brightness preference</label>
+                  <select id="ptw-brightness" name="brightness_preference">
+                    <option>No preference</option>
+                    <option>Max brightness</option>
+                    <option>Balanced (default)</option>
+                    <option>Lower / battery-saver</option>
+                  </select>
+                </div>
+                <div class="ptw-field">
+                  <label for="ptw-buttons">Button feel preference</label>
+                  <select id="ptw-buttons" name="button_feel">
+                    <option>No preference</option>
+                    <option>Tactile / clicky</option>
+                    <option>Soft / quiet</option>
+                    <option>Stock feel</option>
+                  </select>
+                </div>
+              </div>
+              <div class="ptw-field">
+                <label for="ptw-parts">Specific color, brand, or part requests</label>
+                <input type="text" id="ptw-parts" name="part_requests" placeholder="e.g. Funnyplaying v2 IPS, Hispeedido shell in black…" />
+              </div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Notes ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Additional notes
+              </span>
+              <div class="ptw-field">
+                <label for="ptw-notes">Issues, cosmetic damage, or special instructions</label>
+                <textarea id="ptw-notes" name="notes" placeholder="e.g. Left speaker is blown, hinge is cracked, B button sticks…"></textarea>
+              </div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Drop-off date ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Drop-off
+              </span>
+              <div class="ptw-grid-2">
+                <div class="ptw-field">
+                  <label for="ptw-dropoff">Planned drop-off date <span style="color:var(--ptw-text-hint);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                  <input type="date" id="ptw-dropoff" name="dropoff_date" />
+                </div>
+              </div>
+            </div>
+
+            <hr class="ptw-divider" />
+
+            <!-- ── Authorization ── -->
+            <div class="ptw-section">
+              <span class="ptw-section-label">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Authorization
+              </span>
+              <div class="ptw-auth-notice">
+                By submitting this form I authorize Play2Win Games to perform the modifications listed above on my device.
+                I understand that mods require opening the device and may void manufacturer warranties.
+                Parts sourced by the shop are final sale. Play2Win Games is not responsible for pre-existing damage or data loss.
+                All work is subject to parts availability &mdash; a team member will contact you before any work begins.
+              </div>
+              <label class="ptw-auth-check">
+                <input type="checkbox" id="ptw-auth-check" />
+                I understand and agree to the above
+              </label>
+              <button type="submit" class="ptw-submit-btn" id="ptw-submit-btn">Submit intake form</button>
+              <p class="ptw-submit-note">A team member will contact you to confirm parts availability and pricing before any work begins.</p>
+            </div>
+
+            <!-- Success / Error feedback -->
+            <div class="ptw-success" id="ptw-success">
+              <strong>Form submitted!</strong>
+              Thanks! The team will follow up to confirm parts availability and pricing.
+            </div>
+            <div class="ptw-error" id="ptw-error">
+              <strong>Something went wrong.</strong>
+              <span class="ptw-error-body">Please try again or give us a call at (865) 910-8357.</span>
+            </div>
+
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <img src="assets/play-to-win-logo.png" alt="Play To Win Games">
+        <p>Whenever you play, Play 2 Win!</p>
+      </div>
+      <div>
+        <strong>Visit</strong>
+        <p>3903 Western Avenue<br>Knoxville, TN 37921<br><br>Sun 11&ndash;7 &middot; Mon&ndash;Thu 11&ndash;9<br>Fri&ndash;Sat 11&ndash;11</p>
+      </div>
+      <div>
+        <strong>Contact</strong>
+        <p><a href="tel:+18659108357">865-910-8357</a><br><a href="https://www.facebook.com/P2WGames/">Facebook</a></p>
+      </div>
+      <div>
+        <strong>More</strong>
+        <p><a href="sell-trade.html">Sell/Trade</a><br><a href="faq.html">FAQ</a><br><a href="team.html">Team</a><br><a href="about.html">About</a></p>
+      </div>
+    </footer>
+    <script src="nav.js"></script>
+    <script src="konami.js" defer></script>
+    <script src="assets/files/intake-form.js"></script>
+  </body>
+</html>

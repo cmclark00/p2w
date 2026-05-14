@@ -986,6 +986,19 @@ a:focus-visible {
     var(--surface-2);
 }
 
+/* ── Upgrade request page ───────────────────────────────────────────────── */
+
+.upgrade-request-hero {
+  background:
+    linear-gradient(120deg, rgba(217, 31, 56, 0.18), rgba(241, 200, 75, 0.14), rgba(49, 94, 203, 0.18)),
+    var(--ink);
+}
+
+.upgrade-form-section {
+  padding: clamp(36px, 5vw, 72px) clamp(18px, 6vw, 72px) clamp(48px, 7vw, 96px);
+  background: var(--ink);
+}
+
 /* ── Repair pricing list ────────────────────────────────────────────────── */
 
 .pricing {
