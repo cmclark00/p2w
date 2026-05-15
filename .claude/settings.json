@@ -20,7 +20,14 @@
       "Bash(where convert *)",
       "Bash(python -c \"from PIL import Image; print\\('Pillow available'\\)\")",
       "Bash(python -c ' *)",
-      "Bash(python)"
+      "Bash(python)",
+      "Bash(python -)",
+      "Bash(rm _orig_logo.png _orig_bulky.png)",
+      "Bash(gh run *)",
+      "Bash(curl -s \"https://api.github.com/repos/cmclark00/p2w/actions/workflows\")",
+      "Bash(curl -s \"https://api.github.com/repos/cmclark00/p2w/actions/workflows/277642889/runs?per_page=3\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://cmclark00.github.io/p2w/upgrade-request.html\")",
+      "Bash(curl -s \"https://cmclark00.github.io/p2w/events.html\")"
     ]
   }
 }
