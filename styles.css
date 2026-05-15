@@ -2328,19 +2328,25 @@ a:focus-visible {
   color: var(--gold);
 }
 
-.faq-group-title:first-of-type {
+.faq-col > .faq-group-title:first-child {
   margin-top: 0;
+}
+
+.faq-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: clamp(28px, 4vw, 56px);
 }
 
 .faq-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
   gap: 10px;
 }
 
-@media (max-width: 720px) {
-  .faq-list { grid-template-columns: 1fr; }
+@media (max-width: 820px) {
+  .faq-columns { grid-template-columns: 1fr; gap: 0; }
+  .faq-col + .faq-col .faq-group-title:first-child { margin-top: 48px; }
 }
 
 .faq-item {
