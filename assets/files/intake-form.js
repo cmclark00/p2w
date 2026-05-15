@@ -8,7 +8,7 @@
      https://formspree.io
    ============================================ */
 
-const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xzdolgwg';
+const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xaqvrbjn';
 
 /* ------ Device & upgrade data ------ */
 
