@@ -35,6 +35,10 @@
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Horizontal page gutter that also centers content within a max width
+     on large screens (keeps full-bleed backgrounds edge-to-edge). */
+  --gutter: var(--page-x);
+  --page-x: max(var(--gutter), calc((100% - 1280px) / 2));
 }
 
 * {
@@ -159,11 +163,11 @@ a {
 }
 
 .hero {
-  min-height: 720px;
+  min-height: clamp(460px, 64vh, 600px);
   position: relative;
   display: grid;
   align-items: end;
-  padding: clamp(80px, 12vw, 140px) clamp(18px, 6vw, 72px) 64px;
+  padding: clamp(64px, 9vw, 104px) var(--page-x) 56px;
   overflow: hidden;
 }
 
@@ -216,23 +220,23 @@ h3 {
 }
 
 h1 {
-  max-width: 920px;
-  font-size: clamp(2.35rem, 7vw, 5.8rem);
+  max-width: 860px;
+  font-size: clamp(2.1rem, 5vw, 4.2rem);
 }
 
 h2 {
-  font-size: clamp(1.8rem, 4vw, 3.4rem);
+  font-size: clamp(1.55rem, 3vw, 2.55rem);
 }
 
 h3 {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
 }
 
 .lead {
-  max-width: 720px;
-  margin: 22px 0 0;
+  max-width: 680px;
+  margin: 20px 0 0;
   color: var(--muted);
-  font-size: clamp(1rem, 2.1vw, 1.3rem);
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
 }
 
 .hero-actions,
@@ -316,7 +320,7 @@ a:focus-visible {
 .inventory-band,
 .contact-grid,
 .page-hero {
-  padding-inline: clamp(18px, 6vw, 72px);
+  padding-inline: var(--page-x);
 }
 
 .quick-info {
@@ -367,7 +371,7 @@ a:focus-visible {
   grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
   gap: clamp(28px, 5vw, 72px);
   align-items: center;
-  padding-block: clamp(64px, 9vw, 110px);
+  padding-block: clamp(52px, 7vw, 84px);
 }
 
 .about-story {
@@ -426,7 +430,7 @@ a:focus-visible {
 }
 
 .categories {
-  padding-block: clamp(64px, 9vw, 110px);
+  padding-block: clamp(52px, 7vw, 84px);
 }
 
 .section-heading {
@@ -519,7 +523,7 @@ a:focus-visible {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
   gap: 24px;
-  padding: 34px clamp(18px, 6vw, 72px);
+  padding: 34px var(--page-x);
   background: var(--paper);
   color: var(--ink);
   border-top: 4px solid var(--blue);
@@ -540,7 +544,7 @@ a:focus-visible {
 /* ── Map embed ──────────────────────────────────────────────────────────── */
 
 .map-section {
-  padding: 0 clamp(18px, 6vw, 72px) clamp(48px, 8vw, 84px);
+  padding: 0 var(--page-x) clamp(48px, 8vw, 84px);
 }
 
 .map-embed {
@@ -569,7 +573,7 @@ a:focus-visible {
 }
 
 .events-section {
-  padding: clamp(48px, 7vw, 90px) clamp(18px, 6vw, 72px);
+  padding: clamp(48px, 7vw, 90px) var(--page-x);
 }
 
 .events-controls {
@@ -817,7 +821,7 @@ a:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 28px;
-  padding: clamp(38px, 6vw, 66px) clamp(18px, 6vw, 72px);
+  padding: clamp(38px, 6vw, 66px) var(--page-x);
   background:
     linear-gradient(90deg, rgba(49, 94, 203, 0.28), rgba(156, 31, 166, 0.18)),
     var(--surface-2);
@@ -860,7 +864,7 @@ a:focus-visible {
 }
 
 .gallery-section {
-  padding: clamp(64px, 9vw, 110px) clamp(18px, 6vw, 72px);
+  padding: clamp(52px, 7vw, 84px) var(--page-x);
 }
 
 .gallery-grid {
@@ -1001,7 +1005,7 @@ a:focus-visible {
 }
 
 .inquiry-form-section {
-  padding: clamp(36px, 5vw, 72px) clamp(18px, 6vw, 72px) clamp(60px, 9vw, 110px);
+  padding: clamp(36px, 5vw, 72px) var(--page-x) clamp(60px, 9vw, 110px);
   background: var(--surface);
 }
 
@@ -1084,14 +1088,14 @@ a:focus-visible {
 }
 
 .upgrade-form-section {
-  padding: clamp(36px, 5vw, 72px) clamp(18px, 6vw, 72px) clamp(48px, 7vw, 96px);
+  padding: clamp(36px, 5vw, 72px) var(--page-x) clamp(42px, 6vw, 76px);
   background: var(--ink);
 }
 
 /* ── Repair pricing list ────────────────────────────────────────────────── */
 
 .pricing {
-  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  padding: clamp(42px, 6vw, 76px) var(--page-x);
   background: var(--ink);
 }
 
@@ -1195,7 +1199,7 @@ a:focus-visible {
 /* ── Meet the repair techs ──────────────────────────────────────────────── */
 
 .repair-techs {
-  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  padding: clamp(42px, 6vw, 76px) var(--page-x);
   background: var(--surface);
 }
 
@@ -1321,7 +1325,7 @@ a:focus-visible {
 }
 
 .team-section {
-  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  padding: clamp(42px, 6vw, 76px) var(--page-x);
 }
 
 .team-section--owners {
@@ -1906,7 +1910,7 @@ a:focus-visible {
 }
 
 .showcase-section {
-  padding: 0 clamp(18px, 6vw, 72px) clamp(64px, 9vw, 110px);
+  padding: 0 var(--page-x) clamp(52px, 7vw, 84px);
   display: flex;
   flex-direction: column;
 }
@@ -1914,8 +1918,8 @@ a:focus-visible {
 /* ── Category band ──────────────────────────────────────────────────────── */
 
 .showcase-band {
-  margin-inline: calc(-1 * clamp(18px, 6vw, 72px));
-  padding: clamp(28px, 4vw, 48px) clamp(18px, 6vw, 72px);
+  margin-inline: calc(-1 * var(--page-x));
+  padding: clamp(28px, 4vw, 48px) var(--page-x);
   border-bottom: 1px solid var(--line);
 }
 
@@ -2220,7 +2224,7 @@ a:focus-visible {
 }
 
 .how-it-works {
-  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  padding: clamp(42px, 6vw, 76px) var(--page-x);
   background: var(--surface);
 }
 
@@ -2313,7 +2317,7 @@ a:focus-visible {
 }
 
 .faq-section {
-  padding: clamp(48px, 7vw, 96px) clamp(18px, 6vw, 72px);
+  padding: clamp(42px, 6vw, 76px) var(--page-x);
   max-width: 980px;
   margin: 0 auto;
 }
