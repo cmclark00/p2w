@@ -2318,7 +2318,7 @@ a:focus-visible {
 
 .faq-section {
   padding: clamp(42px, 6vw, 76px) var(--page-x);
-  max-width: 980px;
+  max-width: 1160px;
   margin: 0 auto;
 }
 
@@ -2334,7 +2334,13 @@ a:focus-visible {
 
 .faq-list {
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .faq-list { grid-template-columns: 1fr; }
 }
 
 .faq-item {
