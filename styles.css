@@ -38,7 +38,7 @@
   /* Horizontal page gutter — always present on both edges. Big screens
      get extra centering padding so content caps near ~1280px. The
      22px / 5vw floor guarantees padding can never collapse to zero. */
-  --page-x: max(22px, 5vw, calc((100% - 1280px) / 2));
+  --page-x: max(22px, 5vw, calc((100% - 1500px) / 2));
 }
 
 * {
