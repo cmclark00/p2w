@@ -240,7 +240,7 @@
         const list = EVENTS
           .filter(ev => {
             const days = daysUntil(ev.date);
-            return days >= 0 && days <= 14 && (activeFilter === "all" || ev.game === activeFilter);
+            return days >= 0 && days <= 7 && (activeFilter === "all" || ev.game === activeFilter);
           })
           .sort((a, b) => new Date(a.date) - new Date(b.date));
         grid.innerHTML = list.map(renderCard).join("");
