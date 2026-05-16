@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@600;700&display=swap');
+/* Fonts are loaded via <link rel="preconnect"> + <link> in each page's
+   <head> (faster than @import — parallel fetch instead of a serial chain). */
 
 /* Scroll-reveal animation (disabled if user prefers reduced motion) */
 .reveal {
