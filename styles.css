@@ -2465,7 +2465,7 @@ h3 {
 
 /* ── Legal / long-form prose (privacy policy etc.) ──────────────────────── */
 .legal {
-  max-width: 1080px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: clamp(36px, 5vw, 64px) var(--page-x) clamp(56px, 8vw, 96px);
   color: var(--muted);
