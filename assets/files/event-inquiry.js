@@ -7,7 +7,7 @@
    with a dedicated Formspree form if desired.
    ============================================ */
 
-const EVENT_FORMSPREE_ENDPOINT = 'https://formspree.io/f/xaqvrbjn';
+const EVENT_FORMSPREE_ENDPOINT = 'https://formspree.io/f/xjglnaew';
 
 function initEventInquiryForm() {
   const form = document.getElementById('ptw-event-form');
