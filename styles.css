@@ -71,6 +71,33 @@ a {
   color: inherit;
 }
 
+/* Skip-to-content link — hidden until keyboard-focused (WCAG 2.4.1) */
+.skip-link {
+  position: absolute;
+  left: 10px;
+  top: -56px;
+  z-index: 1000;
+  padding: 10px 18px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  border-radius: 0 0 8px 8px;
+  transition: top 0.16s var(--ease);
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+main[tabindex]:focus {
+  outline: none;
+}
+
 .site-header {
   position: sticky;
   top: 0;
@@ -290,11 +317,8 @@ h3 {
 }
 
 .button:hover,
-.button:focus-visible,
-.text-link:hover,
-.text-link:focus-visible {
+.text-link:hover {
   transform: translateY(-2px);
-  outline: none;
 }
 
 .text-link {
@@ -309,10 +333,18 @@ h3 {
   transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
 
-a:focus-visible {
-  outline: 2px solid var(--gold);
+/* Visible keyboard-focus indicator for every interactive element.
+   Gold reads strongly on the dark UI; blue on the light header/footer
+   where a gold ring would wash out against the cream background. */
+:focus-visible {
+  outline: 3px solid var(--gold);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 3px;
+}
+
+.site-header :focus-visible,
+.site-footer :focus-visible {
+  outline-color: var(--blue);
 }
 
 .quick-info,
@@ -1790,7 +1822,6 @@ a:focus-visible {
 .mod-card:focus-visible {
   transform: translateY(-3px);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
-  outline: none;
 }
 
 .mod-images {
@@ -2516,7 +2547,6 @@ a:focus-visible {
 .konami-close:focus-visible {
   background: var(--red);
   border-color: var(--red);
-  outline: none;
   transform: scale(1.05);
 }
 
