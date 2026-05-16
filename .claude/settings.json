@@ -37,7 +37,11 @@
       "Bash(python -c \"import json;d=json.load\\(open\\('events.json'\\)\\);print\\(f'{len\\(d\\)} events; sample keys:', list\\(d[0].keys\\(\\)\\) if d else 'EMPTY'\\)\")",
       "Bash(grep -rl \"shop-header.jpg\" --include=\"*.html\" --include=\"*.css\" --include=\"*.js\" .)",
       "Bash(cd \"c:/Users/Corey Clark/p2w\" && ls /c/Windows/Fonts/arialbd.ttf /c/Windows/Fonts/ariblk.ttf /c/Windows/Fonts/arial.ttf 2>&1 | head)",
-      "Read(//c/Windows/Fonts/**)"
+      "Read(//c/Windows/Fonts/**)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' __TRACKED_VAR__/assets/fonts/__TRACKED_VAR__)",
+      "Bash(curl -s __TRACKED_VAR__/styles.css)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' __TRACKED_VAR__/__TRACKED_VAR__)",
+      "Bash(curl -s __TRACKED_VAR__/__TRACKED_VAR__)"
     ]
   }
 }
