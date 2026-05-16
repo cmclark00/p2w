@@ -541,6 +541,28 @@ a:focus-visible {
   color: var(--ink);
 }
 
+.footer-credit {
+  grid-column: 1 / -1;
+  margin: 14px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid rgba(17, 18, 23, 0.12);
+  text-align: center;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  color: #6b6e75;
+}
+
+.footer-credit a {
+  color: #4f5159;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.18s var(--ease);
+}
+
+.footer-credit a:hover {
+  color: var(--red);
+}
+
 /* ── Map embed ──────────────────────────────────────────────────────────── */
 
 .map-section {
