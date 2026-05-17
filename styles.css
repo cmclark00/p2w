@@ -631,6 +631,21 @@ h3 {
   color: var(--red);
 }
 
+/* Footer: compact 2-up on phones/tablets instead of a tall single stack */
+@media (max-width: 760px) {
+  .site-footer {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 16px;
+    padding: 26px var(--page-x) 28px;
+  }
+  .site-footer img { width: min(150px, 50%); }
+  .footer-credit { margin-top: 6px; padding-top: 14px; }
+}
+
+@media (max-width: 440px) {
+  .site-footer { grid-template-columns: 1fr; gap: 16px; }
+}
+
 /* ── Map embed ──────────────────────────────────────────────────────────── */
 
 .map-section {
@@ -1756,8 +1771,7 @@ h3 {
   .quick-info,
   .split-section,
   .about-story,
-  .contact-grid,
-  .site-footer {
+  .contact-grid {
     grid-template-columns: 1fr;
   }
 
