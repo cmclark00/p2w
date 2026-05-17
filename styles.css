@@ -235,6 +235,7 @@ main[tabindex]:focus {
 .hero-media {
   position: absolute;
   inset: 0;
+  background: var(--ink);
 }
 
 .hero-media::after {
