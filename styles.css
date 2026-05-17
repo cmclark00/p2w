@@ -1784,6 +1784,20 @@ h3 {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  /* Stacked single-column: show 3 distinct cards on the page background
+     instead of one undifferentiated grey slab. */
+  .quick-info {
+    background: var(--ink);
+    border-block: 0;
+    gap: 12px;
+    padding: clamp(28px, 7vw, 40px) var(--page-x);
+  }
+
+  .quick-info article {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
 }
 
 /* ── Phone: hamburger replaces inline nav ───────────────────────────────── */
