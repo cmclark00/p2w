@@ -591,16 +591,30 @@ h3 {
 .site-footer {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 18px 28px;
-  padding: 24px var(--page-x);
+  align-items: start;
+  gap: 14px 28px;
+  padding: 18px var(--page-x);
   background: var(--paper);
   color: var(--ink);
   border-top: 4px solid var(--blue);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 .site-footer img {
-  width: min(170px, 100%);
+  width: min(132px, 100%);
+  margin-bottom: 4px;
+}
+
+.site-footer strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Kill the browser's default ~1em top/bottom <p> margin inside each
+   column — it was padding the whole footer out vertically. */
+.site-footer div p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .site-footer p {
@@ -639,16 +653,16 @@ h3 {
 @media (max-width: 760px) {
   .site-footer {
     grid-template-columns: 1fr 1fr;
-    gap: 16px 18px;
-    padding: 20px var(--page-x) 22px;
-    font-size: 0.88rem;
+    gap: 12px 16px;
+    padding: 14px var(--page-x) 16px;
+    font-size: 0.86rem;
   }
   .site-footer > div:first-child { display: none; }
-  .footer-credit { margin-top: 4px; padding-top: 12px; }
+  .footer-credit { margin-top: 2px; padding-top: 10px; }
 }
 
 @media (max-width: 440px) {
-  .site-footer { gap: 14px 16px; }
+  .site-footer { gap: 10px 14px; }
 }
 
 /* ── Map embed ──────────────────────────────────────────────────────────── */
