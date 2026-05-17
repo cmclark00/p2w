@@ -57,7 +57,9 @@
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" status -s)",
       "Bash(gh auth *)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" status -sb)",
-      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline @{u}..)"
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline @{u}..)",
+      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: iOS safe-area + cross-browser invariants, vault remote noted *)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" push)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
