@@ -590,15 +590,16 @@ h3 {
 .site-footer {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 24px;
-  padding: 34px var(--page-x);
+  gap: 18px 28px;
+  padding: 24px var(--page-x);
   background: var(--paper);
   color: var(--ink);
   border-top: 4px solid var(--blue);
+  font-size: 0.92rem;
 }
 
 .site-footer img {
-  width: min(270px, 100%);
+  width: min(170px, 100%);
 }
 
 .site-footer p {
@@ -611,11 +612,11 @@ h3 {
 
 .footer-credit {
   grid-column: 1 / -1;
-  margin: 14px 0 0;
-  padding-top: 18px;
+  margin: 8px 0 0;
+  padding-top: 14px;
   border-top: 1px solid rgba(17, 18, 23, 0.12);
   text-align: center;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   letter-spacing: 0.02em;
   color: #6b6e75;
 }
@@ -631,19 +632,22 @@ h3 {
   color: var(--red);
 }
 
-/* Footer: compact 2-up on phones/tablets instead of a tall single stack */
+/* Footer: compact 2-up on phones/tablets instead of a tall single stack.
+   The logo is dropped here — it already sits in the sticky header, so
+   repeating it just makes the footer needlessly tall. */
 @media (max-width: 760px) {
   .site-footer {
     grid-template-columns: 1fr 1fr;
-    gap: 18px 16px;
-    padding: 26px var(--page-x) 28px;
+    gap: 16px 18px;
+    padding: 20px var(--page-x) 22px;
+    font-size: 0.88rem;
   }
-  .site-footer img { width: min(150px, 50%); }
-  .footer-credit { margin-top: 6px; padding-top: 14px; }
+  .site-footer > div:first-child { display: none; }
+  .footer-credit { margin-top: 4px; padding-top: 12px; }
 }
 
 @media (max-width: 440px) {
-  .site-footer { grid-template-columns: 1fr; gap: 16px; }
+  .site-footer { gap: 14px 16px; }
 }
 
 /* ── Map embed ──────────────────────────────────────────────────────────── */
@@ -1807,7 +1811,18 @@ h3 {
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0;
+    gap: 0 8px;
+    padding: 8px clamp(14px, 4vw, 22px);
+    /* Solid, not translucent: the semi-transparent cream + backdrop blur
+       rendered as a murky gray bar over the dark hero on mobile. */
+    background: var(--paper);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  }
+
+  .brand img {
+    width: min(190px, 46vw);
   }
 
   .nav-toggle {
