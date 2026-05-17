@@ -91,12 +91,16 @@ Both via **Formspree** (endpoints are public client-side by design):
 
 - `assets/team/*.jpg` photos + manager/owner bios on `team.html`.
 - `assets/repair-techs.jpg` + Keith Stevens' bio on `repairs.html`.
-- `assets/showcase/ttl-collection.jpg` + `ttl-animal-crossing.jpg` on
-  `sell-trade.html`.
 - About-page copy rewrite (owner direction needed).
-- `mods/` + `showcase/` photos are being re-shot; re-run image optimization on
-  the new ones (resize ≤1600px long edge, ~q82) — original optimization skipped
-  them deliberately.
+- **All `mods/` + `showcase/` photos were deleted** (being re-shot; saved
+  ~50 MB). Every card on `mods.html` and `sell-trade.html` now shows the
+  standard placeholder, with the original `<img>` preserved in an HTML
+  comment right below it. To restore: drop the new photo into
+  `assets/mods/` or `assets/showcase/`, delete that card's
+  `.mod-placeholder` / `.showcase-photo-placeholder` div, and uncomment
+  the `<img>`. **Optimize the new shots first: resize ≤1600px long edge,
+  ~q82.** (Includes the never-shot `ttl-collection.jpg` +
+  `ttl-animal-crossing.jpg` on `sell-trade.html`.)
 
 ## Notes
 
