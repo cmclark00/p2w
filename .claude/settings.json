@@ -41,7 +41,27 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}' __TRACKED_VAR__/assets/fonts/__TRACKED_VAR__)",
       "Bash(curl -s __TRACKED_VAR__/styles.css)",
       "Bash(curl -s -o /dev/null -w '%{http_code}' __TRACKED_VAR__/__TRACKED_VAR__)",
-      "Bash(curl -s __TRACKED_VAR__/__TRACKED_VAR__)"
+      "Bash(curl -s __TRACKED_VAR__/__TRACKED_VAR__)",
+      "Bash(cd \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" 2>/dev/null && pwd && echo \"=== tree \\(depth 3\\) ===\" && find . -maxdepth 3 -not -path '*/\\\\.git/*' 2>/dev/null | sort && echo \"\" && echo \"=== hidden/dotfiles at root ===\" && ls -la 2>/dev/null)",
+      "Read(//c/Users/Corey Clark/Documents/p2w_site/**)",
+      "Bash(find \"/c/Users/Corey Clark/AppData/Local/club.refactoring.tolaria\" \"/c/Users/Corey Clark/AppData/Local/Tolaria\" \"/c/Users/Corey Clark/AppData/Roaming/com.tolaria.app\" -maxdepth 5 -type f \\\\\\( -name \"*.md\" -o -iname \"*agent*\" -o -iname \"*doc*\" \\\\\\) 2>/dev/null | grep -vi cache | head -40)",
+      "Read(//c/Users/Corey Clark/AppData/Local/club.refactoring.tolaria/**)",
+      "Read(//c/Users/Corey Clark/AppData/Local/Tolaria/agent-docs/**)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" add -A)",
+      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Build Play2Win second brain: project hub, services, runbook, worklog *)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -2)",
+      "Bash(ls \"C:\\\\Users\\\\Corey Clark\\\\.claude\\\\projects\\\\c--Users-Corey-Clark-p2w\\\\memory\\\\\" 2>/dev/null; echo \"---\"; test -f \"C:\\\\Users\\\\Corey Clark\\\\.claude\\\\projects\\\\c--Users-Corey-Clark-p2w\\\\MEMORY.md\" && echo \"MEMORY.md exists\" || echo \"no MEMORY.md\")",
+      "Read(//c/Users/Corey Clark/.claude/projects/c--Users-Corey-Clark-p2w/memory\" 2>/dev/**)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" branch --show-current)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" remote -v)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" status -s)",
+      "Bash(gh auth *)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" status -sb)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline @{u}..)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Corey Clark\\Documents\\p2w_site",
+      "C:\\Users\\Corey Clark\\.claude\\projects\\c--Users-Corey-Clark-p2w"
     ]
   }
 }
