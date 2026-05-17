@@ -9,11 +9,70 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
   `.github/workflows/deploy.yml` (Pages source must be set to "GitHub Actions").
   It triggers on push to `main`, after the events-sync workflow completes
   (`workflow_run`), and manually.
-- **Migrating to:** GoDaddy hosting at **play2wingames.com**.
-  ⚠️ **At cutover**, find/replace `https://cmclark00.github.io/p2w/` →
-  `https://play2wingames.com/` across: canonical tags, `og:url`, `og:image`,
-  `sitemap.xml`, `robots.txt`, JSON-LD `url`/`image`, and the privacy effective
-  date. One pass, all pages.
+- **Migrating to:** GoDaddy hosting at **play2wingames.com**, and the repo
+  transfers to the shop's GitHub. See **Migration runbook** below for the
+  full step-by-step.
+
+## Migration runbook (Play2Win handoff — do at cutover)
+
+Migration is three independent things people lump together: the **repo**, the
+**connected services**, and the **hosting**. Do them in order. Items marked
+🔑 can only be done by the account owner (Corey / shop), not from the codebase.
+
+### Phase 1 — Transfer the repo
+
+- 🔑 GitHub → repo **Settings → General → Danger Zone → Transfer ownership**,
+  send `cmclark00/p2w` to the Play2Win account/org. Preserves history; GitHub
+  auto-redirects the old URL so nothing breaks mid-flight.
+- Requires repo-owner role + push access to the destination.
+- Actions secrets *do* carry over on transfer, but rotate them anyway under
+  the shop's control (Phase 2) — don't rely on inherited secrets.
+- `WEBSITE-AGREEMENT.md` is git-ignored, so it does **not** travel with the
+  repo (intended — signed copy kept privately, never committed).
+
+### Phase 2 — Move connected services to the shop's accounts
+
+These are independent of GitHub and owned by Corey's accounts today:
+
+| Service | Powers | Action |
+|---|---|---|
+| Google Calendar + service account | `sync-events.yml` → `events.json` | 🔑 Reissue a service account under the **shop's** Google account, share the shop calendar to it, reset repo secrets `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_CALENDAR_ID`. |
+| Firebase (`p2w-leaderboard`) | Konami leaderboard | 🔑 Add shop's Google account as Owner on the Firebase project, remove Corey's. Config in `konami.js` is public by design — no code change. Keep the locked Firestore rules. |
+| Formspree (`xaqvrbjn`, `xjglnaew`) | Upgrade + event-inquiry forms | 🔑 Recreate both forms under the shop's Formspree account → **new endpoint IDs** → update them in `assets/files/intake-form.js` and `event-inquiry.html`. |
+| Domain `play2wingames.com` | — | 🔑 Confirm it's in the shop's GoDaddy account. |
+
+### Phase 3 — Hosting cutover (Pages → GoDaddy)
+
+GoDaddy hosting is **not** GitHub Pages, so `deploy.yml` stops being the
+deploy path.
+
+- **Decision — how files reach GoDaddy:** no-build static site, so options are
+  (a) manual cPanel/File-Manager upload, (b) SFTP, or (c) an FTP-deploy GitHub
+  Action on push to `main`. **(c) recommended** — keeps the current
+  "push = live" workflow. (Workflow file not yet written; can be staged with
+  GoDaddy creds as repo secrets.)
+- **URL sweep — one pass, all files.** Replace
+  `https://cmclark00.github.io/p2w/` → `https://play2wingames.com/` in: all
+  HTML files (canonical, `og:url`, `og:image`, JSON-LD `url`/`image`),
+  `sitemap.xml`, `robots.txt`, and the privacy.html effective/updated date.
+  As of this writing: **57 occurrences across 13 HTML files + sitemap.xml +
+  robots.txt**. ⚠️ **Exclude `.claude/settings.json`** — local tooling
+  config, not part of the site, never committed.
+- 🔑 DNS/SSL at GoDaddy: point domain at hosting (usually auto-wired when
+  domain + hosting are both GoDaddy), enable the free SSL cert, set a
+  www↔non-www redirect so only one canonical host is live.
+- After verified, turn GitHub Pages off (or keep as a private staging mirror).
+
+### Phase 4 — Verify
+
+`play2wingames.com` loads over HTTPS · submit **both** forms and confirm they
+hit the shop inbox · leaderboard reads + writes · let the events cron run once
+and confirm `events.json` updates · re-run Lighthouse + Google Rich Results on
+the new URLs.
+
+> Pre-stage option: the URL sweep can be made a single commit on a `cutover`
+> branch (merge when DNS is ready) and the FTP-deploy workflow added ahead of
+> time, so cutover day is a ~5-minute flip. Not done yet — deferred by owner.
 
 ## Pages
 
