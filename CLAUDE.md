@@ -137,6 +137,21 @@ Both via **Formspree** (endpoints are public client-side by design):
 
 - Single `styles.css`. Design tokens + `--page-x` (gutter that also centers
   content at ~1500px) in `:root`.
+- **iOS safe-area:** every page except `404.html` has
+  `viewport-fit=cover`. `--page-x` folds `env(safe-area-inset-left/right)`
+  into its `max()`; header (base + mobile) and footer (base + mobile) carry
+  `env(safe-area-inset-*)` top/side/bottom insets. All additive via
+  `calc()`/`max()` so `env()` = `0px` off-iPhone → byte-identical layout
+  elsewhere. **Don't strip the `env()`** — it's the notch/home-bar fix; the
+  full-bleed `.showcase-band` re-pads with the same `--page-x` so it stays
+  self-consistent.
+- **Cross-browser (verified safe — don't "fix" these):** `events.html`
+  builds dates with the ISO `T` separator (`dateStr + "T00:00:00"`), which
+  is Safari/Firefox-safe — never change to space-separated. Scroll-reveal is
+  progressive enhancement: `nav.js` *adds* the `.reveal` (opacity:0) class
+  and early-returns if `IntersectionObserver`/reduced-motion — so JS-off or
+  old browsers show content. Don't put `.reveal` in the HTML.
+  Perplexity Comet / Arc / Dia are Chromium — nothing engine-specific.
 - **Self-hosted fonts** — variable woff2 in `assets/fonts/`
   (`inter-latin`, `inter-latin-ext`, `spacegrotesk-latin`, `spacegrotesk-latin-ext`);
   `@font-face` block at top of `styles.css`. No Google Fonts requests anywhere
