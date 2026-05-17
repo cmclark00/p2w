@@ -588,47 +588,76 @@ h3 {
   text-align: right;
 }
 
+/* Compact single-band footer: brand on the left, meta + links on the
+   right, thin credit strip below. No tall <br> link columns. */
 .site-footer {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  align-items: start;
-  gap: 14px 28px;
-  padding: 18px var(--page-x);
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 32px;
+  row-gap: 10px;
+  padding: 14px var(--page-x);
   background: var(--paper);
   color: var(--ink);
   border-top: 4px solid var(--blue);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
 }
 
-.site-footer img {
-  width: min(132px, 100%);
-  margin-bottom: 4px;
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.site-footer strong {
-  display: block;
-  margin-bottom: 4px;
+.footer-brand img {
+  width: 108px;
+  height: auto;
 }
 
-/* Kill the browser's default ~1em top/bottom <p> margin inside each
-   column — it was padding the whole footer out vertically. */
-.site-footer div p {
+.footer-brand p {
   margin: 0;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  color: #6b6e75;
 }
 
-.site-footer p {
+.footer-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+}
+
+.site-footer .footer-meta p {
+  margin: 0;
+  line-height: 1.45;
   color: #4f5159;
 }
 
-.site-footer a {
-  color: var(--ink);
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px 14px;
 }
 
-.footer-credit {
+.footer-meta a,
+.footer-links a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.footer-meta a:hover,
+.footer-links a:hover {
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.site-footer .footer-credit {
   grid-column: 1 / -1;
-  margin: 8px 0 0;
-  padding-top: 14px;
+  margin: 0;
+  padding-top: 12px;
   border-top: 1px solid rgba(17, 18, 23, 0.12);
   text-align: center;
   font-size: 0.74rem;
@@ -647,22 +676,19 @@ h3 {
   color: var(--red);
 }
 
-/* Footer: compact 2-up on phones/tablets instead of a tall single stack.
-   The logo is dropped here — it already sits in the sticky header, so
-   repeating it just makes the footer needlessly tall. */
+/* Phone/tablet: stack to a tight centered block, drop the repeated
+   logo (already in the sticky header). */
 @media (max-width: 760px) {
   .site-footer {
-    grid-template-columns: 1fr 1fr;
-    gap: 12px 16px;
+    grid-template-columns: 1fr;
+    row-gap: 8px;
     padding: 14px var(--page-x) 16px;
-    font-size: 0.86rem;
+    text-align: center;
   }
-  .site-footer > div:first-child { display: none; }
-  .footer-credit { margin-top: 2px; padding-top: 10px; }
-}
-
-@media (max-width: 440px) {
-  .site-footer { gap: 10px 14px; }
+  .footer-brand { display: none; }
+  .footer-meta { align-items: center; text-align: center; }
+  .footer-links { justify-content: center; }
+  .site-footer .footer-credit { padding-top: 10px; }
 }
 
 /* ── Map embed ──────────────────────────────────────────────────────────── */
