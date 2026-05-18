@@ -1,70 +1,6 @@
 [
   {
     "id": 1,
-    "title": "Digimon BT25 Prerelease",
-    "game": "digimon",
-    "gameLabel": "Digimon TCG",
-    "date": "2026-05-17",
-    "time": "1:00 PM",
-    "time24": "13:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Digimon BT25 Prerelease"
-  },
-  {
-    "id": 2,
-    "title": "Digimon Locals",
-    "game": "digimon",
-    "gameLabel": "Digimon TCG",
-    "date": "2026-05-17",
-    "time": "1:00 PM",
-    "time24": "13:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Digimon Locals"
-  },
-  {
-    "id": 3,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-05-17",
-    "time": "2:30 PM",
-    "time24": "14:30",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
-  },
-  {
-    "id": 4,
-    "title": "Gundam Locals",
-    "game": "gundam",
-    "gameLabel": "Gundam Card Game",
-    "date": "2026-05-17",
-    "time": "4:00 PM",
-    "time24": "16:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Gundam Locals"
-  },
-  {
-    "id": 5,
     "title": "Pokemon Chaos Rising Release",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -80,7 +16,7 @@
     "description": "Pokemon Chaos Rising Release"
   },
   {
-    "id": 6,
+    "id": 2,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -96,7 +32,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 7,
+    "id": 3,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -112,7 +48,7 @@
     "description": "One Piece Locals"
   },
   {
-    "id": 8,
+    "id": 4,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -128,7 +64,7 @@
     "description": "Riftbound locals"
   },
   {
-    "id": 9,
+    "id": 5,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -144,7 +80,7 @@
     "description": "Lorcana Locals"
   },
   {
-    "id": 10,
+    "id": 6,
     "title": "Pokemon League Challenge",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -160,7 +96,7 @@
     "description": "Pokemon League Challenge"
   },
   {
-    "id": 11,
+    "id": 7,
     "title": "BeyBlades",
     "game": "other",
     "gameLabel": "Other",
@@ -176,7 +112,7 @@
     "description": "BeyBlades"
   },
   {
-    "id": 12,
+    "id": 8,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -190,73 +126,73 @@
     "registerUrl": null,
     "recurring": null,
     "description": "Digimon Locals"
+  },
+  {
+    "id": 9,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-05-24",
+    "time": "2:30 PM",
+    "time24": "14:30",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Pokemon Locals"
+  },
+  {
+    "id": 10,
+    "title": "Gundam Locals",
+    "game": "gundam",
+    "gameLabel": "Gundam Card Game",
+    "date": "2026-05-24",
+    "time": "4:00 PM",
+    "time24": "16:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Gundam Locals"
+  },
+  {
+    "id": 11,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-05-25",
+    "time": "6:30 PM",
+    "time24": "18:30",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Pokemon Locals"
+  },
+  {
+    "id": 12,
+    "title": "One Piece Locals",
+    "game": "other",
+    "gameLabel": "Other",
+    "date": "2026-05-25",
+    "time": "7:00 PM",
+    "time24": "19:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "One Piece Locals"
   },
   {
     "id": 13,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-05-24",
-    "time": "2:30 PM",
-    "time24": "14:30",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
-  },
-  {
-    "id": 14,
-    "title": "Gundam Locals",
-    "game": "gundam",
-    "gameLabel": "Gundam Card Game",
-    "date": "2026-05-24",
-    "time": "4:00 PM",
-    "time24": "16:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Gundam Locals"
-  },
-  {
-    "id": 15,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-05-25",
-    "time": "6:30 PM",
-    "time24": "18:30",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
-  },
-  {
-    "id": 16,
-    "title": "One Piece Locals",
-    "game": "other",
-    "gameLabel": "Other",
-    "date": "2026-05-25",
-    "time": "7:00 PM",
-    "time24": "19:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "One Piece Locals"
-  },
-  {
-    "id": 17,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -272,7 +208,7 @@
     "description": "Riftbound locals"
   },
   {
-    "id": 18,
+    "id": 14,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -288,7 +224,7 @@
     "description": "Lorcana Locals"
   },
   {
-    "id": 19,
+    "id": 15,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -304,7 +240,7 @@
     "description": "Digimon Locals"
   },
   {
-    "id": 20,
+    "id": 16,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -320,7 +256,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 21,
+    "id": 17,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -336,7 +272,7 @@
     "description": "Gundam Locals"
   },
   {
-    "id": 22,
+    "id": 18,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -352,7 +288,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 23,
+    "id": 19,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -368,7 +304,7 @@
     "description": "One Piece Locals"
   },
   {
-    "id": 24,
+    "id": 20,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -384,7 +320,7 @@
     "description": "Riftbound locals"
   },
   {
-    "id": 25,
+    "id": 21,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -400,7 +336,7 @@
     "description": "Lorcana Locals"
   },
   {
-    "id": 26,
+    "id": 22,
     "title": "One Piece OP16 Prerelease",
     "game": "other",
     "gameLabel": "Other",
@@ -416,7 +352,7 @@
     "description": "One Piece OP16 Prerelease"
   },
   {
-    "id": 27,
+    "id": 23,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -432,7 +368,7 @@
     "description": "Digimon Locals"
   },
   {
-    "id": 28,
+    "id": 24,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -448,7 +384,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 29,
+    "id": 25,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -464,7 +400,7 @@
     "description": "Gundam Locals"
   },
   {
-    "id": 30,
+    "id": 26,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -480,7 +416,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 31,
+    "id": 27,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -496,7 +432,7 @@
     "description": "One Piece Locals"
   },
   {
-    "id": 32,
+    "id": 28,
     "title": "OP 16 One Piece Release",
     "game": "other",
     "gameLabel": "Other",
@@ -512,7 +448,7 @@
     "description": "OP 16 One Piece Release"
   },
   {
-    "id": 33,
+    "id": 29,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -526,73 +462,73 @@
     "registerUrl": null,
     "recurring": null,
     "description": "Riftbound locals"
+  },
+  {
+    "id": 30,
+    "title": "Lorcana Locals",
+    "game": "lorcana",
+    "gameLabel": "Disney Lorcana",
+    "date": "2026-06-12",
+    "time": "7:00 PM",
+    "time24": "19:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Lorcana Locals"
+  },
+  {
+    "id": 31,
+    "title": "Digimon Locals",
+    "game": "digimon",
+    "gameLabel": "Digimon TCG",
+    "date": "2026-06-14",
+    "time": "1:00 PM",
+    "time24": "13:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Digimon Locals"
+  },
+  {
+    "id": 32,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-06-14",
+    "time": "2:30 PM",
+    "time24": "14:30",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Pokemon Locals"
+  },
+  {
+    "id": 33,
+    "title": "Gundam Locals",
+    "game": "gundam",
+    "gameLabel": "Gundam Card Game",
+    "date": "2026-06-14",
+    "time": "4:00 PM",
+    "time24": "16:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Gundam Locals"
   },
   {
     "id": 34,
-    "title": "Lorcana Locals",
-    "game": "lorcana",
-    "gameLabel": "Disney Lorcana",
-    "date": "2026-06-12",
-    "time": "7:00 PM",
-    "time24": "19:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Lorcana Locals"
-  },
-  {
-    "id": 35,
-    "title": "Digimon Locals",
-    "game": "digimon",
-    "gameLabel": "Digimon TCG",
-    "date": "2026-06-14",
-    "time": "1:00 PM",
-    "time24": "13:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Digimon Locals"
-  },
-  {
-    "id": 36,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-06-14",
-    "time": "2:30 PM",
-    "time24": "14:30",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
-  },
-  {
-    "id": 37,
-    "title": "Gundam Locals",
-    "game": "gundam",
-    "gameLabel": "Gundam Card Game",
-    "date": "2026-06-14",
-    "time": "4:00 PM",
-    "time24": "16:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "recurring": null,
-    "description": "Gundam Locals"
-  },
-  {
-    "id": 38,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -608,7 +544,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 39,
+    "id": 35,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -624,7 +560,7 @@
     "description": "One Piece Locals"
   },
   {
-    "id": 40,
+    "id": 36,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -640,7 +576,7 @@
     "description": "Riftbound locals"
   },
   {
-    "id": 41,
+    "id": 37,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -656,7 +592,7 @@
     "description": "Lorcana Locals"
   },
   {
-    "id": 42,
+    "id": 38,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -672,7 +608,7 @@
     "description": "Digimon Locals"
   },
   {
-    "id": 43,
+    "id": 39,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -688,7 +624,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 44,
+    "id": 40,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -704,7 +640,7 @@
     "description": "Gundam Locals"
   },
   {
-    "id": 45,
+    "id": 41,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -720,7 +656,7 @@
     "description": "Pokemon Locals"
   },
   {
-    "id": 46,
+    "id": 42,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -736,7 +672,7 @@
     "description": "One Piece Locals"
   },
   {
-    "id": 47,
+    "id": 43,
     "title": "Gundam ST10 & EB01 Release",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -752,7 +688,7 @@
     "description": "Gundam ST10 & EB01 Release"
   },
   {
-    "id": 48,
+    "id": 44,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -768,7 +704,7 @@
     "description": "Riftbound locals"
   },
   {
-    "id": 49,
+    "id": 45,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -784,7 +720,7 @@
     "description": "Lorcana Locals"
   },
   {
-    "id": 50,
+    "id": 46,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -798,5 +734,69 @@
     "registerUrl": null,
     "recurring": null,
     "description": "Digimon Locals"
+  },
+  {
+    "id": 47,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-06-28",
+    "time": "2:30 PM",
+    "time24": "14:30",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Pokemon Locals"
+  },
+  {
+    "id": 48,
+    "title": "Gundam Locals",
+    "game": "gundam",
+    "gameLabel": "Gundam Card Game",
+    "date": "2026-06-28",
+    "time": "4:00 PM",
+    "time24": "16:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Gundam Locals"
+  },
+  {
+    "id": 49,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-06-29",
+    "time": "6:30 PM",
+    "time24": "18:30",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "Pokemon Locals"
+  },
+  {
+    "id": 50,
+    "title": "One Piece Locals",
+    "game": "other",
+    "gameLabel": "Other",
+    "date": "2026-06-29",
+    "time": "7:00 PM",
+    "time24": "19:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "recurring": null,
+    "description": "One Piece Locals"
   }
 ]
