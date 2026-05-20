@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="preconnect" href="https://playtowingames.crystalcommerce.com">
     <link rel="dns-prefetch" href="https://playtowingames.crystalcommerce.com">
-    <link rel="preload" as="image" href="assets/store-collage.jpg" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/store-collage.webp" type="image/webp" fetchpriority="high">
     <meta name="description" content="Play2Win Games in Knoxville, TN: retro video games, trading card games, console repair, tournaments, and local buy/sell/trade.">
     <title>Play2Win Games | Retro Games & TCGs in Knoxville</title>
     <link rel="stylesheet" href="styles.css">
@@ -85,7 +85,11 @@
     <main id="main" tabindex="-1">
       <section class="hero">
         <div class="hero-media" aria-hidden="true">
-          <img src="assets/store-collage.jpg" alt="" fetchpriority="high" decoding="async">
+          <picture>
+            <source srcset="assets/store-collage.avif" type="image/avif">
+            <source srcset="assets/store-collage.webp" type="image/webp">
+            <img src="assets/store-collage.jpg" alt="" fetchpriority="high" decoding="async">
+          </picture>
         </div>
         <div class="hero-content">
           <p class="eyebrow">Knoxville's one-stop shop for games, cards, and repairs</p>
