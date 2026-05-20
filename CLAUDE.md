@@ -152,6 +152,12 @@ Both via **Formspree** (endpoints are public client-side by design):
   and early-returns if `IntersectionObserver`/reduced-motion — so JS-off or
   old browsers show content. Don't put `.reveal` in the HTML.
   Perplexity Comet / Arc / Dia are Chromium — nothing engine-specific.
+- **Hero image:** `index.html` uses `<picture>` with
+  `assets/store-collage.{avif,webp,jpg}` + a preload of the `.webp`. If you
+  ever swap the hero, re-export all three formats (≤1600px long edge,
+  AVIF q70, WebP q82) and keep filenames in lockstep.
+- **Form spam:** both Formspree forms have a hidden `_gotcha` honeypot
+  input (Formspree's documented anti-bot field). Don't remove it.
 - **Self-hosted fonts** — variable woff2 in `assets/fonts/`
   (`inter-latin`, `inter-latin-ext`, `spacegrotesk-latin`, `spacegrotesk-latin-ext`);
   `@font-face` block at top of `styles.css`. No Google Fonts requests anywhere
