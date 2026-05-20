@@ -31,6 +31,7 @@
     '.section-heading',
     '.gallery-card',
     '.mod-card',
+    '.review-card',
     '.showcase-band',
     '.contact-panel',
     '.events-cta',
