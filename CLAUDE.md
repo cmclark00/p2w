@@ -83,8 +83,8 @@ the new URLs.
 | `sell-trade.html` | Buy/sell/trade info **+ merged showcase galleries** (Video Games / TCG / Toys-to-Life) with lightbox. |
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
 | `event-inquiry.html` | Event-hosting inquiry form → Formspree `xjglnaew` (inline form). |
-| `repairs.html` | Repair services, ballpark pricing, 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs". |
-| `mods.html` | Handheld upgrade before/after showcase; CTA → upgrade-request. |
+| `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (bio pending), Google review prompt at bottom. |
+| `mods.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons); CTA → upgrade-request. |
 | `upgrade-request.html` | Handheld upgrade intake form. Uses `assets/files/intake-form.css` + `intake-form.js` (Formspree `xaqvrbjn`). |
 | `team.html` | Owners + managers. Names filled; **bios & photos still placeholders.** |
 | `faq.html` | 2-column accordion FAQ + `FAQPage` JSON-LD. |
@@ -186,6 +186,16 @@ Both via **Formspree** (endpoints are public client-side by design):
 
 - `WEBSITE-AGREEMENT.md` is **git-ignored** (private handoff/portfolio agreement
   between Corey Clark and owners Mark Spears & Josiah Miller) — never commit it.
+- **Pricing formula** (applies to both `repairs.html` and `mods.html` pricing
+  rows): **labor is $60/hr, parts are billed at our cost + 20%**. Disclosed
+  publicly in the `.pricing-disclaimer` block on `repairs.html`. New pricing
+  rows must follow this formula so quotes and the page agree. (Deep-clean has
+  a documented exception — liquid-metal service uses the *non-bundled* $60
+  clean rate, not the $30 bundled rate, by owner choice.)
+- **Google review CTA** points to `https://g.page/r/CSxEUPh9daG2EAE/review`
+  from 3 places: the home "What people say" section, the `.review-prompt`
+  band on `repairs.html`, and the `.review-prompt` band on `sell-trade.html`.
+  One URL to update if the GBP ever migrates.
 - Contact: 865-910-8357 · admin@play2wingames.com ·
   facebook.com/P2WGames · discord.gg/m44gYFFSd8 (Discord is a non-vanity but
   never-expire invite).
