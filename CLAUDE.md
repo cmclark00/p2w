@@ -79,9 +79,35 @@ hit the shop inbox · leaderboard reads + writes · let the events cron run once
 and confirm `events.json` updates · re-run Lighthouse + Google Rich Results on
 the new URLs.
 
-> Pre-stage option: the URL sweep can be made a single commit on a `cutover`
-> branch (merge when DNS is ready) and the FTP-deploy workflow added ahead of
-> time, so cutover day is a ~5-minute flip. Not done yet — deferred by owner.
+### Cutover branch (pre-staged — **keep in parity with `main`**)
+
+A `cutover` branch exists on origin (`origin/cutover`) with the
+cutover-day state already prepared:
+
+- **URL sweep applied** — `https://cmclark00.github.io/p2w/` →
+  `https://play2wingames.com/` across all HTML, `sitemap.xml`,
+  `robots.txt` (77 occurrences as of branch creation).
+- **`.github/workflows/deploy.yml` replaced** — Pages workflow swapped
+  for an FTP-deploy (`SamKirkland/FTP-Deploy-Action`) targeting GoDaddy
+  `public_html/`. Requires three repo secrets to be set on cutover
+  day: `GODADDY_FTP_HOST`, `GODADDY_FTP_USER`, `GODADDY_FTP_PASSWORD`.
+- **Cutover-day flip:** set the three secrets → merge `cutover` → `main`
+  → next push deploys to GoDaddy.
+
+⚠️ **PARITY RULE:** every non-trivial change on `main` must be
+reflected on `cutover`, or cutover-day will require last-minute
+firefighting. After landing work on `main`, run:
+
+```sh
+git checkout cutover
+git rebase main          # replays the sweep + workflow on top of new commits
+# (If new HTML files were added: rerun the URL sweep against them.)
+git push --force-with-lease origin cutover
+git checkout main
+```
+
+The URL sweep is idempotent so re-running it on a freshly-rebased
+branch is safe.
 
 ## Pages
 
