@@ -64,7 +64,9 @@
       "Bash(sed -n '58,61p' upgrade-request.html)",
       "Bash(git fetch *)",
       "Bash(git rev-list *)",
-      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: hero AVIF/WebP, form honeypot, sitemap lastmod\")"
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: hero AVIF/WebP, form honeypot, sitemap lastmod\")",
+      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: pricing-model note, GBP review URL, worklog updates *)",
+      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: team-guide reference note + worklog entry *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
