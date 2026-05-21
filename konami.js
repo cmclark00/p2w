@@ -148,7 +148,7 @@
     overlay = document.createElement('div');
     overlay.className = 'konami-overlay';
     overlay.innerHTML =
-      '<div class="konami-modal" role="dialog" aria-label="Bulky-Tris">' +
+      '<div class="konami-modal" role="dialog" aria-modal="true" aria-label="Bulky-Tris">' +
         '<button class="konami-close" aria-label="Close">×</button>' +
         '<div class="konami-titlebar">' +
           '<img class="kn-bulky" src="assets/shop-header.png" alt="" aria-hidden="true">' +
