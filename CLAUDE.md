@@ -231,6 +231,26 @@ Both via **Formspree** (endpoints are public client-side by design):
   from 3 places: the home "What people say" section, the `.review-prompt`
   band on `repairs.html`, and the `.review-prompt` band on `sell-trade.html`.
   One URL to update if the GBP ever migrates.
+- **Board games are sell-only.** The shop carries a board game selection
+  but does **not** buy or take them in trade. Board games appears in
+  sell-framed copy (home "What we carry" 5th card, home split-section
+  "carries...", home meta/og/JSON-LD descriptions) and must **not** be
+  added to `sell-trade.html` (trade-in list) or any "buying, selling,
+  trading" framing on other pages.
+- **Hero sizing.** All `.page-hero` blocks share `min-height: clamp(460px,
+  64vh, 600px)` — same curve as the home `.hero` — so every page reads
+  at the same visual weight regardless of content length. Content
+  centered via `display: flex; flex-direction: column; justify-content:
+  center`. Bare `.button` children get `align-self: flex-start` so they
+  don't stretch full-width (events.html bug). Don't lower the min-height
+  thinking the shorter pages look "too tall" — they need the floor to
+  match the longer pages.
+- **Category grid variants.** `.category-grid` is `repeat(4, 1fr)` by
+  default; `.category-grid--three` and `.category-grid--five` variants
+  exist for pages that need different card counts (home uses `--five`
+  for the 5-card "What we carry"; sell-trade uses `--three`). When adding
+  cards to a grid, pick or add the variant rather than overriding the
+  base.
 - Contact: 865-910-8357 · admin@play2wingames.com ·
   facebook.com/P2WGames · discord.gg/m44gYFFSd8 (Discord is a non-vanity but
   never-expire invite).
