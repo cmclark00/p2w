@@ -3,6 +3,14 @@
 Static HTML/CSS/vanilla-JS site for Play2Win Games, a retro video game & TCG shop
 in Knoxville, TN. No build step, no framework, no bundler — edit files directly.
 
+> **Team guide:** Non-developer edit instructions for the shop team live in
+> [`TEAM-GUIDE.md`](TEAM-GUIDE.md) (common edits, GitHub web-editor walkthrough,
+> what to do when something breaks, external-services worksheet, emergency
+> contact). **Keep it in sync** when site structure changes meaningfully —
+> e.g., new pricing groups, new pages, new external services, hours/pricing
+> conventions changing. Devs work from this file (`CLAUDE.md`); the team
+> works from `TEAM-GUIDE.md`.
+
 ## Hosting & deploy
 
 - **Currently:** GitHub Pages at `https://cmclark00.github.io/p2w/`, deployed by
