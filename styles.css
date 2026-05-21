@@ -538,7 +538,7 @@ h3 {
 }
 
 .page-hero {
-  min-height: clamp(440px, 54vh, 520px);
+  min-height: clamp(460px, 64vh, 600px);
   padding-block: clamp(84px, 11vw, 132px) clamp(48px, 8vw, 82px);
   background:
     linear-gradient(120deg, rgba(217, 31, 56, 0.26), rgba(49, 94, 203, 0.12), rgba(156, 31, 166, 0.26)),
