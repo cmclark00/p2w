@@ -38,9 +38,11 @@ is nothing here you can permanently break.
 2. **Get added as a collaborator.** Ask Corey (or whoever owns the repo
    currently) to add your GitHub username to the `cmclark00/p2w` repo with
    "Write" access. You'll get an email invite. Accept it.
-3. **Bookmark this guide.** It lives at
-   `github.com/cmclark00/p2w/blob/main/TEAM-GUIDE.md` (or after the move:
-   `play2wingames` org). You can also print it if you prefer paper.
+3. **Bookmark this guide.** It currently lives at
+   `github.com/cmclark00/p2w/blob/main/TEAM-GUIDE.md`. After the repo
+   migration it'll be at
+   **`github.com/play2wingames/p2w/blob/main/TEAM-GUIDE.md`** — same
+   file, new home. You can also print it if you prefer paper.
 4. **Practice on something small first.** The first time, try changing a
    tiny thing (a typo, a comma) so you've done the round-trip from edit
    → commit → live site once before you need to do it for real.
@@ -480,7 +482,7 @@ Bitwarden, Apple Passwords shared with family, etc.).
 
 | Service | What it does | Where to manage | Account holder |
 |---|---|---|---|
-| **GitHub** | Hosts the code; "Pages" hosts the website itself for now | github.com/cmclark00/p2w (moving to the shop's org) | _{{ FILL IN owner of GitHub account }}_ |
+| **GitHub** | Hosts the code; "Pages" hosts the website itself for now | Currently `github.com/cmclark00/p2w` → moving to **`github.com/play2wingames/p2w`** at migration. GitHub auto-redirects, so existing bookmarks keep working. | _{{ FILL IN owner of `play2wingames` GitHub account — usually whoever created the org }}_ |
 | **GoDaddy** | Will host the website after the move; owns the domain `play2wingames.com` | godaddy.com → My Products | _{{ FILL IN }}_ |
 | **Google Workspace** (the `admin@play2wingames.com` account) | Receives form emails; controls the calendar that drives events on the site | google.com → sign in as admin@play2wingames.com | _{{ FILL IN }}_ |
 | **Google Calendar** | Source of truth for events shown on the site | calendar.google.com (shop calendar) | _{{ FILL IN }}_ |

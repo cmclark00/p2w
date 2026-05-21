@@ -30,8 +30,9 @@ Migration is three independent things people lump together: the **repo**, the
 ### Phase 1 — Transfer the repo
 
 - 🔑 GitHub → repo **Settings → General → Danger Zone → Transfer ownership**,
-  send `cmclark00/p2w` to the Play2Win account/org. Preserves history; GitHub
-  auto-redirects the old URL so nothing breaks mid-flight.
+  send `cmclark00/p2w` → **`play2wingames/p2w`** (the shop's GitHub at
+  https://github.com/play2wingames). Preserves history; GitHub auto-redirects
+  the old URL so nothing breaks mid-flight.
 - Requires repo-owner role + push access to the destination.
 - Actions secrets *do* carry over on transfer, but rotate them anyway under
   the shop's control (Phase 2) — don't rely on inherited secrets.
