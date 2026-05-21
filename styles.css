@@ -529,6 +529,22 @@ h3 {
   }
 }
 
+.category-grid.category-grid--five {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+@media (max-width: 880px) {
+  .category-grid.category-grid--five {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .category-grid.category-grid--five {
+    grid-template-columns: 1fr;
+  }
+}
+
 .category-grid article,
 .contact-panel {
   padding: 26px;
