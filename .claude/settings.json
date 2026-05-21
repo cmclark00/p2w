@@ -66,7 +66,8 @@
       "Bash(git rev-list *)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: hero AVIF/WebP, form honeypot, sitemap lastmod\")",
       "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: pricing-model note, GBP review URL, worklog updates *)",
-      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: team-guide reference note + worklog entry *)"
+      "Bash(git -C 'C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site' -c 'user.name=Corey Clark' -c user.email=playtowingames@hotmail.com commit -m 'Sync: team-guide reference note + worklog entry *)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: name play2wingames/p2w as GitHub destination\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
