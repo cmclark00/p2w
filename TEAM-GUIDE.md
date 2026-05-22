@@ -28,6 +28,7 @@ is nothing here you can permanently break.
 - [When something is wrong](#when-something-is-wrong)
 - [External services — what depends on what](#external-services)
 - [Things you should NOT touch](#things-you-should-not-touch)
+- [Using Claude when this guide isn't enough](#using-claude)
 - [Emergency contact](#emergency-contact)
 
 ---
@@ -518,6 +519,106 @@ certainly break the site. **Always contact the dev for these.**
 
 **Rule of thumb:** if it doesn't end in `.html`, and you're not sure,
 **ask first.**
+
+---
+
+## Using Claude when this guide isn't enough <a id="using-claude"></a>
+
+The shop has a Claude subscription. Claude is the same AI that helped
+build this site — and crucially, the `CLAUDE.md` file in this repo was
+written specifically so a fresh Claude session can pick up where the
+dev left off. It knows the conventions, what not to touch, and the
+deliberate "don't fix this" rules.
+
+**Use Claude when:**
+
+- This guide doesn't cover what you need (a new page, a brand-new
+  service, a layout change).
+- The site looks broken and the [When something is wrong](#when-something-is-wrong)
+  checklist didn't solve it.
+- You want to add something genuinely new (e.g., "a banner for our
+  10-year anniversary sale").
+- The backup dev is unreachable or it's something small enough that
+  you'd rather try yourself first.
+
+**Use the rest of this guide first** when the change is something
+covered here (hours, prices, team members, FAQ, reviews, contact). Don't
+spend Claude budget on routine edits you can do faster yourself in the
+GitHub web editor.
+
+### How to actually do it
+
+1. Open Claude. Whichever way the shop has it set up — the Claude
+   desktop app with the repo folder open, the VS Code Claude
+   extension, or Claude Code in a terminal. Whoever set up the
+   subscription should show you which to launch.
+2. **Point Claude at the project folder** (`p2w`). Claude needs to be
+   able to read the files in the repo.
+3. **Tell Claude what you want plainly.** Examples:
+   - *"I need to add a new page for gift cards. We sell them in
+     denominations of $25, $50, and $100. Use the same look as the
+     contact page."*
+   - *"The repairs page link on the home page is broken. Can you fix
+     it?"*
+   - *"Add a banner across the top of every page that says we're
+     closed Thursday."*
+4. **Claude will read `CLAUDE.md` first** (it tells Claude how this
+   site is built and what the rules are). Then it'll propose changes
+   and show you a diff (a colored before/after view of every file it
+   wants to touch).
+5. **Read every diff before approving.** This is not optional. Claude
+   can misunderstand or hallucinate. If a diff includes a file you
+   don't recognize, or a change that looks weird, **stop** and either
+   ask Claude to explain, or contact the backup dev.
+6. **Approve the changes**, let Claude commit them, and **then visit
+   the live site in your browser** to confirm the result looks right.
+   Hard-refresh (Ctrl + Shift + R) to bypass cache.
+
+### Hard rules
+
+- **Always read the diff before approving.** A junior developer's
+  changes get reviewed; Claude's should too.
+- **If Claude tries to do something CLAUDE.md says NOT to do** — edit
+  `404.html`, remove a form honeypot, "fix" the deliberate
+  non-bundled liquid metal price, etc. — **stop and contact the
+  backup dev.** CLAUDE.md spells these out for a reason.
+- **Don't use Claude for credential or external-service work**
+  (Formspree, Firebase, Google Cloud, GoDaddy, password changes).
+  Claude can't reach those systems, and those changes should always
+  be done by a human with the credentials. See [External services](#external-services).
+- **Don't blanket-trust prices, dates, or names Claude generates.**
+  If Claude makes up a price ("the new battery is $X"), check with
+  Keith. If it writes a bio, check with the person it's about.
+- **One focused task at a time.** Don't open a chat and ramble — be
+  specific. Saves you money and gives better results.
+
+### What Claude can't do
+
+- See the rendered website. It reads code, not pixels. "Does this
+  look right?" is a human's job — open the live site after every
+  change.
+- Test that forms actually deliver to your inbox. Submit the form
+  yourself after any forms-related change.
+- Know about real-world changes you haven't told it. If Keith left
+  the shop, Claude doesn't know — you have to say so. If a price
+  changed in Keith's head but not on the page, Claude can't tell.
+- Reach external services. It can edit HTML referencing a Formspree
+  endpoint, but it can't log into Formspree.
+- Replace a human's call on ambiguous decisions. If you're not sure
+  whether something is a good idea, **don't ship it just because
+  Claude said so.**
+
+### What to do if Claude suggests something that doesn't seem right
+
+1. Ask Claude to **explain why** — "Why did you change the hero
+   height? CLAUDE.md says don't lower it."
+2. **Cross-reference with `CLAUDE.md`.** Search the file for the
+   topic. The notes section near the bottom has invariants Claude
+   should respect.
+3. If still unsure, **don't approve the change.** Save what Claude
+   suggested somewhere (paste it into a doc), and ask the backup dev.
+4. **Git is your safety net.** Even if you do approve something bad,
+   it can be reverted — see [Undoing a mistake](#github-basics).
 
 ---
 
