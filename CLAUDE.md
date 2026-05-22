@@ -16,6 +16,13 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
 > `python3 scripts/build-team-guide-print.py` (needs `pip install markdown`).
 > Re-run that script after any substantive `TEAM-GUIDE.md` edit so the
 > printable handout stays current.
+>
+> A second build script, `scripts/build-website-agreement-print.py`,
+> regenerates `website-agreement-print.html` from the private
+> `WEBSITE-AGREEMENT.md`. **Both source and output are git-ignored —
+> never commit either.** The script itself is safe to commit (no
+> agreement content embedded). Use when it's time to print a clean
+> copy to sign.
 
 ## Hosting & deploy
 
