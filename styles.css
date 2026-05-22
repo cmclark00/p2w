@@ -1656,6 +1656,20 @@ h3 {
   line-height: 1.65;
 }
 
+.tech-link {
+  margin: 14px 0 0;
+  font-size: 0.9rem;
+}
+.tech-link a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+.tech-link a:hover {
+  color: var(--paper);
+}
+
 @media (max-width: 720px) {
   .techs-grid { grid-template-columns: 1fr; }
 }
