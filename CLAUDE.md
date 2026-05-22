@@ -289,6 +289,15 @@ Both via **Formspree** (endpoints are public client-side by design):
   rows must follow this formula so quotes and the page agree. (Deep-clean has
   a documented exception — liquid-metal service uses the *non-bundled* $60
   clean rate, not the $30 bundled rate, by owner choice.)
+- **`/discord` redirect.** `discord/index.html` is a self-contained
+  redirect page that bounces to the Discord invite
+  (`discord.gg/m44gYFFSd8`) via JS + meta-refresh + manual fallback,
+  with `noindex` so search engines don't index it. **Point NFC tags,
+  QR codes, printed signage, and any external "join our Discord"
+  reference at `play2wingames.com/discord`** rather than the
+  `discord.gg/...` URL directly — that way if the Discord invite ever
+  rotates, only this one file needs updating; no re-printing signage
+  or re-programming tags.
 - **Google review CTA** points to `https://g.page/r/CSxEUPh9daG2EAE/review`
   from 3 places: the home "What people say" section, the `.review-prompt`
   band on `repairs.html`, and the `.review-prompt` band on `sell-trade.html`.
