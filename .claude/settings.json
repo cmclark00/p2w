@@ -75,7 +75,16 @@
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -8)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" fetch origin)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" rev-list --left-right --count HEAD...origin/master)",
-      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: board games sell-only, hero sizing, grid variants, session worklog\")"
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: board games sell-only, hero sizing, grid variants, session worklog\")",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: TEAM-GUIDE gained 'Using Claude as backup dev' section\")",
+      "Bash(python3 -c \"import markdown; print\\('python-markdown', markdown.__version__\\)\")",
+      "Bash(python3 scripts/build-team-guide-print.py)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: printable team-guide HTML + build script noted\")",
+      "Bash(python3 scripts/build-website-agreement-print.py)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: agreement printable script noted in handoff-and-portfolio\")",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" add worklog.md)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: worklog entry for the agreement printable script \\(missed earlier\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
