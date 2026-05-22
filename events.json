@@ -7,13 +7,13 @@
     "date": "2026-05-22",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 2,
@@ -151,13 +151,13 @@
     "date": "2026-05-29",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 11,
@@ -279,13 +279,13 @@
     "date": "2026-06-05",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 19,
@@ -423,13 +423,13 @@
     "date": "2026-06-12",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 28,
@@ -567,13 +567,13 @@
     "date": "2026-06-19",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 37,
@@ -695,13 +695,13 @@
     "date": "2026-06-26",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
+    "entry": "$10",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "---\nentry: $10"
+    "description": "Riftbound locals"
   },
   {
     "id": 45,
