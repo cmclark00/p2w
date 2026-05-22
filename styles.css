@@ -2617,6 +2617,26 @@ h3 {
   font-size: 0.95rem;
 }
 
+/* Secondary "for more, see [link]" line tucked at the bottom of a section.
+   Inherits parent color so it works on both dark (.how-it-works) and light
+   (.events-section) backgrounds. */
+.section-followup {
+  max-width: 720px;
+  margin: clamp(24px, 4vw, 40px) auto 0;
+  text-align: center;
+  font-size: 0.92rem;
+  opacity: 0.85;
+}
+.section-followup a {
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+.section-followup a:hover {
+  text-decoration-thickness: 2px;
+}
+
 @media (max-width: 760px) {
   .steps-grid { grid-template-columns: 1fr; }
 }
