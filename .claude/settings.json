@@ -92,7 +92,9 @@
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -4)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: /discord redirect note + GSC Phase 5 mention in worklog\")",
       "WebFetch(domain:github.com)",
-      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: Discord events post, Node 24 bumps, footer credit relocation\")"
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: Discord events post, Node 24 bumps, footer credit relocation\")",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -1)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: repair-techs reorder + polish items \\(theme-color, ET note, Pages Node 24\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
