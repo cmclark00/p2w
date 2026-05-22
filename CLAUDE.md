@@ -84,6 +84,12 @@ deploy path.
   domain + hosting are both GoDaddy), enable the free SSL cert, set a
   www↔non-www redirect so only one canonical host is live.
 - After verified, turn GitHub Pages off (or keep as a private staging mirror).
+- **Restore the Discord events post footer URL.** In
+  `.github/scripts/post_events_to_discord.py`, change the embed footer
+  text from `'Updated daily'` back to
+  `'Updated daily · Full schedule: play2wingames.com/events'` — the URL
+  was stripped pre-cutover because the domain wasn't live; see the
+  `TODO @ cutover` comment right above that line.
 
 ### Phase 4 — Verify
 
