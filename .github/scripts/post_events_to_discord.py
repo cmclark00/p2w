@@ -121,17 +121,40 @@ if os.path.exists(STATE_PATH):
 message_id = state.get('message_id')
 
 
+USER_AGENT = (
+    'Play2Win-Games-Events/1.0 '
+    '(+https://play2wingames.com; '
+    'https://github.com/play2wingames/p2w)'
+)
+
+
 def http(method, url, data):
     """Tiny POST/PATCH helper. Raises on non-2xx (except as handled below)."""
     req = request.Request(
         url,
         data=json.dumps(data).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
+        headers={
+            'Content-Type': 'application/json',
+            # Discord/Cloudflare may 403 the default Python-urllib UA.
+            'User-Agent': USER_AGENT,
+        },
         method=method,
     )
-    with request.urlopen(req) as resp:
-        body = resp.read()
-        return json.loads(body) if body else {}
+    try:
+        with request.urlopen(req) as resp:
+            body = resp.read()
+            return json.loads(body) if body else {}
+    except error.HTTPError as e:
+        # Surface Discord's actual error body so the workflow log is useful.
+        try:
+            err_body = e.read().decode('utf-8', errors='replace')
+        except Exception:
+            err_body = '(unable to read response body)'
+        sys.stderr.write(
+            f'\nDiscord HTTP {e.code} on {method} {url.split("/webhooks/")[0]}/webhooks/<redacted>\n'
+            f'Response: {err_body}\n'
+        )
+        raise
 
 
 def post_new():
