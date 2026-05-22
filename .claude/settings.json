@@ -84,7 +84,9 @@
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: agreement printable script noted in handoff-and-portfolio\")",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" log --oneline -5)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" add worklog.md)",
-      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: worklog entry for the agreement printable script \\(missed earlier\\)\")"
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: worklog entry for the agreement printable script \\(missed earlier\\)\")",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(xargs -I {} sed -n '{},+10p' styles.css)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
