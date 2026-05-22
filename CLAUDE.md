@@ -92,6 +92,55 @@ hit the shop inbox · leaderboard reads + writes · let the events cron run once
 and confirm `events.json` updates · re-run Lighthouse + Google Rich Results on
 the new URLs.
 
+### Phase 5 — Google Search Console
+
+Sets up the shop's SEO dashboard. **DNS verification can happen before
+cutover** (doesn't need the site live); sitemap submission and structured-
+data checks happen after.
+
+**Verify ownership (any time DNS is editable):**
+
+1. 🔑 Sign in to [search.google.com/search-console](https://search.google.com/search-console)
+   with the **shop's** Google account (the one tied to
+   `admin@play2wingames.com` — not Corey's personal account, so the shop
+   keeps access).
+2. **Add property → Domain** type → enter `play2wingames.com`. (Domain
+   property covers all subdomains/protocols; URL-prefix is narrower.
+   Domain is the right choice for a single-domain shop.)
+3. Google gives a TXT record like `google-site-verification=abc123…`.
+4. 🔑 In **GoDaddy → DNS Management for play2wingames.com**, add:
+   - Type: `TXT`, Name/Host: `@`, Value: the verification string, TTL: 1h.
+5. Wait 5–15 min for propagation, then click **Verify** in GSC. Leave the
+   TXT record in place permanently — that's how Google rechecks.
+
+**Submit the sitemap (after the site is live at the new domain):**
+
+1. In GSC → **Sitemaps** in left sidebar → enter `sitemap.xml`.
+2. Google reads `https://play2wingames.com/sitemap.xml` — the cutover
+   branch's URL sweep already updated every entry there. Within 24–48h,
+   GSC reports discovered/indexed URLs.
+
+**Verify structured data is being picked up (~1–2 weeks after first
+submission):**
+
+- **Enhancements** in left sidebar → look for **FAQ**, **Breadcrumbs**,
+  and (eventually) **Sitelinks searchbox** sections. These come from the
+  JSON-LD already on the pages — they should populate automatically as
+  Google crawls. If they're missing after 2 weeks, the markup may have an
+  issue (or Google just hasn't picked it up yet — give it more time).
+- **URL Inspection** (top search bar) → paste any URL → **Request
+  indexing** to nudge Google to crawl sooner.
+
+**Don'ts:**
+
+- Don't verify a personal Google account — must be the shop's account so
+  ownership stays with the shop if Corey is unavailable.
+- Don't verify the old `cmclark00.github.io/p2w` URL in the shop's GSC.
+  If it was ever verified under a personal account in the past, use the
+  **Change of address** tool there to point the SEO signal forward.
+- Don't confuse `google-site-verification` with `og:url` or
+  `canonical` — different things.
+
 ### Cutover branch (pre-staged — **keep in parity with `main`**)
 
 A `cutover` branch exists on origin (`origin/cutover`) with the
