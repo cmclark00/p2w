@@ -321,7 +321,7 @@
   },
   {
     "id": 21,
-    "title": "Digimon Locals",
+    "title": "Digimon Evolution Cup",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
     "date": "2026-06-07",
@@ -333,7 +333,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "Digimon Locals"
+    "description": "Digimon Evolution Cup"
   },
   {
     "id": 22,
@@ -353,7 +353,7 @@
   },
   {
     "id": 23,
-    "title": "Gundam Locals",
+    "title": "Gundam Demo Learn to Play",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
     "date": "2026-06-07",
@@ -365,7 +365,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "Gundam Locals"
+    "description": "Gundam Demo Learn to Play"
   },
   {
     "id": 24,
@@ -753,9 +753,9 @@
   },
   {
     "id": 48,
-    "title": "Gundam Locals",
-    "game": "gundam",
-    "gameLabel": "Gundam Card Game",
+    "title": " GD: G-GENERATION ST10&EB01 Battle Royale Release Event",
+    "game": "other",
+    "gameLabel": "Other",
     "date": "2026-06-28",
     "time": "4:00 PM",
     "time24": "16:00",
@@ -765,7 +765,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "Gundam Locals"
+    "description": " GD: G-GENERATION ST10&EB01 Battle Royale Release Event"
   },
   {
     "id": 49,
