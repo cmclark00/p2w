@@ -23,9 +23,15 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from urllib import request, error
 
-WEBHOOK = os.environ.get('DISCORD_EVENTS_WEBHOOK')
+WEBHOOK = (os.environ.get('DISCORD_EVENTS_WEBHOOK') or '').strip()
 if not WEBHOOK:
     sys.stderr.write('DISCORD_EVENTS_WEBHOOK env var not set\n')
+    sys.exit(1)
+if not WEBHOOK.startswith('https://discord.com/api/webhooks/'):
+    sys.stderr.write(
+        'DISCORD_EVENTS_WEBHOOK does not look like a Discord webhook URL '
+        '(expected https://discord.com/api/webhooks/{id}/{token}).\n'
+    )
     sys.exit(1)
 
 # Resolve paths from the script location so this works in CI and locally.
@@ -135,6 +141,7 @@ def http(method, url, data):
         data=json.dumps(data).encode('utf-8'),
         headers={
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
             # Discord/Cloudflare may 403 the default Python-urllib UA.
             'User-Agent': USER_AGENT,
         },
