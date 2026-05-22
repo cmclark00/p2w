@@ -6,10 +6,16 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
 > **Team guide:** Non-developer edit instructions for the shop team live in
 > [`TEAM-GUIDE.md`](TEAM-GUIDE.md) (common edits, GitHub web-editor walkthrough,
 > what to do when something breaks, external-services worksheet, emergency
-> contact). **Keep it in sync** when site structure changes meaningfully —
-> e.g., new pricing groups, new pages, new external services, hours/pricing
-> conventions changing. Devs work from this file (`CLAUDE.md`); the team
-> works from `TEAM-GUIDE.md`.
+> contact, "using Claude as a backup dev"). **Keep it in sync** when site
+> structure changes meaningfully — e.g., new pricing groups, new pages,
+> new external services, hours/pricing conventions changing. Devs work from
+> this file (`CLAUDE.md`); the team works from `TEAM-GUIDE.md`.
+>
+> **Printable version** of the team guide lives at
+> [`team-guide-print.html`](team-guide-print.html), built by
+> `python3 scripts/build-team-guide-print.py` (needs `pip install markdown`).
+> Re-run that script after any substantive `TEAM-GUIDE.md` edit so the
+> printable handout stays current.
 
 ## Hosting & deploy
 

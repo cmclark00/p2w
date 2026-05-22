@@ -43,7 +43,10 @@ is nothing here you can permanently break.
    `github.com/cmclark00/p2w/blob/main/TEAM-GUIDE.md`. After the repo
    migration it'll be at
    **`github.com/play2wingames/p2w/blob/main/TEAM-GUIDE.md`** — same
-   file, new home. You can also print it if you prefer paper.
+   file, new home. **Prefer paper?** Open
+   [`team-guide-print.html`](team-guide-print.html) in any browser and
+   press Ctrl + P (⌘ P on Mac) — it's the same content formatted for
+   clean printing or PDF export.
 4. **Practice on something small first.** The first time, try changing a
    tiny thing (a typo, a comma) so you've done the round-trip from edit
    → commit → live site once before you need to do it for real.

@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Play2Win Games — Team Edit Guide (Printable)</title>
+  <style>
+    /* Print-optimized stylesheet. Designed for paper handouts during
+       onboarding sessions; also reads cleanly on screen if a team
+       member prefers viewing in a browser. */
+
+    :root {
+      --text: #1a1a1a;
+      --muted: #555;
+      --border: #c8c8c8;
+      --code-bg: #f3f3f3;
+      --accent: #d91f38;
+      --rule: #ddd;
+    }
+
+    * { box-sizing: border-box; }
+    html { font-size: 16px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: var(--text);
+      background: #fafafa;
+      max-width: 7.5in;
+      margin: 0 auto;
+      padding: 0.6in 0.5in 0.8in;
+    }
+
+    .print-banner {
+      background: #fff8d6;
+      border: 1px solid #e6cf6a;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin-bottom: 28px;
+      font-size: 0.95em;
+    }
+    .print-banner strong { color: var(--accent); }
+
+    h1, h2, h3, h4 {
+      font-family: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.2;
+      color: #000;
+      page-break-after: avoid;
+    }
+    h1 { font-size: 22pt; margin: 0 0 8pt; border-bottom: 2px solid var(--accent); padding-bottom: 6pt; }
+    h2 { font-size: 15pt; margin: 24pt 0 8pt; border-bottom: 1px solid var(--rule); padding-bottom: 4pt; }
+    h3 { font-size: 12.5pt; margin: 16pt 0 6pt; }
+    h4 { font-size: 11pt; margin: 12pt 0 4pt; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    p, ul, ol { margin: 0 0 8pt; }
+    li { margin-bottom: 3pt; }
+    li > p { margin-bottom: 4pt; }
+    ul ul, ol ol, ul ol, ol ul { margin: 4pt 0; }
+
+    a { color: #1a4ca6; text-decoration: none; border-bottom: 1px dotted #1a4ca6; }
+
+    code { font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.9em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 10pt 12pt;
+      font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 9.5pt;
+      line-height: 1.4;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 8pt 0 14pt;
+    }
+    pre code { background: transparent; padding: 0; font-size: inherit; }
+
+    blockquote { border-left: 3px solid var(--accent); margin: 8pt 0 14pt; padding: 4pt 12pt; color: var(--muted); page-break-inside: avoid; }
+
+    table { border-collapse: collapse; width: 100%; margin: 8pt 0 16pt; font-size: 0.95em; page-break-inside: avoid; }
+    th, td { border: 1px solid var(--border); padding: 6pt 8pt; text-align: left; vertical-align: top; }
+    th { background: #efefef; font-weight: 600; }
+
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 18pt 0; }
+    strong { color: #000; }
+
+    h2#table-of-contents + ul { columns: 2; column-gap: 24pt; }
+
+    @page { margin: 0.6in; }
+
+    @media print {
+      body { background: #fff; max-width: none; margin: 0; padding: 0; font-size: 10.5pt; }
+      .print-banner { display: none; }
+      h2 { page-break-before: auto; }
+      h2#common-tasks,
+      h2#when-something-is-wrong,
+      h2#external-services,
+      h2#using-claude-when-this-guide-isnt-enough,
+      h2#emergency-contact { page-break-before: page; }
+      h2, h3, h4 { page-break-after: avoid; }
+      pre, table, blockquote, ul, ol { page-break-inside: avoid; }
+      a { color: var(--text); border-bottom: none; }
+      a[href^="http"]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.78em;
+        color: var(--muted);
+        word-break: break-all;
+      }
+      a[href^="#"]::after { content: ""; }
+      @page {
+        @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 9pt; color: #888; }
+        @bottom-left  { content: "Play2Win Games — Team Edit Guide"; font-size: 9pt; color: #888; }
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-banner">
+    <strong>Printable version.</strong> To print or save as PDF: press
+    <strong>Ctrl + P</strong> (or <strong>&#8984; P</strong> on Mac),
+    choose your printer or &ldquo;Save as PDF.&rdquo; This file is
+    generated from <code>TEAM-GUIDE.md</code> &mdash; regenerate via
+    <code>python3 scripts/build-team-guide-print.py</code> after
+    meaningful edits.
+  </div>
+<h1 id="editing-the-play2win-games-website-a-guide-for-the-team">Editing the Play2Win Games website — a guide for the team</h1>
+<p>This guide is for the <strong>shop team</strong> (Mark, Josiah, Nick, Michael, Travis,
+Justin, Keith) to keep the website current. <strong>You don't need to know HTML,
+CSS, or anything about web development.</strong> You do need a GitHub account and
+about 10 minutes of practice the first time.</p>
+<p>Every change you make goes live in about <strong>90 seconds</strong> automatically.
+Every change can be <strong>undone in two clicks</strong> if something goes wrong. There
+is nothing here you can permanently break.</p>
+<hr>
+<h2 id="table-of-contents">Table of contents</h2>
+<ul>
+<li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#github-basics">GitHub basics — the editor you'll use</a></li>
+<li><strong>Common tasks</strong> (the meat of this guide)</li>
+<li><a href="#change-store-hours">Change store hours</a></li>
+<li><a href="#update-or-add-a-repair-price">Update or add a repair price</a></li>
+<li><a href="#update-or-add-a-handheld-upgrade-price">Update or add a handheld upgrade price</a></li>
+<li><a href="#update-a-team-member">Update a team member or add a new one</a></li>
+<li><a href="#update-an-faq-answer">Update an FAQ answer</a></li>
+<li><a href="#swap-out-a-featured-google-review">Swap out a featured Google review</a></li>
+<li><a href="#update-the-google-review-link">Update the Google review link</a></li>
+<li><a href="#update-contact-info">Update contact info — phone, email, address</a></li>
+<li><a href="#update-the-tcg-inventory-link">Update the TCG inventory link</a></li>
+<li><a href="#when-something-is-wrong">When something is wrong</a></li>
+<li><a href="#external-services">External services — what depends on what</a></li>
+<li><a href="#things-you-should-not-touch">Things you should NOT touch</a></li>
+<li><a href="#using-claude">Using Claude when this guide isn't enough</a></li>
+<li><a href="#emergency-contact">Emergency contact</a></li>
+</ul>
+<hr>
+<h2 id="before-you-start">Before you start</h2>
+<ol>
+<li><strong>Get a GitHub account.</strong> Free. Sign up at <a href="https://github.com">github.com</a>.</li>
+<li><strong>Get added as a collaborator.</strong> Ask Corey (or whoever owns the repo
+   currently) to add your GitHub username to the <code>cmclark00/p2w</code> repo with
+   "Write" access. You'll get an email invite. Accept it.</li>
+<li><strong>Bookmark this guide.</strong> It currently lives at
+   <code>github.com/cmclark00/p2w/blob/main/TEAM-GUIDE.md</code>. After the repo
+   migration it'll be at
+   <strong><code>github.com/play2wingames/p2w/blob/main/TEAM-GUIDE.md</code></strong> — same
+   file, new home. <strong>Prefer paper?</strong> Open
+   <a href="team-guide-print.html"><code>team-guide-print.html</code></a> in any browser and
+   press Ctrl + P (⌘ P on Mac) — it's the same content formatted for
+   clean printing or PDF export.</li>
+<li><strong>Practice on something small first.</strong> The first time, try changing a
+   tiny thing (a typo, a comma) so you've done the round-trip from edit
+   → commit → live site once before you need to do it for real.</li>
+</ol>
+<hr>
+<h2 id="github-basics">GitHub basics</h2>
+<p>You will only ever use <strong>the GitHub website</strong>. You do <strong>not</strong> need to
+install anything, learn the command line, or download the code.</p>
+<h3 id="logging-in-and-finding-the-repo">Logging in and finding the repo</h3>
+<ol>
+<li>Go to <a href="https://github.com">github.com</a> and sign in.</li>
+<li>Go to <strong>github.com/cmclark00/p2w</strong> (bookmark this).</li>
+<li>You're looking at a list of files. The site lives here.</li>
+</ol>
+<h3 id="opening-a-file-to-edit">Opening a file to edit</h3>
+<ol>
+<li><strong>Click the file name</strong> in the list (e.g., <code>repairs.html</code>).</li>
+<li>You'll see the file's contents on a colorful background.</li>
+<li>In the <strong>top-right corner of the file</strong>, look for a small <strong>pencil
+   icon</strong> (✏️). Click it. Hover-tip says "Edit this file."</li>
+<li>The file opens in an editor. You can now click anywhere in the text
+   and type.</li>
+</ol>
+<h3 id="searching-within-one-file">Searching within one file</h3>
+<p>While editing a file, press <strong>Ctrl + F</strong> (Windows) or <strong>⌘ + F</strong> (Mac).
+A search box appears in the top right of the editor. Type what you're
+looking for and press Enter to jump to it.</p>
+<h3 id="searching-across-all-files">Searching across all files</h3>
+<p>This is important for things that appear in multiple files (like store
+hours).</p>
+<ol>
+<li>At the top of the GitHub page, in the <strong>search bar</strong>, type what you're
+   looking for inside quotes, e.g., <code>"11 AM – 9 PM"</code>.</li>
+<li>Press Enter.</li>
+<li>Click <strong>Code</strong> in the left sidebar of the search results.</li>
+<li>You'll see every file that contains that text, with the matching
+   line. Click each one to edit it.</li>
+</ol>
+<h3 id="saving-your-change-called-committing">Saving your change (called "committing")</h3>
+<ol>
+<li>Scroll to the <strong>very bottom of the editor</strong>, or click the green
+   <strong>"Commit changes…"</strong> button in the <strong>top-right corner</strong>.</li>
+<li>A box appears asking for a description of what you changed. Type
+   something honest and short, like:</li>
+<li><em>"Updated Switch battery price"</em></li>
+<li><em>"Fixed typo on FAQ page"</em></li>
+<li><em>"Closed Thursday for holiday"</em></li>
+<li>Leave <strong>"Commit directly to the <code>main</code> branch"</strong> selected.</li>
+<li>Click the green <strong>"Commit changes"</strong> button.</li>
+</ol>
+<h3 id="what-happens-after-you-commit">What happens after you commit</h3>
+<ul>
+<li>Within <strong>90 seconds</strong>, the live website updates automatically. Open
+  <code>play2wingames.com</code> (or <code>cmclark00.github.io/p2w</code> until cutover) in
+  another tab to verify.</li>
+<li>If you don't see your change after 2 minutes, do a <strong>hard refresh</strong>:
+  <strong>Ctrl + Shift + R</strong> (Windows) or <strong>⌘ + Shift + R</strong> (Mac).</li>
+</ul>
+<h3 id="undoing-a-mistake">Undoing a mistake</h3>
+<p>Every change is recorded forever. If something looks wrong after you
+commit:</p>
+<ol>
+<li>Go back to the repo home: <strong>github.com/cmclark00/p2w</strong></li>
+<li>Click <strong>"Commits"</strong> (just under the green Code button, with a clock
+   icon).</li>
+<li>Find your bad commit (yours will say your username and the
+   description you typed).</li>
+<li>Click the <strong>"&lt;&gt;"</strong> button next to it — that opens "Browse the
+   repository at this point in time."</li>
+<li><strong>The easier path:</strong> click the three-dot menu <strong>"…"</strong> on the commit
+   row → <strong>"Revert"</strong> → this creates a new commit that undoes the bad
+   one. Click through and commit the revert.</li>
+</ol>
+<p>When in doubt: <strong>ask before reverting</strong>. Reverting is safe but if
+multiple people have edited since then, the revert can collide.</p>
+<hr>
+<h2 id="common-tasks">Common tasks</h2>
+<h3 id="change-store-hours">Change store hours</h3>
+<p><strong>When to do this:</strong> Permanent hours change, holiday closure for a
+specific day, special hours for an event.</p>
+<p><strong>The catch:</strong> Hours appear in <strong>5 places</strong> that all have to be updated
+together, or the website will contradict itself. Use GitHub's
+<strong>search-across-all-files</strong> for this one.</p>
+<p>Search for the exact current hours text, for example: <code>Sun 11&amp;ndash;7</code>
+(the <code>&amp;ndash;</code> is the website's way of writing a dash — copy it
+exactly).</p>
+<p>Files that contain the hours, and where:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>contact.html</code></td>
+<td>The big "Store Hours" list customers see on the Contact page</td>
+</tr>
+<tr>
+<td>Every other HTML page's <code>&lt;footer&gt;</code></td>
+<td>The mini "Visit" block in the footer</td>
+</tr>
+<tr>
+<td><code>index.html</code></td>
+<td>The Google-readable hours block (search-engine data)</td>
+</tr>
+<tr>
+<td><code>faq.html</code></td>
+<td>The "What are your hours?" answer — <strong>AND</strong> the same answer inside the JSON-LD block at the top</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Step-by-step:</strong></p>
+<ol>
+<li><strong>Search the repo</strong> for <code>Sun &amp;middot;</code> (use the across-all-files
+   search described above). This finds the footer line on every page.</li>
+<li><strong>One file at a time</strong>, change the times. Commit each file with a
+   description like <em>"Updated Sunday hours in footer"</em>.</li>
+<li><strong>Then visit <code>contact.html</code></strong> and update the <strong>Store Hours</strong> list
+   there. (Look for <code>&lt;dl class="hours-list"&gt;</code>.)</li>
+<li><strong>Then visit <code>index.html</code></strong> and find the block that starts with
+   <code>"openingHoursSpecification"</code> — update the times there. They look
+   like <code>"opens": "11:00", "closes": "19:00"</code>. <strong>Use 24-hour time</strong>
+   here (so 7 PM = 19:00, 9 PM = 21:00, 11 PM = 23:00).</li>
+<li><strong>Then visit <code>faq.html</code></strong> and update both:</li>
+<li>The visible answer (search for <code>"What are your hours?"</code>)</li>
+<li>The same answer inside the JSON-LD block near the top of the file
+     (also containing <code>"What are your hours?"</code>)</li>
+</ol>
+<p><strong>Verify:</strong> Visit the live site. Check the footer of any page, then
+visit <code>contact.html</code>, then <code>faq.html</code>. Hours should agree everywhere.</p>
+<hr>
+<h3 id="update-or-add-a-repair-price">Update or add a repair price</h3>
+<p><strong>When to do this:</strong> Parts cost or labor rate changed; you added a
+new repair service.</p>
+<p><strong>File to edit:</strong> <code>repairs.html</code> (only).</p>
+<h4 id="updating-an-existing-price">Updating an existing price</h4>
+<ol>
+<li>Open <code>repairs.html</code> in the GitHub editor.</li>
+<li><strong>Ctrl + F</strong> and search for the current price (e.g., <code>$70</code>) or the
+   service name (e.g., <code>Switch internal battery</code>).</li>
+<li>Change the number. Leave everything else exactly as it is.</li>
+<li>Commit.</li>
+</ol>
+<p><strong>Example.</strong> To change the Switch battery from $70 to $80:</p>
+<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Nintendo Switch &amp;middot; Lite &amp;middot; OLED internal battery&lt;/dt&gt;&lt;dd&gt;from $70&lt;/dd&gt;&lt;/div&gt;
+</code></pre>
+<p>becomes:</p>
+<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Nintendo Switch &amp;middot; Lite &amp;middot; OLED internal battery&lt;/dt&gt;&lt;dd&gt;from $80&lt;/dd&gt;&lt;/div&gt;
+</code></pre>
+<p>Only the <code>$70</code> changed. <strong>Do not</strong> change <code>&amp;middot;</code> or any other
+symbols — those are HTML codes, not typos.</p>
+<h4 id="adding-a-new-row-to-an-existing-pricing-group">Adding a new row to an existing pricing group</h4>
+<ol>
+<li>Find the group you want to add to (e.g., <code>&lt;h3&gt;Battery Service&lt;/h3&gt;</code>).</li>
+<li>Find any existing <code>&lt;div class="price-row"&gt;…&lt;/div&gt;</code> line inside that
+   group.</li>
+<li><strong>Copy that whole line</strong> (one line, even if it's long).</li>
+<li><strong>Paste it directly below the line you copied.</strong> Now there are two
+   identical rows.</li>
+<li>In the <strong>new</strong> row, change the description (between <code>&lt;dt&gt;</code> and
+   <code>&lt;/dt&gt;</code>) and the price (between <code>&lt;dd&gt;</code> and <code>&lt;/dd&gt;</code>).</li>
+<li>Commit with a message like <em>"Added new battery service row"</em>.</li>
+</ol>
+<h4 id="adding-a-whole-new-pricing-group">Adding a whole new pricing group</h4>
+<p>This is bigger. Best to ask the technical contact unless you're
+comfortable. If you do it yourself:</p>
+<ol>
+<li>Find an existing <code>&lt;div class="pricing-group"&gt;…&lt;/div&gt;</code> block —
+   typically takes about 6 lines.</li>
+<li>Copy the entire block (from the opening <code>&lt;div class="pricing-group"&gt;</code>
+   to the closing <code>&lt;/div&gt;</code> after the <code>&lt;/dl&gt;</code>).</li>
+<li>Paste below it.</li>
+<li>In the new copy, change the <code>&lt;h3&gt;</code> heading and the rows.</li>
+<li>Commit.</li>
+</ol>
+<p><strong>Pricing rules to keep consistent (already on the page):</strong> labor is
+billed at <strong>$60/hour</strong>, parts at <strong>our cost + 20%</strong>. If you change the
+labor rate or the markup, also update the disclaimer paragraph at the
+top of the pricing section.</p>
+<hr>
+<h3 id="update-or-add-a-handheld-upgrade-price">Update or add a handheld upgrade price</h3>
+<p><strong>When to do this:</strong> Parts cost shifted; you added a new mod.</p>
+<p><strong>File to edit:</strong> <code>mods.html</code> (only).</p>
+<p>Same pattern as the repairs page. Look for the <strong><code>&lt;section
+class="pricing"&gt;</code></strong> block. Each console family has its own
+<code>&lt;div class="pricing-group"&gt;</code> with a list of rows.</p>
+<p>Same rule applies: parts cost + 20%, labor at $60/hour, totals shown as
+ranges (e.g., <code>$128&amp;ndash;$184</code>).</p>
+<p><strong>Math reminder.</strong> If a part costs you $30 and the install takes 1
+hour, the customer price is:</p>
+<blockquote>
+<p>($30 × 1.20) + $60 = <strong>$36 + $60 = $96</strong></p>
+</blockquote>
+<p>For ranges (e.g., labor 30–60 min): low end = parts + (low labor), high
+end = parts + (high labor).</p>
+<hr>
+<h3 id="update-a-team-member">Update a team member</h3>
+<p><strong>When to do this:</strong> Someone joined, left, changed roles, or you finally
+have photos and bios to fill in.</p>
+<p><strong>File to edit:</strong> <code>team.html</code>.</p>
+<p>The page is organized into sections: <strong>Owners</strong>, <strong>Managers</strong>. Each
+person has a card.</p>
+<h4 id="to-change-a-name-or-role">To change a name or role:</h4>
+<ol>
+<li>Open <code>team.html</code>.</li>
+<li><strong>Ctrl + F</strong> the current name.</li>
+<li>Edit the name and/or role text. Leave the surrounding <code>&lt;h3&gt;</code> and
+   <code>&lt;p&gt;</code> tags alone.</li>
+<li>Commit.</li>
+</ol>
+<h4 id="to-add-a-real-photo-and-bio-replacing-the-placeholder">To add a real photo and bio (replacing the placeholder):</h4>
+<p>The HTML for each placeholder card looks roughly like this:</p>
+<pre><code class="language-html">&lt;div class=&quot;person-photo-placeholder&quot;&gt;
+  &lt;svg …&gt;…&lt;/svg&gt;
+&lt;/div&gt;
+&lt;!-- &lt;img src=&quot;assets/team/owner-1.jpg&quot; alt=&quot;Mark Spears, co-owner&quot;&gt; --&gt;
+</code></pre>
+<p>To swap in a real photo:</p>
+<ol>
+<li><strong>First, upload the photo file</strong> to GitHub:</li>
+<li>From the repo home, navigate into the <code>assets/team/</code> folder. If it
+     doesn't exist, you can create it.</li>
+<li>Click <strong>"Add file" → "Upload files"</strong>.</li>
+<li>Drag the photo file in. <strong>Name it the same as the commented <code>&lt;img
+     src=…&gt;</code> line above.</strong> For example, if the comment says
+     <code>assets/team/owner-1.jpg</code>, the file should be named <code>owner-1.jpg</code>.</li>
+<li>Click <strong>"Commit changes"</strong>.</li>
+<li><strong>Photo size tip:</strong> crop/resize the photo to roughly <strong>600×800 pixels</strong>
+     before uploading. Anything bigger slows the site. Free tools:
+     <a href="https://squoosh.app">squoosh.app</a> (drag, drop, download).</li>
+<li><strong>Then, edit <code>team.html</code>:</strong></li>
+<li>Find the person's card.</li>
+<li><strong>Delete</strong> the entire <code>&lt;div class="person-photo-placeholder"&gt;…&lt;/div&gt;</code>
+     block (the icon).</li>
+<li><strong>Uncomment</strong> the <code>&lt;img&gt;</code> line just below it — change <code>&lt;!-- &lt;img
+     src=… --&gt;</code> to just <code>&lt;img src=…&gt;</code> (remove the <code>&lt;!--</code> at the start
+     and the <code>--&gt;</code> at the end).</li>
+<li><strong>Update the bio:</strong> find the placeholder paragraph (<code>&lt;p
+   class="person-bio-placeholder"&gt;…&lt;/p&gt;</code> or similar) and replace its
+   text with the real bio.</li>
+<li>Commit.</li>
+</ol>
+<h4 id="to-add-a-brand-new-person-card">To add a brand-new person card:</h4>
+<ol>
+<li>Find any existing card (e.g., one of the manager cards).</li>
+<li>Copy the whole <code>&lt;article class="person-card"&gt;…&lt;/article&gt;</code> block.</li>
+<li>Paste it below the last card in the same section (Owners or
+   Managers).</li>
+<li>Edit the name, role, photo path, and bio.</li>
+<li>Commit.</li>
+</ol>
+<hr>
+<h3 id="update-an-faq-answer">Update an FAQ answer</h3>
+<p><strong>When to do this:</strong> A question's answer changed, you want to add a new
+question, or a price/policy mentioned in the FAQ changed.</p>
+<p><strong>File to edit:</strong> <code>faq.html</code>.</p>
+<p><strong>The critical gotcha:</strong> every FAQ answer appears in the file <strong>TWICE</strong>
+— once in the visible page, once in a hidden block at the top called
+"JSON-LD" that tells Google what's on the page. <strong>Both must match.</strong> If
+they don't, Google might show outdated info in search results.</p>
+<h4 id="to-change-an-existing-answer">To change an existing answer:</h4>
+<ol>
+<li>Open <code>faq.html</code>.</li>
+<li><strong>Ctrl + F</strong> the question text. You'll find it <strong>twice</strong>:</li>
+<li>First, inside a <code>"name":</code> line near the top (JSON-LD block).
+     The matching <code>"acceptedAnswer"</code> is the answer Google sees.</li>
+<li>Second, inside a <code>&lt;summary&gt;</code> line in the body. The matching <code>&lt;p&gt;</code>
+     tag below it is the answer customers see.</li>
+<li><strong>Update both copies of the answer.</strong> Keep them identical.</li>
+<li>Commit.</li>
+</ol>
+<h4 id="to-add-a-new-faq">To add a new FAQ:</h4>
+<p>Easier to copy an existing one in both places. Ask the technical
+contact the first time if you're not sure — the JSON-LD format is
+fussy about commas.</p>
+<hr>
+<h3 id="swap-out-a-featured-google-review">Swap out a featured Google review</h3>
+<p><strong>When to do this:</strong> A new amazing review came in that's better than
+one of the three currently featured on the home page.</p>
+<p><strong>File to edit:</strong> <code>index.html</code>.</p>
+<ol>
+<li>Open <code>index.html</code>.</li>
+<li><strong>Ctrl + F</strong> <code>"review-card"</code> — there are three blocks, one per
+   featured review.</li>
+<li>Pick the one you want to replace.</li>
+<li><strong>Inside that block:</strong></li>
+<li>Change the text between <code>&lt;p&gt;"…"&lt;/p&gt;</code> to the new review's text.
+     Keep the curly quotes (<code>&amp;ldquo;…&amp;rdquo;</code>).</li>
+<li>Change the <code>&lt;span class="review-author"&gt;First L.&lt;/span&gt;</code> to the
+     new reviewer's first name + last initial.</li>
+<li>Change the <code>&lt;span class="review-when"&gt;…&lt;/span&gt;</code> to the new
+     reviewer's date (e.g., "1 month ago").</li>
+<li>Commit.</li>
+</ol>
+<p><strong>What makes a good featured review:</strong> mentions a specific service
+(repair, trade, TCG); sounds like a real person, not a template; recent
+(under a year); first name attaches a face to the words.</p>
+<hr>
+<h3 id="update-the-google-review-link">Update the Google review link</h3>
+<p><strong>When to do this:</strong> Almost never — but if you ever rebuild the Google
+Business Profile or it migrates accounts.</p>
+<p><strong>Files to edit:</strong> <code>index.html</code>, <code>repairs.html</code>, <code>sell-trade.html</code> —
+<strong>three places</strong>, same link.</p>
+<ol>
+<li>Use the <strong>search across all files</strong> to find the current link:
+   <code>g.page/r/CSxEUPh9daG2EAE/review</code>.</li>
+<li>In each of the three files, change the link to the new URL.</li>
+<li>Commit each file.</li>
+</ol>
+<hr>
+<h3 id="update-contact-info">Update contact info</h3>
+<p>Phone, email, and address appear in <strong>many places</strong>. Use search across
+all files for each one.</p>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Current value</th>
+<th>Where it appears</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phone</td>
+<td><code>865-910-8357</code> (or <code>+18659108357</code> in some links)</td>
+<td>Every page's header + footer, <code>contact.html</code>, <code>index.html</code> JSON-LD, <code>privacy.html</code></td>
+</tr>
+<tr>
+<td>Email</td>
+<td><code>admin@play2wingames.com</code></td>
+<td>Every page's footer, <code>contact.html</code>, <code>index.html</code> JSON-LD, <code>privacy.html</code></td>
+</tr>
+<tr>
+<td>Address</td>
+<td><code>3903 Western Avenue</code></td>
+<td>Every page's footer, <code>contact.html</code>, <code>index.html</code> JSON-LD, <code>privacy.html</code>, map link</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> if you change one, search across all files for the <strong>old</strong>
+value and update everywhere it appears.</p>
+<hr>
+<h3 id="update-the-tcg-inventory-link">Update the TCG inventory link</h3>
+<p><strong>When to do this:</strong> The CrystalCommerce site URL changes (rare).</p>
+<p><strong>Search across all files</strong> for <code>playtowingames.crystalcommerce.com</code>.
+There are several places (the "TCG Inventory" button in every page's
+header, the home-page inventory band, etc.). Update each.</p>
+<hr>
+<h2 id="when-something-is-wrong">When something is wrong</h2>
+<h3 id="the-site-is-down-page-not-found">The site is down ("page not found")</h3>
+<ol>
+<li>Open <a href="https://github.com/cmclark00/p2w/actions">github.com/cmclark00/p2w/actions</a>
+   in a browser. (Or <code>play2wingames/p2w/actions</code> after the move.)</li>
+<li>Look at the most recent run at the top.</li>
+<li><strong>Green checkmark</strong> = deploy succeeded; the issue is probably DNS or
+   browser cache. Wait 5 minutes, hard-refresh.</li>
+<li><strong>Red X</strong> = deploy failed. Click into it; the error message is
+   usually clear. <strong>If you can't tell what to do, contact the dev.</strong></li>
+</ol>
+<h3 id="a-page-looks-broken-jumbled-text-weird-layout">A page looks broken (jumbled text, weird layout)</h3>
+<p>A recent edit probably introduced a typo in the HTML. Best move:</p>
+<ol>
+<li>Go to <strong>github.com/cmclark00/p2w/commits/main</strong>.</li>
+<li>Find the most recent commit before the break.</li>
+<li>Click the <strong>"…"</strong> menu → <strong>Revert</strong>.</li>
+<li>Confirm. The site will return to the working version within 90
+   seconds.</li>
+</ol>
+<h3 id="forms-stopped-sending-email">Forms stopped sending email</h3>
+<p>The forms run through a service called <strong>Formspree</strong>.</p>
+<ol>
+<li>Sign in at <a href="https://formspree.io">formspree.io</a> with the shop's
+   Formspree account (credentials should be in the shared password
+   manager — see <a href="#external-services">External services</a>).</li>
+<li>Look at the Upgrade Request and Event Inquiry forms — is the
+   account active? Are there submissions piling up?</li>
+<li>Often the cause is a paused or out-of-quota Formspree account.</li>
+</ol>
+<h3 id="events-arent-updating-on-the-events-page">Events aren't updating on the events page</h3>
+<p>The events page reads from <code>events.json</code>, which is updated nightly by
+a workflow that talks to Google Calendar.</p>
+<ol>
+<li>Open <a href="https://github.com/cmclark00/p2w/actions">github.com/cmclark00/p2w/actions</a>.</li>
+<li>Look at the <strong>"Sync events from Google Calendar"</strong> workflow. Did it
+   fail recently?</li>
+<li>The most common cause is an expired Google credential. <strong>Contact
+   the dev</strong> for this one — it requires re-issuing a service account
+   key in Google Cloud.</li>
+</ol>
+<h3 id="something-else">Something else</h3>
+<p>Don't guess. <strong>Use the <a href="#emergency-contact">Emergency contact</a>
+section</strong> at the bottom of this guide.</p>
+<hr>
+<h2 id="external-services">External services</h2>
+<p>The website depends on these outside services. <strong>The shop's owners
+should have credentials for each in a shared password manager</strong> (1Password,
+Bitwarden, Apple Passwords shared with family, etc.).</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>What it does</th>
+<th>Where to manage</th>
+<th>Account holder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GitHub</strong></td>
+<td>Hosts the code; "Pages" hosts the website itself for now</td>
+<td>Currently <code>github.com/cmclark00/p2w</code> → moving to <strong><code>github.com/play2wingames/p2w</code></strong> at migration. GitHub auto-redirects, so existing bookmarks keep working.</td>
+<td><em>{{ FILL IN owner of <code>play2wingames</code> GitHub account — usually whoever created the org }}</em></td>
+</tr>
+<tr>
+<td><strong>GoDaddy</strong></td>
+<td>Will host the website after the move; owns the domain <code>play2wingames.com</code></td>
+<td>godaddy.com → My Products</td>
+<td><em>{{ FILL IN }}</em></td>
+</tr>
+<tr>
+<td><strong>Google Workspace</strong> (the <code>admin@play2wingames.com</code> account)</td>
+<td>Receives form emails; controls the calendar that drives events on the site</td>
+<td>google.com → sign in as admin@play2wingames.com</td>
+<td><em>{{ FILL IN }}</em></td>
+</tr>
+<tr>
+<td><strong>Google Calendar</strong></td>
+<td>Source of truth for events shown on the site</td>
+<td>calendar.google.com (shop calendar)</td>
+<td><em>{{ FILL IN }}</em></td>
+</tr>
+<tr>
+<td><strong>Google Cloud / service account</strong></td>
+<td>Behind-the-scenes credential that lets the website read the calendar</td>
+<td>console.cloud.google.com</td>
+<td><em>{{ FILL IN — currently Corey's account, must transfer at handoff }}</em></td>
+</tr>
+<tr>
+<td><strong>Firebase</strong></td>
+<td>Powers the leaderboard for the hidden Konami easter-egg game</td>
+<td>firebase.google.com → "p2w-leaderboard" project</td>
+<td><em>{{ FILL IN — currently Corey, must transfer at handoff }}</em></td>
+</tr>
+<tr>
+<td><strong>Formspree</strong></td>
+<td>Receives the two contact forms and emails them to you</td>
+<td>formspree.io</td>
+<td><em>{{ FILL IN — currently Corey, must move at handoff }}</em></td>
+</tr>
+<tr>
+<td><strong>Google Business Profile</strong></td>
+<td>Your "Play2Win Games" listing on Google Maps; where reviews live</td>
+<td>business.google.com</td>
+<td><em>{{ FILL IN }}</em></td>
+</tr>
+<tr>
+<td><strong>CrystalCommerce</strong></td>
+<td>External TCG inventory site (NOT part of this codebase)</td>
+<td>playtowingames.crystalcommerce.com admin login</td>
+<td><em>{{ FILL IN }}</em></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Action item — owners:</strong> schedule a 30-minute session to (a) make
+sure all the above accounts are in a shared password vault Mark and
+Josiah both have access to, and (b) confirm each one is in the
+<strong>shop's</strong> name and not the developer's personal account. The
+handoff details are in <code>CLAUDE.md</code> under "Migration runbook."</p>
+</blockquote>
+<hr>
+<h2 id="things-you-should-not-touch">Things you should NOT touch</h2>
+<p>These files exist for good reasons. Editing them by hand will almost
+certainly break the site. <strong>Always contact the dev for these.</strong></p>
+<table>
+<thead>
+<tr>
+<th>File / area</th>
+<th>Why</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>404.html</code></td>
+<td>Special easter-egg page; owner-protected</td>
+<td>The "page not found" retro game page</td>
+</tr>
+<tr>
+<td><code>styles.css</code></td>
+<td>One giant file that styles everything</td>
+<td>Colors, spacing, fonts, layout — all pages</td>
+</tr>
+<tr>
+<td><code>nav.js</code>, <code>konami.js</code>, <code>assets/files/intake-form.js</code></td>
+<td>JavaScript</td>
+<td>Mobile menu, the hidden game, the upgrade-request form</td>
+</tr>
+<tr>
+<td><code>.github/workflows/*.yml</code></td>
+<td>The automation that deploys the site and syncs events</td>
+<td>If broken, nothing publishes</td>
+</tr>
+<tr>
+<td><code>assets/fonts/</code></td>
+<td>The web fonts</td>
+<td>Removing these breaks the look on every page</td>
+</tr>
+<tr>
+<td><code>sitemap.xml</code>, <code>robots.txt</code></td>
+<td>Tell Google what to index</td>
+<td>Not user-visible but important for being found in search</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>Technical-developer documentation</td>
+<td>Not the team guide — that's this file</td>
+</tr>
+<tr>
+<td><code>.gitignore</code></td>
+<td>Tells Git what to skip</td>
+<td>Editing wrong can leak private info</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule of thumb:</strong> if it doesn't end in <code>.html</code>, and you're not sure,
+<strong>ask first.</strong></p>
+<hr>
+<h2 id="using-claude-when-this-guide-isnt-enough">Using Claude when this guide isn't enough <a id="using-claude"></a></h2>
+<p>The shop has a Claude subscription. Claude is the same AI that helped
+build this site — and crucially, the <code>CLAUDE.md</code> file in this repo was
+written specifically so a fresh Claude session can pick up where the
+dev left off. It knows the conventions, what not to touch, and the
+deliberate "don't fix this" rules.</p>
+<p><strong>Use Claude when:</strong></p>
+<ul>
+<li>This guide doesn't cover what you need (a new page, a brand-new
+  service, a layout change).</li>
+<li>The site looks broken and the <a href="#when-something-is-wrong">When something is wrong</a>
+  checklist didn't solve it.</li>
+<li>You want to add something genuinely new (e.g., "a banner for our
+  10-year anniversary sale").</li>
+<li>The backup dev is unreachable or it's something small enough that
+  you'd rather try yourself first.</li>
+</ul>
+<p><strong>Use the rest of this guide first</strong> when the change is something
+covered here (hours, prices, team members, FAQ, reviews, contact). Don't
+spend Claude budget on routine edits you can do faster yourself in the
+GitHub web editor.</p>
+<h3 id="how-to-actually-do-it">How to actually do it</h3>
+<ol>
+<li>Open Claude. Whichever way the shop has it set up — the Claude
+   desktop app with the repo folder open, the VS Code Claude
+   extension, or Claude Code in a terminal. Whoever set up the
+   subscription should show you which to launch.</li>
+<li><strong>Point Claude at the project folder</strong> (<code>p2w</code>). Claude needs to be
+   able to read the files in the repo.</li>
+<li><strong>Tell Claude what you want plainly.</strong> Examples:</li>
+<li><em>"I need to add a new page for gift cards. We sell them in
+     denominations of $25, $50, and $100. Use the same look as the
+     contact page."</em></li>
+<li><em>"The repairs page link on the home page is broken. Can you fix
+     it?"</em></li>
+<li><em>"Add a banner across the top of every page that says we're
+     closed Thursday."</em></li>
+<li><strong>Claude will read <code>CLAUDE.md</code> first</strong> (it tells Claude how this
+   site is built and what the rules are). Then it'll propose changes
+   and show you a diff (a colored before/after view of every file it
+   wants to touch).</li>
+<li><strong>Read every diff before approving.</strong> This is not optional. Claude
+   can misunderstand or hallucinate. If a diff includes a file you
+   don't recognize, or a change that looks weird, <strong>stop</strong> and either
+   ask Claude to explain, or contact the backup dev.</li>
+<li><strong>Approve the changes</strong>, let Claude commit them, and <strong>then visit
+   the live site in your browser</strong> to confirm the result looks right.
+   Hard-refresh (Ctrl + Shift + R) to bypass cache.</li>
+</ol>
+<h3 id="hard-rules">Hard rules</h3>
+<ul>
+<li><strong>Always read the diff before approving.</strong> A junior developer's
+  changes get reviewed; Claude's should too.</li>
+<li><strong>If Claude tries to do something CLAUDE.md says NOT to do</strong> — edit
+  <code>404.html</code>, remove a form honeypot, "fix" the deliberate
+  non-bundled liquid metal price, etc. — <strong>stop and contact the
+  backup dev.</strong> CLAUDE.md spells these out for a reason.</li>
+<li><strong>Don't use Claude for credential or external-service work</strong>
+  (Formspree, Firebase, Google Cloud, GoDaddy, password changes).
+  Claude can't reach those systems, and those changes should always
+  be done by a human with the credentials. See <a href="#external-services">External services</a>.</li>
+<li><strong>Don't blanket-trust prices, dates, or names Claude generates.</strong>
+  If Claude makes up a price ("the new battery is $X"), check with
+  Keith. If it writes a bio, check with the person it's about.</li>
+<li><strong>One focused task at a time.</strong> Don't open a chat and ramble — be
+  specific. Saves you money and gives better results.</li>
+</ul>
+<h3 id="what-claude-cant-do">What Claude can't do</h3>
+<ul>
+<li>See the rendered website. It reads code, not pixels. "Does this
+  look right?" is a human's job — open the live site after every
+  change.</li>
+<li>Test that forms actually deliver to your inbox. Submit the form
+  yourself after any forms-related change.</li>
+<li>Know about real-world changes you haven't told it. If Keith left
+  the shop, Claude doesn't know — you have to say so. If a price
+  changed in Keith's head but not on the page, Claude can't tell.</li>
+<li>Reach external services. It can edit HTML referencing a Formspree
+  endpoint, but it can't log into Formspree.</li>
+<li>Replace a human's call on ambiguous decisions. If you're not sure
+  whether something is a good idea, <strong>don't ship it just because
+  Claude said so.</strong></li>
+</ul>
+<h3 id="what-to-do-if-claude-suggests-something-that-doesnt-seem-right">What to do if Claude suggests something that doesn't seem right</h3>
+<ol>
+<li>Ask Claude to <strong>explain why</strong> — "Why did you change the hero
+   height? CLAUDE.md says don't lower it."</li>
+<li><strong>Cross-reference with <code>CLAUDE.md</code>.</strong> Search the file for the
+   topic. The notes section near the bottom has invariants Claude
+   should respect.</li>
+<li>If still unsure, <strong>don't approve the change.</strong> Save what Claude
+   suggested somewhere (paste it into a doc), and ask the backup dev.</li>
+<li><strong>Git is your safety net.</strong> Even if you do approve something bad,
+   it can be reverted — see <a href="#github-basics">Undoing a mistake</a>.</li>
+</ol>
+<hr>
+<h2 id="emergency-contact">Emergency contact</h2>
+<blockquote>
+<p><strong>Primary technical contact:</strong>
+<em>{{ FILL IN name }}</em>
+<em>{{ FILL IN phone or email }}</em>
+<em>{{ FILL IN preferred contact hours }}</em></p>
+<p><strong>Backup technical contact:</strong>
+<em>{{ FILL IN name }}</em>
+<em>{{ FILL IN phone or email }}</em></p>
+<p><strong>What this person has access to:</strong> <em>{{ FILL IN — typically: GitHub
+repo write access, GoDaddy account, password vault read access }}</em></p>
+<p><strong>Service-level expectation:</strong> <em>{{ FILL IN — e.g., "responds within
+24 hours for non-emergencies; same day if the site is down" }}</em></p>
+</blockquote>
+<p>If both are unreachable and the site is on fire:</p>
+<ol>
+<li>The site can be reverted to a known-good version by anyone with
+   GitHub repo write access — see <a href="#when-something-is-wrong">The site is down</a>.</li>
+<li>The shop continues operating regardless of website status. The
+   site is a storefront and discovery channel, not a critical system.
+   Customers can still call, walk in, or use the
+   <a href="https://playtowingames.crystalcommerce.com">external TCG inventory</a>.</li>
+<li>Facebook and Discord are reachable independently and can be used to
+   communicate with customers if the website is down for an extended
+   period.</li>
+</ol>
+<hr>
+<p><em>Last updated by the dev when this guide was written. If you find
+something out of date, </em><em>edit this file</em><em> — it's just another file in
+the repo. The dev who maintains the site should be reviewing this
+guide whenever the site structure changes meaningfully.</em></p>
+</body>
+</html>
