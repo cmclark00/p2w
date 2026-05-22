@@ -27,10 +27,15 @@ jobs:
           GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
         run: python .github/scripts/sync_events.py
 
-      - name: Commit events.json if changed
+      - name: Post events to Discord
+        env:
+          DISCORD_EVENTS_WEBHOOK: ${{ secrets.DISCORD_EVENTS_WEBHOOK }}
+        run: python .github/scripts/post_events_to_discord.py
+
+      - name: Commit changes if any
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add events.json
-          git diff --cached --quiet || git commit -m "chore: sync events from Google Calendar [skip ci]"
+          git add events.json .github/discord-events-state.json
+          git diff --cached --quiet || git commit -m "chore: sync events + Discord state [skip ci]"
           git push
