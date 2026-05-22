@@ -244,6 +244,17 @@ Both via **Formspree** (endpoints are public client-side by design):
   from 3 places: the home "What people say" section, the `.review-prompt`
   band on `repairs.html`, and the `.review-prompt` band on `sell-trade.html`.
   One URL to update if the GBP ever migrates.
+- **Mascot (Bulky) lives in specific places, by design.** Source asset
+  is `assets/shop-header.png` (large); a smaller `assets/bulky-mascot.webp`
+  (~35 KB, 360×404) is used for the lighter placements. Current footprint:
+  hero collage (center tile), home split-section (`shop-header.png` as
+  `.mascot-img`), Konami modal, **footer mascot** on all 12 pages
+  (`.footer-mascot`, 44px), **events-empty state** (`.events-empty-mascot`,
+  140px), and the **"Meet the mascot" split-section on `about.html`**.
+  **Don't add Bulky to every page-hero or service section** — mascots earn
+  their keep in *empty states, brand stamps, and narrative intros*, not as
+  gratuitous decoration. The current set is deliberate; expand only with a
+  reason.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
   sell-framed copy (home "What we carry" 5th card, home split-section
