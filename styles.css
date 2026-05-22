@@ -640,6 +640,12 @@ h3 {
   height: auto;
 }
 
+/* Small Bulky mascot to the left of the wordmark in the footer */
+.footer-brand .footer-mascot {
+  width: 44px;
+  flex: 0 0 auto;
+}
+
 .footer-brand p {
   margin: 0;
   font-size: 0.8rem;
@@ -1037,6 +1043,14 @@ h3 {
   text-align: center;
   color: var(--muted);
   font-size: 1rem;
+}
+
+.events-empty-mascot {
+  display: block;
+  width: 140px;
+  height: auto;
+  margin: 0 auto 18px;
+  opacity: 0.92;
 }
 
 .events-empty a {
