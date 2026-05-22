@@ -822,6 +822,13 @@ h3 {
   gap: 8px;
 }
 
+.events-tz-note {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 .filter-btn {
   padding: 9px 20px;
   border: 1px solid var(--line);
