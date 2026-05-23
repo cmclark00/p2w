@@ -77,7 +77,7 @@ deploy path.
   `https://cmclark00.github.io/p2w/` → `https://play2wingames.com/` in: all
   HTML files (canonical, `og:url`, `og:image`, JSON-LD `url`/`image`),
   `sitemap.xml`, `robots.txt`, and the privacy.html effective/updated date.
-  As of this writing: **57 occurrences across 13 HTML files + sitemap.xml +
+  As of this writing: **69 occurrences across 14 HTML files + sitemap.xml +
   robots.txt**. ⚠️ **Exclude `.claude/settings.json`** — local tooling
   config, not part of the site, never committed.
 - 🔑 DNS/SSL at GoDaddy: point domain at hosting (usually auto-wired when
@@ -184,6 +184,7 @@ branch is safe.
 | `index.html` | Home. Has `GameStore` JSON-LD. |
 | `about.html` | About the shop; links to team page. |
 | `sell-trade.html` | Buy/sell/trade info **+ merged showcase galleries** (Video Games / TCG / Toys-to-Life) with lightbox. |
+| `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown + per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB). Promoted to its own primary nav item. |
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
 | `event-inquiry.html` | Event-hosting inquiry form → Formspree `xjglnaew` (inline form). |
 | `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (bio pending), Google review prompt at bottom. |
@@ -312,7 +313,7 @@ Both via **Formspree** (endpoints are public client-side by design):
   is `assets/shop-header.png` (large); a smaller `assets/bulky-mascot.webp`
   (~35 KB, 360×404) is used for the lighter placements. Current footprint:
   hero collage (center tile), home split-section (`shop-header.png` as
-  `.mascot-img`), Konami modal, **footer mascot** on all 12 pages
+  `.mascot-img`), Konami modal, **footer mascot** on all 13 pages
   (`.footer-mascot`, 44px), **events-empty state** (`.events-empty-mascot`,
   140px), and the **"Meet the mascot" split-section on `about.html`**.
   **Don't add Bulky to every page-hero or service section** — mascots earn

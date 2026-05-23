@@ -577,6 +577,12 @@ h3 {
     var(--surface);
 }
 
+.bulk-hero {
+  background:
+    linear-gradient(120deg, rgba(241, 200, 75, 0.22), rgba(49, 94, 203, 0.18)),
+    var(--surface);
+}
+
 .contact-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
@@ -1392,6 +1398,12 @@ h3 {
 
 .pricing-disclaimer strong {
   color: var(--gold);
+}
+
+.pricing-disclaimer--centered {
+  display: block;
+  text-align: center;
+  border-left: 1px solid rgba(241, 200, 75, 0.45);
 }
 
 .pricing-groups {
