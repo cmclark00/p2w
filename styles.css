@@ -1065,22 +1065,32 @@ h3 {
   font-weight: 800;
 }
 
-/* ── Events CTA band ────────────────────────────────────────────────────── */
+/* ── Events: small "follow us" announce line ────────────────────────────── */
 
-.events-cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28px;
-  padding: clamp(38px, 6vw, 66px) var(--page-x);
-  background:
-    linear-gradient(90deg, rgba(49, 94, 203, 0.28), rgba(156, 31, 166, 0.18)),
-    var(--surface-2);
-  border-block: 1px solid var(--line);
+/* Deliberately small + muted so it doesn't compete with the bigger
+   host-event CTA above it. */
+.events-announce {
+  padding: clamp(22px, 3vw, 34px) var(--page-x);
+  text-align: center;
 }
 
-.events-cta div {
-  max-width: 720px;
+.events-announce p {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.events-announce a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+
+.events-announce a:hover {
+  color: var(--paper);
 }
 
 /* ── Repairs & Gallery ───────────────────────────────────────────────────── */
@@ -1986,11 +1996,6 @@ h3 {
   }
 
   .inventory-band,
-  .events-cta {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   /* Stacked single-column: show 3 distinct cards on the page background
      instead of one undifferentiated grey slab. */
   .quick-info {
