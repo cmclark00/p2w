@@ -1403,6 +1403,7 @@ h3 {
 .pricing-disclaimer--centered {
   display: block;
   text-align: center;
+  border-left-width: 1px;
 }
 
 .pricing-groups {
