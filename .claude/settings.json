@@ -106,7 +106,8 @@
       "Bash(rm _fix_nav2.py)",
       "Bash(sed -n '57,68p' repairs.html)",
       "Bash(sed -n '57,68p' events.html)",
-      "Bash(sed -n '57,68p' event-inquiry.html)"
+      "Bash(sed -n '57,68p' event-inquiry.html)",
+      "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: bulk pricing clarification + Bulk Rates nav item\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",
