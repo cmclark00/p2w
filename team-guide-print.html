@@ -139,6 +139,7 @@ is nothing here you can permanently break.</p>
 <li><a href="#change-store-hours">Change store hours</a></li>
 <li><a href="#update-or-add-a-repair-price">Update or add a repair price</a></li>
 <li><a href="#update-or-add-a-handheld-upgrade-price">Update or add a handheld upgrade price</a></li>
+<li><a href="#update-tcg-bulk-rates">Update TCG bulk rates</a></li>
 <li><a href="#update-a-team-member">Update a team member or add a new one</a></li>
 <li><a href="#update-an-faq-answer">Update an FAQ answer</a></li>
 <li><a href="#swap-out-a-featured-google-review">Swap out a featured Google review</a></li>
@@ -363,6 +364,49 @@ hour, the customer price is:</p>
 </blockquote>
 <p>For ranges (e.g., labor 30–60 min): low end = parts + (low labor), high
 end = parts + (high labor).</p>
+<hr>
+<h3 id="update-tcg-bulk-rates">Update TCG bulk rates</h3>
+<p><strong>When to do this:</strong> Market shifted on a TCG, you want to bump or drop
+what we pay for a category, or a new TCG launched and you want to
+publish a rate for it.</p>
+<p><strong>File to edit:</strong> <code>bulk-rates.html</code> (only).</p>
+<p>The page has <strong>two</strong> <code>&lt;div class="pricing-group"&gt;</code> blocks: <strong>Pokémon</strong>
+(the long one — bulk per-1k rates plus per-card rates for things like
+Vstar/Vmax and EX/GX/V) and <strong>Other TCGs (per 1000)</strong> (one flat per-1k
+rate per game).</p>
+<h4 id="changing-an-existing-rate">Changing an existing rate</h4>
+<ol>
+<li>Open <code>bulk-rates.html</code> in the GitHub editor.</li>
+<li><strong>Ctrl + F</strong> and search for the game name (e.g., <code>Lorcana</code>) or the
+   current price (e.g., <code>$5</code>).</li>
+<li>Change the number between <code>&lt;dd&gt;</code> and <code>&lt;/dd&gt;</code>. Leave everything else
+   alone.</li>
+<li>Commit.</li>
+</ol>
+<p><strong>Example.</strong> To bump Lorcana from $5 to $7 per 1000:</p>
+<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Lorcana&lt;/dt&gt;&lt;dd&gt;$5&lt;/dd&gt;&lt;/div&gt;
+</code></pre>
+<p>becomes:</p>
+<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Lorcana&lt;/dt&gt;&lt;dd&gt;$7&lt;/dd&gt;&lt;/div&gt;
+</code></pre>
+<h4 id="adding-a-new-game-to-the-other-tcgs-card">Adding a new game to the "Other TCGs" card</h4>
+<ol>
+<li>Find any existing row in the <strong>Other TCGs</strong> group (e.g., the
+   <code>&lt;div class="price-row"&gt;&lt;dt&gt;Digimon&lt;/dt&gt;…</code> line).</li>
+<li><strong>Copy that whole line</strong> and paste it below.</li>
+<li>Change the game name and the price in the new row.</li>
+<li>Keep the list sorted by <strong>price descending</strong> (highest pay rate at
+   the top). If multiple games share a price, group them together.</li>
+<li>Commit with a message like <em>"Bulk rates: add Star Wars Unlimited at $5/1k"</em>.</li>
+</ol>
+<p><strong>Important — units convention.</strong> The "Other TCGs" header says
+<strong>"(per 1000)"</strong>, so each row only writes the dollar amount (e.g.,
+<code>$5</code>, not <code>$5 / 1k</code>). Pokémon rows are mixed (some are per-1k like
+<code>$15 / 1k</code>, others are per-card like <code>$0.70 each</code>) so each row
+<strong>must</strong> spell out its unit. Match the style of the rows already there.</p>
+<h4 id="removing-a-game">Removing a game</h4>
+<p>Delete the entire <code>&lt;div class="price-row"&gt;…&lt;/div&gt;</code> line for that game.
+Commit.</p>
 <hr>
 <h3 id="update-a-team-member">Update a team member</h3>
 <p><strong>When to do this:</strong> Someone joined, left, changed roles, or you finally

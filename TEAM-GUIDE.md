@@ -19,6 +19,7 @@ is nothing here you can permanently break.
   - [Change store hours](#change-store-hours)
   - [Update or add a repair price](#update-or-add-a-repair-price)
   - [Update or add a handheld upgrade price](#update-or-add-a-handheld-upgrade-price)
+  - [Update TCG bulk rates](#update-tcg-bulk-rates)
   - [Update a team member or add a new one](#update-a-team-member)
   - [Update an FAQ answer](#update-an-faq-answer)
   - [Swap out a featured Google review](#swap-out-a-featured-google-review)
@@ -260,6 +261,63 @@ hour, the customer price is:
 
 For ranges (e.g., labor 30–60 min): low end = parts + (low labor), high
 end = parts + (high labor).
+
+---
+
+### Update TCG bulk rates
+
+**When to do this:** Market shifted on a TCG, you want to bump or drop
+what we pay for a category, or a new TCG launched and you want to
+publish a rate for it.
+
+**File to edit:** `bulk-rates.html` (only).
+
+The page has **two** `<div class="pricing-group">` blocks: **Pokémon**
+(the long one — bulk per-1k rates plus per-card rates for things like
+Vstar/Vmax and EX/GX/V) and **Other TCGs (per 1000)** (one flat per-1k
+rate per game).
+
+#### Changing an existing rate
+
+1. Open `bulk-rates.html` in the GitHub editor.
+2. **Ctrl + F** and search for the game name (e.g., `Lorcana`) or the
+   current price (e.g., `$5`).
+3. Change the number between `<dd>` and `</dd>`. Leave everything else
+   alone.
+4. Commit.
+
+**Example.** To bump Lorcana from $5 to $7 per 1000:
+
+```html
+<div class="price-row"><dt>Lorcana</dt><dd>$5</dd></div>
+```
+
+becomes:
+
+```html
+<div class="price-row"><dt>Lorcana</dt><dd>$7</dd></div>
+```
+
+#### Adding a new game to the "Other TCGs" card
+
+1. Find any existing row in the **Other TCGs** group (e.g., the
+   `<div class="price-row"><dt>Digimon</dt>…` line).
+2. **Copy that whole line** and paste it below.
+3. Change the game name and the price in the new row.
+4. Keep the list sorted by **price descending** (highest pay rate at
+   the top). If multiple games share a price, group them together.
+5. Commit with a message like *"Bulk rates: add Star Wars Unlimited at $5/1k"*.
+
+**Important — units convention.** The "Other TCGs" header says
+**"(per 1000)"**, so each row only writes the dollar amount (e.g.,
+`$5`, not `$5 / 1k`). Pokémon rows are mixed (some are per-1k like
+`$15 / 1k`, others are per-card like `$0.70 each`) so each row
+**must** spell out its unit. Match the style of the rows already there.
+
+#### Removing a game
+
+Delete the entire `<div class="price-row">…</div>` line for that game.
+Commit.
 
 ---
 
