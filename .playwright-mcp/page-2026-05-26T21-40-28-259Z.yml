@@ -1,0 +1,179 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Play2Win Games home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+      - img "Play 2 Win Games" [ref=e5]
+    - link "Call Play2Win Games at 865-910-8357" [ref=e6] [cursor=pointer]:
+      - /url: tel:+18659108357
+      - img [ref=e7]
+      - generic [ref=e9]: 865-910-8357
+    - navigation "Main navigation" [ref=e10]:
+      - link "Home" [ref=e11] [cursor=pointer]:
+        - /url: index.html
+      - link "About" [ref=e12] [cursor=pointer]:
+        - /url: about.html
+      - link "Sell/Trade" [ref=e13] [cursor=pointer]:
+        - /url: sell-trade.html
+      - link "Bulk Rates" [ref=e14] [cursor=pointer]:
+        - /url: bulk-rates.html
+      - link "Events" [ref=e15] [cursor=pointer]:
+        - /url: events.html
+      - link "Repairs" [ref=e16] [cursor=pointer]:
+        - /url: repairs.html
+      - link "Upgrades" [ref=e17] [cursor=pointer]:
+        - /url: upgrades.html
+      - link "Contact" [ref=e18] [cursor=pointer]:
+        - /url: contact.html
+      - link "TCG Inventory" [ref=e19] [cursor=pointer]:
+        - /url: https://playtowingames.crystalcommerce.com/
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - paragraph [ref=e22]: Upgrade request
+      - heading "Submit your handheld for an upgrade." [level=1] [ref=e23]
+      - paragraph [ref=e24]:
+        - text: Fill out the form below and a team member will follow up to confirm parts availability and pricing before any work begins. Prefer to talk it through? Call the shop at
+        - link "865-910-8357" [ref=e25] [cursor=pointer]:
+          - /url: tel:+18659108357
+        - text: or stop in.
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - img [ref=e31]
+          - text: Customer info
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: First & last name
+            - textbox "First & last name" [ref=e37]:
+              - /placeholder: Jane Smith
+          - generic [ref=e38]:
+            - generic [ref=e39]: Phone number
+            - textbox "Phone number" [ref=e40]:
+              - /placeholder: (865) 555-0100
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]: Email (optional)
+            - textbox "Email (optional)" [ref=e44]:
+              - /placeholder: jane@example.com
+          - generic [ref=e45]:
+            - generic [ref=e46]: Best way to reach you
+            - combobox "Best way to reach you" [ref=e47]:
+              - option "Text message" [selected]
+              - option "Phone call"
+              - option "Email"
+      - separator [ref=e48]
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - img [ref=e51]
+          - text: Device
+        - generic [ref=e53]:
+          - button "Game Boy / GBC" [ref=e54] [cursor=pointer]
+          - button "GBA" [ref=e55] [cursor=pointer]
+          - button "GBA SP" [ref=e56] [cursor=pointer]
+          - button "GBM / Micro" [ref=e57] [cursor=pointer]
+          - button "DS Lite" [ref=e58] [cursor=pointer]
+          - button "DSi / DSi XL" [ref=e59] [cursor=pointer]
+          - button "PSP" [ref=e60] [cursor=pointer]
+          - button "PS Vita" [ref=e61] [cursor=pointer]
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - generic [ref=e64]: Serial / model variant (if known)
+            - textbox "Serial / model variant (if known)" [ref=e65]:
+              - /placeholder: e.g. AGB-001, AGS-001 vs 101
+          - generic [ref=e66]:
+            - generic [ref=e67]: Device condition
+            - generic [ref=e68]:
+              - button "Good" [ref=e69] [cursor=pointer]
+              - button "Fair" [ref=e70] [cursor=pointer]
+              - button "Poor" [ref=e71] [cursor=pointer]
+              - button "For parts" [ref=e72] [cursor=pointer]
+      - separator [ref=e73]
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - img [ref=e76]
+          - text: Requested upgrades
+        - paragraph [ref=e78]: Select a device above, then check all that apply.
+      - separator [ref=e79]
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - img [ref=e82]
+          - text: Customization & specifics
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]: Screen brightness preference
+            - combobox "Screen brightness preference" [ref=e90]:
+              - option "No preference" [selected]
+              - option "Max brightness"
+              - option "Balanced (default)"
+              - option "Lower / battery-saver"
+          - generic [ref=e91]:
+            - generic [ref=e92]: Button feel preference
+            - combobox "Button feel preference" [ref=e93]:
+              - option "No preference" [selected]
+              - option "Tactile / clicky"
+              - option "Soft / quiet"
+              - option "Stock feel"
+        - generic [ref=e94]:
+          - generic [ref=e95]: Specific color, brand, or part requests
+          - textbox "Specific color, brand, or part requests" [ref=e96]:
+            - /placeholder: e.g. Funnyplaying v2 IPS, Hispeedido shell in black…
+      - separator [ref=e97]
+      - generic [ref=e98]:
+        - generic [ref=e99]:
+          - img [ref=e100]
+          - text: Additional notes
+        - generic [ref=e103]:
+          - generic [ref=e104]: Issues, cosmetic damage, or special instructions
+          - textbox "Issues, cosmetic damage, or special instructions" [ref=e105]:
+            - /placeholder: e.g. Left speaker is blown, hinge is cracked, B button sticks…
+      - separator [ref=e106]
+      - generic [ref=e107]:
+        - generic [ref=e108]:
+          - img [ref=e109]
+          - text: Drop-off
+        - generic [ref=e112]:
+          - generic [ref=e113]: Planned drop-off date (optional)
+          - textbox "Planned drop-off date (optional)" [ref=e114]
+      - separator [ref=e115]
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - img [ref=e118]
+          - text: Authorization
+        - generic [ref=e120]: By submitting this form I authorize Play2Win Games to perform the modifications listed above on my device. I understand that mods require opening the device and may void manufacturer warranties. Parts sourced by the shop are final sale. Play2Win Games is not responsible for pre-existing damage or data loss. All work is subject to parts availability — a team member will contact you before any work begins.
+        - generic [ref=e121] [cursor=pointer]:
+          - checkbox "I understand and agree to the above" [ref=e122]
+          - text: I understand and agree to the above
+        - button "Submit intake form" [ref=e123] [cursor=pointer]
+        - paragraph [ref=e124]: A team member will contact you to confirm parts availability and pricing before any work begins.
+  - contentinfo [ref=e125]:
+    - generic [ref=e126]:
+      - img [ref=e127]
+      - img "Play 2 Win Games" [ref=e128]
+      - paragraph [ref=e129]: Whenever you play, Play 2 Win!
+    - generic [ref=e130]:
+      - paragraph [ref=e131]:
+        - text: 3903 Western Avenue, Knoxville, TN 37921 ·
+        - link "865-910-8357" [ref=e132] [cursor=pointer]:
+          - /url: tel:+18659108357
+        - text: ·
+        - link "inquiries@play2wingames.com" [ref=e133] [cursor=pointer]:
+          - /url: mailto:inquiries@play2wingames.com
+      - paragraph [ref=e134]: Sun 11–7 · Mon–Thu 11–9 · Fri–Sat 11–11
+      - navigation "Footer" [ref=e135]:
+        - link "Facebook" [ref=e136] [cursor=pointer]:
+          - /url: https://www.facebook.com/P2WGames/
+        - link "Discord" [ref=e137] [cursor=pointer]:
+          - /url: https://discord.gg/m44gYFFSd8
+        - link "Sell/Trade" [ref=e138] [cursor=pointer]:
+          - /url: sell-trade.html
+        - link "FAQ" [ref=e139] [cursor=pointer]:
+          - /url: faq.html
+        - link "Team" [ref=e140] [cursor=pointer]:
+          - /url: team.html
+        - link "About" [ref=e141] [cursor=pointer]:
+          - /url: about.html
+        - link "Careers" [ref=e142] [cursor=pointer]:
+          - /url: careers.html
+        - link "Privacy" [ref=e143] [cursor=pointer]:
+          - /url: privacy.html

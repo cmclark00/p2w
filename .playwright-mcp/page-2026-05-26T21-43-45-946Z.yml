@@ -1,0 +1,123 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Play2Win Games home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+      - img "Play 2 Win Games" [ref=e5]
+    - link "Call Play2Win Games at 865-910-8357" [ref=e6] [cursor=pointer]:
+      - /url: tel:+18659108357
+      - img [ref=e7]
+    - button "Toggle navigation" [ref=e9] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e17]:
+      - paragraph [ref=e18]: Knoxville's one-stop shop for games, cards, and repairs
+      - heading "Retro games, TCG singles, tournaments, and trade-ins under one roof." [level=1] [ref=e19]
+      - paragraph [ref=e20]: Browse in-store TCG inventory online, bring in your next trade, or stop by for video games, sealed product, repairs, and community events.
+      - generic [ref=e21]:
+        - link "Shop TCG Inventory" [ref=e22] [cursor=pointer]:
+          - /url: https://playtowingames.crystalcommerce.com/
+        - link "Visit the Store" [ref=e23] [cursor=pointer]:
+          - /url: contact.html
+    - region "Store highlights" [ref=e24]:
+      - article [ref=e25]:
+        - heading "Buy, Sell, Trade" [level=2] [ref=e27]
+        - paragraph [ref=e28]: Bring in retro games, consoles, TCG singles, sealed product, and collections for store credit or cash offers.
+      - article [ref=e29]:
+        - heading "TCG Inventory" [level=2] [ref=e31]
+        - paragraph [ref=e32]: Pokemon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, Digimon, Gundam, Riftbound, and more.
+      - article [ref=e33]:
+        - heading "Repairs & Events" [level=2] [ref=e35]
+        - paragraph [ref=e36]: Console and disc repair, tournament registration, league play, trade nights, and a community-focused shop floor.
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - paragraph [ref=e39]: Always buying, selling, and trading
+        - heading "Built for collectors, competitors, and retro players." [level=2] [ref=e40]
+        - paragraph [ref=e41]: Play2Win Games carries modern and retro video games, tested consoles, trading card singles, sealed TCG product, board games, accessories, and tournament entries. The shop is set up for quick browsing, serious collecting, and regular local play.
+        - link "More about Play2Win Games" [ref=e42] [cursor=pointer]:
+          - /url: about.html
+      - img "Play2Win Games shop display" [ref=e43]
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - paragraph [ref=e46]: Live online catalog
+        - heading "Check in-store TCG inventory before you visit." [level=2] [ref=e47]
+        - paragraph [ref=e48]: CrystalCommerce hosts current singles, sealed products, and tournament registration categories for the shop.
+      - link "Open Inventory" [ref=e49] [cursor=pointer]:
+        - /url: https://playtowingames.crystalcommerce.com/
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - paragraph [ref=e52]: What we carry
+        - heading "Games and cards for every table." [level=2] [ref=e53]
+      - generic [ref=e54]:
+        - article [ref=e55]:
+          - heading "Retro Video Games" [level=3] [ref=e56]
+          - paragraph [ref=e57]: Nintendo, PlayStation, Xbox, Sega, handhelds, accessories, and trade-ins.
+        - article [ref=e58]:
+          - heading "Trading Card Games" [level=3] [ref=e59]
+          - paragraph [ref=e60]: Singles, sealed product, supplies, and organized play across major TCGs.
+        - article [ref=e61]:
+          - heading "Board Games" [level=3] [ref=e62]
+          - paragraph [ref=e63]: Strategy, family, party, and classic tabletop games — new and used.
+        - article [ref=e64]:
+          - heading "Console Repair" [level=3] [ref=e65]
+          - paragraph [ref=e66]: Repairs, upgrades, testing, and disc resurfacing for your favorite systems.
+        - article [ref=e67]:
+          - heading "Events" [level=3] [ref=e68]
+          - paragraph [ref=e69]: League play, tournaments, swap meets, trade nights, and local community events.
+    - region "Customer reviews" [ref=e70]:
+      - generic [ref=e71]:
+        - paragraph [ref=e72]: What people say
+        - heading "Reviews from the shop." [level=2] [ref=e73]
+      - generic [ref=e74]:
+        - article [ref=e75]:
+          - generic "5 out of 5 stars" [ref=e76]: ★★★★★
+          - blockquote [ref=e77]:
+            - paragraph [ref=e78]: “The employees were extremely patient, friendly, and knowledgeable, showing us how to determine rarities for cards. We worked together on pricing and made a deal. I think we have found our new date night spot.”
+          - generic [ref=e79]:
+            - generic [ref=e80]: Danielle H.
+            - generic [ref=e81]: 2 months ago
+        - article [ref=e82]:
+          - generic "5 out of 5 stars" [ref=e83]: ★★★★★
+          - blockquote [ref=e84]:
+            - paragraph [ref=e85]: “Great customer service and friendly staff. Back in the summer I had my thick PS2 repaired by Play 2 Win. They did an excellent job and had it finished in a few days. I also bought a PS2 game called Seek and Destroy from GameStop — it was really scratched up, looked beyond repair, but after they resurfaced it, it looked brand new and played like new.”
+          - generic [ref=e86]:
+            - generic [ref=e87]: David W.
+            - generic [ref=e88]: 7 months ago
+        - article [ref=e89]:
+          - generic "5 out of 5 stars" [ref=e90]: ★★★★★
+          - blockquote [ref=e91]:
+            - paragraph [ref=e92]: “The best store for TCGs, Video Games, and Board Games alike. Staff are friendly and knowledgeable, the selection for the hobbies is vast and sorted, and the vibe is immaculate.”
+          - generic [ref=e93]:
+            - generic [ref=e94]: Thomas P.
+            - generic [ref=e95]: Local Guide · 2 months ago
+      - generic [ref=e96]:
+        - paragraph [ref=e97]: Visited the shop? Tell Google about it — it’s how other Knoxville players find us.
+        - link "Leave a Google Review" [ref=e98] [cursor=pointer]:
+          - /url: https://g.page/r/CSxEUPh9daG2EAE/review
+  - contentinfo [ref=e99]:
+    - generic [ref=e100]:
+      - paragraph [ref=e101]:
+        - text: 3903 Western Avenue, Knoxville, TN 37921 ·
+        - link "865-910-8357" [ref=e102] [cursor=pointer]:
+          - /url: tel:+18659108357
+        - text: ·
+        - link "inquiries@play2wingames.com" [ref=e103] [cursor=pointer]:
+          - /url: mailto:inquiries@play2wingames.com
+      - paragraph [ref=e104]: Sun 11–7 · Mon–Thu 11–9 · Fri–Sat 11–11
+      - navigation "Footer" [ref=e105]:
+        - link "Facebook" [ref=e106] [cursor=pointer]:
+          - /url: https://www.facebook.com/P2WGames/
+        - link "Discord" [ref=e107] [cursor=pointer]:
+          - /url: https://discord.gg/m44gYFFSd8
+        - link "Sell/Trade" [ref=e108] [cursor=pointer]:
+          - /url: sell-trade.html
+        - link "FAQ" [ref=e109] [cursor=pointer]:
+          - /url: faq.html
+        - link "Team" [ref=e110] [cursor=pointer]:
+          - /url: team.html
+        - link "About" [ref=e111] [cursor=pointer]:
+          - /url: about.html
+        - link "Careers" [ref=e112] [cursor=pointer]:
+          - /url: careers.html
+        - link "Privacy" [ref=e113] [cursor=pointer]:
+          - /url: privacy.html

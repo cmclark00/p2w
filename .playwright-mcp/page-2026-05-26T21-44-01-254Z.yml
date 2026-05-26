@@ -1,0 +1,168 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Play2Win Games home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+      - img "Play 2 Win Games" [ref=e5]
+    - link "Call Play2Win Games at 865-910-8357" [ref=e6] [cursor=pointer]:
+      - /url: tel:+18659108357
+      - img [ref=e7]
+    - button "Toggle navigation" [ref=e9] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - paragraph [ref=e15]: Careers
+      - heading "Want to work with us?" [level=1] [ref=e16]
+      - paragraph [ref=e17]: We hire people who actually play the games and care about the customer across the counter. If that sounds like you, fill out the form below and email your resume — we’ll be in touch.
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - paragraph [ref=e20]: What we’re looking for
+        - heading "People who play." [level=2] [ref=e21]
+      - generic [ref=e22]:
+        - article [ref=e23]:
+          - heading "Counter & Sales" [level=3] [ref=e24]
+          - paragraph [ref=e25]: Greet customers, ring up sales, talk shop, and keep the floor running. Comfort with retail POS and product knowledge across video games / TCG / consoles is a plus.
+        - article [ref=e26]:
+          - heading "TCG Specialist" [level=3] [ref=e27]
+          - paragraph [ref=e28]: Pricing singles, sorting trade-ins, running events, knowing your game inside-out. Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece — pick your lane.
+        - article [ref=e29]:
+          - heading "Repair Tech" [level=3] [ref=e30]
+          - paragraph [ref=e31]: Console and handheld repair bench. Soldering experience preferred but not required for entry-level — we’ll train. Patience and a steady hand matter more than a certification.
+        - article [ref=e32]:
+          - heading "Event Coordinator" [level=3] [ref=e33]
+          - paragraph [ref=e34]: Running tournaments, league nights, release parties. Familiarity with TOM, Cardio, or Bandai TCG+ helps. Weekends are the busy nights here.
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - img [ref=e40]
+          - text: Contact info
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: First & last name
+            - textbox "First & last name" [ref=e46]:
+              - /placeholder: Jane Smith
+          - generic [ref=e47]:
+            - generic [ref=e48]: Age
+            - spinbutton "Age" [ref=e49]
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - generic [ref=e52]: Phone number
+            - textbox "Phone number" [ref=e53]:
+              - /placeholder: (865) 555-0100
+          - generic [ref=e54]:
+            - generic [ref=e55]: Email
+            - textbox "Email" [ref=e56]:
+              - /placeholder: jane@example.com
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: Best way to reach you
+            - combobox "Best way to reach you" [ref=e60]:
+              - option "Text message" [selected]
+              - option "Phone call"
+              - option "Email"
+          - generic [ref=e61]:
+            - generic [ref=e62]: City & state
+            - textbox "City & state" [ref=e63]:
+              - /placeholder: Knoxville, TN
+      - separator [ref=e64]
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - img [ref=e67]
+          - text: Role & availability
+        - generic [ref=e69]:
+          - generic [ref=e70]: What roles interest you? (check all that apply)
+          - generic [ref=e71]:
+            - generic [ref=e72] [cursor=pointer]:
+              - checkbox "Counter / sales" [ref=e73]
+              - generic [ref=e74]: Counter / sales
+            - generic [ref=e75] [cursor=pointer]:
+              - checkbox "TCG specialist" [ref=e76]
+              - generic [ref=e77]: TCG specialist
+            - generic [ref=e78] [cursor=pointer]:
+              - checkbox "Repair tech" [ref=e79]
+              - generic [ref=e80]: Repair tech
+            - generic [ref=e81] [cursor=pointer]:
+              - checkbox "Event coordinator" [ref=e82]
+              - generic [ref=e83]: Event coordinator
+            - generic [ref=e84] [cursor=pointer]:
+              - checkbox "Anything you have open" [ref=e85]
+              - generic [ref=e86]: Anything you have open
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]: Hours you’re looking for
+            - combobox "Hours you’re looking for" [ref=e90]:
+              - option "Part-time (under 25 hrs)" [selected]
+              - option "Part-time (25–35 hrs)"
+              - option "Full-time (35+ hrs)"
+              - option "Flexible / open"
+          - generic [ref=e91]:
+            - generic [ref=e92]: Earliest start date
+            - textbox "Earliest start date" [ref=e93]:
+              - /placeholder: ASAP, June 1, after graduation...
+        - generic [ref=e94]:
+          - generic [ref=e95]: Weekly availability
+          - textbox "Weekly availability" [ref=e96]:
+            - /placeholder: Which days and times work? Note any standing commitments (school, second job, kids' schedule). Weekends matter most for events.
+      - separator [ref=e97]
+      - generic [ref=e98]:
+        - generic [ref=e99]:
+          - img [ref=e100]
+          - text: About you
+        - generic [ref=e103]:
+          - generic [ref=e104]: Why do you want to work here?
+          - textbox "Why do you want to work here?" [ref=e105]:
+            - /placeholder: Tell us why Play2Win specifically. What about the shop, the community, or the work draws you in?
+        - generic [ref=e106]:
+          - generic [ref=e107]: Gaming / TCG background (optional)
+          - textbox "Gaming / TCG background (optional)" [ref=e108]:
+            - /placeholder: Games you play, formats you follow, console eras you know best, TCG events you've run or competed in, anything relevant.
+        - generic [ref=e109]:
+          - generic [ref=e110]: Relevant work experience (optional)
+          - textbox "Relevant work experience (optional)" [ref=e111]:
+            - /placeholder: Retail, customer service, tech repair, event organizing, TCG judging, anything you'd point to. Full resume goes via the email button below.
+      - separator [ref=e112]
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - img [ref=e115]
+          - text: Before you submit
+        - generic [ref=e117]:
+          - text: Submitting this form starts the conversation. We’ll review applications as they come in and reach out if there’s a fit.
+          - strong [ref=e118]: Don’t forget to email your resume separately
+          - text: using the button below — the form doesn’t accept attachments.
+        - generic [ref=e119] [cursor=pointer]:
+          - checkbox "I understand I need to email my resume to inquiries@play2wingames.com to complete my application." [ref=e120]
+          - text: I understand I need to email my resume to inquiries@play2wingames.com to complete my application.
+        - generic [ref=e121]:
+          - button "Submit application" [ref=e122] [cursor=pointer]
+          - link "Email your resume" [ref=e123] [cursor=pointer]:
+            - /url: mailto:inquiries@play2wingames.com?subject=Resume%20%E2%80%94%20Play2Win%20Careers%20Application&body=Hi%20Play2Win%20Games%2C%0A%0AAttaching%20my%20resume%20for%20the%20careers%20application%20I%20just%20submitted%20on%20your%20site.%0A%0AThanks%2C%0A%5BYour%20name%5D
+        - paragraph [ref=e124]:
+          - text: Questions before you apply? Call
+          - link "865-910-8357" [ref=e125] [cursor=pointer]:
+            - /url: tel:+18659108357
+          - text: or stop in.
+  - contentinfo [ref=e126]:
+    - generic [ref=e127]:
+      - paragraph [ref=e128]:
+        - text: 3903 Western Avenue, Knoxville, TN 37921 ·
+        - link "865-910-8357" [ref=e129] [cursor=pointer]:
+          - /url: tel:+18659108357
+        - text: ·
+        - link "inquiries@play2wingames.com" [ref=e130] [cursor=pointer]:
+          - /url: mailto:inquiries@play2wingames.com
+      - paragraph [ref=e131]: Sun 11–7 · Mon–Thu 11–9 · Fri–Sat 11–11
+      - navigation "Footer" [ref=e132]:
+        - link "Facebook" [ref=e133] [cursor=pointer]:
+          - /url: https://www.facebook.com/P2WGames/
+        - link "Discord" [ref=e134] [cursor=pointer]:
+          - /url: https://discord.gg/m44gYFFSd8
+        - link "Sell/Trade" [ref=e135] [cursor=pointer]:
+          - /url: sell-trade.html
+        - link "FAQ" [ref=e136] [cursor=pointer]:
+          - /url: faq.html
+        - link "Team" [ref=e137] [cursor=pointer]:
+          - /url: team.html
+        - link "About" [ref=e138] [cursor=pointer]:
+          - /url: about.html
+        - link "Privacy" [ref=e139] [cursor=pointer]:
+          - /url: privacy.html

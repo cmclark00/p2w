@@ -1,0 +1,237 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Play2Win Games home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+      - img "Play 2 Win Games" [ref=e5]
+    - link "Call Play2Win Games at 865-910-8357" [ref=e6] [cursor=pointer]:
+      - /url: tel:+18659108357
+      - img [ref=e7]
+      - generic [ref=e9]: 865-910-8357
+    - navigation "Main navigation" [ref=e10]:
+      - link "Home" [ref=e11] [cursor=pointer]:
+        - /url: index.html
+      - link "About" [ref=e12] [cursor=pointer]:
+        - /url: about.html
+      - link "Sell/Trade" [ref=e13] [cursor=pointer]:
+        - /url: sell-trade.html
+      - link "Bulk Rates" [ref=e14] [cursor=pointer]:
+        - /url: bulk-rates.html
+      - link "Events" [ref=e15] [cursor=pointer]:
+        - /url: events.html
+      - link "Repairs" [ref=e16] [cursor=pointer]:
+        - /url: repairs.html
+      - link "Upgrades" [ref=e17] [cursor=pointer]:
+        - /url: upgrades.html
+      - link "Contact" [ref=e18] [cursor=pointer]:
+        - /url: contact.html
+      - link "TCG Inventory" [ref=e19] [cursor=pointer]:
+        - /url: https://playtowingames.crystalcommerce.com/
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - paragraph [ref=e22]: Buy · Sell · Trade
+      - heading "Walk in with your collection. Walk out with cash." [level=1] [ref=e23]
+      - paragraph [ref=e24]: Same-day offers on video games, consoles, accessories, TCG singles, sealed product, toys-to-life figures, and full collections. Take cash, take store credit, or trade straight into your next find.
+      - generic [ref=e25]:
+        - link "Visit the Store" [ref=e26] [cursor=pointer]:
+          - /url: contact.html
+        - 'link "Call: 865-910-8357" [ref=e27] [cursor=pointer]':
+          - /url: tel:+18659108357
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - paragraph [ref=e30]: What we buy
+        - heading "Bring it all — we’re interested." [level=2] [ref=e31]
+      - generic [ref=e32]:
+        - article [ref=e33]:
+          - heading "Video Games" [level=3] [ref=e34]
+          - paragraph [ref=e35]: Retro through modern. NES, SNES, N64, Genesis, GameCube, PS1–PS5, Xbox through Series X, Switch, handhelds, and Japanese imports.
+        - article [ref=e36]:
+          - heading "Consoles & Handhelds" [level=3] [ref=e37]
+          - paragraph [ref=e38]: Working or broken — we buy both. Boxed and CIB units get top dollar. Even parts consoles have value.
+        - article [ref=e39]:
+          - heading "TCG Singles & Sealed" [level=3] [ref=e40]
+          - paragraph [ref=e41]: Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, Digimon, Gundam, Riftbound, and more. Loose singles, sealed product, and graded slabs.
+        - article [ref=e42]:
+          - heading "Accessories & Supplies" [level=3] [ref=e43]
+          - paragraph [ref=e44]: Controllers, cables, memory cards, light guns, peripherals, playmats, sleeves, deck boxes, binders — if it’s game-related, bring it in.
+        - article [ref=e45]:
+          - heading "Full Collections" [level=3] [ref=e46]
+          - paragraph [ref=e47]: Inherited a basement full of games? Closing out a binder? We buy collections big and small, and can travel for the right lot.
+        - article [ref=e48]:
+          - heading "Strategy & Memorabilia" [level=3] [ref=e49]
+          - paragraph [ref=e50]: Strategy guides, manuals, promotional items, store displays, and gaming memorabilia from any era.
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - paragraph [ref=e53]: Big trades & notable finds
+        - heading "Some of what’s come through." [level=2] [ref=e54]
+        - paragraph [ref=e55]: A taste of the collections, rare hardware, and sealed product that’s walked in the door. Bring yours in — you might end up here.
+      - generic [ref=e56]:
+        - paragraph [ref=e57]: Retro & Modern
+        - heading "Video Games & Consoles" [level=2] [ref=e58]
+        - paragraph [ref=e59]: From Game Boys to Xbox Series X — complete collections, rare hardware, and sealed product that’s passed through the shop.
+      - generic [ref=e60]:
+        - figure "Handhelds" [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: Handhelds
+          - generic [ref=e63]:
+            - img [ref=e64]
+            - generic [ref=e67]: Photo coming soon
+        - figure "Nintendo" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]: Nintendo
+          - generic [ref=e70]:
+            - img [ref=e71]
+            - generic [ref=e74]: Photo coming soon
+        - figure "PlayStation" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: PlayStation
+          - generic [ref=e77]:
+            - img [ref=e78]
+            - generic [ref=e81]: Photo coming soon
+        - figure "Xbox" [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: Xbox
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - generic [ref=e88]: Photo coming soon
+        - figure "Retro Consoles" [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]: Retro Consoles
+          - generic [ref=e91]:
+            - img [ref=e92]
+            - generic [ref=e95]: Photo coming soon
+      - generic [ref=e96]:
+        - paragraph [ref=e97]: Singles, Sealed & Graded
+        - heading "Trading Card Games" [level=2] [ref=e98]
+        - paragraph [ref=e99]: "Pokémon, Magic: The Gathering, Yu-Gi-Oh! — vintage holos, PSA-graded slabs, and sealed product collectors dream about."
+      - generic [ref=e100]:
+        - figure "Modern Pokémon" [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]: Modern Pokémon
+          - generic [ref=e103]:
+            - img [ref=e104]
+            - generic [ref=e107]: Photo coming soon
+        - figure "Vintage Pokémon" [ref=e108] [cursor=pointer]:
+          - generic [ref=e109]: Vintage Pokémon
+          - generic [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e114]: Photo coming soon
+        - 'figure "Magic: The Gathering" [ref=e115] [cursor=pointer]':
+          - generic [ref=e116]: "Magic: The Gathering"
+          - generic [ref=e117]:
+            - img [ref=e118]
+            - generic [ref=e121]: Photo coming soon
+        - figure "Yu-Gi-Oh!" [ref=e122] [cursor=pointer]:
+          - generic [ref=e123]: Yu-Gi-Oh!
+          - generic [ref=e124]:
+            - img [ref=e125]
+            - generic [ref=e128]: Photo coming soon
+        - figure "Sealed Product" [ref=e129] [cursor=pointer]:
+          - generic [ref=e130]: Sealed Product
+          - generic [ref=e131]:
+            - img [ref=e132]
+            - generic [ref=e135]: Photo coming soon
+      - generic [ref=e136]:
+        - paragraph [ref=e137]: Skylanders · Amiibo · Disney Infinity · LEGO Dimensions
+        - heading "Toys-to-Life" [level=2] [ref=e138]
+        - paragraph [ref=e139]: One of the deepest toys-to-life inventories in town — loose figures, sealed product, portal sets, and chase variants. Always buying.
+      - generic [ref=e140]:
+        - figure "The Collection" [ref=e141] [cursor=pointer]:
+          - generic [ref=e142]: The Collection
+          - generic [ref=e143]:
+            - img [ref=e144]
+            - generic [ref=e147]: Photo coming soon
+        - figure "Complete Animal Crossing Amiibo" [ref=e148] [cursor=pointer]:
+          - generic [ref=e149]: Complete Animal Crossing Amiibo
+          - generic [ref=e150]:
+            - img [ref=e151]
+            - generic [ref=e154]: Photo coming soon
+    - generic [ref=e155]:
+      - generic [ref=e156]:
+        - paragraph [ref=e157]: How it works
+        - heading "Three steps, same day." [level=2] [ref=e158]
+      - generic [ref=e159]:
+        - article [ref=e160]:
+          - generic [ref=e161]: "01"
+          - heading "Bring It In" [level=3] [ref=e162]
+          - paragraph [ref=e163]: Walk in any time during store hours — no appointment needed. For big collections, give us a heads up and we’ll clear the counter.
+        - article [ref=e164]:
+          - generic [ref=e165]: "02"
+          - heading "We Evaluate" [level=3] [ref=e166]
+          - paragraph [ref=e167]: Our team checks condition, completeness, and current market value. Most evaluations wrap up the same visit.
+        - article [ref=e168]:
+          - generic [ref=e169]: "03"
+          - heading "Cash or Credit" [level=3] [ref=e170]
+          - paragraph [ref=e171]:
+            - text: Take cash on the spot, take store credit (worth more — up to
+            - strong [ref=e172]: 50%
+            - text: on video games, 20% on consoles, 10% on TCG; bulk is flat), or apply it directly to a trade. Whatever works for you.
+      - paragraph [ref=e173]:
+        - text: Common trade-in questions — what we buy, how to sort cards, how we price TCGs — answered in the
+        - link "FAQ" [ref=e174] [cursor=pointer]:
+          - /url: faq.html
+        - text: . Bringing TCG bulk? See our
+        - link "bulk rates" [ref=e175] [cursor=pointer]:
+          - /url: bulk-rates.html
+        - text: .
+    - generic [ref=e176]:
+      - generic [ref=e177]:
+        - paragraph [ref=e178]: Get the best offer
+        - heading "A few small things move the needle." [level=2] [ref=e179]
+        - list [ref=e180]:
+          - listitem [ref=e181]:
+            - text: ✓
+            - strong [ref=e182]: Bring everything.
+            - text: Original box, manual, inserts, all cables and controllers — complete items always offer more.
+          - listitem [ref=e183]:
+            - text: ✓
+            - strong [ref=e184]: Test before you bring.
+            - text: If you know it works, say so. We’ll still test, but it speeds things up.
+          - listitem [ref=e185]:
+            - text: ✓
+            - strong [ref=e186]: Clean is better.
+            - text: A wipe-down on consoles and a quick look through card binders helps us move faster.
+          - listitem [ref=e187]:
+            - text: ✓
+            - strong [ref=e188]: Sleeve your singles.
+            - text: Cards in penny sleeves or a binder get valued more efficiently than loose stacks.
+          - listitem [ref=e189]:
+            - text: ✓
+            - strong [ref=e190]: Don’t toss the “junk.”
+            - text: Bring the broken stuff, the loose discs, the obscure accessories. You’d be surprised what we’ll buy.
+      - img "Play2Win Games store interior with display cases and shelves" [ref=e192]
+    - generic [ref=e193]:
+      - generic [ref=e194]:
+        - paragraph [ref=e195]: Ready when you are
+        - heading "Stop by — we’re always buying." [level=2] [ref=e196]
+        - paragraph [ref=e197]: Open seven days a week. Cash or credit, every offer is no-obligation. If you’d rather talk first, give us a call and we’ll walk through what to expect.
+      - link "Find the Store" [ref=e198] [cursor=pointer]:
+        - /url: contact.html
+    - region "Leave a Google review" [ref=e199]:
+      - paragraph [ref=e200]: Got a fair offer? A quick Google review helps other locals find us when they’re ready to trade.
+      - link "Leave a Google Review" [ref=e201] [cursor=pointer]:
+        - /url: https://g.page/r/CSxEUPh9daG2EAE/review
+  - contentinfo [ref=e202]:
+    - generic [ref=e203]:
+      - img [ref=e204]
+      - img "Play 2 Win Games" [ref=e205]
+      - paragraph [ref=e206]: Whenever you play, Play 2 Win!
+    - generic [ref=e207]:
+      - paragraph [ref=e208]:
+        - text: 3903 Western Avenue, Knoxville, TN 37921 ·
+        - link "865-910-8357" [ref=e209] [cursor=pointer]:
+          - /url: tel:+18659108357
+        - text: ·
+        - link "inquiries@play2wingames.com" [ref=e210] [cursor=pointer]:
+          - /url: mailto:inquiries@play2wingames.com
+      - paragraph [ref=e211]: Sun 11–7 · Mon–Thu 11–9 · Fri–Sat 11–11
+      - navigation "Footer" [ref=e212]:
+        - link "Facebook" [ref=e213] [cursor=pointer]:
+          - /url: https://www.facebook.com/P2WGames/
+        - link "Discord" [ref=e214] [cursor=pointer]:
+          - /url: https://discord.gg/m44gYFFSd8
+        - link "FAQ" [ref=e215] [cursor=pointer]:
+          - /url: faq.html
+        - link "Team" [ref=e216] [cursor=pointer]:
+          - /url: team.html
+        - link "About Us" [ref=e217] [cursor=pointer]:
+          - /url: about.html
+        - link "Careers" [ref=e218] [cursor=pointer]:
+          - /url: careers.html
+        - link "Privacy" [ref=e219] [cursor=pointer]:
+          - /url: privacy.html

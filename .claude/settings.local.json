@@ -15,7 +15,8 @@
       "mcp__playwright__browser_evaluate",
       "Bash(kill %1)",
       "Bash(pkill -f \"http.server 8765\")",
-      "mcp__playwright__browser_close"
+      "mcp__playwright__browser_close",
+      "Bash(git *)"
     ]
   }
 }
