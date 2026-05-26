@@ -553,6 +553,10 @@ h3 {
   background: var(--surface);
 }
 
+.category-grid article h3 {
+  font-size: 1.32rem;
+}
+
 .page-hero {
   min-height: clamp(460px, 64vh, 600px);
   padding-block: clamp(84px, 11vw, 132px) clamp(48px, 8vw, 82px);
