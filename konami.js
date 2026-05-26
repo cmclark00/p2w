@@ -136,8 +136,8 @@
     });
   }
 
-  let board, current, next, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
-  let ctx, nextCtx, scoreEl, levelEl, linesEl;
+  let board, current, next, hold, canHold, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
+  let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl;
   let overlay;
   let initialsMode = false;
 
@@ -164,6 +164,9 @@
             '<div class="konami-stat"><strong>Score</strong><span id="kn-score">0</span></div>' +
             '<div class="konami-stat"><strong>Level</strong><span id="kn-level">1</span></div>' +
             '<div class="konami-stat"><strong>Lines</strong><span id="kn-lines">0</span></div>' +
+            '<div class="konami-stat"><strong>Hold</strong>' +
+              '<canvas id="kn-hold" width="96" height="96"></canvas>' +
+            '</div>' +
             '<div class="konami-stat"><strong>Next</strong>' +
               '<canvas id="kn-next" width="96" height="96"></canvas>' +
             '</div>' +
@@ -171,7 +174,7 @@
         '</div>' +
         '<p class="konami-controls">' +
           '<span>← →</span> MOVE &middot; <span>↑</span> ROTATE &middot; <span>↓</span> SOFT DROP &middot; ' +
-          '<span>SPACE</span> HARD DROP &middot; <span>P</span> PAUSE &middot; <span>ESC</span> QUIT' +
+          '<span>SPACE</span> HARD DROP &middot; <span>C</span> HOLD &middot; <span>P</span> PAUSE &middot; <span>ESC</span> QUIT' +
         '</p>' +
         '<div id="kn-overlay-msg" class="kn-msg" hidden></div>' +
       '</div>';
@@ -183,6 +186,7 @@
 
     ctx = overlay.querySelector('#kn-board').getContext('2d');
     nextCtx = overlay.querySelector('#kn-next').getContext('2d');
+    holdCtx = overlay.querySelector('#kn-hold').getContext('2d');
     scoreEl = overlay.querySelector('#kn-score');
     levelEl = overlay.querySelector('#kn-level');
     linesEl = overlay.querySelector('#kn-lines');
@@ -206,6 +210,7 @@
     score = 0; level = 1; lines = 0;
     dropMs = 800; dropAcc = 0; lastTime = 0;
     gameOver = false; paused = false;
+    hold = null; canHold = true;
     next = spawnPiece();
     current = spawnPiece();
     updateStats();
@@ -251,8 +256,25 @@
     clearLines();
     current = next;
     next = spawnPiece();
+    canHold = true;
     if (collides(current, 0, 0, 0)) gameOver = true;
     if (gameOver) showGameOver();
+  }
+
+  function holdPiece() {
+    if (!canHold) return;
+    const curType = current.type;
+    if (hold === null) {
+      hold = curType;
+      current = next;
+      next = spawnPiece();
+    } else {
+      const swapType = hold;
+      hold = curType;
+      current = { type: swapType, rot: 0, x: swapType === 'O' ? 4 : 3, y: swapType === 'I' ? -1 : 0 };
+    }
+    canHold = false;
+    if (collides(current, 0, 0, 0)) { gameOver = true; showGameOver(); }
   }
 
   function clearLines() {
@@ -326,6 +348,7 @@
       case 'x': case 'X': rotate(1); e.preventDefault(); break;
       case 'z': case 'Z': rotate(-1); e.preventDefault(); break;
       case ' ':          hardDrop(); e.preventDefault(); break;
+      case 'c': case 'C': case 'Shift': holdPiece(); e.preventDefault(); break;
     }
   }
 
@@ -348,6 +371,7 @@
   function drawAll() {
     drawBoard();
     drawNext();
+    drawHold();
   }
 
   function drawBoard() {
@@ -420,30 +444,35 @@
     c.strokeRect(px + 2, py + 2, BLOCK - 4, BLOCK - 4);
   }
 
-  function drawNext() {
-    nextCtx.fillStyle = '#15132a';
-    nextCtx.fillRect(0, 0, 96, 96);
-    const s = PIECES[next.type][0];
+  function drawPreview(c, type, dim) {
+    c.fillStyle = '#15132a';
+    c.fillRect(0, 0, 96, 96);
+    if (!type) return;
+    const s = PIECES[type][0];
     const size = 18;
     const cellW = s[0].length, cellH = s.length;
     const offX = (96 - cellW * size) / 2;
     const offY = (96 - cellH * size) / 2;
+    const color = dim ? '#5a5774' : COLORS[type];
     for (let i = 0; i < cellH; i++) {
       for (let j = 0; j < cellW; j++) {
         if (s[i][j]) {
           const px = offX + j * size, py = offY + i * size;
-          nextCtx.fillStyle = COLORS[next.type];
-          nextCtx.fillRect(px, py, size, size);
-          nextCtx.fillStyle = 'rgba(255,255,255,0.18)';
-          nextCtx.fillRect(px, py, size, 2);
-          nextCtx.fillRect(px, py, 2, size);
-          nextCtx.fillStyle = 'rgba(0,0,0,0.28)';
-          nextCtx.fillRect(px, py + size - 2, size, 2);
-          nextCtx.fillRect(px + size - 2, py, 2, size);
+          c.fillStyle = color;
+          c.fillRect(px, py, size, size);
+          c.fillStyle = 'rgba(255,255,255,0.18)';
+          c.fillRect(px, py, size, 2);
+          c.fillRect(px, py, 2, size);
+          c.fillStyle = 'rgba(0,0,0,0.28)';
+          c.fillRect(px, py + size - 2, size, 2);
+          c.fillRect(px + size - 2, py, 2, size);
         }
       }
     }
   }
+
+  function drawNext() { drawPreview(nextCtx, next.type, false); }
+  function drawHold() { drawPreview(holdCtx, hold, !canHold); }
 
   function updateStats() {
     scoreEl.textContent = score.toLocaleString();

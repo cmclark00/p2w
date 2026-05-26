@@ -3194,7 +3194,8 @@ h3 {
   text-shadow: 0 0 14px rgba(241, 200, 75, 0.5);
 }
 
-#kn-next {
+#kn-next,
+#kn-hold {
   background: #15132a;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
