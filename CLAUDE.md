@@ -321,6 +321,14 @@ Both via **Formspree** (endpoints are public client-side by design):
   their keep in *empty states, brand stamps, and narrative intros*, not as
   gratuitous decoration. The current set is deliberate; expand only with a
   reason.
+- **Trade-in store-credit bumps (tiered).** Store credit pays more than
+  cash on trade-ins, by category: **video games 50% more**, **consoles &
+  handhelds 20% more**, **TCG singles/sealed/graded 10% more**, **TCG
+  bulk is flat** (cash = store credit). Visible in: `faq.html` "Cash or
+  store credit" entry (visible + JSON-LD), `sell-trade.html` step 3 of
+  the How-it-works flow, `bulk-rates.html` centered disclaimer (the
+  "flat" half of the rule). All four must stay in sync if the numbers
+  ever change.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
   sell-framed copy (home "What we carry" 5th card, home split-section
