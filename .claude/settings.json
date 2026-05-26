@@ -108,7 +108,9 @@
       "Bash(sed -n '57,68p' events.html)",
       "Bash(sed -n '57,68p' event-inquiry.html)",
       "Bash(git -C \"C:\\\\Users\\\\Corey Clark\\\\Documents\\\\p2w_site\" -c user.name=\"Corey Clark\" -c user.email=\"playtowingames@hotmail.com\" commit -m \"Sync: bulk pricing clarification + Bulk Rates nav item\")",
-      "Bash(python scripts/build-team-guide-print.py)"
+      "Bash(python scripts/build-team-guide-print.py)",
+      "WebSearch",
+      "Bash(git mv *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Corey Clark\\Documents\\p2w_site",

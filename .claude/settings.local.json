@@ -5,7 +5,17 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(claude mcp *)",
+      "Bash(python *)",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_evaluate",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"http.server 8765\")",
+      "mcp__playwright__browser_close"
     ]
   }
 }
