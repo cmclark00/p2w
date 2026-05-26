@@ -278,7 +278,6 @@ Both via **Formspree** (endpoints are public client-side by design):
 
 - `assets/team/*.jpg` photos + manager/owner bios on `team.html`.
 - `assets/repair-techs.jpg` + Keith Stevens' bio on `repairs.html`.
-- About-page copy rewrite (owner direction needed).
 - **All `mods/` + `showcase/` photos were deleted** (being re-shot; saved
   ~50 MB). Every card on `upgrades.html` and `sell-trade.html` now shows
   the standard placeholder, with the original `<img>` preserved in an
