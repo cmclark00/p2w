@@ -1113,7 +1113,7 @@ h3 {
     var(--surface);
 }
 
-.mods-hero {
+.upgrades-hero {
   background:
     linear-gradient(120deg, rgba(49, 94, 203, 0.28), rgba(217, 31, 56, 0.18), rgba(156, 31, 166, 0.2)),
     var(--surface);

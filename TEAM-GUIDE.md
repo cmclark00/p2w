@@ -245,7 +245,7 @@ top of the pricing section.
 
 **When to do this:** Parts cost shifted; you added a new mod.
 
-**File to edit:** `mods.html` (only).
+**File to edit:** `upgrades.html` (only).
 
 Same pattern as the repairs page. Look for the **`<section
 class="pricing">`** block. Each console family has its own

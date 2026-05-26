@@ -77,7 +77,7 @@ deploy path.
   `https://cmclark00.github.io/p2w/` → `https://play2wingames.com/` in: all
   HTML files (canonical, `og:url`, `og:image`, JSON-LD `url`/`image`),
   `sitemap.xml`, `robots.txt`, and the privacy.html effective/updated date.
-  As of this writing: **75 occurrences across 15 HTML files + sitemap.xml +
+  As of this writing: **76 occurrences across 16 HTML files + sitemap.xml +
   robots.txt**. ⚠️ **Exclude `.claude/settings.json`** — local tooling
   config, not part of the site, never committed.
 - 🔑 DNS/SSL at GoDaddy: point domain at hosting (usually auto-wired when
@@ -189,7 +189,8 @@ branch is safe.
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
 | `event-inquiry.html` | Event-hosting inquiry form → Formspree `xjglnaew` (inline form). |
 | `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (bio pending), Google review prompt at bottom. |
-| `mods.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons); CTA → upgrade-request. |
+| `upgrades.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons); CTA → upgrade-request. (Renamed from `mods.html` — old URL is a redirect file.) |
+| `mods.html` | Redirect → `upgrades.html` (kept for old links). |
 | `upgrade-request.html` | Handheld upgrade intake form. Uses `assets/files/intake-form.css` + `intake-form.js` (Formspree `xaqvrbjn`). |
 | `team.html` | Owners + managers. Names filled; **bios & photos still placeholders.** |
 | `faq.html` | 2-column accordion FAQ + `FAQPage` JSON-LD. |
@@ -278,9 +279,9 @@ Both via **Formspree** (endpoints are public client-side by design):
 - `assets/repair-techs.jpg` + Keith Stevens' bio on `repairs.html`.
 - About-page copy rewrite (owner direction needed).
 - **All `mods/` + `showcase/` photos were deleted** (being re-shot; saved
-  ~50 MB). Every card on `mods.html` and `sell-trade.html` now shows the
-  standard placeholder, with the original `<img>` preserved in an HTML
-  comment right below it. To restore: drop the new photo into
+  ~50 MB). Every card on `upgrades.html` and `sell-trade.html` now shows
+  the standard placeholder, with the original `<img>` preserved in an
+  HTML comment right below it. To restore: drop the new photo into
   `assets/mods/` or `assets/showcase/`, delete that card's
   `.mod-placeholder` / `.showcase-photo-placeholder` div, and uncomment
   the `<img>`. **Optimize the new shots first: resize ≤1600px long edge,
@@ -291,7 +292,7 @@ Both via **Formspree** (endpoints are public client-side by design):
 
 - `WEBSITE-AGREEMENT.md` is **git-ignored** (private handoff/portfolio agreement
   between Corey Clark and owners Mark Spears & Josiah Miller) — never commit it.
-- **Pricing formula** (applies to both `repairs.html` and `mods.html` pricing
+- **Pricing formula** (applies to both `repairs.html` and `upgrades.html` pricing
   rows): **labor is $60/hr, parts are billed at our cost + 20%**. Disclosed
   publicly in the `.pricing-disclaimer` block on `repairs.html`. New pricing
   rows must follow this formula so quotes and the page agree. (Deep-clean has
