@@ -79,6 +79,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://cmclark00.github.io/p2w/careers.html</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://cmclark00.github.io/p2w/privacy.html</loc>
     <lastmod>2026-05-17</lastmod>
     <changefreq>yearly</changefreq>

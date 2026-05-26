@@ -358,6 +358,40 @@
 
 .ptw-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Side-by-side primary + secondary action buttons (used on careers.html) */
+.careers-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.careers-actions .ptw-submit-btn {
+  width: auto;
+}
+
+.ptw-submit-btn--secondary {
+  background: transparent;
+  color: var(--ptw-accent);
+  border: 2px solid var(--ptw-accent);
+  box-shadow: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ptw-submit-btn--secondary:hover,
+.ptw-submit-btn--secondary:focus-visible {
+  background: rgba(217, 31, 56, 0.12);
+  color: var(--ptw-accent);
+  box-shadow: 0 8px 22px rgba(217, 31, 56, 0.25);
+}
+
+@media (max-width: 600px) {
+  .careers-actions { grid-template-columns: 1fr; }
+}
+
 .ptw-submit-note {
   font-size: 0.78rem;
   color: var(--ptw-text-hint);

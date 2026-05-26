@@ -77,7 +77,7 @@ deploy path.
   `https://cmclark00.github.io/p2w/` → `https://play2wingames.com/` in: all
   HTML files (canonical, `og:url`, `og:image`, JSON-LD `url`/`image`),
   `sitemap.xml`, `robots.txt`, and the privacy.html effective/updated date.
-  As of this writing: **76 occurrences across 16 HTML files + sitemap.xml +
+  As of this writing: **81 occurrences across 17 HTML files + sitemap.xml +
   robots.txt**. ⚠️ **Exclude `.claude/settings.json`** — local tooling
   config, not part of the site, never committed.
 - 🔑 DNS/SSL at GoDaddy: point domain at hosting (usually auto-wired when
@@ -195,6 +195,7 @@ branch is safe.
 | `team.html` | Owners + managers. Names filled; **bios & photos still placeholders.** |
 | `faq.html` | 2-column accordion FAQ + `FAQPage` JSON-LD. |
 | `contact.html` | Store info (phone, email, Facebook, Discord), hours, **click-to-load** Google Map. |
+| `careers.html` | Application page for shop hires. Standalone Formspree form (placeholder endpoint `XXXXXXXX` until shop creates one) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
@@ -315,7 +316,7 @@ Both via **Formspree** (endpoints are public client-side by design):
   is `assets/shop-header.png` (large); a smaller `assets/bulky-mascot.webp`
   (~35 KB, 360×404) is used for the lighter placements. Current footprint:
   hero collage (center tile), home split-section (`shop-header.png` as
-  `.mascot-img`), Konami modal, **footer mascot** on all 14 pages
+  `.mascot-img`), Konami modal, **footer mascot** on all 15 pages
   (`.footer-mascot`, 44px), **events-empty state** (`.events-empty-mascot`,
   140px), and the **"Meet the mascot" split-section on `about.html`**.
   **Don't add Bulky to every page-hero or service section** — mascots earn

@@ -593,6 +593,12 @@ h3 {
     var(--surface);
 }
 
+.careers-hero {
+  background:
+    linear-gradient(120deg, rgba(217, 31, 56, 0.22), rgba(241, 200, 75, 0.18), rgba(49, 94, 203, 0.14)),
+    var(--surface);
+}
+
 .contact-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
