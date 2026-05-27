@@ -56,12 +56,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 5,
@@ -200,12 +200,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 14,
@@ -328,12 +328,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 22,
@@ -472,12 +472,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 31,
@@ -600,12 +600,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 39,
@@ -744,12 +744,12 @@
     "time": "2:30 PM",
     "time24": "14:30",
     "entry": "Free",
-    "format": "See description",
+    "format": "Casual",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
-    "recurring": null,
-    "description": "Pokemon Locals"
+    "recurring": "Every Sunday",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nAll skill levels welcome"
   },
   {
     "id": 48,
