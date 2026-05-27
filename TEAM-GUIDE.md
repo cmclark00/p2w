@@ -22,6 +22,7 @@ is nothing here you can permanently break.
   - [Update TCG bulk rates](#update-tcg-bulk-rates)
   - [Update a team member or add a new one](#update-a-team-member)
   - [Update an FAQ answer](#update-an-faq-answer)
+  - [Add or edit a calendar event](#add-or-edit-a-calendar-event)
   - [Edit the careers page](#edit-the-careers-page)
   - [Swap out a featured Google review](#swap-out-a-featured-google-review)
   - [Update the Google review link](#update-the-google-review-link)
@@ -415,6 +416,111 @@ they don't, Google might show outdated info in search results.
 Easier to copy an existing one in both places. Ask the technical
 contact the first time if you're not sure — the JSON-LD format is
 fussy about commas.
+
+---
+
+### Add or edit a calendar event
+
+**When to do this:** New tournament, league night, release party,
+or you want to change an existing one (price, time, description,
+cancel it).
+
+**Where to edit:** **Google Calendar.** Do **not** edit
+`events.json` directly — a nightly automation pulls events from
+the shop's Google Calendar and rewrites `events.json` to match.
+Whatever's in Calendar wins.
+
+**What appears on the site:** the next **7 days** of events.
+Anything farther out exists in Calendar but doesn't render on
+the events page yet.
+
+#### The basics
+
+1. Open the shop's Google Calendar.
+2. Create a normal event — title, date, start time.
+3. If it repeats (weekly locals, monthly tournament), use
+   Google Calendar's built-in **"Repeat"** dropdown ("Weekly on
+   Monday," "Monthly on the first Friday," etc.). Don't make
+   ten separate events.
+4. The event title controls which **game filter tab** the event
+   shows up on. The script auto-detects from the title:
+   - "Pokemon" / "Pokémon" → Pokémon tab
+   - "Magic" / "MTG" / "FNM" / "Friday Night Magic" → Magic tab
+   - "Yu-Gi-Oh" / "yugioh" → Yu-Gi-Oh! tab
+   - "Lorcana", "Digimon", "Gundam", "Smash", "Riftbound" → matching tabs
+   - Anything else → "Other" tab
+
+   So a title like **"Monday Pokemon Locals"** lands on the
+   Pokémon tab automatically — no extra steps.
+
+#### The description box (this is where the structured info goes)
+
+The description has **two parts** separated by a single line
+containing only `---`:
+
+- **Above the `---`:** free-form description that shows up on the
+  card (what the event is, who it's for, what to bring).
+- **Below the `---`:** structured fields the website reads to
+  render the entry fee, format, capacity, register button, and
+  "recurring" badge.
+
+**Paste-ready template:**
+
+```
+Casual + competitive Pokémon TCG locals every Monday night.
+All skill levels welcome — bring sleeves, dice, and a deck
+list (we'll print one for you if needed).
+
+---
+entry: $5
+format: Casual & Competitive
+recurring: Every Monday
+```
+
+That description, paired with the title `Monday Pokemon Locals`,
+produces a card that says:
+
+- Game: **Pokémon** (auto-detected from title)
+- Entry: **$5 entry fee**
+- Format: **Casual & Competitive**
+- Badge: **🔁 Every Monday**
+- Description body: the paragraph above the `---`
+
+#### All the structured fields you can use
+
+| Field | What it shows | Example | Notes |
+|---|---|---|---|
+| `entry` | Entry-fee line on the card | `entry: $5` | Use a literal `$`, or write `Free` or `TBA`. Defaults to **TBA** if missing. |
+| `format` | Format line under the time | `format: Swiss, 3 rounds` | Free text. Defaults to **"See description"**. |
+| `capacity` | Used with `registered` to show "X of Y spots open" progress bar | `capacity: 24` | Must be a number. Does nothing alone — needs `registered` too. |
+| `registered` | Current sign-ups (drives the progress bar) | `registered: 8` | Must be a number. |
+| `registerUrl` | Link the **"Register Now"** button points at | `registerUrl: https://www.facebook.com/events/12345` | If missing, the button links to the Facebook page. |
+| `recurring` | "🔁 Every Monday" badge on the card | `recurring: Every Monday` | **This is just a label.** The actual repetition still has to be set in Google Calendar's Repeat dropdown. |
+| `game` | Force the game-filter tab | `game: pokemon` | **Usually skip this** — the title auto-detects. Only set if the title doesn't include a recognized game name. Valid: `pokemon`, `magic`, `yugioh`, `lorcana`, `digimon`, `gundam`, `smash`, `riftbound`, `other`. |
+| `gameLabel` | Custom game-tag display text | `gameLabel: Magic: The Gathering` | Usually skip — auto-set from `game`. |
+
+#### Gotchas
+
+- **The `---` must be alone on its own line** — no spaces before
+  or after. If it's wrong, the metadata won't parse and you'll
+  get default values everywhere.
+- **Space after the colon matters.** Write `entry: $5`, not
+  `entry:$5`. The latter silently fails.
+- **Skip a field if you don't have a value.** Leaving
+  `registerUrl:` blank with nothing after it is the same as not
+  including it. Don't write `registerUrl: TBA` — that becomes a
+  broken link.
+- **No `---` at all = the whole description shows verbatim.**
+  Entry fee, format, etc. all fall back to defaults ("TBA",
+  "See description"). Fine if you don't have the details yet.
+
+#### How long until it shows up on the site?
+
+The events automation runs **once a night** (early morning UTC).
+After you add/edit/cancel an event in Calendar, it typically
+shows up on the site by next morning. To push it live sooner,
+ask the dev to manually trigger the **"Sync events from Google
+Calendar"** workflow in GitHub Actions — it takes about a minute.
 
 ---
 

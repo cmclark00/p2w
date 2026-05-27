@@ -142,6 +142,7 @@ is nothing here you can permanently break.</p>
 <li><a href="#update-tcg-bulk-rates">Update TCG bulk rates</a></li>
 <li><a href="#update-a-team-member">Update a team member or add a new one</a></li>
 <li><a href="#update-an-faq-answer">Update an FAQ answer</a></li>
+<li><a href="#add-or-edit-a-calendar-event">Add or edit a calendar event</a></li>
 <li><a href="#edit-the-careers-page">Edit the careers page</a></li>
 <li><a href="#swap-out-a-featured-google-review">Swap out a featured Google review</a></li>
 <li><a href="#update-the-google-review-link">Update the Google review link</a></li>
@@ -488,6 +489,147 @@ they don't, Google might show outdated info in search results.</p>
 <p>Easier to copy an existing one in both places. Ask the technical
 contact the first time if you're not sure — the JSON-LD format is
 fussy about commas.</p>
+<hr>
+<h3 id="add-or-edit-a-calendar-event">Add or edit a calendar event</h3>
+<p><strong>When to do this:</strong> New tournament, league night, release party,
+or you want to change an existing one (price, time, description,
+cancel it).</p>
+<p><strong>Where to edit:</strong> <strong>Google Calendar.</strong> Do <strong>not</strong> edit
+<code>events.json</code> directly — a nightly automation pulls events from
+the shop's Google Calendar and rewrites <code>events.json</code> to match.
+Whatever's in Calendar wins.</p>
+<p><strong>What appears on the site:</strong> the next <strong>7 days</strong> of events.
+Anything farther out exists in Calendar but doesn't render on
+the events page yet.</p>
+<h4 id="the-basics">The basics</h4>
+<ol>
+<li>Open the shop's Google Calendar.</li>
+<li>Create a normal event — title, date, start time.</li>
+<li>If it repeats (weekly locals, monthly tournament), use
+   Google Calendar's built-in <strong>"Repeat"</strong> dropdown ("Weekly on
+   Monday," "Monthly on the first Friday," etc.). Don't make
+   ten separate events.</li>
+<li>The event title controls which <strong>game filter tab</strong> the event
+   shows up on. The script auto-detects from the title:</li>
+<li>"Pokemon" / "Pokémon" → Pokémon tab</li>
+<li>"Magic" / "MTG" / "FNM" / "Friday Night Magic" → Magic tab</li>
+<li>"Yu-Gi-Oh" / "yugioh" → Yu-Gi-Oh! tab</li>
+<li>"Lorcana", "Digimon", "Gundam", "Smash", "Riftbound" → matching tabs</li>
+<li>Anything else → "Other" tab</li>
+</ol>
+<p>So a title like <strong>"Monday Pokemon Locals"</strong> lands on the
+   Pokémon tab automatically — no extra steps.</p>
+<h4 id="the-description-box-this-is-where-the-structured-info-goes">The description box (this is where the structured info goes)</h4>
+<p>The description has <strong>two parts</strong> separated by a single line
+containing only <code>---</code>:</p>
+<ul>
+<li><strong>Above the <code>---</code>:</strong> free-form description that shows up on the
+  card (what the event is, who it's for, what to bring).</li>
+<li><strong>Below the <code>---</code>:</strong> structured fields the website reads to
+  render the entry fee, format, capacity, register button, and
+  "recurring" badge.</li>
+</ul>
+<p><strong>Paste-ready template:</strong></p>
+<pre><code>Casual + competitive Pokémon TCG locals every Monday night.
+All skill levels welcome — bring sleeves, dice, and a deck
+list (we'll print one for you if needed).
+
+---
+entry: $5
+format: Casual &amp; Competitive
+recurring: Every Monday
+</code></pre>
+<p>That description, paired with the title <code>Monday Pokemon Locals</code>,
+produces a card that says:</p>
+<ul>
+<li>Game: <strong>Pokémon</strong> (auto-detected from title)</li>
+<li>Entry: <strong>$5 entry fee</strong></li>
+<li>Format: <strong>Casual &amp; Competitive</strong></li>
+<li>Badge: <strong>🔁 Every Monday</strong></li>
+<li>Description body: the paragraph above the <code>---</code></li>
+</ul>
+<h4 id="all-the-structured-fields-you-can-use">All the structured fields you can use</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it shows</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>entry</code></td>
+<td>Entry-fee line on the card</td>
+<td><code>entry: $5</code></td>
+<td>Use a literal <code>$</code>, or write <code>Free</code> or <code>TBA</code>. Defaults to <strong>TBA</strong> if missing.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td>Format line under the time</td>
+<td><code>format: Swiss, 3 rounds</code></td>
+<td>Free text. Defaults to <strong>"See description"</strong>.</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td>Used with <code>registered</code> to show "X of Y spots open" progress bar</td>
+<td><code>capacity: 24</code></td>
+<td>Must be a number. Does nothing alone — needs <code>registered</code> too.</td>
+</tr>
+<tr>
+<td><code>registered</code></td>
+<td>Current sign-ups (drives the progress bar)</td>
+<td><code>registered: 8</code></td>
+<td>Must be a number.</td>
+</tr>
+<tr>
+<td><code>registerUrl</code></td>
+<td>Link the <strong>"Register Now"</strong> button points at</td>
+<td><code>registerUrl: https://www.facebook.com/events/12345</code></td>
+<td>If missing, the button links to the Facebook page.</td>
+</tr>
+<tr>
+<td><code>recurring</code></td>
+<td>"🔁 Every Monday" badge on the card</td>
+<td><code>recurring: Every Monday</code></td>
+<td><strong>This is just a label.</strong> The actual repetition still has to be set in Google Calendar's Repeat dropdown.</td>
+</tr>
+<tr>
+<td><code>game</code></td>
+<td>Force the game-filter tab</td>
+<td><code>game: pokemon</code></td>
+<td><strong>Usually skip this</strong> — the title auto-detects. Only set if the title doesn't include a recognized game name. Valid: <code>pokemon</code>, <code>magic</code>, <code>yugioh</code>, <code>lorcana</code>, <code>digimon</code>, <code>gundam</code>, <code>smash</code>, <code>riftbound</code>, <code>other</code>.</td>
+</tr>
+<tr>
+<td><code>gameLabel</code></td>
+<td>Custom game-tag display text</td>
+<td><code>gameLabel: Magic: The Gathering</code></td>
+<td>Usually skip — auto-set from <code>game</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="gotchas">Gotchas</h4>
+<ul>
+<li><strong>The <code>---</code> must be alone on its own line</strong> — no spaces before
+  or after. If it's wrong, the metadata won't parse and you'll
+  get default values everywhere.</li>
+<li><strong>Space after the colon matters.</strong> Write <code>entry: $5</code>, not
+  <code>entry:$5</code>. The latter silently fails.</li>
+<li><strong>Skip a field if you don't have a value.</strong> Leaving
+  <code>registerUrl:</code> blank with nothing after it is the same as not
+  including it. Don't write <code>registerUrl: TBA</code> — that becomes a
+  broken link.</li>
+<li><strong>No <code>---</code> at all = the whole description shows verbatim.</strong>
+  Entry fee, format, etc. all fall back to defaults ("TBA",
+  "See description"). Fine if you don't have the details yet.</li>
+</ul>
+<h4 id="how-long-until-it-shows-up-on-the-site">How long until it shows up on the site?</h4>
+<p>The events automation runs <strong>once a night</strong> (early morning UTC).
+After you add/edit/cancel an event in Calendar, it typically
+shows up on the site by next morning. To push it live sooner,
+ask the dev to manually trigger the <strong>"Sync events from Google
+Calendar"</strong> workflow in GitHub Actions — it takes about a minute.</p>
 <hr>
 <h3 id="edit-the-careers-page">Edit the careers page</h3>
 <p><strong>When to do this:</strong> You want to change the listed roles, the
