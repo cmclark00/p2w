@@ -1,4 +1,4 @@
-# Play 2 Win Games — Handheld Upgrades Intake Form
+# Play2Win Games — Handheld Upgrades Intake Form
 
 A self-contained intake form for handheld upgrade drop-offs.
 Covers Game Boy / GBC, GBA, GBA SP, GBM/Micro, DS Lite, DSi/DSi XL, PSP, and PS Vita.

@@ -1,5 +1,5 @@
 /* ============================================
-   Play 2 Win Games — Handheld Upgrades Form
+   Play2Win Games — Handheld Upgrades Form
    intake-form.js
    ============================================
    Configuration:
