@@ -60,7 +60,7 @@ These are independent of GitHub and owned by Corey's accounts today:
 |---|---|---|
 | Google Calendar + service account | `sync-events.yml` → `events.json` | 🔑 Reissue a service account under the **shop's** Google account, share the shop calendar to it, reset repo secrets `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_CALENDAR_ID`. |
 | Firebase (`p2w-leaderboard`) | Konami leaderboard | 🔑 Add shop's Google account as Owner on the Firebase project, remove Corey's. Config in `konami.js` is public by design — no code change. Keep the locked Firestore rules. |
-| Formspree (`xaqvrbjn`, `xjglnaew`) | Upgrade + event-inquiry forms | 🔑 Recreate both forms under the shop's Formspree account → **new endpoint IDs** → update them in `assets/files/intake-form.js` and `event-inquiry.html`. |
+| Formspree (`xaqvrbjn`, `xjglnaew`, `mvzyvwzb`) | Upgrade, event-inquiry, careers forms | 🔑 Recreate all three forms under the shop's Formspree account → **new endpoint IDs** → update them in `assets/files/intake-form.js`, `event-inquiry.html`, and `careers.html`. Routing: upgrade + event → `inquiries@`; careers → `careers@`. |
 | Domain `play2wingames.com` | — | 🔑 Confirm it's in the shop's GoDaddy account. |
 
 ### Phase 3 — Hosting cutover (Pages → GoDaddy)
@@ -232,11 +232,13 @@ hand-edit `events.json`.
 
 ## Forms
 
-Both via **Formspree** (endpoints are public client-side by design):
+Three via **Formspree** (endpoints are public client-side by design):
 - Upgrade request: `assets/files/intake-form.js` →
-  `FORMSPREE_ENDPOINT = formspree.io/f/xaqvrbjn`.
+  `FORMSPREE_ENDPOINT = formspree.io/f/xaqvrbjn` (→ `inquiries@`).
 - Event inquiry: inline form in `event-inquiry.html` →
-  `formspree.io/f/xjglnaew`.
+  `formspree.io/f/xjglnaew` (→ `inquiries@`).
+- Careers application: inline form in `careers.html` →
+  `formspree.io/f/mvzyvwzb` (→ `careers@`, separate inbox).
 - Form styling: `assets/files/intake-form.css` (dark theme, scoped to
   `.ptw-form-page` / `.ptw-form-card`).
 

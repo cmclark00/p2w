@@ -21,7 +21,8 @@
       "PowerShell(git rebase *)",
       "Bash(echo \"exit=$?\")",
       "Bash(where python *)",
-      "Bash(where python3 *)"
+      "Bash(where python3 *)",
+      "Bash(rm -f qa-footer-about.png)"
     ]
   }
 }

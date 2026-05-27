@@ -22,6 +22,7 @@ is nothing here you can permanently break.
   - [Update TCG bulk rates](#update-tcg-bulk-rates)
   - [Update a team member or add a new one](#update-a-team-member)
   - [Update an FAQ answer](#update-an-faq-answer)
+  - [Edit the careers page](#edit-the-careers-page)
   - [Swap out a featured Google review](#swap-out-a-featured-google-review)
   - [Update the Google review link](#update-the-google-review-link)
   - [Update contact info — phone, email, address](#update-contact-info)
@@ -417,6 +418,69 @@ fussy about commas.
 
 ---
 
+### Edit the careers page
+
+**When to do this:** You want to change the listed roles, the
+intro copy, the "what we look for" blurb, or you want to pause
+hiring temporarily.
+
+**File to edit:** `careers.html`.
+
+**Where applications land.** Submitted applications go to
+**`careers@play2wingames.com`** (separate inbox from the general
+`inquiries@`). Resumes come in two ways — either via the **Send
+Resume** button (a mailto link that opens the applicant's mail
+app) or as a follow-up email from the applicant after submitting
+the form. Formspree's free tier can't accept file attachments
+through the form itself, so the two-step flow is intentional.
+
+#### Change the listed roles
+
+1. Open `careers.html`. Search (**Ctrl + F**) for
+   **`Roles we're currently hiring`** to find the role cards
+   section.
+2. Each role is an `<article>` with an `<h3>` (role title) and a
+   `<p>` (one-line description). Edit the text or copy/paste an
+   article to add a role.
+3. **Also update the role-interest checkboxes** in the form
+   itself — search for `name="role_interest"`. Each role listed
+   above should have a matching checkbox here. Add/remove
+   `<label class="ptw-upgrade-check">…</label>` lines to match.
+4. Commit with a message like
+   *"Careers: add Repair tech apprentice role"*.
+
+#### Pause hiring temporarily
+
+The cleanest way is to **replace the role cards section with a
+short message and hide the form**:
+
+1. In `careers.html`, find the `<section class="careers-form-section">`
+   line.
+2. Either delete that entire section, **or** wrap it in a
+   `<!-- … -->` HTML comment to hide without losing the markup.
+3. In the **"Roles we're currently hiring"** section above it,
+   replace the role cards with a one-line message like
+   *"We're not actively hiring right now — check back soon, or
+   email careers@play2wingames.com if you'd like us to keep
+   your résumé on file."*
+4. Commit. To re-enable hiring later: uncomment the form section
+   and restore the role cards (use **Revert** on the original
+   commit, see [Undoing a mistake](#undoing-a-mistake)).
+
+#### Change the receiving email
+
+The form action and the Send Resume button both reference
+`careers@play2wingames.com`. To route to a different address:
+
+1. Search across all files for `careers@play2wingames.com`.
+2. Update each occurrence to the new address.
+3. **Separately** — log into the shop's Formspree account and
+   update the form's notification email there too. The page-side
+   change alone won't reroute submissions; Formspree decides
+   where the email goes.
+
+---
+
 ### Swap out a featured Google review
 
 **When to do this:** A new amazing review came in that's better than
@@ -466,7 +530,8 @@ all files for each one.
 | What | Current value | Where it appears |
 |---|---|---|
 | Phone | `865-910-8357` (or `+18659108357` in some links) | Every page's header + footer, `contact.html`, `index.html` JSON-LD, `privacy.html` |
-| Email | `admin@play2wingames.com` | Every page's footer, `contact.html`, `index.html` JSON-LD, `privacy.html` |
+| Email (general) | `inquiries@play2wingames.com` | Every page's footer, `contact.html`, `index.html` JSON-LD, `privacy.html` |
+| Email (careers) | `careers@play2wingames.com` | `careers.html` (Send Resume button + form-success copy) |
 | Address | `3903 Western Avenue` | Every page's footer, `contact.html`, `index.html` JSON-LD, `privacy.html`, map link |
 
 **Rule:** if you change one, search across all files for the **old**
@@ -513,8 +578,8 @@ The forms run through a service called **Formspree**.
 1. Sign in at [formspree.io](https://formspree.io) with the shop's
    Formspree account (credentials should be in the shared password
    manager — see [External services](#external-services)).
-2. Look at the Upgrade Request and Event Inquiry forms — is the
-   account active? Are there submissions piling up?
+2. Look at the Upgrade Request, Event Inquiry, and Careers forms —
+   is the account active? Are there submissions piling up?
 3. Often the cause is a paused or out-of-quota Formspree account.
 
 ### Events aren't updating on the events page

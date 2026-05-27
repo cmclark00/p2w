@@ -142,6 +142,7 @@ is nothing here you can permanently break.</p>
 <li><a href="#update-tcg-bulk-rates">Update TCG bulk rates</a></li>
 <li><a href="#update-a-team-member">Update a team member or add a new one</a></li>
 <li><a href="#update-an-faq-answer">Update an FAQ answer</a></li>
+<li><a href="#edit-the-careers-page">Edit the careers page</a></li>
 <li><a href="#swap-out-a-featured-google-review">Swap out a featured Google review</a></li>
 <li><a href="#update-the-google-review-link">Update the Google review link</a></li>
 <li><a href="#update-contact-info">Update contact info — phone, email, address</a></li>
@@ -488,6 +489,62 @@ they don't, Google might show outdated info in search results.</p>
 contact the first time if you're not sure — the JSON-LD format is
 fussy about commas.</p>
 <hr>
+<h3 id="edit-the-careers-page">Edit the careers page</h3>
+<p><strong>When to do this:</strong> You want to change the listed roles, the
+intro copy, the "what we look for" blurb, or you want to pause
+hiring temporarily.</p>
+<p><strong>File to edit:</strong> <code>careers.html</code>.</p>
+<p><strong>Where applications land.</strong> Submitted applications go to
+<strong><code>careers@play2wingames.com</code></strong> (separate inbox from the general
+<code>inquiries@</code>). Resumes come in two ways — either via the <strong>Send
+Resume</strong> button (a mailto link that opens the applicant's mail
+app) or as a follow-up email from the applicant after submitting
+the form. Formspree's free tier can't accept file attachments
+through the form itself, so the two-step flow is intentional.</p>
+<h4 id="change-the-listed-roles">Change the listed roles</h4>
+<ol>
+<li>Open <code>careers.html</code>. Search (<strong>Ctrl + F</strong>) for
+   <strong><code>Roles we're currently hiring</code></strong> to find the role cards
+   section.</li>
+<li>Each role is an <code>&lt;article&gt;</code> with an <code>&lt;h3&gt;</code> (role title) and a
+   <code>&lt;p&gt;</code> (one-line description). Edit the text or copy/paste an
+   article to add a role.</li>
+<li><strong>Also update the role-interest checkboxes</strong> in the form
+   itself — search for <code>name="role_interest"</code>. Each role listed
+   above should have a matching checkbox here. Add/remove
+   <code>&lt;label class="ptw-upgrade-check"&gt;…&lt;/label&gt;</code> lines to match.</li>
+<li>Commit with a message like
+   <em>"Careers: add Repair tech apprentice role"</em>.</li>
+</ol>
+<h4 id="pause-hiring-temporarily">Pause hiring temporarily</h4>
+<p>The cleanest way is to <strong>replace the role cards section with a
+short message and hide the form</strong>:</p>
+<ol>
+<li>In <code>careers.html</code>, find the <code>&lt;section class="careers-form-section"&gt;</code>
+   line.</li>
+<li>Either delete that entire section, <strong>or</strong> wrap it in a
+   <code>&lt;!-- … --&gt;</code> HTML comment to hide without losing the markup.</li>
+<li>In the <strong>"Roles we're currently hiring"</strong> section above it,
+   replace the role cards with a one-line message like
+   <em>"We're not actively hiring right now — check back soon, or
+   email careers@play2wingames.com if you'd like us to keep
+   your résumé on file."</em></li>
+<li>Commit. To re-enable hiring later: uncomment the form section
+   and restore the role cards (use <strong>Revert</strong> on the original
+   commit, see <a href="#undoing-a-mistake">Undoing a mistake</a>).</li>
+</ol>
+<h4 id="change-the-receiving-email">Change the receiving email</h4>
+<p>The form action and the Send Resume button both reference
+<code>careers@play2wingames.com</code>. To route to a different address:</p>
+<ol>
+<li>Search across all files for <code>careers@play2wingames.com</code>.</li>
+<li>Update each occurrence to the new address.</li>
+<li><strong>Separately</strong> — log into the shop's Formspree account and
+   update the form's notification email there too. The page-side
+   change alone won't reroute submissions; Formspree decides
+   where the email goes.</li>
+</ol>
+<hr>
 <h3 id="swap-out-a-featured-google-review">Swap out a featured Google review</h3>
 <p><strong>When to do this:</strong> A new amazing review came in that's better than
 one of the three currently featured on the home page.</p>
@@ -540,9 +597,14 @@ all files for each one.</p>
 <td>Every page's header + footer, <code>contact.html</code>, <code>index.html</code> JSON-LD, <code>privacy.html</code></td>
 </tr>
 <tr>
-<td>Email</td>
-<td><code>admin@play2wingames.com</code></td>
+<td>Email (general)</td>
+<td><code>inquiries@play2wingames.com</code></td>
 <td>Every page's footer, <code>contact.html</code>, <code>index.html</code> JSON-LD, <code>privacy.html</code></td>
+</tr>
+<tr>
+<td>Email (careers)</td>
+<td><code>careers@play2wingames.com</code></td>
+<td><code>careers.html</code> (Send Resume button + form-success copy)</td>
 </tr>
 <tr>
 <td>Address</td>
@@ -586,8 +648,8 @@ header, the home-page inventory band, etc.). Update each.</p>
 <li>Sign in at <a href="https://formspree.io">formspree.io</a> with the shop's
    Formspree account (credentials should be in the shared password
    manager — see <a href="#external-services">External services</a>).</li>
-<li>Look at the Upgrade Request and Event Inquiry forms — is the
-   account active? Are there submissions piling up?</li>
+<li>Look at the Upgrade Request, Event Inquiry, and Careers forms —
+   is the account active? Are there submissions piling up?</li>
 <li>Often the cause is a paused or out-of-quota Formspree account.</li>
 </ol>
 <h3 id="events-arent-updating-on-the-events-page">Events aren't updating on the events page</h3>
