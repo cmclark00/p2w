@@ -2217,24 +2217,24 @@ h3 {
   }
 }
 
-/* ── Mod showcase cards ─────────────────────────────────────────────────── */
+/* ── Upgrade showcase cards ─────────────────────────────────────────────── */
 
-.mod-hint-desktop,
-.mod-hint-mobile {
+.upgrade-hint-desktop,
+.upgrade-hint-mobile {
   margin: 8px 0 0;
   font-size: 0.88rem;
   color: var(--muted);
 }
 
 @media (hover: none) {
-  .mod-hint-desktop { display: none; }
+  .upgrade-hint-desktop { display: none; }
 }
 
 @media (hover: hover) {
-  .mod-hint-mobile { display: none; }
+  .upgrade-hint-mobile { display: none; }
 }
 
-.mod-grid {
+.upgrade-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
@@ -2243,7 +2243,7 @@ h3 {
   margin-inline: auto;
 }
 
-.mod-card {
+.upgrade-card {
   border: 2px solid transparent;
   border-radius: 3px;
   overflow: hidden;
@@ -2254,13 +2254,13 @@ h3 {
   transition: transform 0.16s, box-shadow 0.16s;
 }
 
-.mod-card:hover,
-.mod-card:focus-visible {
+.upgrade-card:hover,
+.upgrade-card:focus-visible {
   transform: translateY(-3px);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
 }
 
-.mod-images {
+.upgrade-images {
   position: relative;
   background: var(--surface-2);
   overflow: hidden;
@@ -2268,7 +2268,7 @@ h3 {
   aspect-ratio: 3 / 4;
 }
 
-.mod-placeholder {
+.upgrade-placeholder {
   position: absolute;
   inset: 0;
   display: flex;
@@ -2280,11 +2280,11 @@ h3 {
   z-index: 0;
 }
 
-.mod-placeholder svg {
+.upgrade-placeholder svg {
   opacity: 0.35;
 }
 
-.mod-placeholder span {
+.upgrade-placeholder span {
   font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -2292,11 +2292,11 @@ h3 {
   opacity: 0.45;
 }
 
-.mod-img {
+.upgrade-img {
   transition: opacity 0.35s ease;
 }
 
-.mod-img--before {
+.upgrade-img--before {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2306,7 +2306,7 @@ h3 {
   z-index: 1;
 }
 
-.mod-img--after {
+.upgrade-img--after {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2316,17 +2316,17 @@ h3 {
   z-index: 2;
 }
 
-.mod-card:hover .mod-img--before,
-.mod-card.is-flipped .mod-img--before {
+.upgrade-card:hover .upgrade-img--before,
+.upgrade-card.is-flipped .upgrade-img--before {
   opacity: 0;
 }
 
-.mod-card:hover .mod-img--after,
-.mod-card.is-flipped .mod-img--after {
+.upgrade-card:hover .upgrade-img--after,
+.upgrade-card.is-flipped .upgrade-img--after {
   opacity: 1;
 }
 
-.mod-state-label {
+.upgrade-state-label {
   position: absolute;
   bottom: 10px;
   left: 10px;
@@ -2343,50 +2343,50 @@ h3 {
   pointer-events: none;
 }
 
-.mod-state--before {
+.upgrade-state--before {
   opacity: 1;
 }
 
-.mod-state--after {
+.upgrade-state--after {
   opacity: 0;
 }
 
-.mod-card:hover .mod-state--before,
-.mod-card.is-flipped .mod-state--before {
+.upgrade-card:hover .upgrade-state--before,
+.upgrade-card.is-flipped .upgrade-state--before {
   opacity: 0;
 }
 
-.mod-card:hover .mod-state--after,
-.mod-card.is-flipped .mod-state--after {
+.upgrade-card:hover .upgrade-state--after,
+.upgrade-card.is-flipped .upgrade-state--after {
   opacity: 1;
 }
 
-.mod-card--static {
+.upgrade-card--static {
   cursor: default;
 }
 
-.mod-card--static:hover .mod-img--before,
-.mod-card--static.is-flipped .mod-img--before {
+.upgrade-card--static:hover .upgrade-img--before,
+.upgrade-card--static.is-flipped .upgrade-img--before {
   opacity: 1;
 }
 
-.mod-card-body {
+.upgrade-card-body {
   padding: 18px 20px 20px;
 }
 
-.mod-card-body h3 {
+.upgrade-card-body h3 {
   font-size: 1.05rem;
   margin: 0 0 6px;
 }
 
 @media (max-width: 920px) {
-  .mod-grid {
+  .upgrade-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 560px) {
-  .mod-grid {
+  .upgrade-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }

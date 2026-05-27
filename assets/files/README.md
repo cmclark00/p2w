@@ -1,6 +1,6 @@
 # Play 2 Win Games — Handheld Upgrades Intake Form
 
-A self-contained intake form for handheld mod/upgrade drop-offs.
+A self-contained intake form for handheld upgrade drop-offs.
 Covers Game Boy / GBC, GBA, GBA SP, GBM/Micro, DS Lite, DSi/DSi XL, PSP, and PS Vita.
 
 ---
@@ -44,7 +44,7 @@ That's it — Formspree will email you each submission and has a dashboard to vi
 
 ### Option A — Dedicated page (recommended)
 Drop the whole `ptw-intake-form/` folder into your site's file structure.
-Link to `index.html` from your nav as "Book a Mod" or "Upgrade Request".
+Link to `index.html` from your nav as "Upgrade Request".
 
 ### Option B — Embed in an existing page
 If your site already has a page you want the form to live on:

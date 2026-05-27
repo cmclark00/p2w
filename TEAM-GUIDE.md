@@ -243,7 +243,7 @@ top of the pricing section.
 
 ### Update or add a handheld upgrade price
 
-**When to do this:** Parts cost shifted; you added a new mod.
+**When to do this:** Parts cost shifted; you added a new upgrade.
 
 **File to edit:** `upgrades.html` (only).
 

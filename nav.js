@@ -30,7 +30,7 @@
     '.inventory-band',
     '.section-heading',
     '.gallery-card',
-    '.mod-card',
+    '.upgrade-card',
     '.review-card',
     '.showcase-band',
     '.contact-panel',

@@ -19,7 +19,7 @@ const DEVICES = [
     colors: ['Gray', 'Purple', 'Teal', 'Atomic', 'Kiwi', 'Clear', 'Other'],
     groups: [
       { title: 'Display',  upgrades: ['IPS backlight screen', 'Screen lens replacement'] },
-      { title: 'Power',    upgrades: ['USB-C charging mod', 'New battery', 'Capacitor replacement'] },
+      { title: 'Power',    upgrades: ['USB-C charging upgrade', 'New battery', 'Capacitor replacement'] },
       { title: 'Cosmetic', upgrades: ['Shell replacement', 'Button & pad replacement'] },
       { title: 'Audio',    upgrades: ['Speaker replacement', 'Amplifier (CleanAmp) install'] }
     ]
@@ -29,8 +29,8 @@ const DEVICES = [
     label: 'GBA',
     colors: ['Indigo', 'Black', 'Glacier', 'Spice Orange', 'Arctic', 'Other'],
     groups: [
-      { title: 'Display',  upgrades: ['IPS screen upgrade', 'Screen lens replacement', 'Brightness control mod'] },
-      { title: 'Power',    upgrades: ['New battery', 'USB-C charging mod'] },
+      { title: 'Display',  upgrades: ['IPS screen upgrade', 'Screen lens replacement', 'Brightness control upgrade'] },
+      { title: 'Power',    upgrades: ['New battery', 'USB-C charging upgrade'] },
       { title: 'Cosmetic', upgrades: ['Shell replacement', 'Button & pad replacement'] },
       { title: 'Audio',    upgrades: ['Speaker replacement'] }
     ]
@@ -41,9 +41,9 @@ const DEVICES = [
     colors: ['Cobalt Blue', 'Pearl Pink', 'Onyx', 'Flame', 'Platinum', 'Pearl Green', 'Other'],
     groups: [
       { title: 'Display',  upgrades: ['IPS screen (AGS-001)', 'IPS screen (AGS-101)', 'Screen lens replacement'] },
-      { title: 'Power',    upgrades: ['USB-C charging mod', 'New battery', 'Charge port repair'] },
+      { title: 'Power',    upgrades: ['USB-C charging upgrade', 'New battery', 'Charge port repair'] },
       { title: 'Cosmetic', upgrades: ['Shell replacement', 'Button & pad replacement', 'Hinge repair'] },
-      { title: 'Audio',    upgrades: ['Speaker replacement', 'Headphone jack mod (AGS-101)'] }
+      { title: 'Audio',    upgrades: ['Speaker replacement', 'Headphone jack upgrade (AGS-101)'] }
     ]
   },
   {
@@ -52,7 +52,7 @@ const DEVICES = [
     colors: ['Silver', 'Black', 'Famicom edition', 'Other'],
     groups: [
       { title: 'Display',  upgrades: ['IPS screen upgrade', 'Screen lens replacement'] },
-      { title: 'Power',    upgrades: ['USB-C charging mod', 'New battery'] },
+      { title: 'Power',    upgrades: ['USB-C charging upgrade', 'New battery'] },
       { title: 'Cosmetic', upgrades: ['Faceplate replacement'] }
     ]
   },
@@ -62,7 +62,7 @@ const DEVICES = [
     colors: ['White', 'Black', 'Cobalt/Black', 'Crimson/Black', 'Polar White', 'Other'],
     groups: [
       { title: 'Display',  upgrades: ['IPS top screen', 'IPS bottom screen', 'Both screens — IPS'] },
-      { title: 'Power',    upgrades: ['New battery', 'USB-C charging mod'] },
+      { title: 'Power',    upgrades: ['New battery', 'USB-C charging upgrade'] },
       { title: 'Cosmetic', upgrades: ['Shell replacement', 'Button replacement', 'Hinge repair'] },
       { title: 'Audio',    upgrades: ['Speaker replacement'] }
     ]
@@ -73,7 +73,7 @@ const DEVICES = [
     colors: ['White', 'Black', 'Blue', 'Red', 'Pink', 'Yellow', 'Other'],
     groups: [
       { title: 'Display',  upgrades: ['IPS top screen', 'IPS bottom screen', 'Both screens — IPS'] },
-      { title: 'Power',    upgrades: ['New battery', 'USB-C charging mod'] },
+      { title: 'Power',    upgrades: ['New battery', 'USB-C charging upgrade'] },
       { title: 'Cosmetic', upgrades: ['Shell replacement', 'Button replacement'] }
     ]
   },
@@ -84,7 +84,7 @@ const DEVICES = [
     groups: [
       { title: 'Display',  upgrades: ['LCD screen replacement', 'Screen lens replacement'] },
       { title: 'Drive',    upgrades: ['UMD drive replacement', 'UMD drive cleaning'] },
-      { title: 'Power',    upgrades: ['USB-C charging mod', 'Battery replacement'] },
+      { title: 'Power',    upgrades: ['USB-C charging upgrade', 'Battery replacement'] },
       { title: 'Cosmetic', upgrades: ['Shell/faceplate replacement', 'Analog stick replacement', 'Button replacement'] },
       { title: 'Software', upgrades: ['CFW / HEN install'] }
     ]
