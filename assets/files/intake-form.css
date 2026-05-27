@@ -311,6 +311,13 @@
   margin-bottom: 16px;
 }
 
+.ptw-eeo-notice {
+  font-size: 0.76rem;
+  color: var(--ptw-text-hint);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
 .ptw-auth-check {
   display: flex;
   align-items: center;

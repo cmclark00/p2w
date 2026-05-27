@@ -124,8 +124,12 @@
                   <input type="text" id="careers-name" name="name" placeholder="Jane Smith" required>
                 </div>
                 <div class="ptw-field">
-                  <label for="careers-age">Age</label>
-                  <input type="number" id="careers-age" name="age" min="14" max="99" placeholder="21" required>
+                  <label for="careers-work-auth">Authorized to work in the US?</label>
+                  <select id="careers-work-auth" name="work_authorization" required>
+                    <option value="" disabled selected>Select…</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
                 </div>
               </div>
               <div class="ptw-grid-2" style="margin-bottom:12px;">
@@ -189,7 +193,7 @@
               </div>
               <div class="ptw-field">
                 <label for="careers-availability">Weekly availability</label>
-                <textarea id="careers-availability" name="availability" placeholder="Which days and times work? Note any standing commitments (school, second job, kids' schedule). Weekends matter most for events." required></textarea>
+                <textarea id="careers-availability" name="availability" placeholder="Which days and times work? Note any standing commitments (school, second job, recurring obligations). Weekends matter most for events." required></textarea>
               </div>
             </div>
 
@@ -226,6 +230,7 @@
               <div class="ptw-auth-notice">
                 Submitting this form starts the conversation. We&rsquo;ll review applications as they come in and reach out if there&rsquo;s a fit. <strong>Don&rsquo;t forget to email your resume separately</strong> using the button below &mdash; the form doesn&rsquo;t accept attachments.
               </div>
+              <p class="ptw-eeo-notice">Play2Win Games is an equal opportunity employer. We consider all qualified applicants without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, veteran status, or any other status protected by federal, state, or local law.</p>
               <label class="ptw-auth-check">
                 <input type="checkbox" id="careers-acknowledgement" required>
                 I understand I need to email my resume to inquiries@play2wingames.com to complete my application.
