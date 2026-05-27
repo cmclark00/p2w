@@ -16,7 +16,12 @@
       "Bash(kill %1)",
       "Bash(pkill -f \"http.server 8765\")",
       "mcp__playwright__browser_close",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "PowerShell(git rebase *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(where python *)",
+      "Bash(where python3 *)"
     ]
   }
 }
