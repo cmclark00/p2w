@@ -105,9 +105,7 @@ embed = {
     'description': body,
     'color': 0xD91F38,  # brand red
     'footer': {
-        # TODO @ cutover: restore the public URL once play2wingames.com is live.
-        # Replace with: 'Updated daily · Full schedule: play2wingames.com/events'
-        'text': 'Updated daily',
+        'text': 'Updated daily · Full schedule: play2wingames.com/events',
     },
     'timestamp': datetime.now(timezone.utc).isoformat(),
 }
