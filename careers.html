@@ -124,6 +124,20 @@
                   <input type="text" id="careers-name" name="name" placeholder="Jane Smith" required>
                 </div>
                 <div class="ptw-field">
+                  <label for="careers-phone">Phone number</label>
+                  <input type="tel" id="careers-phone" name="phone" placeholder="(865) 555-0100" required>
+                </div>
+              </div>
+              <div class="ptw-grid-2" style="margin-bottom:12px;">
+                <div class="ptw-field">
+                  <label for="careers-age-eligible">Are you 18 or older?</label>
+                  <select id="careers-age-eligible" name="age_18_or_older" required>
+                    <option value="" disabled selected>Select…</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div class="ptw-field">
                   <label for="careers-work-auth">Authorized to work in the US?</label>
                   <select id="careers-work-auth" name="work_authorization" required>
                     <option value="" disabled selected>Select…</option>
@@ -134,12 +148,12 @@
               </div>
               <div class="ptw-grid-2" style="margin-bottom:12px;">
                 <div class="ptw-field">
-                  <label for="careers-phone">Phone number</label>
-                  <input type="tel" id="careers-phone" name="phone" placeholder="(865) 555-0100" required>
-                </div>
-                <div class="ptw-field">
                   <label for="careers-email">Email</label>
                   <input type="email" id="careers-email" name="email" placeholder="jane@example.com" required>
+                </div>
+                <div class="ptw-field">
+                  <label for="careers-city">City &amp; state</label>
+                  <input type="text" id="careers-city" name="city_state" placeholder="Knoxville, TN" required>
                 </div>
               </div>
               <div class="ptw-grid-2">
@@ -150,10 +164,6 @@
                     <option>Phone call</option>
                     <option>Email</option>
                   </select>
-                </div>
-                <div class="ptw-field">
-                  <label for="careers-city">City &amp; state</label>
-                  <input type="text" id="careers-city" name="city_state" placeholder="Knoxville, TN" required>
                 </div>
               </div>
             </div>
