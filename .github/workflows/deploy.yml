@@ -1,4 +1,20 @@
-name: Deploy to GitHub Pages
+name: Deploy to GoDaddy via FTP
+
+# Cutover-branch deploy: push static site files to GoDaddy via FTP.
+# Replaces the GitHub Pages deploy that lives on `main`. Merge this
+# branch to `main` at cutover and the next push triggers an FTP deploy
+# instead of a Pages build.
+#
+# REQUIRED SECRETS (set in repo Settings → Secrets and variables → Actions):
+#   GODADDY_FTP_HOST     - e.g. ftp.play2wingames.com  (or the IP/host
+#                          GoDaddy gives you under "File Manager > FTP")
+#   GODADDY_FTP_USER     - FTP username from the same GoDaddy panel
+#   GODADDY_FTP_PASSWORD - FTP password (rotate it after first deploy)
+#
+# OPTIONAL TWEAK:
+#   server-dir below defaults to ./public_html/ which is the standard
+#   GoDaddy document root. If your hosting plan uses a different path
+#   (rare) update it.
 
 on:
   push:
@@ -10,34 +26,36 @@ on:
     types: [completed]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow one concurrent deployment; let in-progress runs finish.
+# One deploy at a time; let in-progress runs finish.
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v5
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          path: '.'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+          server: ${{ secrets.GODADDY_FTP_HOST }}
+          username: ${{ secrets.GODADDY_FTP_USER }}
+          password: ${{ secrets.GODADDY_FTP_PASSWORD }}
+          server-dir: ./public_html/
+          # Do not push repo plumbing or dev-only docs to the live host.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.claude/**
+            **/CLAUDE.md
+            **/TEAM-GUIDE.md
+            **/team-guide-print.html
+            **/WEBSITE-AGREEMENT.md
+            **/README.md
+            **/.gitignore
+            **/*.md
+            **/scripts/**
