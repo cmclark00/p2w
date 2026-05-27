@@ -1486,10 +1486,52 @@ h3 {
   white-space: nowrap;
 }
 
+/* Full-width pricing card — for groups that benefit from a tier sweep
+   (e.g., bulk pricing where comparing tiers side-by-side is the point). */
+.pricing-group--wide { grid-column: 1 / -1; }
+
+.pricing-group--wide .price-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.pricing-group--wide .price-row {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 14px 0 4px;
+  border-top: none;
+}
+
+.pricing-group--wide .price-row dd {
+  font-size: 1.55rem;
+  color: var(--gold);
+}
+
 @media (max-width: 720px) {
   .pricing-groups { grid-template-columns: 1fr; }
   .pricing-disclaimer { flex-direction: column; gap: 8px; }
   .pricing-asterisk { font-size: 2.4rem; }
+
+  /* Wide card falls back to the standard stacked-row layout on mobile. */
+  .pricing-group--wide .price-list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .pricing-group--wide .price-row {
+    flex-direction: row;
+    align-items: baseline;
+    text-align: left;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    padding: 9px 0;
+  }
+  .pricing-group--wide .price-row:first-child { border-top: none; padding-top: 4px; }
+  .pricing-group--wide .price-row dd {
+    font-size: 1rem;
+    color: var(--paper);
+  }
 }
 
 /* ── Card condition guide ────────────────────────────────────────────────── */
