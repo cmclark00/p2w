@@ -195,7 +195,7 @@ branch is safe.
 | `team.html` | Owners + managers. Names filled; **bios & photos still placeholders.** |
 | `faq.html` | 2-column accordion FAQ + `FAQPage` JSON-LD. |
 | `contact.html` | Store info (phone, email, Facebook, Discord), hours, **click-to-load** Google Map. |
-| `careers.html` | Application page for shop hires. Standalone Formspree form (placeholder endpoint `XXXXXXXX` until shop creates one) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
+| `careers.html` | Application page for shop hires. Formspree form (endpoint `mvzyvwzb`, lands in `careers@play2wingames.com`) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
@@ -350,9 +350,9 @@ Both via **Formspree** (endpoints are public client-side by design):
   for the 5-card "What we carry"; sell-trade uses `--three`). When adding
   cards to a grid, pick or add the variant rather than overriding the
   base.
-- Contact: 865-910-8357 · admin@play2wingames.com ·
-  facebook.com/P2WGames · discord.gg/m44gYFFSd8 (Discord is a non-vanity but
-  never-expire invite).
+- Contact: 865-910-8357 · inquiries@play2wingames.com (general) ·
+  careers@play2wingames.com (hiring) · facebook.com/P2WGames ·
+  discord.gg/m44gYFFSd8 (Discord is a non-vanity but never-expire invite).
 - TCG inventory is external: https://playtowingames.crystalcommerce.com/
 - Parked feature ideas pending vendor answers: surfacing Fulcrum POS video-game
   inventory, and a custom CrystalCommerce TCG search/deckbuilder with bulk
