@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fetch events from Google Calendar and write events.json for the P2W website."""
 
+import html
 import json
 import os
 import re
@@ -31,6 +32,24 @@ def detect_game(title: str):
     return "other", "Other"
 
 
+def normalize_description(raw: str) -> str:
+    """Flatten a Google Calendar description to plain text with real newlines.
+
+    Google Calendar stores descriptions as HTML when they're edited in the web
+    UI (lines wrapped in <br>/<div>, entities escaped). The metadata split below
+    keys off plain-text "\\n---\\n", so without this an HTML-formatted event
+    never parses its metadata. Handles plain-text input unchanged.
+    """
+    text = raw.replace("\r\n", "\n")
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)             # <br> → newline
+    text = re.sub(r"(?i)</(?:p|div|li|ul|ol|h[1-6])>", "\n", text)  # block closings
+    text = re.sub(r"<[^>]+>", "", text)                      # drop remaining tags
+    text = html.unescape(text)                               # &amp; → &, &nbsp; → space
+    text = re.sub(r"[ \t]+\n", "\n", text)                   # trim trailing spaces
+    text = re.sub(r"\n{3,}", "\n\n", text)                   # collapse blank-line runs
+    return text
+
+
 def parse_description(raw: str):
     """Split description into visible text and optional YAML metadata block.
 
@@ -46,12 +65,15 @@ def parse_description(raw: str):
     if not raw:
         return "", {}
 
-    parts = re.split(r"\n---\n", raw.replace("\r\n", "\n"), maxsplit=1)
+    text = normalize_description(raw)
+    parts = re.split(r"\n[ \t]*---[ \t]*\n", "\n" + text.strip("\n") + "\n", maxsplit=1)
     description = parts[0].strip()
     meta = {}
     if len(parts) > 1:
         try:
-            meta = yaml.safe_load(parts[1]) or {}
+            loaded = yaml.safe_load(parts[1])
+            if isinstance(loaded, dict):
+                meta = loaded
         except Exception:
             pass
     return description, meta
