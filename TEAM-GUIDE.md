@@ -492,6 +492,7 @@ produces a card that says:
 |---|---|---|---|
 | `entry` | Entry-fee line on the card | `entry: $5` | Use a literal `$`, or write `Free` or `TBA`. Defaults to **TBA** if missing. |
 | `format` | Format line under the time | `format: Swiss, 3 rounds` | Free text. Defaults to **"See description"**. |
+| `prizing` | 🏆 prize line on the card | `prizing: Packs to top 4 + promos` | Free text — describe the prize support. Omit it and the line just doesn't show. |
 | `capacity` | Used with `registered` to show "X of Y spots open" progress bar | `capacity: 24` | Must be a number. Does nothing alone — needs `registered` too. |
 | `registered` | Current sign-ups (drives the progress bar) | `registered: 8` | Must be a number. |
 | `registerUrl` | Link the **"Register Now"** button points at | `registerUrl: https://www.facebook.com/events/12345` | If missing, the button links to the Facebook page. |

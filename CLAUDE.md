@@ -216,8 +216,12 @@ hand-edit `events.json`.
 ```js
 { id, title, game, gameLabel, date:"YYYY-MM-DD", time:"H:MM AM/PM",
   time24:"HH:MM", entry:"$X.XX"|"Free"|"TBA", format, capacity, registered,
-  registerUrl, recurring, description }
+  registerUrl, recurring, prizing, description }
 ```
+
+Calendar descriptions may be HTML (Google's web editor wraps lines in
+`<br>`/`<div>`); `sync_events.py` flattens that to text before splitting the
+`---` metadata block, so both plain-text and rich-text events parse.
 
 `game` ∈ pokemon | magic | yugioh | lorcana | digimon | gundam | riftbound | other.
 
