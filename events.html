@@ -254,7 +254,7 @@
             <div class="event-card-footer">
               ${ev.registerUrl
                 ? `<a class="button primary event-btn" href="${ev.registerUrl}" target="_blank" rel="noopener">Register Now</a>`
-                : `<a class="button secondary event-btn" href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">More Info</a>`
+                : `<a class="button secondary event-btn" href="${ev.facebookUrl || "https://www.facebook.com/P2WGames/"}" target="_blank" rel="noopener">More Info</a>`
               }
               ${!isPast ? `<button class="cal-btn" data-id="${ev.id}" aria-label="Add ${ev.title} to calendar">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>

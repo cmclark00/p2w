@@ -593,7 +593,13 @@ produces a card that says:</p>
 <td><code>registerUrl</code></td>
 <td>Link the <strong>"Register Now"</strong> button points at</td>
 <td><code>registerUrl: https://www.facebook.com/events/12345</code></td>
-<td>If missing, the button links to the Facebook page.</td>
+<td>If missing, the card shows a <strong>"More Info"</strong> button instead (see <code>facebookUrl</code>).</td>
+</tr>
+<tr>
+<td><code>facebookUrl</code></td>
+<td>Link the <strong>"More Info"</strong> button points at — use the event's Facebook event page</td>
+<td><code>facebookUrl: https://www.facebook.com/events/12345</code></td>
+<td>Only shows when there's <strong>no</strong> <code>registerUrl</code>. If both are missing, "More Info" links to the main Facebook page. Worth adding for bigger events that have their own Facebook event.</td>
 </tr>
 <tr>
 <td><code>recurring</code></td>

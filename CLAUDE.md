@@ -216,7 +216,7 @@ hand-edit `events.json`.
 ```js
 { id, title, game, gameLabel, date:"YYYY-MM-DD", time:"H:MM AM/PM",
   time24:"HH:MM", entry:"$X.XX"|"Free"|"TBA", format, capacity, registered,
-  registerUrl, recurring, prizing, description }
+  registerUrl, facebookUrl, recurring, prizing, description }
 ```
 
 Calendar descriptions may be HTML (Google's web editor wraps lines in

@@ -495,7 +495,8 @@ produces a card that says:
 | `prizing` | 🏆 prize line on the card | `prizing: Packs to top 4 + promos` | Free text — describe the prize support. Omit it and the line just doesn't show. |
 | `capacity` | Used with `registered` to show "X of Y spots open" progress bar | `capacity: 24` | Must be a number. Does nothing alone — needs `registered` too. |
 | `registered` | Current sign-ups (drives the progress bar) | `registered: 8` | Must be a number. |
-| `registerUrl` | Link the **"Register Now"** button points at | `registerUrl: https://www.facebook.com/events/12345` | If missing, the button links to the Facebook page. |
+| `registerUrl` | Link the **"Register Now"** button points at | `registerUrl: https://www.facebook.com/events/12345` | If missing, the card shows a **"More Info"** button instead (see `facebookUrl`). |
+| `facebookUrl` | Link the **"More Info"** button points at — use the event's Facebook event page | `facebookUrl: https://www.facebook.com/events/12345` | Only shows when there's **no** `registerUrl`. If both are missing, "More Info" links to the main Facebook page. Worth adding for bigger events that have their own Facebook event. |
 | `recurring` | "🔁 Every Monday" badge on the card | `recurring: Every Monday` | **This is just a label.** The actual repetition still has to be set in Google Calendar's Repeat dropdown. |
 | `game` | Force the game-filter tab | `game: pokemon` | **Usually skip this** — the title auto-detects. Only set if the title doesn't include a recognized game name. Valid: `pokemon`, `magic`, `yugioh`, `lorcana`, `digimon`, `gundam`, `smash`, `riftbound`, `other`. |
 | `gameLabel` | Custom game-tag display text | `gameLabel: Magic: The Gathering` | Usually skip — auto-set from `game`. |

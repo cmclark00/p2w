@@ -120,6 +120,7 @@ def process_event(item: dict, idx: int) -> dict:
         "capacity": meta.get("capacity") or None,
         "registered": meta.get("registered") or None,
         "registerUrl": meta.get("registerUrl") or None,
+        "facebookUrl": meta.get("facebookUrl") or None,
         "recurring": meta.get("recurring") or None,
         "prizing": str(meta["prizing"]) if meta.get("prizing") else None,
         "description": description or title,
