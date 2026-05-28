@@ -655,6 +655,9 @@ h3 {
   display: flex;
   align-items: center;
   gap: 14px;
+  /* Bulky is the mobile Bulky-Tris launcher (tap 5x). Disable iOS Safari
+     double-tap-to-zoom across the brand so rapid taps register cleanly. */
+  touch-action: manipulation;
 }
 
 .footer-brand img {
@@ -666,6 +669,8 @@ h3 {
 .footer-brand .footer-mascot {
   width: 44px;
   flex: 0 0 auto;
+  touch-action: manipulation;
+  cursor: pointer;
 }
 
 .footer-brand p {
