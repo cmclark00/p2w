@@ -339,6 +339,47 @@
         <p class="section-followup">More questions about upgrades &mdash; timelines, warranty, custom builds, pre-existing damage &mdash; answered in the <a href="faq.html">FAQ</a>.</p>
       </section>
 
+      <section class="upgrade-calc" aria-labelledby="calc-heading">
+        <div class="section-heading">
+          <p class="eyebrow">Build estimator</p>
+          <h2 id="calc-heading">Estimate your upgrade.</h2>
+          <p>Pick your handheld and the upgrades you want for a rough range. It&rsquo;s a ballpark from the rates above &mdash; we confirm the final quote once we see your unit.</p>
+        </div>
+
+        <div class="calc-shell">
+          <div class="calc-controls">
+            <label class="calc-field">
+              <span class="calc-field-label">Your handheld</span>
+              <select id="calc-handheld">
+                <option value="">Select a handheld&hellip;</option>
+                <option value="gb">Game Boy / Pocket / Color / Advance</option>
+                <option value="sp">Game Boy Advance SP</option>
+                <option value="dslite">Nintendo DS Lite</option>
+              </select>
+            </label>
+
+            <fieldset class="calc-group" id="calc-upgrades" hidden>
+              <legend>Upgrades</legend>
+              <div class="calc-opts"></div>
+            </fieldset>
+
+            <fieldset class="calc-group" id="calc-addons" hidden>
+              <legend>Add-ons</legend>
+              <div class="calc-opts"></div>
+            </fieldset>
+          </div>
+
+          <div class="calc-result">
+            <div class="calc-result-inner" aria-live="polite">
+              <p class="calc-result-label">Estimated range</p>
+              <p class="calc-total" id="calc-total">&mdash;</p>
+              <p class="calc-note" id="calc-note">Select your handheld to begin.</p>
+            </div>
+            <a class="button primary" href="upgrade-request.html">Start your request</a>
+          </div>
+        </div>
+      </section>
+
       <section class="inventory-band repairs-cta">
         <div>
           <p class="eyebrow">Ready to upgrade?</p>
@@ -347,6 +388,84 @@
         </div>
         <a class="button primary" href="upgrade-request.html">Start Request</a>
       </section>
+
+      <script>
+        // Handheld upgrade cost estimator — ranges mirror the pricing table above.
+        (function () {
+          var HANDHELDS = {
+            gb: [
+              { label: 'IPS Screen Upgrade', lo: 130, hi: 185 },
+              { label: 'USB-C Battery Upgrade', lo: 55, hi: 110 },
+              { label: 'Shell &amp; Button Swap', lo: 80, hi: 110 }
+            ],
+            sp: [
+              { label: 'IPS Display Upgrade', lo: 160, hi: 235 },
+              { label: 'Shell &amp; Button Swap', lo: 105, hi: 160 }
+            ],
+            dslite: [
+              { label: 'Shell &amp; Button Swap', lo: 180, hi: 260 },
+              { label: 'USB-C Upgrade', lo: 180, hi: 260 }
+            ]
+          };
+          var ADDONS = [
+            { label: 'Upgraded Speaker', lo: 30, hi: 40 },
+            { label: 'RGB LEDs', lo: 25, hi: 60 }
+          ];
+
+          var sel = document.getElementById('calc-handheld');
+          if (!sel) return;
+          var upWrap = document.getElementById('calc-upgrades');
+          var addWrap = document.getElementById('calc-addons');
+          var upOpts = upWrap.querySelector('.calc-opts');
+          var addOpts = addWrap.querySelector('.calc-opts');
+          var totalEl = document.getElementById('calc-total');
+          var noteEl = document.getElementById('calc-note');
+
+          function optHtml(o, kind) {
+            return '<label class="calc-opt">' +
+              '<input type="checkbox" data-lo="' + o.lo + '" data-hi="' + o.hi + '" data-kind="' + kind + '">' +
+              '<span class="calc-opt-name">' + o.label + '</span>' +
+              '<span class="calc-opt-price">$' + o.lo + '&ndash;$' + o.hi + '</span>' +
+            '</label>';
+          }
+
+          function recompute() {
+            var checks = upWrap.querySelectorAll('input:checked');
+            var addChecks = addWrap.querySelectorAll('input:checked');
+            if (!sel.value) { totalEl.textContent = '—'; noteEl.textContent = 'Select your handheld to begin.'; return; }
+            if (!checks.length && !addChecks.length) {
+              totalEl.textContent = '—';
+              noteEl.textContent = 'Pick one or more upgrades above.';
+              return;
+            }
+            var lo = 0, hi = 0;
+            function add(list) { Array.prototype.forEach.call(list, function (c) { lo += +c.dataset.lo; hi += +c.dataset.hi; }); }
+            add(checks); add(addChecks);
+            totalEl.textContent = '$' + lo.toLocaleString() + '–$' + hi.toLocaleString();
+            var note = 'Rough estimate — parts cost and final quote are confirmed before any work begins.';
+            if (checks.length >= 2) {
+              note = 'Bundling these in one visit usually lands a bit under this — multiple upgrades share teardown labor. ' + note;
+            } else if (!checks.length && addChecks.length) {
+              note = 'Add-ons are priced to ride along with a main upgrade. ' + note;
+            }
+            noteEl.textContent = note;
+          }
+
+          sel.addEventListener('change', function () {
+            var ups = HANDHELDS[sel.value];
+            if (!ups) { upWrap.hidden = true; addWrap.hidden = true; recompute(); return; }
+            upOpts.innerHTML = ups.map(function (o) { return optHtml(o, 'upgrade'); }).join('');
+            addOpts.innerHTML = ADDONS.map(function (o) { return optHtml(o, 'addon'); }).join('');
+            upWrap.hidden = false;
+            addWrap.hidden = false;
+            recompute();
+          });
+
+          document.querySelector('.calc-controls').addEventListener('change', function (e) {
+            if (e.target.matches('.calc-opt input')) recompute();
+          });
+        })();
+      </script>
     </main>
 
     <footer class="site-footer">
