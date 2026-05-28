@@ -13,7 +13,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 2,
@@ -29,7 +29,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 3,
@@ -45,7 +45,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 4,
@@ -77,7 +77,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 6,
@@ -125,7 +125,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
+    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br><br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
   },
   {
     "id": 9,
@@ -141,7 +141,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 10,
@@ -157,7 +157,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 11,
@@ -189,7 +189,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 13,
@@ -221,7 +221,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 15,
@@ -285,7 +285,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 19,
@@ -301,7 +301,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 20,
@@ -317,7 +317,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 21,
@@ -349,7 +349,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 23,
@@ -397,7 +397,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
+    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br><br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
   },
   {
     "id": 26,
@@ -429,7 +429,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 28,
@@ -445,7 +445,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 29,
@@ -461,7 +461,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 30,
@@ -493,7 +493,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 32,
@@ -557,7 +557,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 36,
@@ -573,7 +573,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 37,
@@ -589,7 +589,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 38,
@@ -621,7 +621,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 40,
@@ -669,7 +669,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
+    "description": "<pre><code>Casual + competitive </code><code>Pokémon TCG Gym Leader Challenge</code><span> locals every Thursday night.<br>All skill levels welcome!</span></pre><br><br>---<br><br>entry: $5<br>format: Gym Leader Challenge<br>recurring: Every Thursday"
   },
   {
     "id": 43,
@@ -685,7 +685,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $10<br>format: Standard<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Riftbound locals every Friday night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $10<br>format: Standard<br>recurring: Every Friday"
   },
   {
     "id": 44,
@@ -701,7 +701,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
+    "description": "<pre><code>Casual + competitive Disney Lorcana locals every Friday Night.<br>All skill levels welcome!</code></pre><br><br><br>---<br><br>entry: $5<br>format: Core Constructed<br>recurring: Every Friday"
   },
   {
     "id": 45,
@@ -733,7 +733,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Digimon TCG locals every Sunday afternoon.<br>All skill levels welcome!<br><br></code></pre>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 47,
@@ -765,7 +765,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
-    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
+    "description": "<pre><code>Casual + competitive Gundam Card Game locals every Sunday evening.<br>All skill levels welcome!</code></pre><br><br>---<br><br>entry: $5<br>format: Standard<br>recurring: Every Sunday"
   },
   {
     "id": 49,
