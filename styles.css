@@ -3378,7 +3378,10 @@ h3 {
 
 .konami-actions {
   margin: 12px 0 0;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .kn-btn--board {
@@ -3392,6 +3395,61 @@ h3 {
   border-color: #fff;
   color: #fff;
   transform: translateY(-1px);
+}
+
+.kn-btn--sound {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #d7d3e8;
+}
+
+.kn-btn--sound:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+}
+
+.kn-btn--sound[aria-pressed="false"] { color: #8d89a3; }
+
+/* ── On-screen touch controls (shown on touch / coarse pointers) ──────── */
+.kn-touch {
+  display: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px auto 0;
+  max-width: 280px;
+}
+
+.kn-tbtn {
+  padding: 14px 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffe07a;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.kn-tbtn:active {
+  background: rgba(241, 200, 75, 0.3);
+  border-color: var(--gold);
+  transform: translateY(1px);
+}
+
+.kn-tbtn--wide {
+  grid-column: 1 / -1;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+
+@media (pointer: coarse) {
+  .kn-touch { display: grid; }
+  .konami-controls { display: none; }
 }
 
 /* ── Leaderboard table ───────────────────────────────────────────────── */
@@ -3464,17 +3522,25 @@ h3 {
 }
 
 @media (max-width: 560px) {
+  .konami-modal { padding: 16px 14px; }
+  .konami-titlebar { margin-bottom: 12px; }
   .konami-game {
     flex-direction: column;
     align-items: center;
+    gap: 12px;
   }
+  /* Scale the board by height so the touch pad stays on-screen below it */
+  #kn-board { height: min(44vh, 460px); width: auto; max-width: 100%; }
   .konami-side {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
     min-width: 0;
     width: 100%;
+    gap: 8px;
   }
-  .konami-stat { flex: 1 1 calc(50% - 14px); min-width: 80px; }
-  #kn-board { width: 100%; height: auto; max-width: 280px; }
+  .konami-stat { flex: 1 1 calc(33% - 8px); min-width: 70px; padding: 8px 10px; }
+  .konami-stat span { font-size: 1.2rem; }
+  #kn-next, #kn-hold { width: 56px; height: 56px; }
+  .kn-touch { margin-top: 12px; }
 }
