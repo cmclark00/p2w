@@ -22,7 +22,10 @@
       "Bash(echo \"exit=$?\")",
       "Bash(where python *)",
       "Bash(where python3 *)",
-      "Bash(rm -f qa-footer-about.png)"
+      "Bash(rm -f qa-footer-about.png)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(& \"C:\\\\Users\\\\Corey Clark\\\\.bun\\\\bin\\\\bun.exe\" --version)",
+      "PowerShell($bunBin = \"C:\\\\Users\\\\Corey Clark\\\\.bun\\\\bin\"; $userPath = [Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\); if \\($userPath -split ';' -contains $bunBin\\) { \"Already on user PATH — no change needed.\" } else { $newPath = if \\([string]::IsNullOrEmpty\\($userPath\\)\\) { $bunBin } else { \"$userPath;$bunBin\" }; [Environment]::SetEnvironmentVariable\\(\"Path\", $newPath, \"User\"\\); \"Added '$bunBin' to user PATH.\" })"
     ]
   }
 }
