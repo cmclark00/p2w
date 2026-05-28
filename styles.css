@@ -730,8 +730,9 @@ h3 {
   color: var(--red);
 }
 
-/* Phone/tablet: stack to a tight centered block, drop the repeated
-   logo (already in the sticky header). */
+/* Phone/tablet: stack to a tight centered block. The brand (logo + Bulky)
+   stays visible — Bulky is also the mobile launch target for the hidden
+   Bulky-Tris game (tap it 5x). */
 @media (max-width: 760px) {
   .site-footer {
     grid-template-columns: 1fr;
@@ -739,7 +740,11 @@ h3 {
     padding: 14px var(--page-x) calc(16px + env(safe-area-inset-bottom));
     text-align: center;
   }
-  .footer-brand { display: none; }
+  .footer-brand {
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+  }
   .footer-meta { align-items: center; text-align: center; }
   .footer-links { justify-content: center; }
   .site-footer .footer-credit { padding-top: 10px; }
