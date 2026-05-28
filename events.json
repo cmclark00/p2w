@@ -13,6 +13,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -29,6 +30,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -45,6 +47,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -61,6 +64,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -77,6 +81,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -93,6 +98,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -109,6 +115,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
@@ -125,6 +132,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Thursday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
@@ -141,6 +149,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -157,6 +166,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -173,6 +183,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
+    "prizing": null,
     "description": "One Piece OP16 Prerelease. Make sure to register on the Bandai TCG + app!"
   },
   {
@@ -189,6 +200,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -205,6 +217,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -221,6 +234,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -237,6 +251,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -253,6 +268,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
@@ -269,6 +285,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
+    "prizing": null,
     "description": "OP 16 One Piece Release"
   },
   {
@@ -285,6 +302,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -301,6 +319,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -317,6 +336,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -333,6 +353,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -349,6 +370,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -365,6 +387,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -381,6 +404,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
@@ -397,6 +421,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Thursday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
@@ -413,6 +438,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
+    "prizing": null,
     "description": "Trade Night"
   },
   {
@@ -429,6 +455,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -445,6 +472,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -461,6 +489,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -477,6 +506,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -493,6 +523,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -509,6 +540,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -525,6 +557,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
@@ -541,6 +574,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
+    "prizing": null,
     "description": "Gundam ST10 & EB01 Release"
   },
   {
@@ -557,6 +591,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -573,6 +608,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -589,6 +625,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -605,6 +642,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -621,6 +659,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -637,6 +676,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -653,6 +693,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
@@ -669,6 +710,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Thursday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
@@ -685,6 +727,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
@@ -701,6 +744,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Friday",
+    "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
@@ -717,6 +761,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": null,
+    "prizing": null,
     "description": "Pokemon Pitch Black Prerelease"
   },
   {
@@ -733,6 +778,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
@@ -749,6 +795,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
@@ -765,6 +812,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Sunday",
+    "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
@@ -781,6 +829,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
@@ -797,6 +846,7 @@
     "registered": null,
     "registerUrl": null,
     "recurring": "Every Monday",
+    "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   }
 ]
