@@ -77,7 +77,7 @@ deploy path.
   `https://cmclark00.github.io/p2w/` → `https://play2wingames.com/` in: all
   HTML files (canonical, `og:url`, `og:image`, JSON-LD `url`/`image`),
   `sitemap.xml`, `robots.txt`, and the privacy.html effective/updated date.
-  As of this writing: **98 occurrences across 18 HTML files + sitemap.xml +
+  As of this writing: **81 occurrences across 17 HTML files + sitemap.xml +
   robots.txt**. ⚠️ **Exclude `.claude/settings.json`** — local tooling
   config, not part of the site, never committed.
 - 🔑 DNS/SSL at GoDaddy: point domain at hosting (usually auto-wired when
