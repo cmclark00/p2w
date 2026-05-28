@@ -25,7 +25,11 @@
       "Bash(rm -f qa-footer-about.png)",
       "PowerShell(Get-Command *)",
       "PowerShell(& \"C:\\\\Users\\\\Corey Clark\\\\.bun\\\\bin\\\\bun.exe\" --version)",
-      "PowerShell($bunBin = \"C:\\\\Users\\\\Corey Clark\\\\.bun\\\\bin\"; $userPath = [Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\); if \\($userPath -split ';' -contains $bunBin\\) { \"Already on user PATH — no change needed.\" } else { $newPath = if \\([string]::IsNullOrEmpty\\($userPath\\)\\) { $bunBin } else { \"$userPath;$bunBin\" }; [Environment]::SetEnvironmentVariable\\(\"Path\", $newPath, \"User\"\\); \"Added '$bunBin' to user PATH.\" })"
+      "PowerShell($bunBin = \"C:\\\\Users\\\\Corey Clark\\\\.bun\\\\bin\"; $userPath = [Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\); if \\($userPath -split ';' -contains $bunBin\\) { \"Already on user PATH — no change needed.\" } else { $newPath = if \\([string]::IsNullOrEmpty\\($userPath\\)\\) { $bunBin } else { \"$userPath;$bunBin\" }; [Environment]::SetEnvironmentVariable\\(\"Path\", $newPath, \"User\"\\); \"Added '$bunBin' to user PATH.\" })",
+      "mcp__claude-buddy__buddy_show",
+      "Read(//c/Users/Corey Clark/claude-buddy/hooks//**)",
+      "Read(//c/Users/Corey Clark/claude-buddy/statusline//**)",
+      "Bash(\"C:/Users/Corey Clark/claude-buddy/hooks/name-react.sh\")"
     ]
   }
 }
