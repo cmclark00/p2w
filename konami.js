@@ -140,6 +140,7 @@
   let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl;
   let overlay;
   let initialsMode = false;
+  let viewingLeaderboard = false;
 
   function open() {
     if (isOpen) return;
@@ -176,10 +177,14 @@
           '<span>← →</span> MOVE &middot; <span>↑</span> ROTATE &middot; <span>↓</span> SOFT DROP &middot; ' +
           '<span>SPACE</span> HARD DROP &middot; <span>C</span> HOLD &middot; <span>P</span> PAUSE &middot; <span>ESC</span> QUIT' +
         '</p>' +
+        '<div class="konami-actions">' +
+          '<button type="button" class="kn-btn kn-btn--board">LEADERBOARD</button>' +
+        '</div>' +
         '<div id="kn-overlay-msg" class="kn-msg" hidden></div>' +
       '</div>';
     document.body.appendChild(overlay);
     overlay.querySelector('.konami-close').addEventListener('click', close);
+    overlay.querySelector('.kn-btn--board').addEventListener('click', viewLeaderboard);
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) close();
     });
@@ -198,6 +203,8 @@
   function close() {
     if (!isOpen) return;
     isOpen = false;
+    initialsMode = false;
+    viewingLeaderboard = false;
     document.removeEventListener('keydown', handleKey);
     if (rafId) cancelAnimationFrame(rafId);
     document.body.style.overflow = '';
@@ -326,6 +333,13 @@
   }
 
   function handleKey(e) {
+    if (viewingLeaderboard) {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        closeLeaderboardView();
+      }
+      return;
+    }
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (initialsMode) return; // form handles its own keys
     if (gameOver) {
@@ -591,27 +605,73 @@
     });
   }
 
-  function renderLeaderboard(m, scores, justAdded) {
-    let rows;
+  function leaderboardRows(scores, justAdded) {
     if (!scores || !scores.length) {
-      rows = '<tr><td colspan="3" class="kn-empty">Be the first to score!</td></tr>';
-    } else {
-      rows = scores.map(function (s, i) {
-        const isMe = justAdded && s.name === justAdded.name && s.score === justAdded.score;
-        return '<tr class="' + (isMe ? 'kn-just-added' : '') + '">' +
-          '<td class="kn-rank">' + (i + 1) + '</td>' +
-          '<td class="kn-name">' + escapeHtml(s.name) + '</td>' +
-          '<td class="kn-score">' + (s.score || 0).toLocaleString() + '</td>' +
-        '</tr>';
-      }).join('');
+      return '<tr><td colspan="3" class="kn-empty">Be the first to score!</td></tr>';
     }
+    return scores.map(function (s, i) {
+      const isMe = justAdded && s.name === justAdded.name && s.score === justAdded.score;
+      return '<tr class="' + (isMe ? 'kn-just-added' : '') + '">' +
+        '<td class="kn-rank">' + (i + 1) + '</td>' +
+        '<td class="kn-name">' + escapeHtml(s.name) + '</td>' +
+        '<td class="kn-score">' + (s.score || 0).toLocaleString() + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function renderLeaderboard(m, scores, justAdded) {
     m.innerHTML =
       '<h3>HIGH SCORES</h3>' +
       '<p class="kn-final">Your run: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
       '<table class="kn-leaderboard">' +
         '<thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>' +
-        '<tbody>' + rows + '</tbody>' +
+        '<tbody>' + leaderboardRows(scores, justAdded) + '</tbody>' +
       '</table>' +
       '<p class="kn-tip">ENTER to play again &middot; ESC to quit</p>';
+  }
+
+  // ── View the leaderboard mid-game (pauses play) ──────────────────────
+  async function viewLeaderboard(e) {
+    if (e && e.currentTarget) e.currentTarget.blur();
+    if (gameOver || initialsMode || viewingLeaderboard) return;
+    viewingLeaderboard = true;
+    paused = true;
+    const m = overlay.querySelector('#kn-overlay-msg');
+    m.hidden = false;
+    m.innerHTML = '<h3>HIGH SCORES</h3><p class="kn-loading">Loading leaderboard&hellip;</p>';
+
+    let top;
+    try {
+      top = await getTopScores(MAX_SCORES);
+    } catch (err) {
+      console.warn('Leaderboard fetch failed', err);
+      if (!viewingLeaderboard) return;
+      m.innerHTML =
+        '<h3>HIGH SCORES</h3>' +
+        '<p class="kn-error">Couldn\'t reach the leaderboard. Check your connection.</p>' +
+        '<div class="kn-form-actions"><button type="button" class="kn-btn kn-btn--primary kn-resume">RESUME</button></div>';
+      m.querySelector('.kn-resume').addEventListener('click', closeLeaderboardView);
+      return;
+    }
+    if (!viewingLeaderboard) return; // resumed before the fetch landed
+
+    m.innerHTML =
+      '<h3>HIGH SCORES</h3>' +
+      '<table class="kn-leaderboard">' +
+        '<thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>' +
+        '<tbody>' + leaderboardRows(top, null) + '</tbody>' +
+      '</table>' +
+      '<div class="kn-form-actions"><button type="button" class="kn-btn kn-btn--primary kn-resume">RESUME</button></div>' +
+      '<p class="kn-tip">P or ESC to resume</p>';
+    m.querySelector('.kn-resume').addEventListener('click', closeLeaderboardView);
+  }
+
+  function closeLeaderboardView() {
+    if (!viewingLeaderboard) return;
+    viewingLeaderboard = false;
+    paused = false;
+    const m = overlay.querySelector('#kn-overlay-msg');
+    m.hidden = true;
+    m.innerHTML = '';
   }
 })();

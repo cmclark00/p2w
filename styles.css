@@ -3376,6 +3376,24 @@ h3 {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+.konami-actions {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.kn-btn--board {
+  background: transparent;
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.kn-btn--board:hover {
+  background: rgba(241, 200, 75, 0.15);
+  border-color: #fff;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
 /* ── Leaderboard table ───────────────────────────────────────────────── */
 .kn-leaderboard {
   width: 100%;
