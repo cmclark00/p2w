@@ -1926,11 +1926,25 @@ h3 {
 }
 
 .tech-card {
+  display: flex;
+  gap: clamp(16px, 2vw, 22px);
+  align-items: flex-start;
   padding: clamp(22px, 3vw, 32px);
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 10px;
   transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+/* Portrait beside the bio — fixed-width 4/5 frame so the photo and text
+   read as one unit instead of a stray thumbnail. */
+.tech-card .tech-photo {
+  flex: 0 0 132px;
+}
+
+.tech-card-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .tech-card:hover {
@@ -1962,22 +1976,6 @@ h3 {
   line-height: 1.65;
 }
 
-/* Individual tech portraits, a separate row under the bio boxes. Mirrors the
-   2-up techs-grid so each photo sits under its card; each frame is capped and
-   centered to match the team page's manager portraits. */
-.techs-photos {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px;
-  max-width: 880px;
-  margin: 18px auto 0;
-}
-
-.techs-photos .person-photo-frame {
-  max-width: 220px;
-  margin: 0 auto;
-}
-
 .tech-link {
   margin: 14px 0 0;
   font-size: 0.9rem;
@@ -1994,7 +1992,11 @@ h3 {
 
 @media (max-width: 720px) {
   .techs-grid { grid-template-columns: 1fr; }
-  .techs-photos { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 420px) {
+  .tech-card { flex-direction: column; }
+  .tech-card .tech-photo { flex: 0 0 auto; max-width: 160px; }
 }
 
 /* ── Meet the Team page ─────────────────────────────────────────────────── */
