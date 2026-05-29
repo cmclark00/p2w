@@ -1962,6 +1962,13 @@ h3 {
   line-height: 1.65;
 }
 
+/* Individual tech photo under the bio — matches the team page's 4/5 portrait
+   frame, capped so it doesn't dominate the text card. */
+.tech-card .person-photo-frame {
+  margin-top: 16px;
+  max-width: 240px;
+}
+
 .tech-link {
   margin: 14px 0 0;
   font-size: 0.9rem;
