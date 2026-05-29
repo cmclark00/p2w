@@ -12,6 +12,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -29,6 +30,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -46,6 +48,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -63,6 +66,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -80,6 +84,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -97,6 +102,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -114,6 +120,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
@@ -131,6 +138,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Thursday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
@@ -148,6 +156,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -165,6 +174,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -182,6 +192,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": null,
     "prizing": null,
     "description": "One Piece OP16 Prerelease. Make sure to register on the Bandai TCG + app!"
@@ -199,6 +210,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -216,6 +228,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -233,6 +246,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -250,6 +264,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -267,6 +282,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
@@ -284,6 +300,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": null,
     "prizing": null,
     "description": "OP 16 One Piece Release"
@@ -301,6 +318,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -318,6 +336,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -335,6 +354,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -352,6 +372,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -369,6 +390,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -386,6 +408,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -403,6 +426,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
@@ -420,6 +444,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Thursday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
@@ -437,6 +462,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": null,
     "prizing": null,
     "description": "Trade Night"
@@ -454,6 +480,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -471,6 +498,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -488,6 +516,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -505,6 +534,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -522,6 +552,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -539,6 +570,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -556,6 +588,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
@@ -573,6 +606,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": null,
     "prizing": null,
     "description": "Gundam ST10 & EB01 Release"
@@ -590,6 +624,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -607,6 +642,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -624,6 +660,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -641,6 +678,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -658,6 +696,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -675,6 +714,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -692,6 +732,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
@@ -709,6 +750,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Thursday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
@@ -726,6 +768,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
@@ -743,6 +786,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Friday",
     "prizing": null,
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
@@ -760,6 +804,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": null,
     "prizing": null,
     "description": "Pokemon Pitch Black Prerelease"
@@ -777,6 +822,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
@@ -794,6 +840,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
@@ -811,6 +858,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Sunday",
     "prizing": null,
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
@@ -828,6 +876,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
@@ -845,6 +894,7 @@
     "capacity": null,
     "registered": null,
     "registerUrl": null,
+    "facebookUrl": null,
     "recurring": "Every Monday",
     "prizing": null,
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
