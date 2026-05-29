@@ -572,17 +572,19 @@ h3 {
 }
 
 /* Semi-transparent store-collage behind every page hero, matching the
-   homepage treatment: the image sits under a dark + brand-tinted gradient so
-   headings stay readable. The colored gradient on .page-hero above is the
-   fallback if the image can't load. */
+   homepage treatment exactly: the image sits under the same dark gradient
+   stack as the home hero (.hero-media::after) — a horizontal left-to-right
+   darkening plus a bottom-up darkening, no brand tint — so the look and
+   transparency are identical site-wide. The colored gradient on .page-hero
+   above is the fallback if the image can't load. */
 .page-hero::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   background:
-    linear-gradient(120deg, rgba(217, 31, 56, 0.22), rgba(49, 94, 203, 0.10), rgba(156, 31, 166, 0.22)),
-    linear-gradient(0deg, rgba(17, 18, 23, 0.88) 0%, rgba(17, 18, 23, 0.66) 55%, rgba(17, 18, 23, 0.55) 100%),
+    linear-gradient(90deg, rgba(17, 18, 23, 0.96) 0%, rgba(17, 18, 23, 0.76) 46%, rgba(17, 18, 23, 0.34) 100%),
+    linear-gradient(0deg, rgba(17, 18, 23, 0.9) 0%, rgba(17, 18, 23, 0.12) 45%),
     url("assets/store-collage.webp");
   background-size: cover;
   background-position: center;
