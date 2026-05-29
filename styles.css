@@ -558,6 +558,8 @@ h3 {
 }
 
 .page-hero {
+  position: relative;
+  overflow: hidden;
   min-height: clamp(460px, 64vh, 600px);
   padding-block: clamp(84px, 11vw, 132px) clamp(48px, 8vw, 82px);
   background:
@@ -567,6 +569,29 @@ h3 {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+/* Semi-transparent store-collage behind every page hero, matching the
+   homepage treatment: the image sits under a dark + brand-tinted gradient so
+   headings stay readable. The colored gradient on .page-hero above is the
+   fallback if the image can't load. */
+.page-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(120deg, rgba(217, 31, 56, 0.22), rgba(49, 94, 203, 0.10), rgba(156, 31, 166, 0.22)),
+    linear-gradient(0deg, rgba(17, 18, 23, 0.88) 0%, rgba(17, 18, 23, 0.66) 55%, rgba(17, 18, 23, 0.55) 100%),
+    url("assets/store-collage.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* Keep hero content above the image layer. */
+.page-hero > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Bare buttons directly inside .page-hero (e.g. events.html) shouldn't
