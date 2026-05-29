@@ -2946,6 +2946,13 @@ h3 {
   font-size: 0.95rem;
 }
 
+.step .step-note {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
 /* Secondary "for more, see [link]" line tucked at the bottom of a section.
    Inherits parent color so it works on both dark (.how-it-works) and light
    (.events-section) backgrounds. */
