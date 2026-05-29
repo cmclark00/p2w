@@ -31,7 +31,11 @@
       "Read(//c/Users/Corey Clark/claude-buddy/statusline//**)",
       "Bash(\"C:/Users/Corey Clark/claude-buddy/hooks/name-react.sh\")",
       "Bash(grep -iE \"thumbs\\\\.db|\\\\.ds_store|\\\\.bak$|\\\\.tmp$|~$|\\\\.orig$|\\\\.swp$|copy|\\\\.old$\")",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "WebFetch(domain:www.pokemon.com)",
+      "WebFetch(domain:club.pokemon.com)",
+      "WebFetch(domain:join.pokemon.com)",
+      "Bash(powershell *)"
     ]
   }
 }
