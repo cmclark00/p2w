@@ -1962,11 +1962,20 @@ h3 {
   line-height: 1.65;
 }
 
-/* Individual tech photo under the bio — matches the team page's 4/5 portrait
-   frame, capped so it doesn't dominate the text card. */
-.tech-card .person-photo-frame {
-  margin-top: 16px;
-  max-width: 240px;
+/* Individual tech portraits, a separate row under the bio boxes. Mirrors the
+   2-up techs-grid so each photo sits under its card; each frame is capped and
+   centered to match the team page's manager portraits. */
+.techs-photos {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  max-width: 880px;
+  margin: 18px auto 0;
+}
+
+.techs-photos .person-photo-frame {
+  max-width: 220px;
+  margin: 0 auto;
 }
 
 .tech-link {
@@ -1985,6 +1994,7 @@ h3 {
 
 @media (max-width: 720px) {
   .techs-grid { grid-template-columns: 1fr; }
+  .techs-photos { grid-template-columns: 1fr; }
 }
 
 /* ── Meet the Team page ─────────────────────────────────────────────────── */
