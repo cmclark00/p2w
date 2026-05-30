@@ -209,6 +209,8 @@
 
   let board, current, next, hold, canHold, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
   let combo;  // consecutive line-clearing placements; -1 = no active combo (Guideline)
+  let lockMs, lockResets, lowestY;  // lock-delay state for the active piece
+  let heldDir, dasMs, dasCharged, softHeld, softMs;  // keyboard DAS/ARR state
   let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl;
   let overlay;
   let initialsMode = false;
@@ -218,6 +220,11 @@
   let clearing = null;   // { rows:[...], start } while a line-clear flash plays
   let bag = [];          // 7-bag randomizer queue
   const CLEAR_MS = 220;  // line-clear flash duration
+  const LOCK_DELAY = 500;     // ms a grounded piece waits before locking
+  const LOCK_RESET_MAX = 15;  // max move/rotate lock-delay refreshes per row (Guideline)
+  const DAS = 150;            // ms before held left/right auto-shift engages
+  const ARR = 40;             // ms between auto-shift steps once engaged
+  const SOFT_REPEAT = 45;     // ms between held soft-drop steps
 
   function open() {
     if (isOpen) return;
@@ -315,6 +322,8 @@
     comboEl = overlay.querySelector('#kn-combo');
 
     document.addEventListener('keydown', handleKey);
+    document.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', releaseKeys);
     showLevelSelect();
   }
 
@@ -324,6 +333,8 @@
     initialsMode = false;
     viewingLeaderboard = false;
     document.removeEventListener('keydown', handleKey);
+    document.removeEventListener('keyup', handleKeyUp);
+    window.removeEventListener('blur', releaseKeys);
     if (rafId) cancelAnimationFrame(rafId);
     document.body.style.overflow = '';
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -337,9 +348,11 @@
     gameOver = false; paused = false;
     hold = null; canHold = true;
     combo = -1;
+    heldDir = 0; dasMs = 0; dasCharged = false; softHeld = false; softMs = 0;
     clearing = null; bag = [];
     next = spawnPiece();
     current = spawnPiece();
+    resetLockState();
     updateStats();
     drawAll();
     rafId = requestAnimationFrame(loop);
@@ -476,7 +489,27 @@
     current = next;
     next = spawnPiece();
     canHold = true;
+    resetLockState();
     if (collides(current, 0, 0, 0)) { gameOver = true; showGameOver(); }
+  }
+
+  // Lock-delay bookkeeping for the active piece.
+  function grounded() { return collides(current, 0, 1, 0); }
+
+  function resetLockState() {
+    lockMs = 0;
+    lockResets = 0;
+    lowestY = current ? current.y : 0;
+    dropAcc = 0;  // each new piece starts with a full gravity interval
+  }
+
+  // After a successful move/rotate, refresh the lock delay if the piece is
+  // resting — capped per row by LOCK_RESET_MAX (Guideline "move reset" rule).
+  function onPieceShift() {
+    if (grounded() && lockResets < LOCK_RESET_MAX) {
+      lockMs = 0;
+      lockResets++;
+    }
   }
 
   function holdPiece() {
@@ -493,6 +526,7 @@
       current = { type: swapType, rot: 0, x: swapType === 'O' ? 4 : 3, y: swapType === 'I' ? -1 : 0 };
     }
     canHold = false;
+    resetLockState();
     if (collides(current, 0, 0, 0)) { gameOver = true; showGameOver(); }
   }
 
@@ -531,10 +565,14 @@
     spawnNext();
   }
 
-  function move(dx) { if (!collides(current, dx, 0, 0)) { current.x += dx; SFX.move(); } }
+  function move(dx) { if (!collides(current, dx, 0, 0)) { current.x += dx; SFX.move(); onPieceShift(); } }
   function softDrop() {
-    if (!collides(current, 0, 1, 0)) { current.y++; score++; updateStats(); SFX.soft(); }
-    else lock();
+    if (!collides(current, 0, 1, 0)) {
+      current.y++; score++; updateStats(); SFX.soft();
+      if (current.y > lowestY) { lowestY = current.y; lockResets = 0; lockMs = 0; }
+    }
+    // Grounded: the lock delay in loop() handles locking — no instant lock,
+    // so players can still slide/tuck. Hard drop (SPACE) is the instant-lock.
   }
   function hardDrop() {
     let dropped = 0;
@@ -548,6 +586,7 @@
     if (!collides(current, 0, 0, dir)) {
       current.rot = (current.rot + dir + 4) % PIECES[current.type].length;
       SFX.rotate();
+      onPieceShift();
       return;
     }
     for (const kick of [-1, 1, -2, 2]) {
@@ -555,6 +594,7 @@
         current.x += kick;
         current.rot = (current.rot + dir + 4) % PIECES[current.type].length;
         SFX.rotate();
+        onPieceShift();
         return;
       }
     }
@@ -567,7 +607,7 @@
   function togglePause() {
     if (gameOver || clearing || viewingLeaderboard || initialsMode || selectingLevel) return;
     paused = !paused;
-    if (paused) showMessage('PAUSED', 'Tap here or press P to resume');
+    if (paused) { releaseKeys(); showMessage('PAUSED', 'Tap here or press P to resume'); }
     else hideGameOver();
   }
 
@@ -615,10 +655,13 @@
       return;
     }
     if (paused) return;
+    // Ignore the OS key-repeat stream — held-key auto-shift is driven by the
+    // game loop (DAS/ARR) so movement feels consistent across keyboards.
+    if (e.repeat) { e.preventDefault(); return; }
     switch (e.key) {
-      case 'ArrowLeft':  move(-1); e.preventDefault(); break;
-      case 'ArrowRight': move(1);  e.preventDefault(); break;
-      case 'ArrowDown':  softDrop(); e.preventDefault(); break;
+      case 'ArrowLeft':  startDir(-1); e.preventDefault(); break;
+      case 'ArrowRight': startDir(1);  e.preventDefault(); break;
+      case 'ArrowDown':  startSoft();  e.preventDefault(); break;
       case 'ArrowUp':
       case 'x': case 'X': rotate(1); e.preventDefault(); break;
       case 'z': case 'Z': rotate(-1); e.preventDefault(); break;
@@ -627,6 +670,26 @@
     }
   }
 
+  // Initial press handlers: act once immediately, then the loop auto-repeats
+  // while the key stays held (cleared by handleKeyUp / releaseKeys).
+  function startDir(dir) {
+    heldDir = dir;
+    dasMs = 0;
+    dasCharged = false;
+    move(dir);
+  }
+  function startSoft() {
+    softHeld = true;
+    softMs = 0;
+    softDrop();
+  }
+  function handleKeyUp(e) {
+    if (e.key === 'ArrowLeft' && heldDir === -1) heldDir = 0;
+    else if (e.key === 'ArrowRight' && heldDir === 1) heldDir = 0;
+    else if (e.key === 'ArrowDown') softHeld = false;
+  }
+  function releaseKeys() { heldDir = 0; softHeld = false; }
+
   function loop(t) {
     if (!isOpen) return;
     const dt = lastTime ? t - lastTime : 0;
@@ -634,11 +697,38 @@
     if (clearing) {
       if (performance.now() - clearing.start >= CLEAR_MS) finishClear();
     } else if (!gameOver && !paused) {
+      // Held-key auto-shift: wait DAS, then step every ARR. Guards cap the work
+      // if dt spikes (e.g. the tab was backgrounded) so we never runaway-loop.
+      if (heldDir !== 0) {
+        dasMs += dt;
+        if (!dasCharged) {
+          if (dasMs >= DAS) { dasCharged = true; dasMs -= DAS; move(heldDir); }
+        } else {
+          let g = 0;
+          while (dasMs >= ARR && g++ < COLS) { dasMs -= ARR; move(heldDir); }
+        }
+      }
+      if (softHeld) {
+        softMs += dt;
+        let g = 0;
+        while (softMs >= SOFT_REPEAT && g++ < ROWS) { softMs -= SOFT_REPEAT; softDrop(); }
+      }
       dropAcc += dt;
       if (dropAcc >= dropMs) {
         dropAcc = 0;
-        if (!collides(current, 0, 1, 0)) current.y++;
-        else lock();
+        if (!collides(current, 0, 1, 0)) {
+          current.y++;
+          // Falling to a new lowest row grants a fresh batch of lock resets.
+          if (current.y > lowestY) { lowestY = current.y; lockResets = 0; lockMs = 0; }
+        }
+      }
+      // Lock delay: a grounded piece waits LOCK_DELAY (refreshed by move/rotate)
+      // before it locks, so last-moment slides and tucks are possible.
+      if (collides(current, 0, 1, 0)) {
+        lockMs += dt;
+        if (lockMs >= LOCK_DELAY) lock();
+      } else {
+        lockMs = 0;
       }
     }
     drawAll();
