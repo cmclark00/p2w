@@ -229,6 +229,10 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
 
 - `konami.js` loaded (deferred) on all standard pages. Code
   `↑ ↑ ↓ ↓ ← → ← → B A` opens a Tetris modal.
+- **Level select** (`showLevelSelect`) shows before each game (on open and on
+  replay): pick a start level 1–10 by click, digit key, or ← → + ENTER. The
+  choice is remembered in `localStorage` (`p2w-bt-startlevel`) and sets both the
+  initial drop speed and the level floor (`level = startLevel + lines/10`).
 - Global leaderboard via **Firebase Firestore** (config in `konami.js`, project
   `p2w-leaderboard`). Firestore security rules are locked to a strict schema
   (read all; create-only with validated fields; no update/delete) — **keep them

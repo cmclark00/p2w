@@ -3501,6 +3501,41 @@ h3 {
 .kn-error { color: #ff8090; margin-top: 12px; }
 .kn-tip { color: var(--muted); font-size: 0.74rem; letter-spacing: 0.06em; margin-top: 14px; }
 
+/* ── Level select grid ───────────────────────────────────────────────── */
+.kn-levels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 260px;
+  margin: 16px 0 2px;
+}
+
+.kn-lvl {
+  padding: 12px 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffe07a;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.kn-lvl:hover {
+  background: rgba(241, 200, 75, 0.18);
+  border-color: rgba(241, 200, 75, 0.7);
+  transform: translateY(-1px);
+}
+
+.kn-lvl--sel {
+  background: var(--gold);
+  border-color: #fff;
+  color: var(--ink);
+}
+
 /* ── Initials form ───────────────────────────────────────────────────── */
 .kn-initials-form {
   display: flex;

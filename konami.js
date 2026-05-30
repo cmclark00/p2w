@@ -29,6 +29,7 @@
 
   // ── Tetris definitions ───────────────────────────────────────────────
   const COLS = 10, ROWS = 20, BLOCK = 24;
+  const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // selectable start levels
   const COLORS = {
     I: '#00ffff', O: '#ffe600', T: '#e040ff',
     S: '#00ff66', Z: '#ff2a55', J: '#5a8eff', L: '#ffa033'
@@ -141,6 +142,13 @@
   let soundOn = true;
   try { soundOn = localStorage.getItem('p2w-bt-muted') !== '1'; } catch (e) {}
 
+  // Start level — chosen on the level-select screen, remembered across games.
+  let startLevel = 1;
+  try {
+    const sl = parseInt(localStorage.getItem('p2w-bt-startlevel'), 10);
+    if (sl >= 1 && sl <= LEVELS.length) startLevel = sl;
+  } catch (e) {}
+
   function ensureAudio() {
     if (!soundOn) return null;
     if (!audioCtx) {
@@ -203,6 +211,8 @@
   let overlay;
   let initialsMode = false;
   let viewingLeaderboard = false;
+  let selectingLevel = false;
+  let selLevel = startLevel;  // highlighted level on the level-select screen
   let clearing = null;   // { rows:[...], start } while a line-clear flash plays
   let bag = [];          // 7-bag randomizer queue
   const CLEAR_MS = 220;  // line-clear flash duration
@@ -289,8 +299,8 @@
     // Tap the dimmed overlay (not its buttons) to resume from pause or restart after game over
     overlay.querySelector('#kn-overlay-msg').addEventListener('click', function (e) {
       if (e.target.closest('button')) return;
-      if (paused && !gameOver && !viewingLeaderboard && !initialsMode) { togglePause(); return; }
-      if (gameOver && !initialsMode && !viewingLeaderboard) { hideGameOver(); startGame(); }
+      if (paused && !gameOver && !viewingLeaderboard && !initialsMode && !selectingLevel) { togglePause(); return; }
+      if (gameOver && !initialsMode && !viewingLeaderboard && !selectingLevel) { hideGameOver(); showLevelSelect(); }
     });
 
     ctx = overlay.querySelector('#kn-board').getContext('2d');
@@ -301,7 +311,7 @@
     linesEl = overlay.querySelector('#kn-lines');
 
     document.addEventListener('keydown', handleKey);
-    startGame();
+    showLevelSelect();
   }
 
   function close() {
@@ -318,8 +328,8 @@
 
   function startGame() {
     board = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-    score = 0; level = 1; lines = 0;
-    dropMs = 800; dropAcc = 0; lastTime = 0;
+    score = 0; level = startLevel; lines = 0;
+    dropMs = Math.max(80, 800 - (level - 1) * 60); dropAcc = 0; lastTime = 0;
     gameOver = false; paused = false;
     hold = null; canHold = true;
     clearing = null; bag = [];
@@ -328,6 +338,68 @@
     updateStats();
     drawAll();
     rafId = requestAnimationFrame(loop);
+  }
+
+  // ── Level select (shown on open and before each replay) ──────────────
+  function showLevelSelect() {
+    selectingLevel = true;
+    initialsMode = false;
+    viewingLeaderboard = false;
+    gameOver = false;
+    paused = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    selLevel = startLevel;
+    const m = overlay.querySelector('#kn-overlay-msg');
+    m.hidden = false;
+    m.innerHTML =
+      '<h3>SELECT LEVEL</h3>' +
+      '<p class="kn-final">Higher start = faster drop &amp; bigger points.</p>' +
+      '<div class="kn-levels">' +
+        LEVELS.map(function (n) {
+          return '<button type="button" class="kn-lvl' + (n === selLevel ? ' kn-lvl--sel' : '') +
+            '" data-lvl="' + n + '">' + n + '</button>';
+        }).join('') +
+      '</div>' +
+      '<p class="kn-tip">Click a level &middot; or ← → then ENTER &middot; ESC to quit</p>';
+    m.querySelectorAll('.kn-lvl').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        startAtLevel(parseInt(btn.dataset.lvl, 10));
+      });
+    });
+  }
+
+  function highlightLevel() {
+    if (!overlay) return;
+    overlay.querySelectorAll('.kn-lvl').forEach(function (btn) {
+      btn.classList.toggle('kn-lvl--sel', parseInt(btn.dataset.lvl, 10) === selLevel);
+    });
+  }
+
+  function startAtLevel(n) {
+    startLevel = Math.min(LEVELS.length, Math.max(1, n));
+    try { localStorage.setItem('p2w-bt-startlevel', String(startLevel)); } catch (e) {}
+    selectingLevel = false;
+    const m = overlay.querySelector('#kn-overlay-msg');
+    m.hidden = true;
+    m.innerHTML = '';
+    startGame();
+  }
+
+  function handleLevelSelectKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      selLevel = selLevel > 1 ? selLevel - 1 : LEVELS.length;
+      highlightLevel(); SFX.move(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      selLevel = selLevel < LEVELS.length ? selLevel + 1 : 1;
+      highlightLevel(); SFX.move(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startAtLevel(selLevel); return; }
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      startAtLevel(e.key === '0' ? 10 : parseInt(e.key, 10));
+    }
   }
 
   function nextType() {
@@ -427,7 +499,7 @@
     clearing = null;
     lines += cleared;
     score += [0, 100, 300, 500, 800][cleared] * level;
-    const newLevel = Math.floor(lines / 10) + 1;
+    const newLevel = startLevel + Math.floor(lines / 10);
     if (newLevel > level) {
       level = newLevel;
       dropMs = Math.max(80, 800 - (level - 1) * 60);
@@ -467,11 +539,11 @@
   }
 
   function playable() {
-    return !gameOver && !paused && !clearing && !viewingLeaderboard && !initialsMode;
+    return !gameOver && !paused && !clearing && !viewingLeaderboard && !initialsMode && !selectingLevel;
   }
 
   function togglePause() {
-    if (gameOver || clearing || viewingLeaderboard || initialsMode) return;
+    if (gameOver || clearing || viewingLeaderboard || initialsMode || selectingLevel) return;
     paused = !paused;
     if (paused) showMessage('PAUSED', 'Tap here or press P to resume');
     else hideGameOver();
@@ -500,6 +572,7 @@
   }
 
   function handleKey(e) {
+    if (selectingLevel) { handleLevelSelectKey(e); return; }
     if (viewingLeaderboard) {
       if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ' || e.key === 'p' || e.key === 'P') {
         e.preventDefault();
@@ -510,7 +583,7 @@
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (initialsMode) return; // form handles its own keys
     if (gameOver) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideGameOver(); startGame(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideGameOver(); showLevelSelect(); }
       return;
     }
     if (clearing) return; // ignore input during the line-clear flash
@@ -700,7 +773,7 @@
         '<h3>GAME OVER</h3>' +
         '<p class="kn-final">Score: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
         '<p class="kn-error">Couldn\'t reach the leaderboard. Check your connection.</p>' +
-        '<p class="kn-tip">Tap or ENTER to play again &middot; ESC to quit</p>';
+        '<p class="kn-tip">Tap or ENTER to pick level &middot; ESC to quit</p>';
       return;
     }
 
@@ -810,7 +883,7 @@
   // ── View the leaderboard mid-game (pauses play) ──────────────────────
   async function viewLeaderboard(e) {
     if (e && e.currentTarget) e.currentTarget.blur();
-    if (gameOver || initialsMode || viewingLeaderboard) return;
+    if (gameOver || initialsMode || viewingLeaderboard || selectingLevel) return;
     viewingLeaderboard = true;
     paused = true;
     const m = overlay.querySelector('#kn-overlay-msg');
