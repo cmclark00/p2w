@@ -499,8 +499,14 @@
   function finishClear() {
     const rows = clearing.rows;
     const cleared = rows.length;
+    // Remove every full row first (highest index down, so the lower indices in
+    // `rows` stay valid), THEN drop in the replacement empties. Doing the
+    // unshift inside the loop would re-index the board mid-pass and leave one
+    // full line (usually the bottom of the group) uncleared until the next lock.
     for (let k = rows.length - 1; k >= 0; k--) {
       board.splice(rows[k], 1);
+    }
+    for (let k = 0; k < cleared; k++) {
       board.unshift(Array(COLS).fill(null));
     }
     clearing = null;
