@@ -241,6 +241,19 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
   clears nothing resets it). **10 lines per level.** The live **Combo** counter
   is the `#kn-combo` stat tile — dim "0" when idle, red glowing "×N" + pulse
   (`.kn-combo-live`/`.kn-combo-pulse`) while a streak is active.
+- **T-spins & Back-to-Back.** `detectTSpin` uses the 3-corner rule (last action
+  a rotation + T piece + ≥3 box corners blocked; "mini" when only one front
+  corner is blocked). T-spin clears score `400` (spin only) / `800` / `1200` /
+  `1600 × level` (mini: `100`/`200`/`400`). A Tetris **or** any T-spin line
+  clear is "difficult" and feeds the **Back-to-Back** chain — chaining two
+  difficult clears with no normal clear between is `×1.5`, shown by the `#kn-b2b`
+  badge under the Combo tile. Notable clears flash the `.kn-callout` over the
+  board (TETRIS / T-SPIN / B2B …).
+- **Lock delay & input feel.** Grounded pieces wait `LOCK_DELAY` (500ms),
+  refreshed by move/rotate up to `LOCK_RESET_MAX` (15) per row, so last-moment
+  slides/tucks work (hard drop still locks instantly; soft drop doesn't
+  force-lock). Keyboard movement is loop-driven `DAS`/`ARR` (150/40ms), not OS
+  key-repeat. Don't reintroduce instant soft-drop lock or per-keydown movement.
 - Global leaderboard via **Firebase Firestore** (config in `konami.js`, project
   `p2w-leaderboard`). Firestore security rules are locked to a strict schema
   (read all; create-only with validated fields; no update/delete) — **keep them

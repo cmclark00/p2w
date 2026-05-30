@@ -3428,6 +3428,52 @@ h3 {
   100% { transform: scale(1); }
 }
 
+/* Back-to-Back badge under the combo number (a <small>, so the .konami-stat
+   span rules above don't touch it). */
+.kn-b2b-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  color: var(--ink);
+  background: linear-gradient(120deg, #ffe07a, #ff5b75);
+  box-shadow: 0 0 14px rgba(255, 91, 117, 0.6);
+}
+.kn-b2b-badge[hidden] { display: none; }
+
+/* Transient celebratory callout over the board (TETRIS / T-SPIN / B2B …). */
+.kn-board-wrap { position: relative; display: flex; }
+
+.kn-callout {
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.2rem, 4.4vw, 1.8rem);
+  letter-spacing: 0.06em;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  text-shadow: 0 0 18px rgba(241, 200, 75, 0.9), 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+.kn-callout.show { animation: kn-callout 1s var(--ease) forwards; }
+
+@keyframes kn-callout {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  30%  { transform: translate(-50%, -50%) scale(1); }
+  75%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -90%) scale(1); }
+}
+
 #kn-next,
 #kn-hold {
   background: #15132a;

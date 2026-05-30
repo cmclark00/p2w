@@ -198,6 +198,7 @@
     },
     levelup: function () { arp([523, 784, 1047], 0.08, 'triangle', 0.10); },
     combo:   function (n) { beep(Math.min(1600, 520 + n * 90), 0.07, 'square', 0.09); },
+    tetris:  function () { arp([523, 659, 784, 1047, 1319, 1568], 0.06, 'square', 0.12); },
     over:    function () { arp([392, 311, 247, 165], 0.13, 'sawtooth', 0.09); }
   };
 
@@ -209,6 +210,7 @@
 
   let board, current, next, hold, canHold, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
   let combo;  // consecutive line-clearing placements; -1 = no active combo (Guideline)
+  let b2bActive, lastWasRotation;   // Back-to-Back chain + T-spin rotation flag
   let lockMs, lockResets, lowestY;  // lock-delay state for the active piece
   let heldDir, dasMs, dasCharged, softHeld, softMs;  // keyboard DAS/ARR state
   let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl;
@@ -244,12 +246,16 @@
           '<img class="kn-bulky kn-bulky--flip" src="assets/shop-header.png" alt="" aria-hidden="true">' +
         '</div>' +
         '<div class="konami-game">' +
-          '<canvas id="kn-board" width="' + (COLS*BLOCK) + '" height="' + (ROWS*BLOCK) + '"></canvas>' +
+          '<div class="kn-board-wrap">' +
+            '<canvas id="kn-board" width="' + (COLS*BLOCK) + '" height="' + (ROWS*BLOCK) + '"></canvas>' +
+            '<div class="kn-callout" aria-hidden="true"></div>' +
+          '</div>' +
           '<div class="konami-side">' +
             '<div class="konami-stat"><strong>Score</strong><span id="kn-score">0</span></div>' +
             '<div class="konami-stat"><strong>Level</strong><span id="kn-level">1</span></div>' +
             '<div class="konami-stat"><strong>Lines</strong><span id="kn-lines">0</span></div>' +
-            '<div class="konami-stat kn-stat-combo"><strong>Combo</strong><span id="kn-combo">0</span></div>' +
+            '<div class="konami-stat kn-stat-combo"><strong>Combo</strong><span id="kn-combo">0</span>' +
+              '<small class="kn-b2b-badge" id="kn-b2b" hidden>B2B</small></div>' +
             '<div class="konami-stat"><strong>Hold</strong>' +
               '<canvas id="kn-hold" width="96" height="96"></canvas>' +
             '</div>' +
@@ -348,6 +354,7 @@
     gameOver = false; paused = false;
     hold = null; canHold = true;
     combo = -1;
+    b2bActive = false; lastWasRotation = false;
     heldDir = 0; dasMs = 0; dasCharged = false; softHeld = false; softMs = 0;
     clearing = null; bag = [];
     next = spawnPiece();
@@ -468,12 +475,20 @@
     }
     SFX.lock();
     if (gameOver) { showGameOver(); return; }
+    const ts = detectTSpin();
     const full = fullRows();
     if (full.length) {
-      clearing = { rows: full, start: performance.now() };
+      clearing = { rows: full, start: performance.now(), tspin: ts.tspin, mini: ts.mini };
       SFX.clear(full.length);
     } else {
-      combo = -1;       // a placement with no clear breaks the combo streak
+      // No lines cleared. A T-spin with no clear still scores and (per Guideline)
+      // does NOT affect the Back-to-Back chain; the combo streak still breaks.
+      if (ts.tspin) {
+        score += (ts.mini ? 100 : 400) * level;
+        flashCallout(ts.mini ? 'T-SPIN MINI' : 'T-SPIN');
+        SFX.combo(ts.mini ? 2 : 5);
+      }
+      combo = -1;
       updateStats();
       spawnNext();
     }
@@ -483,6 +498,27 @@
     const rows = [];
     for (let i = 0; i < ROWS; i++) if (board[i].every(c => c)) rows.push(i);
     return rows;
+  }
+
+  // T-spin detection via the 3-corner rule: the last action was a rotation, the
+  // piece is a T, and >=3 of its 3x3 box corners are blocked (wall/floor/cells).
+  // "Mini" when only one of the two corners the T points toward is blocked.
+  function detectTSpin() {
+    if (current.type !== 'T' || !lastWasRotation) return { tspin: false, mini: false };
+    const cx = current.x, cy = current.y;
+    function blocked(r, c) {
+      const x = cx + c, y = cy + r;
+      if (x < 0 || x >= COLS || y >= ROWS) return true;  // wall / floor
+      if (y < 0) return false;                            // above the board
+      return !!board[y][x];
+    }
+    const tl = blocked(0, 0), tr = blocked(0, 2), bl = blocked(2, 0), br = blocked(2, 2);
+    const count = tl + tr + bl + br;
+    if (count < 3) return { tspin: false, mini: false };
+    const rot = ((current.rot % 4) + 4) % 4;
+    // Front corners = the two on the side the T points toward.
+    const front = rot === 0 ? [tl, tr] : rot === 1 ? [tr, br] : rot === 2 ? [bl, br] : [tl, bl];
+    return { tspin: true, mini: !(front[0] && front[1]) };
   }
 
   function spawnNext() {
@@ -501,6 +537,7 @@
     lockResets = 0;
     lowestY = current ? current.y : 0;
     dropAcc = 0;  // each new piece starts with a full gravity interval
+    lastWasRotation = false;  // a fresh piece hasn't been rotated yet
   }
 
   // After a successful move/rotate, refresh the lock delay if the piece is
@@ -543,9 +580,34 @@
     for (let k = 0; k < cleared; k++) {
       board.unshift(Array(COLS).fill(null));
     }
+    const tspin = clearing.tspin, mini = clearing.mini;
     clearing = null;
     lines += cleared;
-    score += [0, 100, 300, 500, 800][cleared] * level;
+
+    // Base line-clear value (x level). T-spins score much higher than normal
+    // clears (Guideline). A Tetris or any T-spin line clear is a "difficult"
+    // clear and feeds the Back-to-Back chain.
+    let lineScore, difficult;
+    if (tspin) {
+      lineScore = mini ? [0, 200, 400][cleared] : [0, 800, 1200, 1600][cleared];
+      difficult = true;
+    } else {
+      lineScore = [0, 100, 300, 500, 800][cleared];
+      difficult = (cleared === 4);  // Tetris
+    }
+    lineScore *= level;
+
+    // Back-to-Back: a difficult clear chained to the previous difficult clear
+    // (no normal line clear between) is worth x1.5. A normal clear breaks it.
+    let chained = false;
+    if (difficult) {
+      if (b2bActive) { lineScore = Math.floor(lineScore * 1.5); chained = true; }
+      b2bActive = true;
+    } else {
+      b2bActive = false;
+    }
+    score += lineScore;
+
     // Combo: each consecutive line-clearing placement scores 50 x combo x level
     // (Guideline). combo starts at -1, so the first clear (combo 0) pays nothing
     // and the bonus kicks in from the second consecutive clear onward.
@@ -555,6 +617,17 @@
       SFX.combo(combo);
       flashCombo();
     }
+
+    // Celebratory callout for the notable clears.
+    let label = '';
+    if (tspin) label = (mini ? 'T-SPIN MINI' : 'T-SPIN') + (['', ' SINGLE', ' DOUBLE', ' TRIPLE'][cleared] || '');
+    else if (cleared === 4) label = 'TETRIS';
+    if (label) {
+      if (chained) label = 'B2B ' + label;
+      flashCallout(label);
+      if (cleared === 4 || tspin) SFX.tetris();
+    }
+
     const newLevel = startLevel + Math.floor(lines / 10);
     if (newLevel > level) {
       level = newLevel;
@@ -565,10 +638,10 @@
     spawnNext();
   }
 
-  function move(dx) { if (!collides(current, dx, 0, 0)) { current.x += dx; SFX.move(); onPieceShift(); } }
+  function move(dx) { if (!collides(current, dx, 0, 0)) { current.x += dx; lastWasRotation = false; SFX.move(); onPieceShift(); } }
   function softDrop() {
     if (!collides(current, 0, 1, 0)) {
-      current.y++; score++; updateStats(); SFX.soft();
+      current.y++; score++; lastWasRotation = false; updateStats(); SFX.soft();
       if (current.y > lowestY) { lowestY = current.y; lockResets = 0; lockMs = 0; }
     }
     // Grounded: the lock delay in loop() handles locking — no instant lock,
@@ -577,6 +650,7 @@
   function hardDrop() {
     let dropped = 0;
     while (!collides(current, 0, 1, 0)) { current.y++; dropped++; }
+    if (dropped > 0) lastWasRotation = false;  // a drop isn't a spin
     score += dropped * 2;
     updateStats();
     SFX.hard();
@@ -585,6 +659,7 @@
   function rotate(dir) {
     if (!collides(current, 0, 0, dir)) {
       current.rot = (current.rot + dir + 4) % PIECES[current.type].length;
+      lastWasRotation = true;
       SFX.rotate();
       onPieceShift();
       return;
@@ -593,6 +668,7 @@
       if (!collides(current, kick, 0, dir)) {
         current.x += kick;
         current.rot = (current.rot + dir + 4) % PIECES[current.type].length;
+        lastWasRotation = true;
         SFX.rotate();
         onPieceShift();
         return;
@@ -718,6 +794,7 @@
         dropAcc = 0;
         if (!collides(current, 0, 1, 0)) {
           current.y++;
+          lastWasRotation = false;  // a gravity drop isn't a spin
           // Falling to a new lowest row grants a fresh batch of lock resets.
           if (current.y > lowestY) { lowestY = current.y; lockResets = 0; lockMs = 0; }
         }
@@ -859,6 +936,8 @@
       const stat = comboEl.closest('.konami-stat');
       if (stat) stat.classList.toggle('kn-combo-live', active);
     }
+    const b2bEl = overlay && overlay.querySelector('#kn-b2b');
+    if (b2bEl) b2bEl.hidden = !b2bActive;  // badge shows while the B2B chain is live
   }
 
   // Restart the brief combo pulse each time the streak grows.
@@ -869,6 +948,16 @@
     stat.classList.remove('kn-combo-pulse');
     void stat.offsetWidth;  // force reflow so the animation replays
     stat.classList.add('kn-combo-pulse');
+  }
+
+  // Transient centered callout over the board (TETRIS / T-SPIN / B2B …).
+  function flashCallout(text) {
+    const el = overlay && overlay.querySelector('.kn-callout');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('show');
+    void el.offsetWidth;  // restart the animation
+    el.classList.add('show');
   }
 
   function showMessage(title, sub) {
