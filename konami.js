@@ -248,6 +248,7 @@
         '<div class="konami-game">' +
           '<div class="kn-board-wrap">' +
             '<canvas id="kn-board" width="' + (COLS*BLOCK) + '" height="' + (ROWS*BLOCK) + '"></canvas>' +
+            '<div class="kn-flash" aria-hidden="true"></div>' +
             '<div class="kn-callout" aria-hidden="true"></div>' +
           '</div>' +
           '<div class="konami-side">' +
@@ -625,7 +626,7 @@
     if (label) {
       if (chained) label = 'B2B ' + label;
       flashCallout(label);
-      if (cleared === 4 || tspin) SFX.tetris();
+      if (cleared === 4 || tspin) { SFX.tetris(); flashBigClear(); }
     }
 
     const newLevel = startLevel + Math.floor(lines / 10);
@@ -960,6 +961,24 @@
     el.classList.add('show');
   }
 
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function restartAnim(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  // Celebratory shake + white flash for big clears (skipped under reduced motion).
+  function flashBigClear() {
+    if (prefersReducedMotion()) return;
+    restartAnim(overlay && overlay.querySelector('.kn-board-wrap'), 'kn-shake');
+    restartAnim(overlay && overlay.querySelector('.kn-flash'), 'show');
+  }
+
   function showMessage(title, sub) {
     const m = overlay.querySelector('#kn-overlay-msg');
     m.innerHTML = '<h3>' + title + '</h3><p>' + sub + '</p>';
@@ -1006,6 +1025,7 @@
   function showInitialsPrompt(m, currentTop) {
     initialsMode = true;
     m.innerHTML =
+      '<img class="kn-cheer" src="assets/bulky-mascot.webp" alt="" aria-hidden="true">' +
       '<h3 class="kn-newhi">NEW HIGH SCORE!</h3>' +
       '<p class="kn-final">Score: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
       '<form class="kn-initials-form" novalidate>' +

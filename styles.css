@@ -3474,6 +3474,51 @@ h3 {
   100% { opacity: 0; transform: translate(-50%, -90%) scale(1); }
 }
 
+/* White flash + board shake on Tetris / T-spin clears. */
+.kn-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.kn-flash.show { animation: kn-flash 0.4s ease-out; }
+@keyframes kn-flash { 0% { opacity: 0; } 12% { opacity: 0.5; } 100% { opacity: 0; } }
+
+.kn-shake { animation: kn-shake 0.3s var(--ease); }
+@keyframes kn-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, -2px); }
+  80% { transform: translate(3px, 2px); }
+}
+
+/* Bulky cheers on a new high score (brand stamp, per the mascot rule). */
+.kn-cheer {
+  width: 84px;
+  height: auto;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+  animation: kn-cheer-bounce 0.9s var(--ease) infinite;
+}
+@keyframes kn-cheer-bounce {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-8px) rotate(3deg); }
+}
+
+/* Reduced motion: drop the juice animations, keep things readable/static. */
+@media (prefers-reduced-motion: reduce) {
+  .kn-shake { animation: none; }
+  .kn-flash.show { animation: none; }
+  .kn-combo-pulse { animation: none; }
+  .kn-cheer { animation: none; }
+  .kn-callout { transform: translate(-50%, -50%) scale(1); }
+  .kn-callout.show { animation: kn-callout-fade 1s ease forwards; }
+}
+@keyframes kn-callout-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
 #kn-next,
 #kn-hold {
   background: #15132a;
