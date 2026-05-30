@@ -3413,6 +3413,21 @@ h3 {
   text-shadow: 0 0 14px rgba(241, 200, 75, 0.5);
 }
 
+/* Combo counter: dim when idle, lights up red/gold during an active combo. */
+.kn-stat-combo span { color: #8d89a3; text-shadow: none; transition: color 0.15s var(--ease); }
+.kn-combo-live {
+  background: rgba(217, 31, 56, 0.28);
+  border-color: rgba(255, 91, 117, 0.7);
+}
+.kn-combo-live span { color: #ff5b75; text-shadow: 0 0 16px rgba(255, 91, 117, 0.7); }
+.kn-combo-pulse { animation: kn-combo-pop 0.32s var(--ease); }
+
+@keyframes kn-combo-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
 #kn-next,
 #kn-hold {
   background: #15132a;

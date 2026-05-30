@@ -197,6 +197,7 @@
       else arp([440, 660, 880].slice(0, n + 1), 0.05, 'square', 0.09);
     },
     levelup: function () { arp([523, 784, 1047], 0.08, 'triangle', 0.10); },
+    combo:   function (n) { beep(Math.min(1600, 520 + n * 90), 0.07, 'square', 0.09); },
     over:    function () { arp([392, 311, 247, 165], 0.13, 'sawtooth', 0.09); }
   };
 
@@ -207,7 +208,8 @@
   }
 
   let board, current, next, hold, canHold, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
-  let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl;
+  let combo;  // consecutive line-clearing placements; -1 = no active combo (Guideline)
+  let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl;
   let overlay;
   let initialsMode = false;
   let viewingLeaderboard = false;
@@ -240,6 +242,7 @@
             '<div class="konami-stat"><strong>Score</strong><span id="kn-score">0</span></div>' +
             '<div class="konami-stat"><strong>Level</strong><span id="kn-level">1</span></div>' +
             '<div class="konami-stat"><strong>Lines</strong><span id="kn-lines">0</span></div>' +
+            '<div class="konami-stat kn-stat-combo"><strong>Combo</strong><span id="kn-combo">0</span></div>' +
             '<div class="konami-stat"><strong>Hold</strong>' +
               '<canvas id="kn-hold" width="96" height="96"></canvas>' +
             '</div>' +
@@ -309,6 +312,7 @@
     scoreEl = overlay.querySelector('#kn-score');
     levelEl = overlay.querySelector('#kn-level');
     linesEl = overlay.querySelector('#kn-lines');
+    comboEl = overlay.querySelector('#kn-combo');
 
     document.addEventListener('keydown', handleKey);
     showLevelSelect();
@@ -332,6 +336,7 @@
     dropMs = Math.max(80, 800 - (level - 1) * 60); dropAcc = 0; lastTime = 0;
     gameOver = false; paused = false;
     hold = null; canHold = true;
+    combo = -1;
     clearing = null; bag = [];
     next = spawnPiece();
     current = spawnPiece();
@@ -455,6 +460,8 @@
       clearing = { rows: full, start: performance.now() };
       SFX.clear(full.length);
     } else {
+      combo = -1;       // a placement with no clear breaks the combo streak
+      updateStats();
       spawnNext();
     }
   }
@@ -499,6 +506,15 @@
     clearing = null;
     lines += cleared;
     score += [0, 100, 300, 500, 800][cleared] * level;
+    // Combo: each consecutive line-clearing placement scores 50 x combo x level
+    // (Guideline). combo starts at -1, so the first clear (combo 0) pays nothing
+    // and the bonus kicks in from the second consecutive clear onward.
+    combo++;
+    if (combo > 0) {
+      score += 50 * combo * level;
+      SFX.combo(combo);
+      flashCombo();
+    }
     const newLevel = startLevel + Math.floor(lines / 10);
     if (newLevel > level) {
       level = newLevel;
@@ -741,6 +757,22 @@
     scoreEl.textContent = score.toLocaleString();
     levelEl.textContent = level;
     linesEl.textContent = lines;
+    if (comboEl) {
+      const active = combo > 0;
+      comboEl.textContent = active ? '×' + combo : '0';  // ×N while active
+      const stat = comboEl.closest('.konami-stat');
+      if (stat) stat.classList.toggle('kn-combo-live', active);
+    }
+  }
+
+  // Restart the brief combo pulse each time the streak grows.
+  function flashCombo() {
+    if (!comboEl) return;
+    const stat = comboEl.closest('.konami-stat');
+    if (!stat) return;
+    stat.classList.remove('kn-combo-pulse');
+    void stat.offsetWidth;  // force reflow so the animation replays
+    stat.classList.add('kn-combo-pulse');
   }
 
   function showMessage(title, sub) {

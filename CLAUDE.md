@@ -233,6 +233,14 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
   replay): pick a start level 1–10 by click, digit key, or ← → + ENTER. The
   choice is remembered in `localStorage` (`p2w-bt-startlevel`) and sets both the
   initial drop speed and the level floor (`level = startLevel + lines/10`).
+- **Scoring follows the modern Tetris Guideline** (don't "simplify" these):
+  line clears `100/300/500/800 × level` (single/double/triple/tetris), soft drop
+  `1 ×` cells, hard drop `2 ×` cells, **combo `50 × combo × level`** where
+  `combo` starts at −1 and increments on every consecutive line-clearing
+  placement (so the bonus starts on the 2nd clear in a row; any placement that
+  clears nothing resets it). **10 lines per level.** The live **Combo** counter
+  is the `#kn-combo` stat tile — dim "0" when idle, red glowing "×N" + pulse
+  (`.kn-combo-live`/`.kn-combo-pulse`) while a streak is active.
 - Global leaderboard via **Firebase Firestore** (config in `konami.js`, project
   `p2w-leaderboard`). Firestore security rules are locked to a strict schema
   (read all; create-only with validated fields; no update/delete) — **keep them
