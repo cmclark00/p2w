@@ -254,6 +254,15 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
   slides/tucks work (hard drop still locks instantly; soft drop doesn't
   force-lock). Keyboard movement is loop-driven `DAS`/`ARR` (150/40ms), not OS
   key-repeat. Don't reintroduce instant soft-drop lock or per-keydown movement.
+- **Juice & options.** A `READY 3·2·1·GO!` countdown (`runCountdown`, gates
+  gravity/input) precedes each game; Tetris/T-spin clears trigger a board
+  flash + shake (`flashBigClear`); Bulky cheers on the NEW HIGH SCORE screen.
+  Three toggles in the actions bar, each remembered in `localStorage`:
+  **SOUND** (`p2w-bt-muted`), **MUSIC** (`p2w-bt-music`, off by default — a
+  looping public-domain Korobeiniki melody synthesized on the shared
+  AudioContext, independent of the SFX mute), and **LABELS** (`p2w-bt-cb`,
+  colorblind mode stamping each block's letter). All juice animations honor
+  `prefers-reduced-motion` (CSS media query + a JS guard in `flashBigClear`).
 - Global leaderboard via **Firebase Firestore** (config in `konami.js`, project
   `p2w-leaderboard`). Firestore security rules are locked to a strict schema
   (read all; create-only with validated fields; no update/delete) — **keep them

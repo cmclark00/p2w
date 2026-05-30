@@ -68,6 +68,10 @@
     ]
   };
   const TYPES = Object.keys(PIECES);
+  // Reverse map so settled blocks (stored as colors) can show their letter in
+  // colorblind/labels mode.
+  const LETTER_BY_COLOR = {};
+  TYPES.forEach(function (t) { LETTER_BY_COLOR[COLORS[t]] = t; });
 
   // ── Global leaderboard (Firebase Firestore) ──────────────────────────
   const FIREBASE_CONFIG = {
@@ -160,8 +164,16 @@
     try { localStorage.setItem('p2w-bt-best', String(bestScore)); } catch (e) {}
   }
 
-  function ensureAudio() {
-    if (!soundOn) return null;
+  // Colorblind "labels" mode — draws each piece's letter on its blocks.
+  let colorBlind = false;
+  try { colorBlind = localStorage.getItem('p2w-bt-cb') === '1'; } catch (e) {}
+  function setColorBlind(on) {
+    colorBlind = on;
+    try { localStorage.setItem('p2w-bt-cb', on ? '1' : '0'); } catch (e) {}
+  }
+
+  // Create/resume the shared AudioContext (used by both SFX and music).
+  function getCtx() {
     if (!audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
@@ -169,6 +181,10 @@
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
+  }
+
+  function ensureAudio() {
+    return soundOn ? getCtx() : null;  // SFX respect the mute toggle
   }
 
   function tone(freq, start, dur, type, vol) {
@@ -210,6 +226,7 @@
     levelup: function () { arp([523, 784, 1047], 0.08, 'triangle', 0.10); },
     combo:   function (n) { beep(Math.min(1600, 520 + n * 90), 0.07, 'square', 0.09); },
     tetris:  function () { arp([523, 659, 784, 1047, 1319, 1568], 0.06, 'square', 0.12); },
+    count:   function (go) { beep(go ? 880 : 440, go ? 0.18 : 0.1, 'square', 0.09); },
     over:    function () { arp([392, 311, 247, 165], 0.13, 'sawtooth', 0.09); }
   };
 
@@ -219,11 +236,70 @@
     if (on) ensureAudio();
   }
 
+  // ── Background music (Korobeiniki — public-domain folk tune, synthesized) ──
+  // Opt-in toggle, independent of the SFX mute. The melody loops via lookahead
+  // scheduling on the shared AudioContext, routed through its own gain node.
+  const NOTE = { A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, A5: 880, R: 0 };
+  const MELODY = [
+    ['E5',2],['B4',1],['C5',1],['D5',2],['C5',1],['B4',1],
+    ['A4',2],['A4',1],['C5',1],['E5',2],['D5',1],['C5',1],
+    ['B4',3],['C5',1],['D5',2],['E5',2],
+    ['C5',2],['A4',2],['A4',2],['R',2]
+  ];
+  const EIGHTH = 0.15;  // seconds per beat unit
+
+  let musicOn = false;
+  try { musicOn = localStorage.getItem('p2w-bt-music') === '1'; } catch (e) {}
+  let musicTimer = null, musicGain = null;
+
+  function scheduleMelody() {
+    const ctx = getCtx();
+    if (!ctx) return;
+    if (!musicGain) { musicGain = ctx.createGain(); musicGain.connect(ctx.destination); }
+    musicGain.gain.value = 1;
+    let t = ctx.currentTime + 0.06;
+    MELODY.forEach(function (pair) {
+      const dur = pair[1] * EIGHTH;
+      const f = NOTE[pair[0]];
+      if (f) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.045, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.9);
+        osc.connect(g).connect(musicGain);
+        osc.start(t);
+        osc.stop(t + dur);
+      }
+      t += dur;
+    });
+    const ms = (t - ctx.currentTime) * 1000;
+    musicTimer = setTimeout(function () { if (musicOn && isOpen) scheduleMelody(); }, ms - 60);
+  }
+
+  function startMusic() {
+    if (!musicOn || !isOpen) return;
+    if (musicTimer) return;  // already looping — don't double-schedule (overlap)
+    scheduleMelody();
+  }
+  function stopMusic() {
+    if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+    if (musicGain) musicGain.gain.value = 0;  // mute any already-scheduled notes
+  }
+  function setMusic(on) {
+    musicOn = on;
+    try { localStorage.setItem('p2w-bt-music', on ? '1' : '0'); } catch (e) {}
+    if (on) startMusic(); else stopMusic();
+  }
+
   let board, current, next, hold, canHold, score, level, lines, dropMs, dropAcc, lastTime, gameOver, paused, rafId;
   let combo;  // consecutive line-clearing placements; -1 = no active combo (Guideline)
   let b2bActive, lastWasRotation;   // Back-to-Back chain + T-spin rotation flag
   let lockMs, lockResets, lowestY;  // lock-delay state for the active piece
   let heldDir, dasMs, dasCharged, softHeld, softMs;  // keyboard DAS/ARR state
+  let countingDown = false, countTimer = null;       // pre-game READY countdown
   let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl, bestEl;
   let overlay;
   let initialsMode = false;
@@ -293,6 +369,8 @@
         '<div class="konami-actions">' +
           '<button type="button" class="kn-btn kn-btn--board">LEADERBOARD</button>' +
           '<button type="button" class="kn-btn kn-btn--sound" aria-pressed="true">SOUND: ON</button>' +
+          '<button type="button" class="kn-btn kn-btn--music" aria-pressed="false">MUSIC: OFF</button>' +
+          '<button type="button" class="kn-btn kn-btn--cb" aria-pressed="false">LABELS: OFF</button>' +
         '</div>' +
         '<div id="kn-overlay-msg" class="kn-msg" hidden></div>' +
       '</div>';
@@ -310,6 +388,22 @@
     }
     syncSoundBtn();
     soundBtn.addEventListener('click', function () { setSound(!soundOn); syncSoundBtn(); });
+
+    const musicBtn = overlay.querySelector('.kn-btn--music');
+    function syncMusicBtn() {
+      musicBtn.textContent = musicOn ? 'MUSIC: ON' : 'MUSIC: OFF';
+      musicBtn.setAttribute('aria-pressed', musicOn ? 'true' : 'false');
+    }
+    syncMusicBtn();
+    musicBtn.addEventListener('click', function () { setMusic(!musicOn); syncMusicBtn(); });
+
+    const cbBtn = overlay.querySelector('.kn-btn--cb');
+    function syncCbBtn() {
+      cbBtn.textContent = colorBlind ? 'LABELS: ON' : 'LABELS: OFF';
+      cbBtn.setAttribute('aria-pressed', colorBlind ? 'true' : 'false');
+    }
+    syncCbBtn();
+    cbBtn.addEventListener('click', function () { setColorBlind(!colorBlind); syncCbBtn(); if (isOpen) drawAll(); });
 
     const touchActs = {
       left:   function () { if (playable()) move(-1); },
@@ -351,6 +445,9 @@
     if (!isOpen) return;
     isOpen = false;
     saveBest();
+    stopMusic();
+    if (countTimer) { clearTimeout(countTimer); countTimer = null; }
+    countingDown = false;
     initialsMode = false;
     viewingLeaderboard = false;
     document.removeEventListener('keydown', handleKey);
@@ -378,7 +475,33 @@
     resetLockState();
     updateStats();
     drawAll();
+    runCountdown();
+    startMusic();
     rafId = requestAnimationFrame(loop);
+  }
+
+  // Brief "3 · 2 · 1 · GO!" before play; gravity/input are gated until GO.
+  function runCountdown() {
+    if (countTimer) clearTimeout(countTimer);
+    countingDown = true;
+    const steps = ['3', '2', '1'];
+    let i = 0;
+    flashCallout(steps[i]);
+    SFX.count(false);
+    const tick = function () {
+      i++;
+      if (i < steps.length) {
+        flashCallout(steps[i]);
+        SFX.count(false);
+        countTimer = setTimeout(tick, 550);
+      } else {
+        countingDown = false;
+        flashCallout('GO!');
+        SFX.count(true);
+        countTimer = null;
+      }
+    };
+    countTimer = setTimeout(tick, 550);
   }
 
   // ── Level select (shown on open and before each replay) ──────────────
@@ -693,11 +816,11 @@
   }
 
   function playable() {
-    return !gameOver && !paused && !clearing && !viewingLeaderboard && !initialsMode && !selectingLevel;
+    return !gameOver && !paused && !clearing && !viewingLeaderboard && !initialsMode && !selectingLevel && !countingDown;
   }
 
   function togglePause() {
-    if (gameOver || clearing || viewingLeaderboard || initialsMode || selectingLevel) return;
+    if (gameOver || clearing || viewingLeaderboard || initialsMode || selectingLevel || countingDown) return;
     paused = !paused;
     if (paused) { releaseKeys(); showMessage('PAUSED', 'Tap here or press P to resume'); }
     else hideGameOver();
@@ -727,6 +850,7 @@
 
   function handleKey(e) {
     if (selectingLevel) { handleLevelSelectKey(e); return; }
+    if (countingDown) { if (e.key === 'Escape') { e.preventDefault(); close(); } return; }
     if (viewingLeaderboard) {
       if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ' || e.key === 'p' || e.key === 'P') {
         e.preventDefault();
@@ -788,7 +912,7 @@
     lastTime = t;
     if (clearing) {
       if (performance.now() - clearing.start >= CLEAR_MS) finishClear();
-    } else if (!gameOver && !paused) {
+    } else if (!gameOver && !paused && !countingDown) {
       // Held-key auto-shift: wait DAS, then step every ARR. Guards cap the work
       // if dt spikes (e.g. the tab was backgrounded) so we never runaway-loop.
       if (heldDir !== 0) {
@@ -903,6 +1027,17 @@
     c.strokeStyle = 'rgba(255,255,255,0.15)';
     c.lineWidth = 1;
     c.strokeRect(px + 0.5, py + 0.5, BLOCK - 1, BLOCK - 1);
+    // colorblind "labels" mode: stamp the piece letter on the block
+    if (colorBlind) {
+      const letter = LETTER_BY_COLOR[color];
+      if (letter) {
+        c.fillStyle = 'rgba(0,0,0,0.72)';
+        c.font = 'bold ' + Math.round(BLOCK * 0.6) + 'px ' + 'monospace';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(letter, px + BLOCK / 2, py + BLOCK / 2 + 1);
+      }
+    }
   }
 
   function drawGhost(c, x, y, color) {
@@ -936,6 +1071,13 @@
           c.fillRect(px + size - 2, py, 2, size);
         }
       }
+    }
+    if (colorBlind && !dim) {
+      c.fillStyle = 'rgba(0,0,0,0.72)';
+      c.font = 'bold 22px monospace';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(type, 48, 49);
     }
   }
 

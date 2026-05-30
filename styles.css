@@ -3772,6 +3772,21 @@ h3 {
 
 .kn-btn--sound[aria-pressed="false"] { color: #8d89a3; }
 
+.kn-btn--cb,
+.kn-btn--music {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #d7d3e8;
+}
+.kn-btn--cb:hover,
+.kn-btn--music:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+}
+.kn-btn--cb[aria-pressed="false"],
+.kn-btn--music[aria-pressed="false"] { color: #8d89a3; }
+
 /* ── On-screen touch controls (shown on touch / coarse pointers) ──────── */
 .kn-touch {
   display: none;
