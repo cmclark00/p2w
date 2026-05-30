@@ -252,7 +252,7 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
 - **Lock delay & input feel.** Grounded pieces wait `LOCK_DELAY` (500ms),
   refreshed by move/rotate up to `LOCK_RESET_MAX` (15) per row, so last-moment
   slides/tucks work (hard drop still locks instantly; soft drop doesn't
-  force-lock). Keyboard movement is loop-driven `DAS`/`ARR` (150/40ms), not OS
+  force-lock). Keyboard movement is loop-driven `DAS`/`ARR` (220/40ms), not OS
   key-repeat. Don't reintroduce instant soft-drop lock or per-keydown movement.
 - **Juice & options.** A `READY 3·2·1·GO!` countdown (`runCountdown`, gates
   gravity/input) precedes each game; Tetris/T-spin clears trigger a board

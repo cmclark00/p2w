@@ -311,7 +311,9 @@
   const CLEAR_MS = 220;  // line-clear flash duration
   const LOCK_DELAY = 500;     // ms a grounded piece waits before locking
   const LOCK_RESET_MAX = 15;  // max move/rotate lock-delay refreshes per row (Guideline)
-  const DAS = 150;            // ms before held left/right auto-shift engages
+  const DAS = 220;            // ms before held left/right auto-shift engages
+                              // (long enough that a deliberate tap stays a single
+                              // move and doesn't trip auto-shift — see "touchy" fix)
   const ARR = 40;             // ms between auto-shift steps once engaged
   const SOFT_REPEAT = 45;     // ms between held soft-drop steps
 
