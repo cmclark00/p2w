@@ -149,6 +149,17 @@
     if (sl >= 1 && sl <= LEVELS.length) startLevel = sl;
   } catch (e) {}
 
+  // Personal best — remembered locally so there's always a target offline.
+  let bestScore = 0;
+  try {
+    const bs = parseInt(localStorage.getItem('p2w-bt-best'), 10);
+    if (bs > 0) bestScore = bs;
+  } catch (e) {}
+  let isNewBest = false;
+  function saveBest() {
+    try { localStorage.setItem('p2w-bt-best', String(bestScore)); } catch (e) {}
+  }
+
   function ensureAudio() {
     if (!soundOn) return null;
     if (!audioCtx) {
@@ -213,7 +224,7 @@
   let b2bActive, lastWasRotation;   // Back-to-Back chain + T-spin rotation flag
   let lockMs, lockResets, lowestY;  // lock-delay state for the active piece
   let heldDir, dasMs, dasCharged, softHeld, softMs;  // keyboard DAS/ARR state
-  let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl;
+  let ctx, nextCtx, holdCtx, scoreEl, levelEl, linesEl, comboEl, bestEl;
   let overlay;
   let initialsMode = false;
   let viewingLeaderboard = false;
@@ -257,6 +268,7 @@
             '<div class="konami-stat"><strong>Lines</strong><span id="kn-lines">0</span></div>' +
             '<div class="konami-stat kn-stat-combo"><strong>Combo</strong><span id="kn-combo">0</span>' +
               '<small class="kn-b2b-badge" id="kn-b2b" hidden>B2B</small></div>' +
+            '<div class="konami-stat kn-stat-best"><strong>Best</strong><span id="kn-best">0</span></div>' +
             '<div class="konami-stat"><strong>Hold</strong>' +
               '<canvas id="kn-hold" width="96" height="96"></canvas>' +
             '</div>' +
@@ -327,6 +339,7 @@
     levelEl = overlay.querySelector('#kn-level');
     linesEl = overlay.querySelector('#kn-lines');
     comboEl = overlay.querySelector('#kn-combo');
+    bestEl = overlay.querySelector('#kn-best');
 
     document.addEventListener('keydown', handleKey);
     document.addEventListener('keyup', handleKeyUp);
@@ -337,6 +350,7 @@
   function close() {
     if (!isOpen) return;
     isOpen = false;
+    saveBest();
     initialsMode = false;
     viewingLeaderboard = false;
     document.removeEventListener('keydown', handleKey);
@@ -356,6 +370,7 @@
     hold = null; canHold = true;
     combo = -1;
     b2bActive = false; lastWasRotation = false;
+    isNewBest = false;
     heldDir = 0; dasMs = 0; dasCharged = false; softHeld = false; softMs = 0;
     clearing = null; bag = [];
     next = spawnPiece();
@@ -939,6 +954,12 @@
     }
     const b2bEl = overlay && overlay.querySelector('#kn-b2b');
     if (b2bEl) b2bEl.hidden = !b2bActive;  // badge shows while the B2B chain is live
+    if (bestEl) {
+      if (score > bestScore) { bestScore = score; isNewBest = true; }  // live PB
+      bestEl.textContent = bestScore.toLocaleString();
+      const stat = bestEl.closest('.konami-stat');
+      if (stat) stat.classList.toggle('kn-best-live', isNewBest);
+    }
   }
 
   // Restart the brief combo pulse each time the streak grows.
@@ -993,6 +1014,8 @@
 
   async function showGameOver() {
     SFX.over();
+    if (score >= bestScore) { bestScore = score; isNewBest = true; }
+    saveBest();
     const m = overlay.querySelector('#kn-overlay-msg');
     m.hidden = false;
     m.innerHTML =
@@ -1094,7 +1117,7 @@
 
   function leaderboardRows(scores, justAdded) {
     if (!scores || !scores.length) {
-      return '<tr><td colspan="3" class="kn-empty">Be the first to score!</td></tr>';
+      return '<tr><td colspan="5" class="kn-empty">Be the first to score!</td></tr>';
     }
     return scores.map(function (s, i) {
       const isMe = justAdded && s.name === justAdded.name && s.score === justAdded.score;
@@ -1102,6 +1125,8 @@
         '<td class="kn-rank">' + (i + 1) + '</td>' +
         '<td class="kn-name">' + escapeHtml(s.name) + '</td>' +
         '<td class="kn-score">' + (s.score || 0).toLocaleString() + '</td>' +
+        '<td class="kn-lvcol">' + (s.level || 1) + '</td>' +
+        '<td class="kn-lncol">' + (s.lines || 0) + '</td>' +
       '</tr>';
     }).join('');
   }
@@ -1109,9 +1134,10 @@
   function renderLeaderboard(m, scores, justAdded) {
     m.innerHTML =
       '<h3>HIGH SCORES</h3>' +
-      '<p class="kn-final">Your run: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines + '</p>' +
+      '<p class="kn-final">Your run: <strong>' + score.toLocaleString() + '</strong> &middot; Lines: ' + lines +
+        (isNewBest ? ' &middot; <span class="kn-pb">NEW BEST!</span>' : '') + '</p>' +
       '<table class="kn-leaderboard">' +
-        '<thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>' +
+        '<thead><tr><th>#</th><th>Name</th><th>Score</th><th>Lv</th><th>Lines</th></tr></thead>' +
         '<tbody>' + leaderboardRows(scores, justAdded) + '</tbody>' +
       '</table>' +
       '<p class="kn-tip">Tap or ENTER to play again &middot; ESC to quit</p>';
@@ -1145,7 +1171,7 @@
     m.innerHTML =
       '<h3>HIGH SCORES</h3>' +
       '<table class="kn-leaderboard">' +
-        '<thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>' +
+        '<thead><tr><th>#</th><th>Name</th><th>Score</th><th>Lv</th><th>Lines</th></tr></thead>' +
         '<tbody>' + leaderboardRows(top, null) + '</tbody>' +
       '</table>' +
       '<div class="kn-form-actions"><button type="button" class="kn-btn kn-btn--primary kn-resume">RESUME</button></div>' +

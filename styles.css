@@ -3446,6 +3446,12 @@ h3 {
 }
 .kn-b2b-badge[hidden] { display: none; }
 
+/* Personal-best tile: teal accent; pulses green when the run sets a new best. */
+.kn-stat-best span { color: #9fe7c4; text-shadow: 0 0 12px rgba(74, 222, 128, 0.4); }
+.kn-best-live { background: rgba(74, 222, 128, 0.18); border-color: rgba(74, 222, 128, 0.6); }
+.kn-best-live span { color: #6ef0a8; text-shadow: 0 0 16px rgba(74, 222, 128, 0.65); }
+.kn-pb { color: #6ef0a8; font-weight: 800; letter-spacing: 0.06em; }
+
 /* Transient celebratory callout over the board (TETRIS / T-SPIN / B2B …). */
 .kn-board-wrap { position: relative; display: flex; }
 
@@ -3483,8 +3489,8 @@ h3 {
   opacity: 0;
   pointer-events: none;
 }
-.kn-flash.show { animation: kn-flash 0.4s ease-out; }
-@keyframes kn-flash { 0% { opacity: 0; } 12% { opacity: 0.5; } 100% { opacity: 0; } }
+.kn-flash.show { animation: kn-board-flash 0.4s ease-out; }
+@keyframes kn-board-flash { 0% { opacity: 0; } 12% { opacity: 0.5; } 100% { opacity: 0; } }
 
 .kn-shake { animation: kn-shake 0.3s var(--ease); }
 @keyframes kn-shake {
@@ -3858,6 +3864,12 @@ h3 {
   color: var(--paper);
   font-weight: 700;
 }
+
+/* Leaderboard Level / Lines columns (right-aligned, slightly dimmer). */
+.kn-leaderboard th:nth-child(n+3),
+.kn-leaderboard td:nth-child(n+3) { text-align: right; }
+.kn-lvcol, .kn-lncol { color: #c7c3dc; font-size: 0.9em; }
+.kn-leaderboard th, .kn-leaderboard td { padding-left: 7px; padding-right: 7px; }
 
 .kn-just-added {
   background: rgba(241, 200, 75, 0.18);

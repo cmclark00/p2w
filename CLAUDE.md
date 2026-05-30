@@ -257,7 +257,11 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
 - Global leaderboard via **Firebase Firestore** (config in `konami.js`, project
   `p2w-leaderboard`). Firestore security rules are locked to a strict schema
   (read all; create-only with validated fields; no update/delete) — **keep them
-  that way.** Profanity blocklist is the `BLOCKED` set in `konami.js`.
+  that way.** Profanity blocklist is the `BLOCKED` set in `konami.js`. The table
+  shows rank/name/score **+ Lv + Lines** (all already stored per score).
+- **Local personal best** kept in `localStorage` (`p2w-bt-best`) — shown in the
+  `#kn-best` side tile (teal; pulses green on a new best) and as a "NEW BEST!"
+  note on the game-over screen, so there's a target even offline.
 
 ## Forms
 
