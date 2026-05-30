@@ -403,7 +403,7 @@
       cbBtn.setAttribute('aria-pressed', colorBlind ? 'true' : 'false');
     }
     syncCbBtn();
-    cbBtn.addEventListener('click', function () { setColorBlind(!colorBlind); syncCbBtn(); if (isOpen) drawAll(); });
+    cbBtn.addEventListener('click', function () { setColorBlind(!colorBlind); syncCbBtn(); if (board) drawAll(); });
 
     const touchActs = {
       left:   function () { if (playable()) move(-1); },
