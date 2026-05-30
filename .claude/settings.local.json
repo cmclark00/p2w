@@ -35,7 +35,8 @@
       "WebFetch(domain:www.pokemon.com)",
       "WebFetch(domain:club.pokemon.com)",
       "WebFetch(domain:join.pokemon.com)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "mcp__playwright__browser_press_key"
     ]
   }
 }
