@@ -37,7 +37,9 @@
       "WebFetch(domain:join.pokemon.com)",
       "Bash(powershell *)",
       "mcp__playwright__browser_press_key",
-      "mcp__claude-buddy__buddy_pet"
+      "mcp__claude-buddy__buddy_pet",
+      "Bash(ls -la assets/team/)",
+      "Bash(ls -la assets/repair-techs.jpg)"
     ]
   }
 }
