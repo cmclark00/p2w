@@ -364,13 +364,7 @@ Three via **Formspree** (endpoints are public client-side by design):
   hero collage (center tile), home split-section (`shop-header.png` as
   `.mascot-img`), Konami modal, **footer mascot** on all 15 pages
   (`.footer-mascot`, 44px), **events-empty state** (`.events-empty-mascot`,
-  140px), and the **"Meet the mascot" split-section on `about.html`** —
-  which is an **animated video** (`assets/bulky-mascot.{mp4,webm}`, 16:9,
-  muted/looped, `assets/bulky-mascot-poster.webp` poster). Its autoplay is
-  JS-gated on `prefers-reduced-motion` (inline script next to the `<video>`),
-  so no-JS / reduced-motion users get only the still poster. **To swap that
-  clip:** re-encode with audio stripped + `-movflags +faststart`, keep both
-  `.mp4` and `.webm`, and regenerate the poster from frame 0.
+  140px), and the **"Meet the mascot" split-section on `about.html`**.
   **Don't add Bulky to every page-hero or service section** — mascots earn
   their keep in *empty states, brand stamps, and narrative intros*, not as
   gratuitous decoration. The current set is deliberate; expand only with a

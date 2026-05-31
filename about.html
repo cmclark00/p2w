@@ -122,22 +122,7 @@
           <p>The shop&rsquo;s resident sunglass-wearing goat &mdash; gold chain and opinions on every game we sell. You&rsquo;ll spot him in the logo, around the shop, and (if you know what you&rsquo;re doing) somewhere a little more hidden than that.</p>
           <p>The name&rsquo;s a running shop joke &mdash; he keeps eating our bulk cards. We&rsquo;ve made peace with it.</p>
         </div>
-        <video id="bulky-video" class="mascot-img" muted loop playsinline preload="metadata"
-               poster="assets/bulky-mascot-poster.webp"
-               aria-label="Animation of Bulky, the Play2Win Games mascot — a goat wearing sunglasses and a gold chain">
-          <source src="assets/bulky-mascot.webm" type="video/webm">
-          <source src="assets/bulky-mascot.mp4" type="video/mp4">
-        </video>
-        <script>
-          // Autoplay the mascot loop only when motion is welcome (and JS is on);
-          // otherwise the poster frame stays put. Muted, so play() is allowed.
-          (function () {
-            var v = document.getElementById('bulky-video');
-            if (!v) return;
-            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            if (!reduce) { v.autoplay = true; v.play().catch(function () {}); }
-          })();
-        </script>
+        <img class="mascot-img" src="assets/bulky-mascot.webp" alt="Bulky, the Play2Win Games mascot — a goat wearing sunglasses and a gold chain">
       </section>
     </main>
 
