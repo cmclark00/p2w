@@ -917,7 +917,13 @@ h3 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  align-items: start;
+  /* stretch (not start) so every card matches the tallest in its row — the
+     footer's margin-top:auto drops the buttons to the bottom and shorter
+     cards just carry empty space above them. grid-auto-rows:1fr then makes
+     every row track equal to the tallest, so all boxes match across the whole
+     grid (not just within a row) — responsive, no magic height number. */
+  align-items: stretch;
+  grid-auto-rows: 1fr;
 }
 
 /* ── Game color tokens ──────────────────────────────────────────────────── */
