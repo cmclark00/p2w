@@ -1894,6 +1894,9 @@ h3 {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
+  /* Source is 3/2, wider frame is 16/9 — cover crops top/bottom, so anchor
+     to the top to keep heads in frame (matches .person-photo-frame img). */
+  object-position: center top;
   display: block;
 }
 
