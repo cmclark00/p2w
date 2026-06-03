@@ -2145,6 +2145,13 @@ h3 {
   margin: 0 auto 18px;
 }
 
+.owner-card .person-photo-frame--lg img {
+  /* Owner shots have extra headroom above their heads; nudge the crop down
+     from "top" so the frame top sits closer to the tops of their heads (and
+     a bit more of the weapon shows at the bottom). */
+  object-position: center 30%;
+}
+
 .owner-card h3 {
   margin: 0 0 4px;
   font-size: 1.6rem;
