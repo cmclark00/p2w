@@ -397,6 +397,15 @@ Three via **Formspree** (endpoints are public client-side by design):
   for the 5-card "What we carry"; sell-trade uses `--three`). When adding
   cards to a grid, pick or add the variant rather than overriding the
   base.
+- **Team photo frames (`team.html`).** All `.person-photo-frame` use a
+  `4/5` portrait crop, `object-fit: cover` anchored `center top` so the
+  crop comes off the bottom and tops of heads are never clipped. Owner
+  cards (`.person-photo-frame--lg`) share that same `4/5` ratio (they used
+  to be square `1/1`, which chopped top+bottom) but override
+  `object-position: center 30%` — their shots have extra headroom and they
+  hold prop "weapons", so nudging the crop down pulls the frame top toward
+  their heads and shows more of the weapon. Don't reset owners to `center
+  top` or back to `1/1`.
 - Contact: 865-910-8357 · inquiries@play2wingames.com (general) ·
   careers@play2wingames.com (hiring) · facebook.com/P2WGames ·
   discord.gg/m44gYFFSd8 (Discord is a non-vanity but never-expire invite).
