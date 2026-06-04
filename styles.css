@@ -2097,6 +2097,15 @@ h3 {
   opacity: 1;
 }
 
+/* Travis's hover shot (guitar-shred pose) is a tall portrait with the guitar
+   headstock up top and TCG cards fanned in his hand near the bottom. The
+   default "center top" anchor crops the bottom and loses the cards, so nudge
+   the crop down — sacrifices empty shelf headroom above his head to keep both
+   the headstock and the cards in frame. */
+.person-photo-frame--swap .photo-hover--low {
+  object-position: center 65%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .person-photo-frame--swap .photo-hover { transition: none; }
 }
