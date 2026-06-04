@@ -151,15 +151,15 @@
     "date": "2026-06-07",
     "time": "4:00 PM",
     "time24": "16:00",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "Free",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
     "prizing": null,
-    "description": "Gundam Learn to Play Event.\nAll skill levels welcome!---\nentry: Free\nformat: Standard"
+    "description": "Gundam Learn to Play Event.\nAll skill levels welcome!"
   },
   {
     "id": 10,
