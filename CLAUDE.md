@@ -320,10 +320,10 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 ## Pending content (placeholders, marked with HTML comments)
 
-- `team.html` photos: only the optional **full-crew group shot**
-  (`assets/team/full-crew.jpg`) is still a placeholder — every individual
-  has a real photo. Bios still pending for the owners (Mark, Josiah), Nick,
-  and Keith (Justin, Mike, and Travis are written).
+- `team.html` photos: **all in** — every individual plus the full-crew
+  group shot (`assets/team/full-crew.jpg`) now have real photos. Bios still
+  pending for the owners (Mark, Josiah), Nick, and Keith (Justin, Mike, and
+  Travis are written).
 - Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
   group shot + Keith/Corey portraits are already in).
 - **All `upgrades/` + `showcase/` photos were deleted** (being re-shot;
@@ -418,9 +418,11 @@ Three via **Formspree** (endpoints are public client-side by design):
   positioned over it at `opacity:0`, → `opacity:1` on `:hover`/`:focus-within`
   (crossfade honors `prefers-reduced-motion`). Hover/focus-only by design —
   touch + screen readers just get the base. Currently on **Travis**
-  (`tcg-manager-hover.jpg`) and **Mike** (`frontend-manager-hover.jpg`); the
-  hover shots are framed with the same 4/5 top-crop as the base. Keep it
-  sparing — it's a playful touch, not a default for every card.
+  (`tcg-manager-hover.jpg`), **Mike** (`frontend-manager-hover.jpg`), and
+  owner **Mark** (`owner-1-hover.jpg` — his `--lg` frame also carries
+  `--swap`, so the hover img inherits the owner `center 30%` crop). The
+  manager hover shots are framed with the same 4/5 top-crop as the base.
+  Keep it sparing — it's a playful touch, not a default for every card.
 - Contact: 865-910-8357 · inquiries@play2wingames.com (general) ·
   careers@play2wingames.com (hiring) · facebook.com/P2WGames ·
   discord.gg/m44gYFFSd8 (Discord is a non-vanity but never-expire invite).

@@ -2262,7 +2262,9 @@ h3 {
   border: 1px solid var(--line);
   background: var(--surface-2);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-  aspect-ratio: 16 / 9;
+  /* Matches the supplied crew photo's 2:1 ratio so the full shot shows
+     (no cover-crop of the people on the ends). */
+  aspect-ratio: 2 / 1;
 }
 
 .team-group-frame img {
