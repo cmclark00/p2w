@@ -79,15 +79,15 @@
     "date": "2026-06-06",
     "time": "1:00 PM",
     "time24": "13:00",
-    "entry": "TBA",
+    "entry": "$5",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
-    "prizing": null,
-    "description": "Lorcana Set Championship"
+    "prizing": "Participation - Entry Promo, Top 8 - Foil Promo, Winner - Winner Playmat",
+    "description": "Come out and enjoy our Lorcana Set Championship!"
   },
   {
     "id": 6,
@@ -97,15 +97,15 @@
     "date": "2026-06-06",
     "time": "4:00 PM",
     "time24": "16:00",
-    "entry": "TBA",
+    "entry": "$5",
     "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
-    "prizing": null,
-    "description": "Riftbound Skirmish"
+    "prizing": "Participation - 1 Participation Promo, Top 8 - Top Cut Promo, Winner - Championship Playmat, Champion Promo",
+    "description": "Come out and enjoy our Riftbound TCG June Skirmish!"
   },
   {
     "id": 7,
