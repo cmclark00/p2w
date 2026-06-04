@@ -326,15 +326,19 @@ Three via **Formspree** (endpoints are public client-side by design):
   are written).
 - Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
   group shot + Keith/Corey portraits are already in).
-- **All `upgrades/` + `showcase/` photos were deleted** (being re-shot;
-  saved ~50 MB). Every card on `upgrades.html` and `sell-trade.html`
-  now shows the standard placeholder, with the original `<img>`
-  preserved in an HTML comment right below it. To restore: drop the
-  new photo into `assets/upgrades/` or `assets/showcase/`, delete that
-  card's `.upgrade-placeholder` / `.showcase-photo-placeholder` div,
-  and uncomment the `<img>`. **Optimize the new shots first: resize
-  ≤1600px long edge, ~q82.** (Includes the never-shot
-  `ttl-collection.jpg` + `ttl-animal-crossing.jpg` on `sell-trade.html`.)
+- **`upgrades/` photos still all placeholders; `showcase/` partially
+  re-shot.** All were deleted to be re-shot (saved ~50 MB); each card
+  keeps the original `<img>` in an HTML comment below its placeholder.
+  To restore: drop the new photo into `assets/upgrades/` or
+  `assets/showcase/`, delete that card's `.upgrade-placeholder` /
+  `.showcase-photo-placeholder` div, and uncomment the `<img>`.
+  **Optimize first: resize ≤1600px long edge, ~q82.**
+  - `sell-trade.html` showcase — **5 of 12 cards now have real photos**:
+    `vg-handhelds`, `vg-nintendo`, `vg-playstation`, `vg-xbox`, and
+    `ttl-collection`. **Still pending:** `vg-retro`, all 5 TCG cards
+    (`tcg-pokemon-holos`/`-vintage`, `tcg-magic`, `tcg-yugioh`,
+    `tcg-sealed`), and `ttl-animal-crossing`.
+  - `upgrades.html` — every card still a placeholder.
 
 ## Notes
 
