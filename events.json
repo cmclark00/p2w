@@ -206,13 +206,13 @@
     "time": "5:30 PM",
     "time24": "17:30",
     "entry": "$5",
-    "format": "See description",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
-    "prizing": "100% payout to top 4",
+    "prizing": "100% payout to top 4 in store credit",
     "description": "Casual + competitive BeyBlade tournament.\nAll skill levels welcome!"
   },
   {
