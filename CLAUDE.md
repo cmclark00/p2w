@@ -322,8 +322,8 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 - `team.html` photos: **all in** — every individual plus the full-crew
   group shot (`assets/team/full-crew.jpg`) now have real photos. Bios still
-  pending for the owners (Mark, Josiah), Nick, and Keith (Justin, Mike, and
-  Travis are written).
+  pending for owner Mark, Nick, and Keith (Josiah, Justin, Mike, and Travis
+  are written).
 - Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
   group shot + Keith/Corey portraits are already in).
 - **All `upgrades/` + `showcase/` photos were deleted** (being re-shot;
