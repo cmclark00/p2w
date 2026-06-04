@@ -320,8 +320,13 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 ## Pending content (placeholders, marked with HTML comments)
 
-- `assets/team/*.jpg` photos + manager/owner bios on `team.html`.
-- `assets/repair-techs.jpg` + Keith Stevens' bio on `repairs.html`.
+- `team.html` photos: only **Travis Welch** (`assets/team/tcg-manager.jpg`)
+  and the optional **full-crew group shot** (`assets/team/full-crew.jpg`)
+  are still placeholders — everyone else has a real photo. Bios still
+  pending for the owners (Mark, Josiah), Nick, Travis, and Keith (Justin
+  and Mike are written).
+- Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
+  group shot + Keith/Corey portraits are already in).
 - **All `upgrades/` + `showcase/` photos were deleted** (being re-shot;
   saved ~50 MB). Every card on `upgrades.html` and `sell-trade.html`
   now shows the standard placeholder, with the original `<img>`
