@@ -151,15 +151,15 @@
     "date": "2026-06-07",
     "time": "4:00 PM",
     "time24": "16:00",
-    "entry": "$5",
-    "format": "Standard",
+    "entry": "TBA",
+    "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": "Every Sunday",
-    "prizing": "100% payout in store credit to top 4",
-    "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
+    "recurring": null,
+    "prizing": null,
+    "description": "Gundam Learn to Play Event.\nAll skill levels welcome!---\nformat: Standard"
   },
   {
     "id": 10,
