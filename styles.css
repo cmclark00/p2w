@@ -2081,6 +2081,26 @@ h3 {
   display: block;
 }
 
+/* Hover photo swap: a second "fun" portrait fades in over the base shot on
+   hover/focus. Used on the Travis + Mike cards (team.html). The .photo-hover
+   img sits absolutely over the base and is decorative (alt="", aria-hidden),
+   so screen readers/no-hover (touch) just get the base photo. */
+.person-photo-frame--swap .photo-hover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+}
+
+.person-photo-frame--swap:hover .photo-hover,
+.person-photo-frame--swap:focus-within .photo-hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .person-photo-frame--swap .photo-hover { transition: none; }
+}
+
 .person-photo-placeholder {
   position: absolute;
   inset: 0;

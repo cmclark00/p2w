@@ -320,11 +320,10 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 ## Pending content (placeholders, marked with HTML comments)
 
-- `team.html` photos: only **Travis Welch** (`assets/team/tcg-manager.jpg`)
-  and the optional **full-crew group shot** (`assets/team/full-crew.jpg`)
-  are still placeholders — everyone else has a real photo. Bios still
-  pending for the owners (Mark, Josiah), Nick, and Keith (Justin, Mike,
-  and Travis are written).
+- `team.html` photos: only the optional **full-crew group shot**
+  (`assets/team/full-crew.jpg`) is still a placeholder — every individual
+  has a real photo. Bios still pending for the owners (Mark, Josiah), Nick,
+  and Keith (Justin, Mike, and Travis are written).
 - Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
   group shot + Keith/Corey portraits are already in).
 - **All `upgrades/` + `showcase/` photos were deleted** (being re-shot;
@@ -411,6 +410,17 @@ Three via **Formspree** (endpoints are public client-side by design):
   hold prop "weapons", so nudging the crop down pulls the frame top toward
   their heads and shows more of the weapon. Don't reset owners to `center
   top` or back to `1/1`.
+- **Team photo hover-swap (`team.html`).** A card can carry a second "fun"
+  portrait that fades in on hover/focus. Opt in by adding
+  `.person-photo-frame--swap` to the frame and giving it **two** imgs: the
+  real `.photo-base` (normal `alt`) and a decorative `.photo-hover`
+  (`alt=""` + `aria-hidden="true"` + `loading="lazy"`) that's absolutely
+  positioned over it at `opacity:0`, → `opacity:1` on `:hover`/`:focus-within`
+  (crossfade honors `prefers-reduced-motion`). Hover/focus-only by design —
+  touch + screen readers just get the base. Currently on **Travis**
+  (`tcg-manager-hover.jpg`) and **Mike** (`frontend-manager-hover.jpg`); the
+  hover shots are framed with the same 4/5 top-crop as the base. Keep it
+  sparing — it's a playful touch, not a default for every card.
 - Contact: 865-910-8357 · inquiries@play2wingames.com (general) ·
   careers@play2wingames.com (hiring) · facebook.com/P2WGames ·
   discord.gg/m44gYFFSd8 (Discord is a non-vanity but never-expire invite).
