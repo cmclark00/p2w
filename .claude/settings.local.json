@@ -39,7 +39,11 @@
       "mcp__playwright__browser_press_key",
       "mcp__claude-buddy__buddy_pet",
       "Bash(ls -la assets/team/)",
-      "Bash(ls -la assets/repair-techs.jpg)"
+      "Bash(ls -la assets/repair-techs.jpg)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m http.server 8765 --bind 127.0.0.1)",
+      "mcp__playwright__browser_hover",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }
