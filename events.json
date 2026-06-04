@@ -151,15 +151,15 @@
     "date": "2026-06-07",
     "time": "4:00 PM",
     "time24": "16:00",
-    "entry": "$5",
+    "entry": "Free",
     "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": "Every Sunday",
-    "prizing": "100% payout in store credit to top 4",
-    "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
+    "recurring": null,
+    "prizing": null,
+    "description": "Gundam Learn to Play Event.\nAll skill levels welcome!"
   },
   {
     "id": 10,
@@ -205,15 +205,15 @@
     "date": "2026-06-10",
     "time": "5:30 PM",
     "time24": "17:30",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "$5",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
-    "prizing": null,
-    "description": "BeyBlade"
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive BeyBlade tournament.\nAll skill levels welcome!"
   },
   {
     "id": 13,
@@ -224,14 +224,14 @@
     "time": "11:00 AM",
     "time24": "11:00",
     "entry": "TBA",
-    "format": "See description",
+    "format": "Sealed Tournament",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
     "recurring": null,
     "prizing": null,
-    "description": "OP 16 One Piece Release"
+    "description": "One Piece OP16 Release Sealed Tournament."
   },
   {
     "id": 14,
@@ -385,7 +385,7 @@
     "date": "2026-06-19",
     "time": "5:00 PM",
     "time24": "17:00",
-    "entry": "TBA",
+    "entry": "Free",
     "format": "See description",
     "capacity": null,
     "registered": null,
@@ -393,7 +393,7 @@
     "facebookUrl": null,
     "recurring": null,
     "prizing": null,
-    "description": "Trade Night"
+    "description": "Come out for a fun-filled night of trading your favorite TCG's!"
   },
   {
     "id": 23,
