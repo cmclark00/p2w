@@ -2766,13 +2766,28 @@ h3 {
 }
 
 /* TCG: 5 upright portrait columns */
+/* TCG showcase shots are landscape (3:2) card spreads, not portrait console
+   stacks like VG — so the grid runs 3 wide with ~3:2 cells (label strip +
+   aspect-ratio). 5 cards = a row of 3 + a row of 2; the trailing pair centers
+   under the top row (6-track grid, cards span 2). This keeps each full spread
+   visible (object-fit: cover only trims a little backdrop air top/bottom,
+   never the cards on the left/right edges). */
 .showcase-grid[data-cat="tcg"] {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-auto-rows: clamp(200px, 26vw, 380px);
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: auto;
   gap: 14px;
   margin-top: clamp(20px, 3vw, 32px);
 }
+
+.showcase-grid[data-cat="tcg"] .showcase-card {
+  aspect-ratio: 7 / 5;
+  grid-column: span 2;
+}
+
+/* Center the trailing two cards under the row of three. */
+.showcase-grid[data-cat="tcg"] .showcase-card:nth-child(4) { grid-column: 2 / span 2; }
+.showcase-grid[data-cat="tcg"] .showcase-card:nth-child(5) { grid-column: 4 / span 2; }
 
 .showcase-grid[data-cat="ttl"] {
   display: grid;
@@ -2917,9 +2932,41 @@ h3 {
 }
 
 @media (max-width: 680px) {
-  .showcase-grid[data-cat="vg"],
-  .showcase-grid[data-cat="tcg"] {
+  .showcase-grid[data-cat="vg"] {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Mid widths: three-up gets cramped — step to two-up, with the lone 5th card
+   centered under the 2x2. */
+@media (max-width: 900px) {
+  .showcase-grid[data-cat="tcg"] {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .showcase-grid[data-cat="tcg"] .showcase-card,
+  .showcase-grid[data-cat="tcg"] .showcase-card:nth-child(4) {
+    grid-column: auto;
+  }
+
+  .showcase-grid[data-cat="tcg"] .showcase-card:nth-child(5) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc(50% - 7px);
+  }
+}
+
+/* TCG landscape cells get small two-up on phones — drop to a single column
+   so each card spread stays readable. */
+@media (max-width: 620px) {
+  .showcase-grid[data-cat="tcg"] {
+    grid-template-columns: 1fr;
+  }
+
+  .showcase-grid[data-cat="tcg"] .showcase-card:nth-child(5) {
+    grid-column: auto;
+    width: auto;
+    justify-self: stretch;
   }
 }
 
@@ -2930,13 +2977,11 @@ h3 {
 }
 
 @media (max-width: 420px) {
-  .showcase-grid[data-cat="vg"],
-  .showcase-grid[data-cat="tcg"] {
+  .showcase-grid[data-cat="vg"] {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .showcase-grid[data-cat="vg"] .showcase-card:last-child,
-  .showcase-grid[data-cat="tcg"] .showcase-card:last-child {
+  .showcase-grid[data-cat="vg"] .showcase-card:last-child {
     grid-column: span 2;
   }
 }
