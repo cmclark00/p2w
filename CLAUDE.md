@@ -333,11 +333,15 @@ Three via **Formspree** (endpoints are public client-side by design):
   `assets/showcase/`, delete that card's `.upgrade-placeholder` /
   `.showcase-photo-placeholder` div, and uncomment the `<img>`.
   **Optimize first: resize ≤1600px long edge, ~q82.**
-  - `sell-trade.html` showcase — **5 of 12 cards now have real photos**:
-    `vg-handhelds`, `vg-nintendo`, `vg-playstation`, `vg-xbox`, and
-    `ttl-collection`. **Still pending:** `vg-retro`, all 5 TCG cards
-    (`tcg-pokemon-holos`/`-vintage`, `tcg-magic`, `tcg-yugioh`,
-    `tcg-sealed`), and `ttl-animal-crossing`.
+  - `sell-trade.html` showcase — **10 of 12 cards now have real photos**:
+    `vg-handhelds`, `vg-nintendo`, `vg-playstation`, `vg-xbox`,
+    `ttl-collection`, and all 5 TCG cards (`tcg-pokemon-holos`/`-vintage`,
+    `tcg-magic`, `tcg-yugioh`, `tcg-sealed`). **Still pending:** `vg-retro`
+    and `ttl-animal-crossing`. ⚠️ The TCG shots are **landscape** (3:2) card
+    spreads, so the TCG showcase grid (`[data-cat="tcg"]` in `styles.css`) has
+    its own **landscape layout** (3-up, `aspect-ratio: 7/5` cells, trailing
+    pair centered; steps to 2-up then 1-up) — distinct from the VG grid's
+    5-col portrait cells. Keep new TCG shots landscape, or revisit the grid.
   - `upgrades.html` — every card still a placeholder.
 
 ## Notes
