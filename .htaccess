@@ -1,0 +1,13 @@
+RewriteEngine on
+
+# Canonical host: strip www -> apex (any protocol), force HTTPS.
+# 1) www.* -> https://play2wingames.com (single hop, both http + https)
+RewriteCond %{HTTP_HOST} ^www\.play2wingames\.com$ [NC]
+RewriteRule ^(.*)$ https://play2wingames.com/$1 [R=301,L]
+
+# 2) Force HTTPS on the bare apex (proxy-aware: GoDaddy may terminate
+#    SSL upstream and pass X-Forwarded-SSL: on, so check both).
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-SSL} !on
+RewriteCond %{HTTP_HOST} ^play2wingames\.com$ [NC]
+RewriteRule ^(.*)$ https://play2wingames.com/$1 [R=301,L]

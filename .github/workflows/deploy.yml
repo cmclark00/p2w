@@ -85,8 +85,10 @@ jobs:
           # non-serving account — every upload silently went into a void.
           # The deploy FTP account is chrooted to the live docroot, so the
           # login working dir IS public_html -> mirror target is "./".
-          # Protect host-managed files from --delete: SSL/ACME challenges
-          # (.well-known), Apache rules (.htaccess), and cgi-bin.
+          # .htaccess IS tracked in the repo (canonical-host/HTTPS redirect
+          # rules) so it deploys like any other file. Protect only the
+          # host-managed dirs from --delete: SSL/ACME challenges
+          # (.well-known) and cgi-bin.
           lftp -c "
           set ftp:ssl-allow no;
           set net:max-retries 3;
@@ -94,6 +96,6 @@ jobs:
           open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
           set cmd:fail-exit yes;
           mirror --reverse --delete --verbose --parallel=2 \
-                 -x '^\.well-known/' -x '^\.htaccess$' -x '^cgi-bin/' \
+                 -x '^\.well-known/' -x '^cgi-bin/' \
                  _site/ ./;
           "
