@@ -326,8 +326,8 @@ Three via **Formspree** (endpoints are public client-side by design):
   are written).
 - Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
   group shot + Keith/Corey portraits are already in).
-- **`upgrades/` photos still all placeholders; `showcase/` partially
-  re-shot.** All were deleted to be re-shot (saved ~50 MB); each card
+- **`showcase/` partially re-shot; `upgrades/` restored from the old shots.**
+  All photos were originally deleted to be re-shot (saved ~50 MB); each card
   keeps the original `<img>` in an HTML comment below its placeholder.
   To restore: drop the new photo into `assets/upgrades/` or
   `assets/showcase/`, delete that card's `.upgrade-placeholder` /
@@ -342,7 +342,11 @@ Three via **Formspree** (endpoints are public client-side by design):
     its own **landscape layout** (3-up, `aspect-ratio: 7/5` cells, trailing
     pair centered; steps to 2-up then 1-up) — distinct from the VG grid's
     5-col portrait cells. Keep new TCG shots landscape, or revisit the grid.
-  - `upgrades.html` — every card still a placeholder.
+  - `upgrades.html` — **all 8 cards restored** from the old pre-re-shoot
+    photos (recovered from git history `d5af5b0^:assets/mods/`, re-optimized
+    into `assets/upgrades/`). These are the *original* shots, not re-shoots —
+    swap in better ones later if/when they're taken. Cards 1–6 are
+    before/after hover pairs, 7–8 are static single shots.
 
 ## Notes
 
