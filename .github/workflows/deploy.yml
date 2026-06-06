@@ -44,7 +44,15 @@ jobs:
           server: ${{ secrets.GODADDY_FTP_HOST }}
           username: ${{ secrets.GODADDY_FTP_USER }}
           password: ${{ secrets.GODADDY_FTP_PASSWORD }}
-          server-dir: ./public_html/
+          server-dir: public_html/
+          # ⚠️ ONE-TIME: force a full clean re-upload. The first publish left
+          # an EMPTY public_html/assets on the server (GoDaddy FTP nested-dir
+          # quirk — root files uploaded, asset files didn't land, no error
+          # raised) and wrote a sync-state file that makes plain re-runs a
+          # no-op. clean-slate wipes public_html and re-uploads everything
+          # fresh. REMOVE this line again after the first good deploy so it
+          # doesn't wipe the live site on every push.
+          dangerous-clean-slate: true
           # Do not push repo plumbing or dev-only docs to the live host.
           exclude: |
             **/.git*
