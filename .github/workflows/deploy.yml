@@ -6,15 +6,22 @@ name: Deploy to GoDaddy via FTP
 # instead of a Pages build.
 #
 # REQUIRED SECRETS (set in repo Settings → Secrets and variables → Actions):
-#   GODADDY_FTP_HOST     - e.g. ftp.play2wingames.com  (or the IP/host
-#                          GoDaddy gives you under "File Manager > FTP")
-#   GODADDY_FTP_USER     - FTP username from the same GoDaddy panel
-#   GODADDY_FTP_PASSWORD - FTP password (rotate it after first deploy)
+#   GODADDY_FTP_HOST     - FTP hostname for the cPanel account that ACTUALLY
+#                          serves play2wingames.com (from FTP Accounts >
+#                          "Configure FTP Client"). NOT necessarily the apex IP.
+#   GODADDY_FTP_USER     - a dedicated FTP account on that same cPanel whose
+#                          Directory is set to the live docroot (public_html),
+#                          e.g. deploy@play2wingames.com
+#   GODADDY_FTP_PASSWORD - that FTP account's password
 #
-# OPTIONAL TWEAK:
-#   server-dir below defaults to ./public_html/ which is the standard
-#   GoDaddy document root. If your hosting plan uses a different path
-#   (rare) update it.
+# DOCROOT NOTE:
+#   The FTP account above is chrooted INTO public_html (the live docroot),
+#   so after login the working dir already IS the docroot and the mirror
+#   target is "./". A previous set of creds logged into a different,
+#   non-serving account whose own public_html nobody served — every upload
+#   silently went into a void. If you ever use a login that lands in the
+#   home dir instead (sees public_html as a subfolder), change the target
+#   back to "public_html/".
 
 on:
   push:
@@ -38,24 +45,55 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: FTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.GODADDY_FTP_HOST }}
-          username: ${{ secrets.GODADDY_FTP_USER }}
-          password: ${{ secrets.GODADDY_FTP_PASSWORD }}
-          server-dir: ./public_html/
-          # Do not push repo plumbing or dev-only docs to the live host.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.claude/**
-            **/CLAUDE.md
-            **/TEAM-GUIDE.md
-            **/team-guide-print.html
-            **/WEBSITE-AGREEMENT.md
-            **/README.md
-            **/.gitignore
-            **/*.md
-            **/scripts/**
+      # Deploy with lftp's recursive mirror. We previously used
+      # SamKirkland/FTP-Deploy-Action, but its basic-ftp engine reliably
+      # FAILED to push files into subdirectories on GoDaddy's FTP server:
+      # root-level files uploaded fine, but every nested dir (assets/**)
+      # came out EMPTY on the server with no error raised — confirmed even
+      # with a clean-slate full re-upload. lftp's `mirror -R` handles
+      # recursive directory creation + upload correctly against GoDaddy.
+      - name: Build clean deploy dir
+        # Copy only the public site files — drop repo plumbing + dev-only docs
+        # (same exclusion intent as the old action's `exclude:` list).
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='scripts' \
+            --exclude='_site' \
+            --exclude='.gitignore' \
+            --exclude='*.md' \
+            --exclude='team-guide-print.html' \
+            --exclude='WEBSITE-AGREEMENT.md' \
+            ./ _site/
+          echo "Files staged for upload:"; find _site -type f | wc -l
+
+      - name: Deploy via lftp mirror
+        env:
+          FTP_HOST: ${{ secrets.GODADDY_FTP_HOST }}
+          FTP_USER: ${{ secrets.GODADDY_FTP_USER }}
+          FTP_PASS: ${{ secrets.GODADDY_FTP_PASSWORD }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y lftp
+          # --reverse: upload (local -> remote); --delete: prune remote files
+          # not present locally so the host stays in sync with the repo.
+          #
+          # NOTE: the FTP secrets MUST belong to the SAME hosting account that
+          # actually serves play2wingames.com (the cPanel whose File Manager
+          # shows the live files). A prior set of creds pointed at a different,
+          # non-serving account — every upload silently went into a void.
+          # The deploy FTP account is chrooted to the live docroot, so the
+          # login working dir IS public_html -> mirror target is "./".
+          # Protect host-managed files from --delete: SSL/ACME challenges
+          # (.well-known), Apache rules (.htaccess), and cgi-bin.
+          lftp -c "
+          set ftp:ssl-allow no;
+          set net:max-retries 3;
+          set net:timeout 25;
+          open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
+          set cmd:fail-exit yes;
+          mirror --reverse --delete --verbose --parallel=2 \
+                 -x '^\.well-known/' -x '^\.htaccess$' -x '^cgi-bin/' \
+                 _site/ ./;
+          "
