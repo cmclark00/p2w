@@ -60,6 +60,23 @@ jobs:
             --exclude='team-guide-print.html' \
             --exclude='WEBSITE-AGREEMENT.md' \
             ./ _site/
+          # TEMP diagnostic probe — reveals the real Apache DocumentRoot and
+          # what PHP actually sees there. Remove once the subdir-404 mystery
+          # is solved.
+          cat > _site/whereami.php <<'PHP'
+          <?php
+          header('Content-Type: text/plain');
+          $d = $_SERVER['DOCUMENT_ROOT'];
+          echo "DOCUMENT_ROOT=$d\n";
+          echo "__FILE__=".__FILE__."\n";
+          echo "SCRIPT_FILENAME=".$_SERVER['SCRIPT_FILENAME']."\n";
+          echo "--- scandir(DOCUMENT_ROOT) ---\n";
+          foreach (scandir($d) as $f) echo "$f\n";
+          echo "--- assets check ---\n";
+          echo "is_dir(\$d/assets)=".(is_dir("$d/assets")?'yes':'no')."\n";
+          echo "file_exists(\$d/assets/store-collage.jpg)=".(file_exists("$d/assets/store-collage.jpg")?'yes':'no')."\n";
+          if (is_dir("$d/assets")) { echo "--- scandir(assets) ---\n"; foreach (scandir("$d/assets") as $f) echo "$f\n"; }
+          PHP
           echo "Files staged for upload:"; find _site -type f | wc -l
 
       - name: Deploy via lftp mirror
@@ -71,14 +88,6 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y lftp
           # --reverse: upload (local -> remote); --delete: prune remote files
           # not present locally so the host stays in sync with the repo.
-          #
-          # chmod pass: GoDaddy's FTP server creates uploaded directories
-          # without the group/other execute (traverse) bit, so the shared
-          # web-server user can't descend into them — every subdir served
-          # 403 on the folder + 404 on its contents while root-level files
-          # worked. SITE CHMOD them to 755 (dirs traversable, files readable)
-          # after each upload so subdirectories actually serve. The ls dumps
-          # before/after are diagnostic — safe to leave in.
           lftp -c "
           set ftp:ssl-allow no;
           set net:max-retries 3;
@@ -87,14 +96,4 @@ jobs:
           set cmd:fail-exit yes;
           mirror --reverse --delete --verbose --parallel=2 \
                  _site/ public_html/;
-          set cmd:fail-exit no;
-          chmod -R 755 public_html/;
-          echo '===== ls -la public_html (catch hidden .htaccess) =====';
-          ls -la public_html/;
-          echo '===== ls -la FTP home (.) =====';
-          ls -la ./;
-          echo '===== public_html/.htaccess contents (if any) =====';
-          cat public_html/.htaccess;
-          echo '===== assets/.htaccess contents (if any) =====';
-          cat public_html/assets/.htaccess;
           "
