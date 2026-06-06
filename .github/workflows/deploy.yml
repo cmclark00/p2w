@@ -86,14 +86,23 @@ jobs:
           FTP_PASS: ${{ secrets.GODADDY_FTP_PASSWORD }}
         run: |
           sudo apt-get update -qq && sudo apt-get install -y lftp
-          # --reverse: upload (local -> remote); --delete: prune remote files
-          # not present locally so the host stays in sync with the repo.
+          # RECON: figure out where this FTP account actually maps vs where
+          # the domain is served from. Drops a canary at the FTP home root
+          # AND inside public_html so we can see which (if either) appears on
+          # the web. Also dumps pwd + listings of home and FS root.
+          printf '<!doctype html><h1>CANARY HOME %s</h1>' "$GITHUB_SHA" > canaryhome.html
+          printf '<!doctype html><h1>CANARY PUBHTML %s</h1>' "$GITHUB_SHA" > canarypub.html
           lftp -c "
           set ftp:ssl-allow no;
           set net:max-retries 3;
           set net:timeout 25;
           open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
+          set cmd:fail-exit no;
+          echo '===== pwd =====';            pwd;
+          echo '===== ls -la (home/cwd) ====='; ls -la;
+          echo '===== ls -la / (fs root) ====='; ls -la /;
+          echo '===== put canary at HOME root =====';     put -O ./ canaryhome.html;
+          echo '===== put canary in public_html =====';   put -O public_html/ canarypub.html;
           set cmd:fail-exit yes;
-          mirror --reverse --delete --verbose --parallel=2 \
-                 _site/ public_html/;
+          mirror --reverse --verbose --parallel=2 _site/ public_html/;
           "
