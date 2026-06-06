@@ -6,15 +6,22 @@ name: Deploy to GoDaddy via FTP
 # instead of a Pages build.
 #
 # REQUIRED SECRETS (set in repo Settings → Secrets and variables → Actions):
-#   GODADDY_FTP_HOST     - e.g. ftp.play2wingames.com  (or the IP/host
-#                          GoDaddy gives you under "File Manager > FTP")
-#   GODADDY_FTP_USER     - FTP username from the same GoDaddy panel
-#   GODADDY_FTP_PASSWORD - FTP password (rotate it after first deploy)
+#   GODADDY_FTP_HOST     - FTP hostname for the cPanel account that ACTUALLY
+#                          serves play2wingames.com (from FTP Accounts >
+#                          "Configure FTP Client"). NOT necessarily the apex IP.
+#   GODADDY_FTP_USER     - a dedicated FTP account on that same cPanel whose
+#                          Directory is set to the live docroot (public_html),
+#                          e.g. deploy@play2wingames.com
+#   GODADDY_FTP_PASSWORD - that FTP account's password
 #
-# OPTIONAL TWEAK:
-#   server-dir below defaults to ./public_html/ which is the standard
-#   GoDaddy document root. If your hosting plan uses a different path
-#   (rare) update it.
+# DOCROOT NOTE:
+#   The FTP account above is chrooted INTO public_html (the live docroot),
+#   so after login the working dir already IS the docroot and the mirror
+#   target is "./". A previous set of creds logged into a different,
+#   non-serving account whose own public_html nobody served — every upload
+#   silently went into a void. If you ever use a login that lands in the
+#   home dir instead (sees public_html as a subfolder), change the target
+#   back to "public_html/".
 
 on:
   push:
@@ -76,6 +83,10 @@ jobs:
           # actually serves play2wingames.com (the cPanel whose File Manager
           # shows the live files). A prior set of creds pointed at a different,
           # non-serving account — every upload silently went into a void.
+          # The deploy FTP account is chrooted to the live docroot, so the
+          # login working dir IS public_html -> mirror target is "./".
+          # Protect host-managed files from --delete: SSL/ACME challenges
+          # (.well-known), Apache rules (.htaccess), and cgi-bin.
           lftp -c "
           set ftp:ssl-allow no;
           set net:max-retries 3;
@@ -83,5 +94,6 @@ jobs:
           open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
           set cmd:fail-exit yes;
           mirror --reverse --delete --verbose --parallel=2 \
-                 _site/ public_html/;
+                 -x '^\.well-known/' -x '^\.htaccess$' -x '^cgi-bin/' \
+                 _site/ ./;
           "
