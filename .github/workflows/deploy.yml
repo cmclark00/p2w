@@ -38,32 +38,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: FTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.GODADDY_FTP_HOST }}
-          username: ${{ secrets.GODADDY_FTP_USER }}
-          password: ${{ secrets.GODADDY_FTP_PASSWORD }}
-          server-dir: public_html/
-          # ⚠️ ONE-TIME: force a full clean re-upload. The first publish left
-          # an EMPTY public_html/assets on the server (GoDaddy FTP nested-dir
-          # quirk — root files uploaded, asset files didn't land, no error
-          # raised) and wrote a sync-state file that makes plain re-runs a
-          # no-op. clean-slate wipes public_html and re-uploads everything
-          # fresh. REMOVE this line again after the first good deploy so it
-          # doesn't wipe the live site on every push.
-          dangerous-clean-slate: true
-          # Do not push repo plumbing or dev-only docs to the live host.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.claude/**
-            **/CLAUDE.md
-            **/TEAM-GUIDE.md
-            **/team-guide-print.html
-            **/WEBSITE-AGREEMENT.md
-            **/README.md
-            **/.gitignore
-            **/*.md
-            **/scripts/**
+      # Deploy with lftp's recursive mirror. We previously used
+      # SamKirkland/FTP-Deploy-Action, but its basic-ftp engine reliably
+      # FAILED to push files into subdirectories on GoDaddy's FTP server:
+      # root-level files uploaded fine, but every nested dir (assets/**)
+      # came out EMPTY on the server with no error raised — confirmed even
+      # with a clean-slate full re-upload. lftp's `mirror -R` handles
+      # recursive directory creation + upload correctly against GoDaddy.
+      - name: Build clean deploy dir
+        # Copy only the public site files — drop repo plumbing + dev-only docs
+        # (same exclusion intent as the old action's `exclude:` list).
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='scripts' \
+            --exclude='_site' \
+            --exclude='.gitignore' \
+            --exclude='*.md' \
+            --exclude='team-guide-print.html' \
+            --exclude='WEBSITE-AGREEMENT.md' \
+            ./ _site/
+          echo "Files staged for upload:"; find _site -type f | wc -l
+
+      - name: Deploy via lftp mirror
+        env:
+          FTP_HOST: ${{ secrets.GODADDY_FTP_HOST }}
+          FTP_USER: ${{ secrets.GODADDY_FTP_USER }}
+          FTP_PASS: ${{ secrets.GODADDY_FTP_PASSWORD }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y lftp
+          # --reverse: upload (local -> remote); --delete: prune remote files
+          # not present locally so the host stays in sync with the repo.
+          lftp -c "
+          set cmd:fail-exit yes;
+          set ftp:ssl-allow no;
+          set net:max-retries 3;
+          set net:timeout 25;
+          open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
+          mirror --reverse --delete --verbose --parallel=2 \
+                 _site/ public_html/;
+          "
