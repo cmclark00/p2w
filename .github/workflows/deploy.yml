@@ -71,12 +71,28 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y lftp
           # --reverse: upload (local -> remote); --delete: prune remote files
           # not present locally so the host stays in sync with the repo.
+          #
+          # chmod pass: GoDaddy's FTP server creates uploaded directories
+          # without the group/other execute (traverse) bit, so the shared
+          # web-server user can't descend into them — every subdir served
+          # 403 on the folder + 404 on its contents while root-level files
+          # worked. SITE CHMOD them to 755 (dirs traversable, files readable)
+          # after each upload so subdirectories actually serve. The ls dumps
+          # before/after are diagnostic — safe to leave in.
           lftp -c "
-          set cmd:fail-exit yes;
           set ftp:ssl-allow no;
           set net:max-retries 3;
           set net:timeout 25;
           open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
+          set cmd:fail-exit yes;
           mirror --reverse --delete --verbose --parallel=2 \
                  _site/ public_html/;
+          set cmd:fail-exit no;
+          echo '===== perms BEFORE chmod =====';
+          ls public_html/;
+          ls public_html/assets/;
+          chmod -R 755 public_html/;
+          echo '===== perms AFTER chmod =====';
+          ls public_html/;
+          ls public_html/assets/;
           "
