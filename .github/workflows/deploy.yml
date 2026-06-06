@@ -88,11 +88,13 @@ jobs:
           mirror --reverse --delete --verbose --parallel=2 \
                  _site/ public_html/;
           set cmd:fail-exit no;
-          echo '===== perms BEFORE chmod =====';
-          ls public_html/;
-          ls public_html/assets/;
           chmod -R 755 public_html/;
-          echo '===== perms AFTER chmod =====';
-          ls public_html/;
-          ls public_html/assets/;
+          echo '===== ls -la public_html (catch hidden .htaccess) =====';
+          ls -la public_html/;
+          echo '===== ls -la FTP home (.) =====';
+          ls -la ./;
+          echo '===== public_html/.htaccess contents (if any) =====';
+          cat public_html/.htaccess;
+          echo '===== assets/.htaccess contents (if any) =====';
+          cat public_html/assets/.htaccess;
           "
