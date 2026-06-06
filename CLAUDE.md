@@ -188,7 +188,7 @@ branch is safe.
 | `card-conditions.html` | Standalone card condition guide — Near Mint / LP / MP / HP / Damaged with photo reference and criteria for each grade. Reachable from the FAQ ("How do you grade card condition?"). Not in the primary nav. Images live in `assets/conditions/`. |
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
 | `event-inquiry.html` | Event-hosting inquiry form → Formspree `xjglnaew` (inline form). |
-| `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (bio pending), Google review prompt at bottom. |
+| `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (Keith + Corey, bios in), Google review prompt at bottom. |
 | `upgrades.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons) **+ interactive cost estimator** (`.upgrade-calc`, inline JS — ranges mirror the pricing table on the same page); CTA → upgrade-request. (Renamed from `mods.html` — old URL is a redirect file.) |
 | `mods.html` | Redirect → `upgrades.html` (kept for old links). |
 | `upgrade-request.html` | Handheld upgrade intake form. Uses `assets/files/intake-form.css` + `intake-form.js` (Formspree `xaqvrbjn`). |
@@ -320,12 +320,10 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 ## Pending content (placeholders, marked with HTML comments)
 
-- `team.html` photos: **all in** — every individual plus the full-crew
-  group shot (`assets/team/full-crew.jpg`) now have real photos. Bios still
-  pending for Nick and Keith (Mark, Josiah, Justin, Mike, and Travis are
-  written).
-- Keith Stevens' bio on `repairs.html` (the `assets/repair-techs.jpg`
-  group shot + Keith/Corey portraits are already in).
+- `team.html`: **all in** — every individual plus the full-crew group shot
+  (`assets/team/full-crew.jpg`) have real photos, and **all bios are written**
+  (Mark, Josiah, Nick, Justin, Mike, Travis, Keith). Keith's bio also appears
+  on `repairs.html` (same text in both spots).
 - **`showcase/` partially re-shot; `upgrades/` restored from the old shots.**
   All photos were originally deleted to be re-shot (saved ~50 MB); each card
   keeps the original `<img>` in an HTML comment below its placeholder.
