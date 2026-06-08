@@ -196,6 +196,9 @@ main[tabindex]:focus {
    nav sits stacked on its own row below (see .nav flex-basis). */
 .header-cta {
   flex: 0 0 auto;
+  /* Pushes the pill + phone + nav into one cluster on the right, leaving the
+     logo alone on the left (a clean logo-left / nav-right header) */
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,11 +238,10 @@ main[tabindex]:focus {
   flex-wrap: wrap;
   gap: 8px 10px;
   font-weight: 800;
-  /* Flows inline to the right of the phone pill, pushed to the right edge
-     and capped so its links wrap to two rows (~5 on top, the rest centered
-     beneath) */
-  margin-left: auto;
-  max-width: 470px;
+  /* No width cap: the nav stays on one row when there's room (large
+     displays) and only wraps to two centered tiers when space runs out
+     (smaller displays). justify-content:center keeps the wrapped 2nd tier
+     centered under the first. */
 }
 
 .nav a {

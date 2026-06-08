@@ -313,19 +313,25 @@ Three via **Formspree** (endpoints are public client-side by design):
   **size/shape-matched to `.header-phone`** (same `padding: 8px 14px`,
   `font: 700 0.95rem`, `border-radius: 999px`, and a CSS-forced `16px` icon)
   so the two pills read as a matched set — keep them in lockstep if you
-  restyle either. The desktop bar (header is `nowrap`) reads left→right as
-  **logo · CFP pill · phone · nav**: the pill is sized to its text
-  (`flex: 0 0 auto`); `.header-phone` is `flex-shrink: 0` + `white-space:
-  nowrap` so the number never wraps; and `.nav` flows inline after the phone
-  with `margin-left: auto`, `max-width: 470px`, and `justify-content: center`
-  so its 9 links wrap to **~5 on top, the remaining 4 centered beneath**.
-  Don't remove the `max-width`/`flex-shrink` guards — without them the phone
-  number wraps and the nav split drifts. (Caveat: in the ~700–1100px tablet
-  band the pill squeezes the inline nav to 3 short rows until the `≤680px`
-  hamburger kicks in — acceptable, but if it bothers you raise the mobile-nav
-  breakpoint.) `.header-phone`'s `margin-left:auto` is restored only in the
-  `≤680px` mobile block, where the pill instead becomes its own full-width
-  row under the logo/phone/hamburger bar. If you add the pill to a new page,
+  restyle either. The desktop bar (header is `nowrap`, padding-inline =
+  `clamp(18px, 4vw, 54px)` so the logo stays near the left edge — not capped
+  to the body width, by owner preference) is **logo (left) · then a
+  right-hand cluster of CFP pill · phone · nav**. The cluster is grouped to
+  the right by `margin-left: auto` on `.header-cta` (so the logo sits alone
+  on the left, conventional logo-left / nav-right). The pill is sized to its
+  text (`flex: 0 0 auto`); `.header-phone` is `flex-shrink: 0` + `white-space:
+  nowrap` so the number never wraps; and `.nav` has **no width cap** +
+  `justify-content: center`, so its 9 links stay on **one row on large
+  displays (~1580px+) and only wrap to two centered tiers on smaller
+  screens** — that responsive collapse is the point, don't re-add a
+  `max-width` cap (it would force two tiers at every width). Don't remove the
+  phone's `flex-shrink:0`/`white-space:nowrap` either, or the number wraps.
+  (Caveat: in the ~700–1100px tablet band the cluster squeezes the nav to 3
+  short tiers until the `≤680px` hamburger kicks in — acceptable, but if it
+  bothers you raise the mobile-nav breakpoint.) `.header-phone`'s
+  `margin-left:auto` is restored only in the `≤680px` mobile block, where the
+  pill instead becomes its own full-width row under the logo/phone/hamburger
+  bar. If you add the pill to a new page,
   copy the exact `.header-cta` markup from any standard page (15 share it
   identically).
 - `nav.js`: mobile nav toggle + IntersectionObserver scroll-reveal.
