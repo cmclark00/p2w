@@ -47,7 +47,12 @@
       "Bash(python -m http.server 8841 --bind 127.0.0.1)",
       "Bash(curl -s -o /dev/null -w \"server: %{http_code}\\\\n\" http://127.0.0.1:8841/sell-trade.html)",
       "Bash(rm -f tcg-3up.jpeg tcg-2up.jpeg)",
-      "Bash(pkill -f \"http.server 884\")"
+      "Bash(pkill -f \"http.server 884\")",
+      "Bash(awk '{printf \"%8.1f KB  %s\\\\n\", $4/1024, $5}')",
+      "Bash(rm -f upg-grid.jpeg)",
+      "Bash(pkill -f \"http.server 8843\")",
+      "Bash(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' git show \"origin/cutover:.github/workflows/deploy.yml\")",
+      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { $g.Source; gh auth status } else { \"gh not found\" })"
     ]
   }
 }
