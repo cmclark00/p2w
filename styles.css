@@ -1331,6 +1331,103 @@ h3 {
     var(--surface-2);
 }
 
+/* Community First Release Program — MSRP perk for regulars */
+.community-first {
+  padding: clamp(48px, 7vw, 84px) var(--page-x);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(241, 200, 75, 0.12), transparent 55%),
+    radial-gradient(circle at 90% 100%, rgba(49, 94, 203, 0.12), transparent 55%),
+    var(--surface);
+  border-block: 1px solid var(--line);
+}
+
+.community-first-inner {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.cf-head {
+  max-width: 760px;
+  margin-bottom: clamp(28px, 4vw, 44px);
+}
+
+.cf-head h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  line-height: 1.12;
+}
+
+.cf-lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.cf-lead strong {
+  color: var(--gold);
+}
+
+.cf-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.cf-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.cf-rule-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  color: var(--gold);
+  background: rgba(241, 200, 75, 0.12);
+  border: 1px solid rgba(241, 200, 75, 0.32);
+}
+
+.cf-rules li strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 1.02rem;
+}
+
+.cf-rules li span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.cf-foot {
+  margin: clamp(24px, 4vw, 36px) 0 0;
+  text-align: center;
+  font-size: 0.98rem;
+  color: var(--muted);
+}
+
+.cf-foot strong {
+  color: var(--paper);
+}
+
+@media (max-width: 720px) {
+  .cf-rules {
+    grid-template-columns: 1fr;
+  }
+}
+
 .inquiry-form-section {
   padding: clamp(36px, 5vw, 72px) var(--page-x) clamp(60px, 9vw, 110px);
   background: var(--surface);
