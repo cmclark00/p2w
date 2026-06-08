@@ -444,10 +444,11 @@ Three via **Formspree** (endpoints are public client-side by design):
   (crossfade honors `prefers-reduced-motion`). Hover/focus-only by design —
   touch + screen readers just get the base. Currently on **Travis**
   (`tcg-manager-hover.jpg`), **Mike** (`frontend-manager-hover.jpg`), and
-  owner **Mark** (`owner-1-hover.jpg` — his `--lg` frame also carries
-  `--swap`, so the hover img inherits the owner `center 30%` crop). The
-  manager hover shots are framed with the same 4/5 top-crop as the base.
-  Keep it sparing — it's a playful touch, not a default for every card.
+  **Keith** (`keith-hover.jpg`). The hover shots are framed with the same
+  4/5 top-crop as the base. Keep it sparing — it's a playful touch, not a
+  default for every card. (Owner **Mark** previously had a sword/gun swap;
+  the gun shot was dropped by owner request, so his `--lg` card now shows
+  only the single sword photo as `owner-1.jpg`.)
 - Contact: 865-910-8357 · inquiries@play2wingames.com (general) ·
   careers@play2wingames.com (hiring) · facebook.com/P2WGames ·
   discord.gg/m44gYFFSd8 (Discord is a non-vanity but never-expire invite).
