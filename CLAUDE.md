@@ -26,13 +26,26 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
 
 ## Hosting & deploy
 
-- **Currently:** GitHub Pages at `https://cmclark00.github.io/p2w/`, deployed by
-  `.github/workflows/deploy.yml` (Pages source must be set to "GitHub Actions").
-  It triggers on push to `main`, after the events-sync workflow completes
-  (`workflow_run`), and manually.
-- **Migrating to:** GoDaddy hosting at **play2wingames.com**, and the repo
-  transfers to the shop's GitHub. See **Migration runbook** below for the
-  full step-by-step.
+- **LIVE on GoDaddy at `https://play2wingames.com` (hosting cutover done
+  2026-06-06).** `.github/workflows/deploy.yml` is an `lftp mirror` FTP
+  deploy: push to `main` (or the nightly events-sync `workflow_run`, or
+  manual dispatch) uploads the site to the GoDaddy docroot. Deploy creds
+  are repo secrets `GODADDY_FTP_HOST` (the apex IP `107.180.117.156` —
+  `ftp.play2wingames.com` has an A record now but the secret stays on the
+  IP), `GODADDY_FTP_USER` (`deploy@play2wingames.com`, a dedicated cPanel
+  FTP account chrooted to `public_html`), `GODADDY_FTP_PASSWORD`. The
+  mirror target is `./` (login lands in the docroot); `--delete` prunes
+  stale files but excludes the host-managed `.well-known/` and `cgi-bin/`.
+  See [[ftp-deploy-wrong-docroot]] for the war story (old creds hit a
+  different non-serving account).
+- **`.htaccess` is tracked in the repo** and deploys like any other file —
+  it holds the canonical-host rules (www→apex + force-HTTPS, proxy-aware).
+  Edit it in the repo, not on the server, or a deploy will overwrite your
+  server-side change.
+- **Remaining 🔑 handoff items** (don't block the live site): turn off
+  GitHub Pages, move Formspree/Calendar/Firebase to shop accounts, transfer
+  the repo to `play2wingames/p2w`, set up Google Search Console. See the
+  **Migration runbook** below (Phases 1, 2, 5) for the step-by-step.
 
 ## Migration runbook (Play2Win handoff — do at cutover)
 
@@ -147,35 +160,15 @@ submission):**
 - Don't confuse `google-site-verification` with `og:url` or
   `canonical` — different things.
 
-### Cutover branch (pre-staged — **keep in parity with `main`**)
+### Cutover branch (done — merged & removed 2026-06-06)
 
-A `cutover` branch exists on origin (`origin/cutover`) with the
-cutover-day state already prepared:
-
-- **URL sweep applied** — `https://cmclark00.github.io/p2w/` →
-  `https://play2wingames.com/` across all HTML, `sitemap.xml`,
-  `robots.txt` (77 occurrences as of branch creation).
-- **`.github/workflows/deploy.yml` replaced** — Pages workflow swapped
-  for an FTP-deploy (`SamKirkland/FTP-Deploy-Action`) targeting GoDaddy
-  `public_html/`. Requires three repo secrets to be set on cutover
-  day: `GODADDY_FTP_HOST`, `GODADDY_FTP_USER`, `GODADDY_FTP_PASSWORD`.
-- **Cutover-day flip:** set the three secrets → merge `cutover` → `main`
-  → next push deploys to GoDaddy.
-
-⚠️ **PARITY RULE:** every non-trivial change on `main` must be
-reflected on `cutover`, or cutover-day will require last-minute
-firefighting. After landing work on `main`, run:
-
-```sh
-git checkout cutover
-git rebase main          # replays the sweep + workflow on top of new commits
-# (If new HTML files were added: rerun the URL sweep against them.)
-git push --force-with-lease origin cutover
-git checkout main
-```
-
-The URL sweep is idempotent so re-running it on a freshly-rebased
-branch is safe.
+The `cutover` branch was merged into `main` at hosting cutover and then
+deleted (local + `origin`). Its payload now lives on `main`: the URL sweep
+(`cmclark00.github.io/p2w` → `play2wingames.com`), the FTP-deploy workflow,
+and the restored Discord footer URL. No parity rule anymore — `main` is the
+single source of truth and every push deploys straight to GoDaddy. (The
+`SamKirkland/FTP-Deploy-Action` mentioned in older notes was replaced by the
+`lftp mirror` deploy described under **Hosting & deploy**.)
 
 ## Pages
 
