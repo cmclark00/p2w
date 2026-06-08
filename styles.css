@@ -527,6 +527,153 @@ h3 {
   margin: 0 auto;
 }
 
+/* Bulky's Coin Hunt teaser — coin badge + copy, links to the hunt page */
+.coin-hunt-teaser {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 28px;
+  padding: 16px 20px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 18% 30%, rgba(49, 94, 203, 0.16), transparent 60%),
+    var(--surface-2);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.coin-hunt-teaser:hover,
+.coin-hunt-teaser:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(49, 94, 203, 0.55);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+}
+
+.coin-hunt-teaser-coin {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+  transition: transform 0.3s var(--ease);
+}
+
+.coin-hunt-teaser:hover .coin-hunt-teaser-coin {
+  transform: rotate(-8deg) scale(1.05);
+}
+
+.coin-hunt-teaser-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.coin-hunt-teaser-text > strong {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+}
+
+.coin-hunt-teaser-text span strong {
+  color: var(--gold);
+}
+
+.coin-hunt-teaser-cta {
+  margin-top: 4px;
+  color: var(--blue);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coin-hunt-teaser,
+  .coin-hunt-teaser-coin {
+    transition: none;
+  }
+}
+
+/* Coin Hunt page — hero coin + weather note */
+.coin-hunt-hero {
+  text-align: center;
+  align-items: center;
+}
+
+.coin-hunt-hero .lead {
+  margin-inline: auto;
+}
+
+.coin-hunt-hero .lead strong {
+  color: var(--gold);
+}
+
+.coin-hunt-hero-coin {
+  width: clamp(150px, 24vw, 220px);
+  height: auto;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
+  animation: coin-float 4s var(--ease) infinite;
+}
+
+@keyframes coin-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-10px) rotate(3deg); }
+}
+
+.weather-note {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 760px;
+  margin: clamp(28px, 4vw, 40px) auto 0;
+  padding: 18px 22px;
+  border: 1px solid rgba(241, 200, 75, 0.4);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 30%, rgba(241, 200, 75, 0.12), transparent 60%),
+    var(--surface-2);
+}
+
+.weather-note-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: var(--gold);
+  background: rgba(241, 200, 75, 0.12);
+  border: 1px solid rgba(241, 200, 75, 0.32);
+}
+
+.weather-note p {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.weather-note a {
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coin-hunt-hero-coin { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .weather-note {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+}
+
 .inventory-band {
   display: flex;
   align-items: center;
@@ -1422,6 +1569,11 @@ h3 {
   gap: 16px;
 }
 
+/* Single row of 3 (coin-hunt "how it works") instead of the 2-col default */
+.cf-rules--row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .cf-rules li {
   display: flex;
   align-items: flex-start;
@@ -1465,6 +1617,12 @@ h3 {
 
 .cf-foot strong {
   color: var(--paper);
+}
+
+@media (max-width: 860px) {
+  .cf-rules--row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {

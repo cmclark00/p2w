@@ -175,7 +175,8 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | File | Purpose |
 |---|---|
 | `index.html` | Home. Has `GameStore` JSON-LD. |
-| `about.html` | About the shop; links to team page. |
+| `about.html` | About the shop; links to team page. Its **"Meet the mascot" Bulky split-section** carries a `.coin-hunt-teaser` card (cut-out coin + copy) linking to `bulky-coin-hunt.html`. |
+| `bulky-coin-hunt.html` | **Bulky's Coin Hunt** — every Saturday Bulky loses a coin within a 5-mile radius of the shop; find it + bring it in = **$50 store credit**. Bad weather = Bulky stays indoors, no coin that week. Floating hero coin, 3 "how it works" cards (reuses `.community-first`/`.cf-rules` styling), and a `.weather-note` rain-check callout. Reached from the about-page teaser; not in primary nav. |
 | `sell-trade.html` | Buy/sell/trade info **+ merged showcase galleries** (Video Games / TCG / Toys-to-Life) with lightbox. |
 | `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown + per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB). Promoted to its own primary nav item. |
 | `card-conditions.html` | Standalone card condition guide — Near Mint / LP / MP / HP / Damaged with photo reference and criteria for each grade. Reachable from the FAQ ("How do you grade card condition?"). Not in the primary nav. Images live in `assets/conditions/`. |
@@ -403,7 +404,10 @@ Three via **Formspree** (endpoints are public client-side by design):
   **Don't add Bulky to every page-hero or service section** — mascots earn
   their keep in *empty states, brand stamps, and narrative intros*, not as
   gratuitous decoration. The current set is deliberate; expand only with a
-  reason.
+  reason. (Separate asset: `assets/bulky-coin.webp` — a background-removed
+  cut-out of the 3D-printed Play2Win Bulky coin, used in the about-page
+  `.coin-hunt-teaser` and as the floating hero on `bulky-coin-hunt.html`.
+  It was cut from a photo with a feathered circular PIL mask, not rembg.)
 - **Trade-in store-credit bumps (tiered).** Store credit pays more than
   cash on trade-ins, by category: **video games 50% more**, **consoles &
   handhelds 20% more**, **TCG singles/sealed/graded 10% more**, **TCG
