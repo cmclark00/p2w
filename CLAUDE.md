@@ -180,6 +180,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown + per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB). Promoted to its own primary nav item. |
 | `card-conditions.html` | Standalone card condition guide — Near Mint / LP / MP / HP / Damaged with photo reference and criteria for each grade. Reachable from the FAQ ("How do you grade card condition?"). Not in the primary nav. Images live in `assets/conditions/`. |
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
+| `community-first.html` | Community First Release Program — regulars get new core set product at **true MSRP**. The four program rules (one item/person, consistent in-store players, must be present, seal cut at pickup) + "ask staff" footer. Reached from the **header CTA pill** (`.header-cta`) on every standard page. Was originally a section on `events.html`; moved to its own page. |
 | `event-inquiry.html` | Event-hosting inquiry form → Formspree `xjglnaew` (inline form). |
 | `repairs.html` | Repair services, ballpark pricing across multiple service groups (Controller Sticks, HDMI Port, Charging Port, Battery, Deep Clean, Thermal Service, PS2 Optical, Disc Resurfacing), 3-step process ($30 non-refundable diagnosis fee that applies to final cost), "Meet your repair techs" (Keith + Corey, bios in), Google review prompt at bottom. |
 | `upgrades.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons) **+ interactive cost estimator** (`.upgrade-calc`, inline JS — ranges mirror the pricing table on the same page); CTA → upgrade-request. (Renamed from `mods.html` — old URL is a redirect file.) |
@@ -306,6 +307,27 @@ Three via **Formspree** (endpoints are public client-side by design):
   (`inter-latin`, `inter-latin-ext`, `spacegrotesk-latin`, `spacegrotesk-latin-ext`);
   `@font-face` block at top of `styles.css`. No Google Fonts requests anywhere
   except `404.html`.
+- **Header CTA pill (`.header-cta`).** The purple→black "Community First
+  Program" pill links to `community-first.html` and lives in every standard
+  page's `<header>` between `.brand` and `.header-phone`. It's deliberately
+  **size/shape-matched to `.header-phone`** (same `padding: 8px 14px`,
+  `font: 700 0.95rem`, `border-radius: 999px`, and a CSS-forced `16px` icon)
+  so the two pills read as a matched set — keep them in lockstep if you
+  restyle either. The desktop bar (header is `nowrap`) reads left→right as
+  **logo · CFP pill · phone · nav**: the pill is sized to its text
+  (`flex: 0 0 auto`); `.header-phone` is `flex-shrink: 0` + `white-space:
+  nowrap` so the number never wraps; and `.nav` flows inline after the phone
+  with `margin-left: auto`, `max-width: 470px`, and `justify-content: center`
+  so its 9 links wrap to **~5 on top, the remaining 4 centered beneath**.
+  Don't remove the `max-width`/`flex-shrink` guards — without them the phone
+  number wraps and the nav split drifts. (Caveat: in the ~700–1100px tablet
+  band the pill squeezes the inline nav to 3 short rows until the `≤680px`
+  hamburger kicks in — acceptable, but if it bothers you raise the mobile-nav
+  breakpoint.) `.header-phone`'s `margin-left:auto` is restored only in the
+  `≤680px` mobile block, where the pill instead becomes its own full-width
+  row under the logo/phone/hamburger bar. If you add the pill to a new page,
+  copy the exact `.header-cta` markup from any standard page (15 share it
+  identically).
 - `nav.js`: mobile nav toggle + IntersectionObserver scroll-reveal.
 - Accessibility: skip links, `main#main`, visible `:focus-visible` rings.
 - SEO: canonical tags, OG tags + `assets/og-image.jpg` share card, `sitemap.xml`,

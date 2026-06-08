@@ -161,7 +161,8 @@ main[tabindex]:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 8px 14px;
   border-radius: 999px;
   background: rgba(217, 31, 56, 0.1);
@@ -190,13 +191,55 @@ main[tabindex]:focus {
   .header-phone { padding: 8px 10px; }
 }
 
+/* Community First CTA — a pill sized to its text, centered on the top bar
+   between the logo and the phone pill (header is space-between). The main
+   nav sits stacked on its own row below (see .nav flex-basis). */
+.header-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(100deg, var(--purple), #18141f);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(156, 31, 166, 0.32);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), filter 0.2s var(--ease);
+}
+
+/* Match the phone pill's icon size so the two pills read as a matched set */
+.header-cta svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.header-cta:hover,
+.header-cta:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(156, 31, 166, 0.5);
+  filter: brightness(1.1);
+}
+
 .nav {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
   font-weight: 800;
+  /* Flows inline to the right of the phone pill, pushed to the right edge
+     and capped so its links wrap to two rows (~5 on top, the rest centered
+     beneath) */
+  margin-left: auto;
+  max-width: 470px;
 }
 
 .nav a {
@@ -2515,6 +2558,24 @@ h3 {
 
   .brand img {
     width: min(190px, 46vw);
+  }
+
+  /* Phone pushes to the right of the logo row (the desktop fill-pill
+     removes its auto margin; restore it here for the mobile bar) */
+  .header-phone {
+    margin-left: auto;
+  }
+
+  /* Drop the CTA to its own full-width row under the logo / phone / menu */
+  .header-cta {
+    order: 1;
+    flex-basis: 100%;
+    margin-top: 8px;
+    font-size: 0.92rem;
+  }
+
+  .nav {
+    order: 2;
   }
 
   .nav-toggle {
