@@ -52,7 +52,11 @@
       "Bash(rm -f upg-grid.jpeg)",
       "Bash(pkill -f \"http.server 8843\")",
       "Bash(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' git show \"origin/cutover:.github/workflows/deploy.yml\")",
-      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { $g.Source; gh auth status } else { \"gh not found\" })"
+      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { $g.Source; gh auth status } else { \"gh not found\" })",
+      "Bash(rm -f community-first.png)",
+      "Bash(rm -rf .playwright-mcp)",
+      "Bash(Select-String -NotMatch \"settings.local\")",
+      "Bash(magick -version)"
     ]
   }
 }
