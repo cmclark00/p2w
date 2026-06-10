@@ -685,6 +685,24 @@
   },
   {
     "id": 39,
+    "title": "Riftbound Skirmish ",
+    "game": "riftbound",
+    "gameLabel": "Riftbound",
+    "date": "2026-07-11",
+    "time": "4:00 PM",
+    "time24": "16:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": null,
+    "prizing": null,
+    "description": "Riftbound Skirmish "
+  },
+  {
+    "id": 40,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -702,7 +720,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 40,
+    "id": 41,
     "title": "Mid Year Celebrations Pokemon",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -720,7 +738,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 41,
+    "id": 42,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -738,7 +756,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 42,
+    "id": 43,
     "title": "Pokemon Pitch Black release",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -756,7 +774,7 @@
     "description": "Pokemon Pitch Black release"
   },
   {
-    "id": 43,
+    "id": 44,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -774,7 +792,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 44,
+    "id": 45,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -792,7 +810,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 45,
+    "id": 46,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -810,7 +828,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 46,
+    "id": 47,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -828,7 +846,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 47,
+    "id": 48,
     "title": "Attack of the Vines Prerelease",
     "game": "other",
     "gameLabel": "Other",
@@ -846,7 +864,7 @@
     "description": "Casual + competitive Disney Lorcana.\nAll skill levels welcome! Come join us for our Attack of the Vines Prerelease at P2W"
   },
   {
-    "id": 48,
+    "id": 49,
     "title": "Lorcana Learn to Play ",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -864,7 +882,7 @@
     "description": "Lorcana Learn to Play "
   },
   {
-    "id": 49,
+    "id": 50,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -880,23 +898,5 @@
     "recurring": "Every Sunday",
     "prizing": "100% payout in store credit to top 4",
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
-  },
-  {
-    "id": 50,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-07-19",
-    "time": "2:30 PM",
-    "time24": "14:30",
-    "entry": "Free",
-    "format": "Standard",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": "Every Sunday",
-    "prizing": "Prize pack on entry, 2nd prize pack to top 4",
-    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   }
 ]
