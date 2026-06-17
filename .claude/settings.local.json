@@ -60,7 +60,22 @@
       "WebFetch(domain:play2wingames.com)",
       "WebFetch(domain:www.play2wingames.com)",
       "Bash(curl -sI https://www.play2wingames.com/)",
-      "Bash(curl -sI http://play2wingames.com/)"
+      "Bash(curl -sI http://play2wingames.com/)",
+      "Bash(curl -s -i -X OPTIONS \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: accept\" --max-time 25)",
+      "Bash(findstr /I \"HTTP access-control allow origin\")",
+      "Bash(curl -s -i -X OPTIONS \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://cmclark00.github.io\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: accept\" --max-time 25)",
+      "Bash(curl -s \"https://play2wingames.com/assets/files/intake-form.js\" --max-time 25)",
+      "Bash(findstr /I \"FORMSPREE_ENDPOINT\")",
+      "Bash(curl -s -D - -o NUL -X OPTIONS \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: accept\" --max-time 25)",
+      "Bash(curl -s -D - -o NUL -X OPTIONS \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://cmclark00.github.io\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: accept\" --max-time 25)",
+      "Bash(curl -s -o intake_live.tmp -w \"HTTP %{http_code}  size=%{size_download}  type=%{content_type}\\\\n\" \"https://play2wingames.com/assets/files/intake-form.js\" --max-time 25)",
+      "Bash(curl -s -o NUL -w \"HTTP %{http_code}  size=%{size_download}  type=%{content_type}\\\\n\" \"https://play2wingames.com/assets/files/intake-form.css\" --max-time 25)",
+      "Bash(curl -s -o page_live.tmp -w \"HTTP %{http_code}  size=%{size_download}\\\\n\" \"https://play2wingames.com/upgrade-request.html\" --max-time 25)",
+      "Bash(findstr /C:\"FORMSPREE_ENDPOINT\" intake_live.tmp)",
+      "Bash(findstr /I /C:\"ptw-intake-form\" /C:\"intake-form.js\" /C:\"_gotcha\" page_live.tmp)",
+      "Bash(curl -s -w \"\\\\n--- HTTP %{http_code} ---\\\\n\" -X POST \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Referer: https://play2wingames.com/upgrade-request.html\" -H \"Accept: application/json\" -F \"_gotcha=diagnostic-test-please-ignore\" -F \"name=DIAGNOSTIC TEST\" -F \"device=test\" --max-time 30)",
+      "Bash(curl -s -w \"\\\\n--- HTTP %{http_code} ---\\\\n\" -X POST \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Referer: https://play2wingames.com/upgrade-request.html\" -H \"Accept: application/json\" -F \"name=DIAGNOSTIC TEST - please ignore \\(Claude debugging upgrade form\\)\" -F \"phone=000-000-0000\" -F \"device=GBA SP\" -F \"upgrades=DIAGNOSTIC TEST\" -F \"notes=Automated test to verify Formspree delivery after GoDaddy cutover. Safe to delete.\" --max-time 30)",
+      "PowerShell(Resolve-DnsName *)"
     ]
   }
 }
