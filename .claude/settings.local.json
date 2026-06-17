@@ -56,7 +56,11 @@
       "Bash(rm -f community-first.png)",
       "Bash(rm -rf .playwright-mcp)",
       "Bash(Select-String -NotMatch \"settings.local\")",
-      "Bash(magick -version)"
+      "Bash(magick -version)",
+      "WebFetch(domain:play2wingames.com)",
+      "WebFetch(domain:www.play2wingames.com)",
+      "Bash(curl -sI https://www.play2wingames.com/)",
+      "Bash(curl -sI http://play2wingames.com/)"
     ]
   }
 }
