@@ -1,78 +1,6 @@
 [
   {
     "id": 1,
-    "title": "Gundam ST10 & EB01 Release",
-    "game": "gundam",
-    "gameLabel": "Gundam Card Game",
-    "date": "2026-06-26",
-    "time": "11:00 AM",
-    "time24": "11:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Gundam ST10 & EB01 Release"
-  },
-  {
-    "id": 2,
-    "title": "Trade Night",
-    "game": "other",
-    "gameLabel": "Other",
-    "date": "2026-06-26",
-    "time": "5:00 PM",
-    "time24": "17:00",
-    "entry": "Free",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Come out for a fun-filled night of trading your favorite TCG's!"
-  },
-  {
-    "id": 3,
-    "title": "Riftbound locals",
-    "game": "riftbound",
-    "gameLabel": "Riftbound",
-    "date": "2026-06-26",
-    "time": "6:30 PM",
-    "time24": "18:30",
-    "entry": "$10",
-    "format": "Standard",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": "Every Friday",
-    "prizing": "Nexus pack, current set pack, $5 of all entries goes to prize pool for top 4 in store credit",
-    "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
-  },
-  {
-    "id": 4,
-    "title": "Lorcana Locals",
-    "game": "lorcana",
-    "gameLabel": "Disney Lorcana",
-    "date": "2026-06-26",
-    "time": "7:00 PM",
-    "time24": "19:00",
-    "entry": "$5",
-    "format": "Core Constructed",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": "Every Friday",
-    "prizing": "100% payout in store credit to top 4",
-    "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
-  },
-  {
-    "id": 5,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -90,7 +18,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 6,
+    "id": 2,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -108,25 +36,25 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 7,
-    "title": " GD: G-GENERATION ST10&EB01 Battle Royale Release Event",
-    "game": "other",
-    "gameLabel": "Other",
+    "id": 3,
+    "title": "Gundam ST10 & EB01 Release",
+    "game": "gundam",
+    "gameLabel": "Gundam Card Game",
     "date": "2026-06-28",
     "time": "4:00 PM",
     "time24": "16:00",
-    "entry": "$5",
-    "format": "Standard",
+    "entry": "TBA",
+    "format": "See description",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": "Every Sunday",
-    "prizing": "100% payout in store credit to top 4",
-    "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
+    "recurring": null,
+    "prizing": null,
+    "description": "Gundam ST10 & EB01 Release"
   },
   {
-    "id": 8,
+    "id": 4,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -144,7 +72,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 9,
+    "id": 5,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -162,7 +90,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 10,
+    "id": 6,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -180,7 +108,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 11,
+    "id": 7,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -198,7 +126,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 12,
+    "id": 8,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -216,7 +144,7 @@
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
-    "id": 13,
+    "id": 9,
     "title": "Pokemon Pitch Black Prerelease",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -234,7 +162,7 @@
     "description": "Prerelease event!\nbeginner-friendly.\nAll skill levels welcome!\nCome join us and celebrate Independence Day as we grill out and celebrate our local communities."
   },
   {
-    "id": 14,
+    "id": 10,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -252,7 +180,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 15,
+    "id": 11,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -270,7 +198,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 16,
+    "id": 12,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -288,7 +216,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 17,
+    "id": 13,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -306,7 +234,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 18,
+    "id": 14,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -324,7 +252,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 19,
+    "id": 15,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -342,7 +270,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 20,
+    "id": 16,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -360,7 +288,7 @@
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
-    "id": 21,
+    "id": 17,
     "title": "Riftbound Skirmish ",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -378,7 +306,7 @@
     "description": "Riftbound Skirmish "
   },
   {
-    "id": 22,
+    "id": 18,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -396,7 +324,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 23,
+    "id": 19,
     "title": "Mid Year Celebrations Pokemon",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -414,7 +342,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 24,
+    "id": 20,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -432,7 +360,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 25,
+    "id": 21,
     "title": "Pokemon Pitch Black release",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -450,7 +378,7 @@
     "description": "Pokemon Pitch Black release"
   },
   {
-    "id": 26,
+    "id": 22,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -468,7 +396,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 27,
+    "id": 23,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -486,7 +414,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 28,
+    "id": 24,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -504,7 +432,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 29,
+    "id": 25,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -522,7 +450,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 30,
+    "id": 26,
     "title": "Attack of the Vines Prerelease",
     "game": "other",
     "gameLabel": "Other",
@@ -540,13 +468,13 @@
     "description": "Casual + competitive Disney Lorcana.\nAll skill levels welcome! Come join us for our Attack of the Vines Prerelease at P2W"
   },
   {
-    "id": 31,
+    "id": 27,
     "title": "Lorcana Learn to Play ",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
     "date": "2026-07-18",
-    "time": "TBA",
-    "time24": "00:00",
+    "time": "1:00 PM",
+    "time24": "13:00",
     "entry": "TBA",
     "format": "See description",
     "capacity": null,
@@ -558,7 +486,7 @@
     "description": "Lorcana Learn to Play "
   },
   {
-    "id": 32,
+    "id": 28,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -576,7 +504,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 33,
+    "id": 29,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -594,7 +522,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 34,
+    "id": 30,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -612,7 +540,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 35,
+    "id": 31,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -630,7 +558,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 36,
+    "id": 32,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -648,7 +576,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 37,
+    "id": 33,
     "title": "Trade Night",
     "game": "other",
     "gameLabel": "Other",
@@ -666,7 +594,7 @@
     "description": "Trade Night"
   },
   {
-    "id": 38,
+    "id": 34,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -684,7 +612,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 39,
+    "id": 35,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -702,7 +630,7 @@
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
-    "id": 40,
+    "id": 36,
     "title": "Riftbound Prerift Vendetta",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -720,7 +648,7 @@
     "description": "Riftbound Prerift Vendetta"
   },
   {
-    "id": 41,
+    "id": 37,
     "title": " GUNDAM CARD GAME GD05 Release Event",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -738,7 +666,7 @@
     "description": " GUNDAM CARD GAME GD05 Release Event"
   },
   {
-    "id": 42,
+    "id": 38,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -756,7 +684,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 43,
+    "id": 39,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -774,7 +702,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 44,
+    "id": 40,
     "title": "Gundam Prerelease",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -792,7 +720,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 45,
+    "id": 41,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -810,7 +738,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 46,
+    "id": 42,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -828,7 +756,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 47,
+    "id": 43,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -846,7 +774,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 48,
+    "id": 44,
     "title": "Riftbound Vendetta Release",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -864,7 +792,7 @@
     "description": "Riftbound Vendetta Release"
   },
   {
-    "id": 49,
+    "id": 45,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -882,7 +810,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 50,
+    "id": 46,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -898,5 +826,77 @@
     "recurring": "Every Friday",
     "prizing": "100% payout in store credit to top 4",
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
+  },
+  {
+    "id": 47,
+    "title": "Digimon Locals",
+    "game": "digimon",
+    "gameLabel": "Digimon TCG",
+    "date": "2026-08-02",
+    "time": "1:00 PM",
+    "time24": "13:00",
+    "entry": "$5",
+    "format": "Standard",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": "Every Sunday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
+  },
+  {
+    "id": 48,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-08-02",
+    "time": "2:30 PM",
+    "time24": "14:30",
+    "entry": "Free",
+    "format": "Standard",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": "Every Sunday",
+    "prizing": "Prize pack on entry, 2nd prize pack to top 4",
+    "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
+  },
+  {
+    "id": 49,
+    "title": "Gundam Locals",
+    "game": "gundam",
+    "gameLabel": "Gundam Card Game",
+    "date": "2026-08-02",
+    "time": "4:00 PM",
+    "time24": "16:00",
+    "entry": "$5",
+    "format": "Standard",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": "Every Sunday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
+  },
+  {
+    "id": 50,
+    "title": "Pokemon Locals",
+    "game": "pokemon",
+    "gameLabel": "Pokémon TCG",
+    "date": "2026-08-03",
+    "time": "6:30 PM",
+    "time24": "18:30",
+    "entry": "$5",
+    "format": "Standard",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": "Every Monday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   }
 ]
