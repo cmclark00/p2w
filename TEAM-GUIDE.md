@@ -1,6 +1,6 @@
 # Editing the Play2Win Games website — a guide for the team
 
-This guide is for the **shop team** (Mark, Josiah, Nick, Michael, Travis,
+This guide is for the **shop team** (Mark, Josiah, Nick, Corey, Travis,
 Justin, Keith) to keep the website current. **You don't need to know HTML,
 CSS, or anything about web development.** You do need a GitHub account and
 about 10 minutes of practice the first time.

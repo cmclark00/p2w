@@ -344,7 +344,7 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 - `team.html`: **all in** — every individual plus the full-crew group shot
   (`assets/team/full-crew.jpg`) have real photos, and **all bios are written**
-  (Mark, Josiah, Nick, Justin, Mike, Travis, Keith). Keith's bio also appears
+  (Mark, Josiah, Nick, Justin, Corey, Travis, Keith). Keith's bio also appears
   on `repairs.html` (same text in both spots).
 - **`showcase/` partially re-shot; `upgrades/` restored from the old shots.**
   All photos were originally deleted to be re-shot (saved ~50 MB); each card
@@ -453,8 +453,9 @@ Three via **Formspree** (endpoints are public client-side by design):
   positioned over it at `opacity:0`, → `opacity:1` on `:hover`/`:focus-within`
   (crossfade honors `prefers-reduced-motion`). Hover/focus-only by design —
   touch + screen readers just get the base. Currently on **Travis**
-  (`tcg-manager-hover.jpg`), **Mike** (`frontend-manager-hover.jpg`), and
-  **Keith** (`keith-hover.jpg`). The hover shots are framed with the same
+  (`tcg-manager-hover.jpg`) and **Keith** (`keith-hover.jpg`); the
+  frontend-manager card is now Corey with no hover shot (so
+  `frontend-manager-hover.jpg` is orphaned). The hover shots are framed with the same
   4/5 top-crop as the base. Keep it sparing — it's a playful touch, not a
   default for every card. (Owner **Mark** previously had a sword/gun swap;
   the gun shot was dropped by owner request, so his `--lg` card now shows
