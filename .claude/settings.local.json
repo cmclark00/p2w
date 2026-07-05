@@ -75,7 +75,13 @@
       "Bash(findstr /I /C:\"ptw-intake-form\" /C:\"intake-form.js\" /C:\"_gotcha\" page_live.tmp)",
       "Bash(curl -s -w \"\\\\n--- HTTP %{http_code} ---\\\\n\" -X POST \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Referer: https://play2wingames.com/upgrade-request.html\" -H \"Accept: application/json\" -F \"_gotcha=diagnostic-test-please-ignore\" -F \"name=DIAGNOSTIC TEST\" -F \"device=test\" --max-time 30)",
       "Bash(curl -s -w \"\\\\n--- HTTP %{http_code} ---\\\\n\" -X POST \"https://formspree.io/f/xaqvrbjn\" -H \"Origin: https://play2wingames.com\" -H \"Referer: https://play2wingames.com/upgrade-request.html\" -H \"Accept: application/json\" -F \"name=DIAGNOSTIC TEST - please ignore \\(Claude debugging upgrade form\\)\" -F \"phone=000-000-0000\" -F \"device=GBA SP\" -F \"upgrades=DIAGNOSTIC TEST\" -F \"notes=Automated test to verify Formspree delivery after GoDaddy cutover. Safe to delete.\" --max-time 30)",
-      "PowerShell(Resolve-DnsName *)"
+      "PowerShell(Resolve-DnsName *)",
+      "PowerShell(gh run list --branch main --limit 3 --json databaseId,name,status,conclusion,createdAt --template '{{range .}}{{.name}} | {{.status}} {{.conclusion}} | {{.createdAt}}{{\"\\\\n\"}}{{end}}')",
+      "PowerShell(git *)",
+      "PowerShell(gh run *)",
+      "PowerShell(\\(Invoke-RestMethod \"https://api.github.com/repos/cmclark00/p2w/actions/runs?per_page=3\"\\).workflow_runs | Select-Object name, status, conclusion, head_sha, html_url | Format-List)",
+      "Bash(curl -s \"https://api.github.com/repos/cmclark00/p2w/actions/runs?per_page=1\")",
+      "Bash(curl -s https://play2wingames.com/team.html)"
     ]
   }
 }
