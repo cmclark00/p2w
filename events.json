@@ -169,15 +169,15 @@
     "date": "2026-07-16",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "$5",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Standard Pokemon "
+    "recurring": "Every Monday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
     "id": 11,
@@ -367,15 +367,15 @@
     "date": "2026-07-23",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "$5",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Standard Pokemon "
+    "recurring": "Every Monday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
     "id": 22,
@@ -565,15 +565,15 @@
     "date": "2026-07-30",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "$5",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Standard Pokemon "
+    "recurring": "Every Monday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
     "id": 33,
@@ -745,15 +745,15 @@
     "date": "2026-08-06",
     "time": "6:00 PM",
     "time24": "18:00",
-    "entry": "TBA",
-    "format": "See description",
+    "entry": "$5",
+    "format": "Standard",
     "capacity": null,
     "registered": null,
     "registerUrl": null,
     "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "Standard Pokemon "
+    "recurring": "Every Monday",
+    "prizing": "100% payout in store credit to top 4",
+    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
     "id": 43,
