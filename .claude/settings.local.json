@@ -81,7 +81,16 @@
       "PowerShell(gh run *)",
       "PowerShell(\\(Invoke-RestMethod \"https://api.github.com/repos/cmclark00/p2w/actions/runs?per_page=3\"\\).workflow_runs | Select-Object name, status, conclusion, head_sha, html_url | Format-List)",
       "Bash(curl -s \"https://api.github.com/repos/cmclark00/p2w/actions/runs?per_page=1\")",
-      "Bash(curl -s https://play2wingames.com/team.html)"
+      "Bash(curl -s https://play2wingames.com/team.html)",
+      "Bash(python3 scripts/build-team-guide-print.py)",
+      "Bash(py --version)",
+      "Bash(py -3 -c \"import markdown; print\\('markdown ok'\\)\")",
+      "PowerShell($py = Get-Command python,python3,py -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($py\\) { & $py.Source scripts/build-team-guide-print.py; if \\($?\\) { \"BUILT\" } } else { \"NO_PYTHON\" })",
+      "Bash(gh auth *)",
+      "Bash(command -v git)",
+      "Read(//c/Program Files/Git/cmd/**)",
+      "Read(//c/Program Files/Git/bin/**)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe\" push origin main 2>&1)"
     ]
   }
 }
