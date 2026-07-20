@@ -72,7 +72,7 @@ These are independent of GitHub and owned by Corey's accounts today:
 | Service | Powers | Action |
 |---|---|---|
 | Google Calendar + service account | `sync-events.yml` → `events.json` | 🔑 Reissue a service account under the **shop's** Google account, share the shop calendar to it, reset repo secrets `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_CALENDAR_ID`. |
-| Firebase (`p2w-leaderboard`) | Konami leaderboard | 🔑 Add shop's Google account as Owner on the Firebase project, remove Corey's. Config in `konami.js` is public by design — no code change. Keep the locked Firestore rules. |
+| Firebase (`p2w-leaderboard`) | Konami leaderboard **+ tournament pairings** | 🔑 Add shop's Google account as Owner on the Firebase project, remove Corey's. Config in `konami.js` (and inlined on `pairings.html`/`pairings-admin.html`) is public by design — no code change. Keep the locked `scores` Firestore rules **and** the `pairings` create-only rule (which holds the pairings passphrase — see **Tournament pairings**). |
 | Formspree (`xaqvrbjn`, `xjglnaew`, `mvzyvwzb`) | Upgrade, event-inquiry, careers forms | 🔑 Recreate all three forms under the shop's Formspree account → **new endpoint IDs** → update them in `assets/files/intake-form.js`, `event-inquiry.html`, and `careers.html`. Routing: upgrade → `repairs@`; event → `inquiries@`; careers → `careers@`. |
 | Domain `play2wingames.com` | — | 🔑 Confirm it's in the shop's GoDaddy account. |
 
@@ -193,6 +193,8 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `careers.html` | Application page for shop hires. Formspree form (endpoint `mvzyvwzb`, lands in `careers@play2wingames.com`) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
+| `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Reads the newest `pairings` Firestore doc and shows the screenshot big + tap-to-zoom, with event name / Round N / "updated X min ago"; auto-refreshes every 25s. `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
+| `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + a pairings screenshot (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -219,6 +221,60 @@ Calendar descriptions may be HTML (Google's web editor wraps lines in
 `---` metadata block, so both plain-text and rich-text events parse.
 
 `game` ∈ pokemon | magic | yugioh | lorcana | digimon | gundam | riftbound | other.
+
+## Tournament pairings (staff post → player QR view)
+
+Lets staff push the current round's Pokémon (or any TCG) pairings to players via a
+QR code on the play tables — no backend, reusing the **same Firebase project** as
+the Konami leaderboard (`p2w-leaderboard`).
+
+- **Two pages:** `pairings-admin.html` (hidden staff uploader) and `pairings.html`
+  (the QR target players scan). Both are `noindex`, out of the nav, and out of
+  `sitemap.xml`. Both load Firebase with the **same dynamic-import pattern and
+  public `FIREBASE_CONFIG`** as `konami.js` (config inlined on each page).
+- **Storage:** a new Firestore collection **`pairings`**. Each publish is **one new
+  doc** — nothing is ever updated or deleted, matching the existing "read all;
+  create-only; no update/delete" rule philosophy. The player page reads the newest
+  doc (`orderBy('ts','desc'), limit(1)`). Doc shape:
+
+  ```js
+  { event:"Friday Night Pokémon", round:3, img:"data:image/webp;base64,…",
+    pubkey:"<passphrase>", ts: serverTimestamp() }
+  ```
+
+- **Image handling:** the pairings screenshot is stored **inline as a compressed
+  base64 data URL** (no Firebase Storage). `pairings-admin.html` downscales to
+  ≤1400px and re-encodes WebP→JPEG, stepping quality/size down until under
+  ~800 000 chars so it stays clear of Firestore's 1 MB/doc limit. (If a screenshot
+  can't get under the limit, the fix is to crop tighter — or, longer term, move to
+  Firebase Storage.)
+- **Passphrase / access:** publishing requires a passphrase that lives **only in
+  the Firestore security rule** (server-side), never in the page source. The admin
+  page sends whatever staff type as the `pubkey` field; a wrong/blank one is
+  rejected by the rule (`permission-denied`). It's remembered per-device in
+  `localStorage` (`p2w-pair-pass`). This is a soft gate (keeps casual/accidental
+  posts out), not real auth — keep the admin URL staff-only.
+- **🔑 Firestore rule (Firebase console — not in repo).** Add a `pairings` match
+  block *alongside* the `scores` rules (don't touch `scores`). The `pubkey ==`
+  check is the passphrase enforcement — set the string here:
+
+  ```
+  match /pairings/{id} {
+    allow read: if true;
+    allow create: if request.resource.data.pubkey == "CHOOSE_A_PASSPHRASE"
+      && request.resource.data.img is string
+      && request.resource.data.img.size() < 950000
+      && request.resource.data.round is number
+      && request.resource.data.event is string;
+    allow update, delete: if false;
+  }
+  ```
+
+- **🔑 QR code (one-time):** generate a QR for `https://play2wingames.com/pairings.html`
+  with any free generator, print it, place it on the tables. The URL is fixed
+  (content updates each round), so the QR never needs reprinting. Point any
+  NFC/printed signage at the same URL. (If a shorter URL is wanted later, add a
+  `/pairings/` redirect folder mirroring `discord/index.html`.)
 
 ## Konami easter egg (BULKY-TRIS)
 

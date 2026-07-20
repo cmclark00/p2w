@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#111217">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Post Pairings (Staff) | Play2Win Games</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <style>
+      /* Scoped utility-page styles — this is an internal staff tool, so it
+         skips the full site header/nav and keeps a single focused column. */
+      .pa-wrap { max-width: 640px; margin: 0 auto; padding: 28px var(--page-x) 64px; }
+      .pa-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+      .pa-brand img { height: 40px; width: auto; }
+      .pa-badge {
+        display: inline-block; font: 700 0.7rem/1 var(--font-display);
+        letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--ink); background: var(--gold);
+        padding: 5px 9px; border-radius: 999px;
+      }
+      .pa-wrap h1 { font-size: clamp(1.5rem, 5vw, 2rem); margin: 14px 0 4px; }
+      .pa-sub { color: var(--muted); margin: 0 0 24px; }
+      .pa-card {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 16px; padding: 20px; margin-bottom: 18px;
+      }
+      .pa-field { margin-bottom: 16px; }
+      .pa-field:last-child { margin-bottom: 0; }
+      .pa-field label {
+        display: block; font: 700 0.85rem var(--font-display);
+        letter-spacing: 0.02em; margin-bottom: 6px;
+      }
+      .pa-field .hint { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
+      .pa-field input[type="text"],
+      .pa-field input[type="number"],
+      .pa-field input[type="password"],
+      .pa-field input[type="file"] {
+        width: 100%; padding: 11px 13px; font-size: 1rem;
+        color: var(--paper); background: var(--surface-2);
+        border: 1px solid var(--line); border-radius: 10px;
+      }
+      .pa-field input:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+      .pa-row { display: flex; gap: 14px; }
+      .pa-row .pa-field { flex: 1; }
+      .pa-preview {
+        margin-top: 12px; border-radius: 10px; overflow: hidden;
+        border: 1px solid var(--line); background: var(--ink);
+      }
+      .pa-preview img { width: 100%; height: auto; }
+      .pa-meta { color: var(--muted); font-size: 0.82rem; margin: 8px 2px 0; }
+      .pa-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      .pa-status { font-size: 0.9rem; font-weight: 600; }
+      .pa-status.ok { color: #3ddc84; }
+      .pa-status.err { color: #ff6b81; }
+      .pa-status.busy { color: var(--gold); }
+      button.pa-btn {
+        font: 700 1rem var(--font-display); letter-spacing: 0.01em;
+        color: var(--ink); background: var(--gold);
+        border: none; border-radius: 999px; padding: 12px 26px; cursor: pointer;
+      }
+      button.pa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      button.pa-btn:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
+      .pa-link { color: var(--gold); font-weight: 600; }
+      .pa-note {
+        font-size: 0.82rem; color: var(--muted); line-height: 1.5;
+        border-left: 3px solid var(--line); padding-left: 12px; margin-top: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <main id="main" tabindex="-1" class="pa-wrap">
+      <div class="pa-brand">
+        <img src="assets/play-to-win-logo.png" alt="Play2Win Games">
+        <span class="pa-badge">Staff</span>
+      </div>
+      <h1>Post Tournament Pairings</h1>
+      <p class="pa-sub">Snap or upload a screenshot of the current round's pairings.
+        Players see it instantly on the table QR page.</p>
+
+      <div class="pa-card">
+        <div class="pa-field">
+          <label for="pa-pass">Staff passphrase
+            <span class="hint">— required to publish. Remembered on this device.</span>
+          </label>
+          <input type="password" id="pa-pass" autocomplete="off" placeholder="Ask a manager">
+        </div>
+        <div class="pa-row">
+          <div class="pa-field">
+            <label for="pa-event">Event name</label>
+            <input type="text" id="pa-event" placeholder="Friday Night Pokémon" autocomplete="off">
+          </div>
+          <div class="pa-field" style="max-width: 120px;">
+            <label for="pa-round">Round #</label>
+            <input type="number" id="pa-round" min="1" step="1" inputmode="numeric" placeholder="1">
+          </div>
+        </div>
+        <div class="pa-field">
+          <label for="pa-file">Pairings screenshot
+            <span class="hint">— take a photo or pick from your gallery.</span>
+          </label>
+          <input type="file" id="pa-file" accept="image/*" capture="environment">
+          <div class="pa-preview" id="pa-preview" hidden>
+            <img id="pa-preview-img" alt="Selected pairings preview">
+          </div>
+          <p class="pa-meta" id="pa-meta" hidden></p>
+        </div>
+      </div>
+
+      <div class="pa-actions">
+        <button class="pa-btn" id="pa-publish" disabled>Publish to players</button>
+        <span class="pa-status" id="pa-status" role="status" aria-live="polite"></span>
+      </div>
+      <p class="pa-meta" style="margin-top:14px">
+        <a class="pa-link" id="pa-viewlink" href="pairings.html" target="_blank" rel="noopener">Open the player page ↗</a>
+        — this is what the table QR code points to.
+      </p>
+
+      <p class="pa-note">
+        Each publish adds a new entry; players always see the newest one, so you
+        never overwrite or delete — just post the next round when it's ready.
+        Nothing here is bank-grade security: the passphrase keeps casual/accidental
+        posts out, but keep this page's link to staff only.
+      </p>
+    </main>
+
+    <script>
+      (function () {
+        var FIREBASE_CONFIG = {
+          apiKey: "AIzaSyAVf2_7vqQL--vt12udlpJ-EW0BSW_EjaM",
+          authDomain: "p2w-leaderboard.firebaseapp.com",
+          projectId: "p2w-leaderboard",
+          storageBucket: "p2w-leaderboard.firebasestorage.app",
+          messagingSenderId: "900204827002",
+          appId: "1:900204827002:web:4a3950730e0e79bce246c3"
+        };
+        var MAX_DIM = 1400;          // longest edge, px
+        var TARGET_CHARS = 800000;   // keep base64 well under Firestore's 1MB doc cap
+
+        var $pass = document.getElementById('pa-pass');
+        var $event = document.getElementById('pa-event');
+        var $round = document.getElementById('pa-round');
+        var $file = document.getElementById('pa-file');
+        var $preview = document.getElementById('pa-preview');
+        var $previewImg = document.getElementById('pa-preview-img');
+        var $meta = document.getElementById('pa-meta');
+        var $publish = document.getElementById('pa-publish');
+        var $status = document.getElementById('pa-status');
+
+        var compressed = null; // { dataUrl, chars }
+
+        // Remember passphrase + event name per device so staff don't retype
+        // every round. (Passphrase is validated server-side by the Firestore rule.)
+        try {
+          $pass.value = localStorage.getItem('p2w-pair-pass') || '';
+          $event.value = localStorage.getItem('p2w-pair-event') || '';
+        } catch (e) {}
+
+        function setStatus(msg, cls) {
+          $status.textContent = msg || '';
+          $status.className = 'pa-status' + (cls ? ' ' + cls : '');
+        }
+
+        function refreshEnabled() {
+          $publish.disabled = !($pass.value.trim() && compressed && $round.value);
+        }
+
+        $pass.addEventListener('input', refreshEnabled);
+        $round.addEventListener('input', refreshEnabled);
+
+        // ── Client-side image compression ────────────────────────────────
+        function loadImage(file) {
+          return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+            img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+            img.src = url;
+          });
+        }
+
+        function encode(img, dim, quality) {
+          var scale = Math.min(1, dim / Math.max(img.width, img.height));
+          var w = Math.round(img.width * scale);
+          var h = Math.round(img.height * scale);
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff';         // flatten any transparency
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          var url = c.toDataURL('image/webp', quality);
+          if (url.indexOf('data:image/webp') !== 0) {   // WebP unsupported → JPEG
+            url = c.toDataURL('image/jpeg', quality);
+          }
+          return url;
+        }
+
+        function compress(img) {
+          // Step down quality, then dimensions, until under the char budget.
+          var dims = [MAX_DIM, 1200, 1000, 850];
+          var qualities = [0.82, 0.72, 0.62, 0.5];
+          var best = null;
+          for (var d = 0; d < dims.length; d++) {
+            for (var q = 0; q < qualities.length; q++) {
+              var url = encode(img, dims[d], qualities[q]);
+              best = url;
+              if (url.length <= TARGET_CHARS) return url;
+            }
+          }
+          return best; // smallest we could get, even if still over target
+        }
+
+        $file.addEventListener('change', function () {
+          var file = $file.files && $file.files[0];
+          compressed = null;
+          $preview.hidden = true;
+          $meta.hidden = true;
+          refreshEnabled();
+          if (!file) return;
+          setStatus('Processing image…', 'busy');
+          loadImage(file).then(function (img) {
+            var url = compress(img);
+            compressed = { dataUrl: url, chars: url.length };
+            $previewImg.src = url;
+            $preview.hidden = false;
+            var kb = Math.round(url.length / 1024);
+            var over = url.length > 1000000;
+            $meta.textContent = 'Ready · ~' + kb + ' KB' +
+              (over ? ' ⚠ still large — this may fail to publish; crop tighter and retry.' : '');
+            $meta.hidden = false;
+            setStatus('');
+            refreshEnabled();
+          }).catch(function (err) {
+            setStatus(err.message || 'Could not process that image.', 'err');
+          });
+        });
+
+        // ── Firebase (same dynamic-import pattern as konami.js) ───────────
+        var fb = null;
+        function loadFirebase() {
+          if (fb) return Promise.resolve(fb);
+          return Promise.all([
+            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'),
+            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js')
+          ]).then(function (mods) {
+            var app = mods[0].initializeApp(FIREBASE_CONFIG);
+            var fs = mods[1];
+            fb = { db: fs.getFirestore(app), collection: fs.collection,
+                   addDoc: fs.addDoc, serverTimestamp: fs.serverTimestamp };
+            return fb;
+          });
+        }
+
+        $publish.addEventListener('click', function () {
+          if ($publish.disabled) return;
+          var pass = $pass.value.trim();
+          var eventName = $event.value.trim() || 'Pairings';
+          var round = parseInt($round.value, 10);
+          if (!compressed || !pass || !round) return;
+
+          $publish.disabled = true;
+          setStatus('Publishing…', 'busy');
+          try {
+            localStorage.setItem('p2w-pair-pass', pass);
+            localStorage.setItem('p2w-pair-event', eventName);
+          } catch (e) {}
+
+          loadFirebase().then(function (f) {
+            return f.addDoc(f.collection(f.db, 'pairings'), {
+              event: eventName,
+              round: round,
+              img: compressed.dataUrl,
+              pubkey: pass,
+              ts: f.serverTimestamp()
+            });
+          }).then(function () {
+            setStatus('Published! Players can see Round ' + round + ' now.', 'ok');
+            $publish.disabled = false;
+          }).catch(function (err) {
+            var denied = err && (err.code === 'permission-denied' ||
+              /permission|insufficient/i.test(err.message || ''));
+            setStatus(denied
+              ? 'Rejected — check the passphrase (or the image is too large).'
+              : 'Publish failed: ' + (err && err.message ? err.message : 'unknown error'), 'err');
+            $publish.disabled = false;
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -23,6 +23,7 @@ is nothing here you can permanently break.
   - [Update a team member or add a new one](#update-a-team-member)
   - [Update an FAQ answer](#update-an-faq-answer)
   - [Add or edit a calendar event](#add-or-edit-a-calendar-event)
+  - [Post tournament pairings for players](#post-tournament-pairings)
   - [Edit the careers page](#edit-the-careers-page)
   - [Swap out a featured Google review](#swap-out-a-featured-google-review)
   - [Update the Google review link](#update-the-google-review-link)
@@ -523,6 +524,50 @@ After you add/edit/cancel an event in Calendar, it typically
 shows up on the site by next morning. To push it live sooner,
 ask the dev to manually trigger the **"Sync events from Google
 Calendar"** workflow in GitHub Actions — it takes about a minute.
+
+---
+
+### Post tournament pairings for players <a id="post-tournament-pairings"></a>
+
+**When to do this:** You're running a Pokémon (or any TCG) tournament and
+want players to see each round's pairings by scanning the QR code on the
+tables — instead of everyone crowding the counter.
+
+**This is NOT the GitHub editor.** It's a simple web page on the site. You
+don't need a GitHub account for this one.
+
+**One-time setup (ask the dev / manager):**
+- A **passphrase** is set up in the Firebase settings. You type it to post;
+  it stops random people from posting fake pairings. Get it from a manager.
+- A **QR code** pointing at `play2wingames.com/pairings.html` is printed and
+  placed on the tables. That QR never changes — only what it shows changes.
+
+**Each round, from your phone or the shop tablet:**
+
+1. In the Pokémon Play app, get the pairings on screen and take a
+   **screenshot** (or a clear photo).
+2. Go to **`play2wingames.com/pairings-admin.html`** (bookmark it — it's not
+   linked anywhere on the site on purpose).
+3. Type the **passphrase** (it's remembered on that device after the first
+   time), the **event name** (e.g. "Friday Night Pokémon"), and the
+   **round number**.
+4. Tap **"Pairings screenshot"** and pick the screenshot (or snap a photo).
+   Wait a second for the preview to appear.
+5. Tap **"Publish to players."** You'll see "Published! Players can see
+   Round N now."
+
+That's it. Players who scan the table QR now see that screenshot, and it
+updates within about 25 seconds (or they can tap Refresh). For the next
+round, just repeat — you never delete anything, the newest post always wins.
+
+**Tips & gotchas:**
+- **Keep the screenshot readable.** A tight crop of just the pairings looks
+  better zoomed-in than a full, cluttered screen.
+- **"Rejected — check the passphrase"** means the passphrase was wrong, or
+  the image was too big. Re-type the passphrase, or crop the screenshot
+  tighter and try again.
+- Players can't search their name in an image — they scan, then pinch/tap to
+  zoom and find their table. That's expected.
 
 ---
 

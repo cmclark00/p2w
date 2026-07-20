@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#111217">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Current Pairings | Play2Win Games</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <style>
+      /* Player view — deliberately lightweight and big for phones at the table. */
+      .pr-top {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px var(--page-x);
+        border-bottom: 1px solid var(--line);
+        position: sticky; top: 0; background: var(--ink); z-index: 5;
+      }
+      .pr-top img { height: 30px; width: auto; }
+      .pr-top .pr-name { font: 700 0.95rem var(--font-display); letter-spacing: 0.01em; }
+      .pr-refresh {
+        margin-left: auto; font: 700 0.8rem var(--font-display);
+        color: var(--ink); background: var(--gold);
+        border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+      }
+      .pr-refresh:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
+      .pr-wrap { max-width: 900px; margin: 0 auto; padding: 18px var(--page-x) 48px; }
+      .pr-head { text-align: center; margin-bottom: 16px; }
+      .pr-head h1 { font-size: clamp(1.4rem, 6vw, 2.1rem); margin: 0 0 4px; }
+      .pr-round { font: 700 1rem var(--font-display); color: var(--gold); letter-spacing: 0.02em; }
+      .pr-updated { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+      .pr-figure {
+        margin: 0; border: 1px solid var(--line); border-radius: 14px;
+        overflow: hidden; background: var(--surface); cursor: zoom-in;
+      }
+      .pr-figure img { width: 100%; height: auto; display: block; }
+      .pr-hint { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
+
+      /* Tap-to-zoom fullscreen overlay */
+      .pr-zoom {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.94);
+        display: none; align-items: center; justify-content: center;
+        z-index: 50; padding: 8px; cursor: zoom-out; overflow: auto;
+      }
+      .pr-zoom.open { display: flex; }
+      .pr-zoom img { max-width: none; width: auto; height: auto; }
+
+      .pr-state { text-align: center; padding: 60px var(--page-x); color: var(--muted); }
+      .pr-state img { width: 120px; height: auto; margin: 0 auto 16px; opacity: 0.9; }
+      .pr-state h2 { font-size: 1.3rem; color: var(--paper); margin: 0 0 6px; }
+      .pr-spinner {
+        width: 34px; height: 34px; margin: 0 auto 16px;
+        border: 3px solid var(--line); border-top-color: var(--gold);
+        border-radius: 50%; animation: pr-spin 0.9s linear infinite;
+      }
+      @keyframes pr-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .pr-spinner { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="pr-top">
+      <img src="assets/play-to-win-logo.png" alt="Play2Win Games">
+      <span class="pr-name">Pairings</span>
+      <button class="pr-refresh" id="pr-refresh" type="button">↻ Refresh</button>
+    </div>
+
+    <main id="main" tabindex="-1">
+      <div class="pr-wrap">
+        <!-- Loading -->
+        <div class="pr-state" id="pr-loading">
+          <div class="pr-spinner" aria-hidden="true"></div>
+          <p>Loading the latest pairings…</p>
+        </div>
+
+        <!-- Empty -->
+        <div class="pr-state" id="pr-empty" hidden>
+          <img src="assets/bulky-mascot.webp" alt="" aria-hidden="true">
+          <h2>No pairings posted yet</h2>
+          <p>Hang tight — they'll appear here as soon as staff post this round.</p>
+        </div>
+
+        <!-- Content -->
+        <div id="pr-content" hidden>
+          <div class="pr-head">
+            <h1 id="pr-event">Pairings</h1>
+            <div class="pr-round" id="pr-round"></div>
+            <div class="pr-updated" id="pr-updated"></div>
+          </div>
+          <figure class="pr-figure" id="pr-figure">
+            <img id="pr-img" alt="Current round pairings">
+          </figure>
+          <p class="pr-hint">Tap the image to zoom · this page refreshes automatically</p>
+        </div>
+      </div>
+    </main>
+
+    <div class="pr-zoom" id="pr-zoom" aria-hidden="true">
+      <img id="pr-zoom-img" alt="Pairings, zoomed">
+    </div>
+
+    <script>
+      (function () {
+        var FIREBASE_CONFIG = {
+          apiKey: "AIzaSyAVf2_7vqQL--vt12udlpJ-EW0BSW_EjaM",
+          authDomain: "p2w-leaderboard.firebaseapp.com",
+          projectId: "p2w-leaderboard",
+          storageBucket: "p2w-leaderboard.firebasestorage.app",
+          messagingSenderId: "900204827002",
+          appId: "1:900204827002:web:4a3950730e0e79bce246c3"
+        };
+        var REFRESH_MS = 25000;
+
+        var $loading = document.getElementById('pr-loading');
+        var $empty = document.getElementById('pr-empty');
+        var $content = document.getElementById('pr-content');
+        var $event = document.getElementById('pr-event');
+        var $round = document.getElementById('pr-round');
+        var $updated = document.getElementById('pr-updated');
+        var $img = document.getElementById('pr-img');
+        var $figure = document.getElementById('pr-figure');
+        var $zoom = document.getElementById('pr-zoom');
+        var $zoomImg = document.getElementById('pr-zoom-img');
+        var $refresh = document.getElementById('pr-refresh');
+
+        var lastId = null; // avoid re-rendering (and image flicker) when unchanged
+
+        function timeAgo(date) {
+          if (!date) return '';
+          var secs = Math.round((Date.now() - date.getTime()) / 1000);
+          if (secs < 60) return 'just now';
+          var mins = Math.round(secs / 60);
+          if (mins < 60) return mins + ' min ago';
+          var hrs = Math.round(mins / 60);
+          if (hrs < 24) return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+          var days = Math.round(hrs / 24);
+          return days + (days === 1 ? ' day ago' : ' days ago');
+        }
+
+        function show(el) {
+          $loading.hidden = el !== $loading;
+          $empty.hidden = el !== $empty;
+          $content.hidden = el !== $content;
+        }
+
+        function render(doc, id) {
+          if (id !== lastId) {
+            $img.src = doc.img || '';
+            lastId = id;
+          }
+          $event.textContent = doc.event || 'Pairings';
+          $round.textContent = doc.round ? 'Round ' + doc.round : '';
+          var when = doc.ts && doc.ts.toDate ? doc.ts.toDate() : null;
+          $updated.textContent = when ? 'Updated ' + timeAgo(when) : '';
+          show($content);
+        }
+
+        // ── Firebase (same dynamic-import pattern as konami.js) ───────────
+        var fb = null;
+        function loadFirebase() {
+          if (fb) return Promise.resolve(fb);
+          return Promise.all([
+            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'),
+            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js')
+          ]).then(function (mods) {
+            var app = mods[0].initializeApp(FIREBASE_CONFIG);
+            var fs = mods[1];
+            fb = { db: fs.getFirestore(app), collection: fs.collection,
+                   query: fs.query, orderBy: fs.orderBy, limit: fs.limit, getDocs: fs.getDocs };
+            return fb;
+          });
+        }
+
+        function fetchLatest() {
+          return loadFirebase().then(function (f) {
+            var q = f.query(f.collection(f.db, 'pairings'), f.orderBy('ts', 'desc'), f.limit(1));
+            return f.getDocs(q);
+          }).then(function (snap) {
+            if (snap.empty) {
+              if (!lastId) show($empty);   // keep showing last image if we already have one
+              return;
+            }
+            var d = snap.docs[0];
+            render(d.data(), d.id);
+          }).catch(function () {
+            if (!lastId) show($empty);      // network/permission error → don't spin forever
+          });
+        }
+
+        // Zoom overlay
+        $figure.addEventListener('click', function () {
+          if (!$img.src) return;
+          $zoomImg.src = $img.src;
+          $zoom.classList.add('open');
+          $zoom.setAttribute('aria-hidden', 'false');
+        });
+        $zoom.addEventListener('click', function () {
+          $zoom.classList.remove('open');
+          $zoom.setAttribute('aria-hidden', 'true');
+          $zoomImg.src = '';
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && $zoom.classList.contains('open')) $zoom.click();
+        });
+
+        $refresh.addEventListener('click', fetchLatest);
+
+        fetchLatest();
+        setInterval(fetchLatest, REFRESH_MS);
+        // Refresh immediately when the player returns to the tab.
+        document.addEventListener('visibilitychange', function () {
+          if (!document.hidden) fetchLatest();
+        });
+      })();
+    </script>
+  </body>
+</html>
