@@ -319,11 +319,19 @@ the Konami leaderboard (`p2w-leaderboard`).
   normalized, since the record text can OCR differently between the two
   rows even when both names read fine). (3) `sequenceFillTables` — a
   no-OCR deterministic backstop: tables run 1..N with each number on
-  exactly two mirrored rows, so when exactly one number is short of its
-  two copies, the remaining blanks can only be that value (the classic
-  case: a lone "1" — a single thin stroke — dropped on *both* of table 1's
-  rows, which OCR is worst at). It deliberately fills nothing when two or
-  more different tables are blank (ambiguous — staff decide). Parsed rows
+  exactly two mirrored rows, so when exactly one number is **fully absent**
+  from every parsed row, the remaining blanks (≤2) can only be that value
+  (the classic case: a lone "1" — a single thin stroke — dropped on *both*
+  of table 1's rows, which OCR is worst at). Keyed off fully-absent values
+  deliberately: a number seen only once (its other copy lost to a
+  malformed/unparsed row) must not poison the deduction, because that
+  missing copy isn't one of the blank rows and couldn't be filled anyway —
+  an earlier version counted all under-represented values and bailed as
+  "ambiguous" in exactly that situation. It fills nothing when two+ values
+  are absent or blanks exceed one table's two rows (genuinely ambiguous —
+  staff decide). `runOcr` logs the blank-table count after each recovery
+  stage (`table# blanks after …`) so a failing stage can be localized from
+  the console instead of re-derived. Parsed rows
   carry `y0/y1/x0` geometry from `reconstructRows` to make the crop pass
   possible; geometry never reaches Firestore (`collectRows` reads only the
   DOM inputs). Lines matching neither pattern are

@@ -337,12 +337,16 @@
         }
 
         // Last-resort deterministic fill, no OCR involved: tables run 1..N
-        // with each number on exactly two mirrored rows. If exactly one
-        // table number is short of its two copies, every remaining blank
-        // row can only be that value — e.g. OCR losing the thin "1" glyph
-        // on both of table 1's rows (the single worst case for OCR) leaves
-        // 1 as the only absent value. Ambiguous cases (two+ different
-        // tables blank) are left alone for staff rather than guessed.
+        // with each number on exactly two mirrored rows, so when exactly one
+        // number is absent from every parsed row, the remaining blanks can
+        // only be that value — e.g. OCR losing the thin "1" glyph on both of
+        // table 1's rows (the single worst case for OCR) leaves 1 as the only
+        // absent value. Keyed off *fully-absent* values on purpose: a number
+        // seen once (its other copy lost to a malformed/unparsed row) can't
+        // poison the deduction, because that missing copy isn't one of our
+        // blank rows and couldn't be filled anyway. Two+ absent values, or
+        // more blanks than one table's two rows, is genuinely ambiguous —
+        // left alone for staff rather than guessed.
         function sequenceFillTables(rows) {
           var paired = rows.filter(function (r) { return r.p1 && r.p2; });
           var blanks = paired.filter(function (r) { return !r.table; });
@@ -359,15 +363,12 @@
           // N from the highest table seen or the row count (each table twice),
           // whichever is larger — conservative if whole rows failed to parse.
           var expectedN = Math.max(maxSeen, Math.floor(paired.length / 2));
-          var deficit = [];
+          var absent = [];
           for (var n2 = 1; n2 <= expectedN; n2++) {
-            for (var k = (counts[n2] || 0); k < 2; k++) deficit.push(n2);
+            if (!counts[n2]) absent.push(n2);
           }
-          var distinct = {};
-          deficit.forEach(function (v) { distinct[v] = true; });
-          var vals = Object.keys(distinct);
-          if (vals.length === 1 && deficit.length >= blanks.length) {
-            blanks.forEach(function (r) { r.table = vals[0]; });
+          if (absent.length === 1 && blanks.length <= 2) {
+            blanks.forEach(function (r) { r.table = String(absent[0]); });
           }
         }
 
@@ -542,9 +543,17 @@
               if (rows.some(function (r) { return !r.table; })) {
                 $ocrStatus.textContent = 'Reading table numbers…';
               }
+              function logBlanks(label) {
+                console.log('[pairings OCR] table# blanks after ' + label + ': ' +
+                  rows.filter(function (r) { return !r.table; }).length + '/' + rows.length);
+              }
+              logBlanks('page pass');
               return recoverTableNumbers(worker, c, rows).then(function () {
+                logBlanks('digit crop pass');
                 mirrorFillTables(rows);
+                logBlanks('mirror fill');
                 sequenceFillTables(rows);
+                logBlanks('sequence fill');
                 console.log('[pairings OCR] parsed:', rows);
                 return rows;
               });
