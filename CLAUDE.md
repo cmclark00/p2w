@@ -263,13 +263,20 @@ the Konami leaderboard (`p2w-leaderboard`).
   dynamic-`import()` pattern as Firebase — no bundler, no npm dependency) on
   the selected photo, on a **separate, higher-res canvas** from the
   Firestore-bound compressed copy (OCR accuracy degrades badly on the heavily
-  compressed publish image). Recognition requests word-level bounding boxes
+  compressed publish image). Recognition requests bounding boxes
   (`worker.recognize(canvas, {}, { blocks: true })`); `reconstructRows`
-  rebuilds each table row from word `bbox`es (cluster by vertical position,
-  then sort left-to-right) rather than trusting Tesseract's own line breaks —
-  gridlines in bordered "Table | Name | Opponent" style exports otherwise
-  split/merge cells inconsistently row to row and silently drop most rows.
-  Falls back to plain `data.text` line-splitting if no words come back.
+  rebuilds each table row by **merging Tesseract's own per-cell Line objects
+  across columns using vertical bbox overlap** (forgiving of cross-column
+  baseline/padding jitter — an earlier version clustered on exact word
+  centers, which fragmented rows across columns instead of helping), then
+  joins them left-to-right by x-position. Gridlines in bordered "Table |
+  Name | Opponent" style exports otherwise make Tesseract split/merge cells
+  inconsistently row to row and silently drop most rows. Falls back to plain
+  `data.text` line-splitting if no lines come back. `runOcr` also
+  `console.log`s the reconstructed lines and parsed rows — check DevTools
+  console first when tuning this further, rather than guessing blind
+  (bbox-clustering heuristics are hard to get right without seeing the
+  actual OCR geometry for the image at hand).
   `parsePairingLines` is a **heuristic parser, not a general one** — tuned
   for "Table N  PlayerA  PlayerB" / "N  PlayerA vs PlayerB" layouts (matches
   both the Pokémon Play app and TO-software table exports); `cleanCell` also

@@ -278,41 +278,43 @@
           return out;
         }
 
-        // Tesseract's own line-breaking gets confused by table gridlines —
-        // cells can split or merge inconsistently row to row. Rebuilding rows
-        // from word bounding boxes (cluster by vertical position, then sort
-        // left-to-right) is robust to that regardless of how Tesseract
-        // originally segmented blocks/lines/columns.
-        function flattenWords(data) {
-          var words = [];
+        // Tesseract's own line-breaking gets confused by table gridlines — a
+        // row's cells can land as separate Line objects across different
+        // blocks/columns instead of one line. Re-merge lines into full rows by
+        // *vertical bbox overlap* (forgiving of cross-column baseline/padding
+        // jitter — far more so than clustering on exact word centers, which
+        // tends to fragment a row across columns), then join left-to-right.
+        // Each Tesseract line's own `.text` is already correctly ordered
+        // within its cell, so there's no need to re-sort individual words.
+        function flattenLines(data) {
+          var lines = [];
           (data.blocks || []).forEach(function (block) {
             (block.paragraphs || []).forEach(function (para) {
               (para.lines || []).forEach(function (line) {
-                (line.words || []).forEach(function (w) {
-                  if (w.text && w.text.trim() && w.bbox) words.push(w);
-                });
+                if (line.text && line.text.trim() && line.bbox) lines.push(line);
               });
             });
           });
-          return words;
+          return lines;
         }
 
-        function reconstructRows(words) {
-          if (!words.length) return [];
-          var items = words.map(function (w) {
-            return { text: w.text, x0: w.bbox.x0, cy: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 };
-          }).sort(function (a, b) { return a.cy - b.cy; });
-          var heights = items.map(function (it) { return it.h; }).sort(function (a, b) { return a - b; });
-          var threshold = (heights[Math.floor(heights.length / 2)] || 12) * 0.6;
+        function reconstructRows(lines) {
+          if (!lines.length) return [];
+          var items = lines.map(function (l) {
+            return { text: l.text.trim(), x0: l.bbox.x0, y0: l.bbox.y0, y1: l.bbox.y1 };
+          }).sort(function (a, b) { return a.y0 - b.y0; });
 
           var rows = [];
           items.forEach(function (it) {
             var row = rows[rows.length - 1];
-            if (row && Math.abs(it.cy - row.cy) <= threshold) {
+            var overlap = row ? Math.min(row.y1, it.y1) - Math.max(row.y0, it.y0) : -1;
+            var minHeight = row ? Math.min(row.y1 - row.y0, it.y1 - it.y0) : 0;
+            if (row && overlap > minHeight * 0.3) {
               row.items.push(it);
-              row.cy = (row.cy * (row.items.length - 1) + it.cy) / row.items.length;
+              row.y0 = Math.min(row.y0, it.y0);
+              row.y1 = Math.max(row.y1, it.y1);
             } else {
-              rows.push({ cy: it.cy, items: [it] });
+              rows.push({ y0: it.y0, y1: it.y1, items: [it] });
             }
           });
           return rows.map(function (row) {
@@ -353,9 +355,14 @@
           loadTesseractWorker().then(function (worker) {
             return worker.recognize(c, {}, { blocks: true });
           }).then(function (result) {
-            var geoLines = reconstructRows(flattenWords(result.data || {}));
+            var geoLines = reconstructRows(flattenLines(result.data || {}));
             var lines = geoLines.length ? geoLines : ((result.data && result.data.text) || '').split('\n');
             var rows = parsePairingLines(lines.join('\n'));
+            // Debugging aid: if row extraction is missing/wrong entries, check
+            // these in the browser console — "reconstructed" shows what the
+            // parser actually saw, one row per line.
+            console.log('[pairings OCR] reconstructed rows:\n' + lines.join('\n'));
+            console.log('[pairings OCR] parsed:', rows);
             if (!rows.length) {
               $ocrStatus.textContent = "Couldn't auto-read any rows — add them manually below, or just publish the photo as-is.";
               $ocrStatus.className = 'pa-status err';
