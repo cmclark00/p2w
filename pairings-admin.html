@@ -393,6 +393,16 @@
           var xs = missing.map(function (r) { return r.x0; }).sort(function (a, b) { return a - b; });
           var cropX1 = Math.round(xs[Math.floor(xs.length / 2)]) - 3;
           if (cropX1 < 8) return Promise.resolve();   // nothing left of the names — no table column
+          // Highest plausible table number: half the pair rows (each pairing
+          // listed twice), or the highest number the page pass read, whichever
+          // is larger. Crop reads above this cap are misreads by definition.
+          var pairedCount = rows.filter(function (r) { return r.p1 && r.p2; }).length;
+          var pageMax = 0;
+          rows.forEach(function (r) {
+            var n = parseInt(r.table, 10);
+            if (!isNaN(n) && n > pageMax) pageMax = n;
+          });
+          var cap = Math.max(Math.floor(pairedCount / 2), pageMax) || 999;
           return worker.setParameters({
             tessedit_char_whitelist: '0123456789',
             tessedit_pageseg_mode: '7'                // single line
@@ -428,11 +438,56 @@
                     lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
                     d[i] = d[i + 1] = d[i + 2] = lum < mid ? 0 : 255;
                   }
+                  // Erase table gridlines that survive into the crop.
+                  // Binarization turns the table's left border into a crisp
+                  // vertical stroke that digits-only OCR reads as a leading
+                  // "1" (real failure: 5 → "15", 3 → "13", and true 1s
+                  // unreadable). A near-full-height black column is a border,
+                  // never a digit — the crop's padding keeps even a "1"
+                  // comfortably short of full height. Same for near-full-width
+                  // black rows (horizontal rules).
+                  var W = cc.width, H = cc.height, x, y, o, black;
+                  for (x = 0; x < W; x++) {
+                    black = 0;
+                    for (y = 0; y < H; y++) if (d[(y * W + x) * 4] === 0) black++;
+                    if (black >= H * 0.85) {
+                      for (y = 0; y < H; y++) {
+                        for (var dx = -1; dx <= 1; dx++) {
+                          if (x + dx >= 0 && x + dx < W) {
+                            o = (y * W + x + dx) * 4;
+                            d[o] = d[o + 1] = d[o + 2] = 255;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  for (y = 0; y < H; y++) {
+                    black = 0;
+                    for (x = 0; x < W; x++) if (d[(y * W + x) * 4] === 0) black++;
+                    if (black >= W * 0.9) {
+                      for (x = 0; x < W; x++) {
+                        o = (y * W + x) * 4;
+                        d[o] = d[o + 1] = d[o + 2] = 255;
+                      }
+                    }
+                  }
                   cctx.putImageData(id, 0, 0);
                 }
                 return worker.recognize(cc).then(function (res) {
                   var m = ((res.data && res.data.text) || '').match(/\d{1,3}/);
-                  if (m) r.table = m[0];
+                  if (!m) return;
+                  var v = m[0];
+                  var n = parseInt(v, 10);
+                  // Salvage a phantom leading "1" from any residual border
+                  // stroke: when the raw read exceeds the table count but
+                  // dropping its leading 1 lands in range, trust the rest.
+                  if (n > cap && v.length > 1 && v.charAt(0) === '1') {
+                    var alt = parseInt(v.slice(1), 10);
+                    if (alt >= 1 && alt <= cap) { r.table = String(alt); return; }
+                  }
+                  // Out-of-range with no salvage → leave blank for the
+                  // mirror/sequence passes (a wrong number is worse than none).
+                  if (n >= 1 && n <= cap) r.table = v;
                 });
               });
             });
@@ -517,7 +572,7 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v9';
+        var OCR_BUILD = 'v10';
         var $build = document.getElementById('pa-build');
         if ($build) $build.textContent = OCR_BUILD;
 

@@ -313,10 +313,19 @@ the Konami leaderboard (`p2w-leaderboard`).
   median x0 of the digit-dropped rows) is cropped from the pass-1 canvas,
   upscaled 2–6×, **contrast-stretched and binarized to pure black/white**
   (thin digit strokes survive much better without anti-aliasing gray;
-  near-blank crops skip the threshold), and re-recognized in digits-only
-  single-line mode (`tessedit_char_whitelist: '0123456789'`, PSM 7) —
-  isolated small digits that the page-scale pass drops are an easy problem
-  at cell scale. The worker's whitelist/PSM are restored to full-page
+  near-blank crops skip the threshold), has **gridlines erased**
+  (near-full-height black columns / near-full-width black rows are borders,
+  never digits — binarization otherwise turns the table's left border into
+  a stroke that digits-only OCR reads as a phantom leading "1"; real
+  failure: 5 → "15", 3 → "13" on both mirror copies at once, which also
+  poisoned the sequence-fill deduction with fake absent values), and is
+  re-recognized in digits-only single-line mode (`tessedit_char_whitelist:
+  '0123456789'`, PSM 7) — isolated small digits that the page-scale pass
+  drops are an easy problem at cell scale. Crop reads are **validated
+  against a cap** (half the pair rows, or the page pass's highest table if
+  larger): an over-cap read with a leading "1" is salvaged by dropping that
+  digit if the remainder lands in range, and otherwise discarded — a wrong
+  table number is worse than a blank one. The worker's whitelist/PSM are restored to full-page
   settings afterwards (same worker is reused across photos in a session).
   (2) `mirrorFillTables` — the export lists every pairing twice (sides
   swapped), so a still-blank table number is recovered from its mirror row,
