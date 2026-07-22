@@ -298,9 +298,17 @@ the Konami leaderboard (`p2w-leaderboard`).
   word (e.g. the Pokémon Play app). **Don't make table-number capture
   mandatory again** — that regressed recall badly (only ~7 of 24 real rows
   survived) versus keeping rows with a blank table number for staff to fill
-  in. `cleanCell` also strips a trailing "(record) - division" parenthetical
-  some exports append to names. Lines matching neither pattern are silently
-  skipped rather than added as junk rows. Results populate an **editable
+  in. `cleanCell` only trims OCR junk off cell edges — the "(record) -
+  division" parenthetical (e.g. "(1/1/0 (3) - MA)") is **deliberately kept**
+  in displayed names (owner wants records + JR/SR/MA labels visible to
+  players; an earlier version stripped it and that was reversed by request).
+  Missing table numbers get a **mirror-fill pass**: the export lists every
+  pairing twice (sides swapped), and Tesseract rarely drops the digit on
+  *both* copies, so a blank table number is recovered from its mirror row —
+  matched via `nameKey` (parentheticals stripped, case/whitespace
+  normalized, since the record text can OCR differently between the two
+  rows even when both names read fine). Lines matching neither pattern are
+  silently skipped rather than added as junk rows. Results populate an **editable
   review table** (`#pa-rows-card`) — staff must eyeball/fix names and table
   numbers, delete misreads, or add rows the OCR missed (`+ Add row`) before
   publishing; nothing auto-publishes from OCR alone. `pairs` is sent to

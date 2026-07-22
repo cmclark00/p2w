@@ -256,16 +256,25 @@
         // matching neither are skipped rather than added as junk rows;
         // staff fill in anything missed (or a blank table #) via the
         // review table before publishing.
+        // Trim OCR junk (stray brackets/pipes from gridlines) off cell edges.
+        // The "(record) - division" parenthetical, e.g. "(1/1/0 (3) - MA)",
+        // is deliberately KEPT in the displayed name — owner wants players to
+        // see records and JR/SR/MA labels on the pairings table.
         function cleanCell(s) {
-          s = (s || '').replace(/^[\s:.\-|]+|[\s:.\-|]+$/g, '').trim();
-          // Strip a trailing "(record) - division" style suffix some exports
-          // append to names, e.g. "Alex Huff (1/1/0 (3) - MA)" -> "Alex Huff".
+          return (s || '').replace(/^[\s:.\-|\[\]]+|[\s:.,\-|\[\]]+$/g, '').trim();
+        }
+
+        // Name key for mirror-matching only: parentheticals stripped (the two
+        // mirrored rows can OCR the record text slightly differently even when
+        // both names read fine), whitespace collapsed, lowercased.
+        function nameKey(s) {
+          s = cleanCell(s);
           var prev;
           do {
             prev = s;
             s = s.replace(/\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*$/, '').trim();
           } while (s !== prev);
-          return s;
+          return s.toLowerCase().replace(/\s+/g, ' ');
         }
 
         function parsePairingLines(text) {
@@ -293,6 +302,21 @@
               out.push({ table: m[1], p1: cleanCell(restParts[0]), p2: cleanCell(restParts.slice(1).join(' ')) });
             } else {
               out.push({ table: m[1], p1: cleanCell(m[2]), p2: '' });
+            }
+          });
+
+          // Mirror-fill missing table numbers: this export format lists every
+          // pairing twice (once per player, sides swapped). Tesseract drops
+          // isolated table-number digits on many rows, but rarely on *both*
+          // mirrored copies — so recover a blank one from its mirror row.
+          var tableByKey = {};
+          out.forEach(function (r) {
+            if (r.table && r.p1 && r.p2) tableByKey[nameKey(r.p1) + '|' + nameKey(r.p2)] = r.table;
+          });
+          out.forEach(function (r) {
+            if (!r.table && r.p1 && r.p2) {
+              var t = tableByKey[nameKey(r.p2) + '|' + nameKey(r.p1)];
+              if (t) r.table = t;
             }
           });
           return out;
