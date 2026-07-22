@@ -263,20 +263,28 @@ the Konami leaderboard (`p2w-leaderboard`).
   dynamic-`import()` pattern as Firebase — no bundler, no npm dependency) on
   the selected photo, on a **separate, higher-res canvas** from the
   Firestore-bound compressed copy (OCR accuracy degrades badly on the heavily
-  compressed publish image). `parsePairingLines` is a **heuristic parser, not
-  a general one** — tuned for "Table N  PlayerA  PlayerB" / "N  PlayerA vs
-  PlayerB" layouts (matches what the Pokémon Play app shows). Lines that don't
-  match a leading table number are silently skipped rather than added as junk
-  rows. Results populate an **editable review table** (`#pa-rows-card`) —
-  staff must eyeball/fix names and table numbers, delete misreads, or add
-  rows the OCR missed (`+ Add row`) before publishing; nothing auto-publishes
-  from OCR alone. `pairs` is sent to Firestore as whatever's in that table at
-  publish time (can be an empty array if OCR found nothing and staff added
-  nothing — in which case the player page just falls back to the photo).
-  **Don't try to make the regex parser "smarter" for every possible
-  screenshot layout** — the editable table is the correctness backstop by
-  design, so a good-enough heuristic + human review beats a fragile
-  do-everything parser.
+  compressed publish image). Recognition requests word-level bounding boxes
+  (`worker.recognize(canvas, {}, { blocks: true })`); `reconstructRows`
+  rebuilds each table row from word `bbox`es (cluster by vertical position,
+  then sort left-to-right) rather than trusting Tesseract's own line breaks —
+  gridlines in bordered "Table | Name | Opponent" style exports otherwise
+  split/merge cells inconsistently row to row and silently drop most rows.
+  Falls back to plain `data.text` line-splitting if no words come back.
+  `parsePairingLines` is a **heuristic parser, not a general one** — tuned
+  for "Table N  PlayerA  PlayerB" / "N  PlayerA vs PlayerB" layouts (matches
+  both the Pokémon Play app and TO-software table exports); `cleanCell` also
+  strips a trailing "(record) - division" parenthetical some exports append
+  to names. Lines that don't match a leading table number are silently
+  skipped rather than added as junk rows. Results populate an **editable
+  review table** (`#pa-rows-card`) — staff must eyeball/fix names and table
+  numbers, delete misreads, or add rows the OCR missed (`+ Add row`) before
+  publishing; nothing auto-publishes from OCR alone. `pairs` is sent to
+  Firestore as whatever's in that table at publish time (can be an empty
+  array if OCR found nothing and staff added nothing — in which case the
+  player page just falls back to the photo). **Don't try to make the regex
+  parser "smarter" for every possible screenshot layout** — the editable
+  table is the correctness backstop by design, so a good-enough heuristic +
+  human review beats a fragile do-everything parser.
 - **Player page rendering.** `pairings.html` shows a **styled, searchable
   table** (`#pr-table-section`) when the newest doc has a non-empty `pairs`
   array — a "Find your name" input (`#pr-search`) filters rows client-side by

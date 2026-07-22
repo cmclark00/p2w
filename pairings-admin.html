@@ -242,11 +242,20 @@
 
         // ── OCR: read table/player rows out of the pairings photo ────────
         // Heuristic, not a general parser — tuned for "Table N  PlayerA  PlayerB"
-        // / "N  PlayerA vs PlayerB" style layouts (e.g. the Pokémon Play app).
+        // / "N  PlayerA vs PlayerB" style layouts (e.g. the Pokémon Play app, or
+        // a bordered "Table | Name | Opponent" tournament-software export).
         // Lines that don't match a leading table number are skipped rather than
         // added as junk rows; staff fill in anything missed via "+ Add row".
         function cleanCell(s) {
-          return (s || '').replace(/^[\s:.\-|]+|[\s:.\-|]+$/g, '').trim();
+          s = (s || '').replace(/^[\s:.\-|]+|[\s:.\-|]+$/g, '').trim();
+          // Strip a trailing "(record) - division" style suffix some exports
+          // append to names, e.g. "Alex Huff (1/1/0 (3) - MA)" -> "Alex Huff".
+          var prev;
+          do {
+            prev = s;
+            s = s.replace(/\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*$/, '').trim();
+          } while (s !== prev);
+          return s;
         }
 
         function parsePairingLines(text) {
@@ -267,6 +276,49 @@
             }
           });
           return out;
+        }
+
+        // Tesseract's own line-breaking gets confused by table gridlines —
+        // cells can split or merge inconsistently row to row. Rebuilding rows
+        // from word bounding boxes (cluster by vertical position, then sort
+        // left-to-right) is robust to that regardless of how Tesseract
+        // originally segmented blocks/lines/columns.
+        function flattenWords(data) {
+          var words = [];
+          (data.blocks || []).forEach(function (block) {
+            (block.paragraphs || []).forEach(function (para) {
+              (para.lines || []).forEach(function (line) {
+                (line.words || []).forEach(function (w) {
+                  if (w.text && w.text.trim() && w.bbox) words.push(w);
+                });
+              });
+            });
+          });
+          return words;
+        }
+
+        function reconstructRows(words) {
+          if (!words.length) return [];
+          var items = words.map(function (w) {
+            return { text: w.text, x0: w.bbox.x0, cy: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 };
+          }).sort(function (a, b) { return a.cy - b.cy; });
+          var heights = items.map(function (it) { return it.h; }).sort(function (a, b) { return a - b; });
+          var threshold = (heights[Math.floor(heights.length / 2)] || 12) * 0.6;
+
+          var rows = [];
+          items.forEach(function (it) {
+            var row = rows[rows.length - 1];
+            if (row && Math.abs(it.cy - row.cy) <= threshold) {
+              row.items.push(it);
+              row.cy = (row.cy * (row.items.length - 1) + it.cy) / row.items.length;
+            } else {
+              rows.push({ cy: it.cy, items: [it] });
+            }
+          });
+          return rows.map(function (row) {
+            row.items.sort(function (a, b) { return a.x0 - b.x0; });
+            return row.items.map(function (it) { return it.text; }).join(' ');
+          });
         }
 
         var tessWorkerPromise = null;
@@ -299,9 +351,11 @@
           ctx.drawImage(img, 0, 0, w, h);
 
           loadTesseractWorker().then(function (worker) {
-            return worker.recognize(c);
+            return worker.recognize(c, {}, { blocks: true });
           }).then(function (result) {
-            var rows = parsePairingLines((result.data && result.data.text) || '');
+            var geoLines = reconstructRows(flattenWords(result.data || {}));
+            var lines = geoLines.length ? geoLines : ((result.data && result.data.text) || '').split('\n');
+            var rows = parsePairingLines(lines.join('\n'));
             if (!rows.length) {
               $ocrStatus.textContent = "Couldn't auto-read any rows — add them manually below, or just publish the photo as-is.";
               $ocrStatus.className = 'pa-status err';
