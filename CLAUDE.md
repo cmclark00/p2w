@@ -327,11 +327,19 @@ the Konami leaderboard (`p2w-leaderboard`).
   malformed/unparsed row) must not poison the deduction, because that
   missing copy isn't one of the blank rows and couldn't be filled anyway —
   an earlier version counted all under-represented values and bailed as
-  "ambiguous" in exactly that situation. It fills nothing when two+ values
-  are absent or blanks exceed one table's two rows (genuinely ambiguous —
-  staff decide). `runOcr` logs the blank-table count after each recovery
-  stage (`table# blanks after …`) so a failing stage can be localized from
-  the console instead of re-derived. Parsed rows
+  "ambiguous" in exactly that situation. The expected N comes **only from
+  the row count** (half the pair rows — each pairing is listed twice),
+  never from the highest number seen: a single misread digit (a "7"
+  crop-read as "77") would inflate a max-based range and flood `absent`
+  with phantom values, vetoing an otherwise-certain fill (this happened
+  in a real run). It fills nothing when two+ values are absent or blanks
+  exceed one table's two rows (genuinely ambiguous — staff decide).
+  `runOcr` logs a build tag (`OCR_BUILD` — bump it on every pipeline
+  change; it's how a console paste proves whether the browser is running
+  current or cached code), the blank-table count after each recovery stage
+  (`table# blanks after …`), the sequence-fill decision with its `absent`
+  list, and a compact per-row tables line — so a failing stage or stray
+  misread digit can be read straight off a console paste. Parsed rows
   carry `y0/y1/x0` geometry from `reconstructRows` to make the crop pass
   possible; geometry never reaches Firestore (`collectRows` reads only the
   DOM inputs). Lines matching neither pattern are

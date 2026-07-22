@@ -352,22 +352,25 @@
           var blanks = paired.filter(function (r) { return !r.table; });
           if (!blanks.length) return;
           var counts = {};
-          var maxSeen = 0;
           paired.forEach(function (r) {
             var n = parseInt(r.table, 10);
-            if (!isNaN(n) && n > 0) {
-              counts[n] = (counts[n] || 0) + 1;
-              if (n > maxSeen) maxSeen = n;
-            }
+            if (!isNaN(n) && n > 0) counts[n] = (counts[n] || 0) + 1;
           });
-          // N from the highest table seen or the row count (each table twice),
-          // whichever is larger — conservative if whole rows failed to parse.
-          var expectedN = Math.max(maxSeen, Math.floor(paired.length / 2));
+          // N tables = half the pair rows (each pairing is listed twice).
+          // The row count is deliberately the ONLY source for N: deriving it
+          // from the highest number seen lets a single misread digit (a "7"
+          // crop-read as "77", say) inflate the range and flood `absent`
+          // with phantom values, vetoing an otherwise-certain fill.
+          var expectedN = Math.floor(paired.length / 2);
           var absent = [];
           for (var n2 = 1; n2 <= expectedN; n2++) {
             if (!counts[n2]) absent.push(n2);
           }
-          if (absent.length === 1 && blanks.length <= 2) {
+          var fill = absent.length === 1 && blanks.length <= 2;
+          console.log('[pairings OCR] sequence fill: absent=[' + absent.join(',') +
+            '] blanks=' + blanks.length +
+            (fill ? ' → filling ' + absent[0] : ' → ambiguous, left for staff'));
+          if (fill) {
             blanks.forEach(function (r) { r.table = String(absent[0]); });
           }
         }
@@ -511,7 +514,7 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v7-sequence-fill';
+        var OCR_BUILD = 'v8-seqfill-rowcount';
 
         function runOcr(img) {
           console.log('[pairings OCR] build: ' + OCR_BUILD);
@@ -560,6 +563,8 @@
                 logBlanks('mirror fill');
                 sequenceFillTables(rows);
                 logBlanks('sequence fill');
+                console.log('[pairings OCR] tables: ' +
+                  rows.map(function (r) { return r.table || '·'; }).join(' '));
                 console.log('[pairings OCR] parsed:', rows);
                 return rows;
               });
