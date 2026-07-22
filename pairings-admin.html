@@ -439,17 +439,37 @@
             localStorage.setItem('p2w-pair-event', eventName);
           } catch (e) {}
 
+          var rows = collectRows();
+
           loadFirebase().then(function (f) {
-            return f.addDoc(f.collection(f.db, 'pairings'), {
+            var base = {
               event: eventName,
               round: round,
               img: compressed.dataUrl,
-              pairs: collectRows(),
               pubkey: pass,
               ts: f.serverTimestamp()
+            };
+            var withPairs = Object.assign({}, base, { pairs: rows });
+            return f.addDoc(f.collection(f.db, 'pairings'), withPairs).catch(function (err) {
+              var denied = err && (err.code === 'permission-denied' ||
+                /permission|insufficient/i.test(err.message || ''));
+              if (!denied) throw err;
+              // The `pairs` field may be tripping an older Firestore rule that
+              // doesn't know about it yet. Retry without it so staff aren't
+              // blocked from publishing; if this also fails, the real cause
+              // (bad passphrase / oversized image) surfaces normally below.
+              return f.addDoc(f.collection(f.db, 'pairings'), base).then(function (ref) {
+                ref._pairsDropped = true;
+                return ref;
+              });
             });
-          }).then(function () {
-            setStatus('Published! Players can see Round ' + round + ' now.', 'ok');
+          }).then(function (ref) {
+            if (ref && ref._pairsDropped) {
+              setStatus('Published (photo only) — Round ' + round + '. The pairings ' +
+                'table needs a Firestore rule update to save; ask a dev.', 'ok');
+            } else {
+              setStatus('Published! Players can see Round ' + round + ' now.', 'ok');
+            }
             $publish.disabled = false;
           }).catch(function (err) {
             var denied = err && (err.code === 'permission-denied' ||

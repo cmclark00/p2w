@@ -243,9 +243,20 @@ the Konami leaderboard (`p2w-leaderboard`).
     pubkey:"<passphrase>", ts: serverTimestamp() }
   ```
 
-  The existing Firestore rule (below) doesn't restrict the doc to specific
-  fields, so adding `pairs` needed **no rule change** — it was a front-end-only
-  addition.
+  The rule *as documented* below doesn't restrict the doc to specific fields,
+  so `pairs` should need no rule change — but the **live console rule may be
+  stricter than this doc** (e.g. a `hasOnly([...])` field allowlist someone
+  added when first wiring this up), in which case the extra `pairs` field
+  makes the whole `allow create` fail and Firestore returns a generic
+  `permission-denied` — which reads to staff as "wrong passphrase" even
+  though it isn't. `pairings-admin.html`'s publish handler defends against
+  this: it tries the doc **with** `pairs` first, and if that's specifically
+  denied, silently retries **without** `pairs` (photo-only) so staff are
+  never blocked from publishing — the status message says "photo only...
+  ask a dev" in that case. **The permanent fix is a 🔑 console change**: open
+  Firebase Console → `p2w-leaderboard` → Firestore → Rules, find the
+  `pairings` match block, and make sure `pairs` isn't excluded by any
+  `hasOnly()`/field-count check (add it to the allowlist if one exists).
 
 - **Auto-extracted pairings table (OCR).** `pairings-admin.html` runs
   **Tesseract.js** (loaded on demand from jsDelivr as an ESM module, same
