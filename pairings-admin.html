@@ -336,6 +336,41 @@
           });
         }
 
+        // Last-resort deterministic fill, no OCR involved: tables run 1..N
+        // with each number on exactly two mirrored rows. If exactly one
+        // table number is short of its two copies, every remaining blank
+        // row can only be that value — e.g. OCR losing the thin "1" glyph
+        // on both of table 1's rows (the single worst case for OCR) leaves
+        // 1 as the only absent value. Ambiguous cases (two+ different
+        // tables blank) are left alone for staff rather than guessed.
+        function sequenceFillTables(rows) {
+          var paired = rows.filter(function (r) { return r.p1 && r.p2; });
+          var blanks = paired.filter(function (r) { return !r.table; });
+          if (!blanks.length) return;
+          var counts = {};
+          var maxSeen = 0;
+          paired.forEach(function (r) {
+            var n = parseInt(r.table, 10);
+            if (!isNaN(n) && n > 0) {
+              counts[n] = (counts[n] || 0) + 1;
+              if (n > maxSeen) maxSeen = n;
+            }
+          });
+          // N from the highest table seen or the row count (each table twice),
+          // whichever is larger — conservative if whole rows failed to parse.
+          var expectedN = Math.max(maxSeen, Math.floor(paired.length / 2));
+          var deficit = [];
+          for (var n2 = 1; n2 <= expectedN; n2++) {
+            for (var k = (counts[n2] || 0); k < 2; k++) deficit.push(n2);
+          }
+          var distinct = {};
+          deficit.forEach(function (v) { distinct[v] = true; });
+          var vals = Object.keys(distinct);
+          if (vals.length === 1 && deficit.length >= blanks.length) {
+            blanks.forEach(function (r) { r.table = vals[0]; });
+          }
+        }
+
         // Second, targeted OCR pass for table numbers Tesseract dropped in
         // the full-page pass. Isolated 1–2 digit cells are exactly what it
         // loses at page scale, but a single cell cropped out and blown up
@@ -370,6 +405,24 @@
                 cctx.fillStyle = '#ffffff';
                 cctx.fillRect(0, 0, cc.width, cc.height);
                 cctx.drawImage(canvas, 0, sy, cropX1, sh, 0, 0, cc.width, cc.height);
+                // Contrast-stretch + binarize to pure black/white — thin
+                // single-digit strokes ("1" especially) survive recognition
+                // far better without anti-aliasing gray around them.
+                var id = cctx.getImageData(0, 0, cc.width, cc.height);
+                var d = id.data, lmin = 255, lmax = 0, i, lum;
+                for (i = 0; i < d.length; i += 4) {
+                  lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                  if (lum < lmin) lmin = lum;
+                  if (lum > lmax) lmax = lum;
+                }
+                if (lmax - lmin > 30) {   // skip essentially-blank crops
+                  var mid = (lmin + lmax) / 2;
+                  for (i = 0; i < d.length; i += 4) {
+                    lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                    d[i] = d[i + 1] = d[i + 2] = lum < mid ? 0 : 255;
+                  }
+                  cctx.putImageData(id, 0, 0);
+                }
                 return worker.recognize(cc).then(function (res) {
                   var m = ((res.data && res.data.text) || '').match(/\d{1,3}/);
                   if (m) r.table = m[0];
@@ -491,6 +544,7 @@
               }
               return recoverTableNumbers(worker, c, rows).then(function () {
                 mirrorFillTables(rows);
+                sequenceFillTables(rows);
                 console.log('[pairings OCR] parsed:', rows);
                 return rows;
               });
