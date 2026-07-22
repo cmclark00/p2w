@@ -104,6 +104,9 @@
       <div class="pa-brand">
         <img src="assets/play-to-win-logo.png" alt="Play2Win Games">
         <span class="pa-badge">Staff</span>
+        <!-- Filled from OCR_BUILD at load: if this chip is missing or shows an
+             old tag, the browser is running a stale copy of this page. -->
+        <span class="pa-badge" id="pa-build" style="background: var(--surface-2); color: var(--muted);"></span>
       </div>
       <h1>Post Tournament Pairings</h1>
       <p class="pa-sub">Snap or upload a screenshot of the current round's pairings.
@@ -514,7 +517,9 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v8-seqfill-rowcount';
+        var OCR_BUILD = 'v9';
+        var $build = document.getElementById('pa-build');
+        if ($build) $build.textContent = OCR_BUILD;
 
         function runOcr(img) {
           console.log('[pairings OCR] build: ' + OCR_BUILD);
