@@ -38,25 +38,78 @@
       .pr-figure img { width: 100%; height: auto; display: block; }
       .pr-hint { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
 
-      .pr-search-wrap { margin: 0 0 12px; }
+      /* Header block — mirrors the site's eyebrow + display-type pattern */
+      .pr-eyebrow {
+        margin: 0 0 10px; color: var(--gold); font: 900 0.82rem var(--font-display);
+        letter-spacing: 0.06em; text-transform: uppercase;
+      }
+      .pr-round {
+        display: inline-block; margin-top: 6px; padding: 5px 16px;
+        border: 1px solid rgba(241, 200, 75, 0.45); border-radius: 999px;
+        background: rgba(241, 200, 75, 0.08);
+        color: var(--gold); font: 700 0.95rem var(--font-display); letter-spacing: 0.03em;
+      }
+
+      /* Search — pill input with inline icon, gold focus ring */
+      .pr-search-wrap { position: relative; margin: 0 0 14px; }
+      .pr-search-wrap svg {
+        position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+        width: 17px; height: 17px; stroke: var(--muted); fill: none;
+        stroke-width: 2.4; pointer-events: none;
+      }
       .pr-search-wrap input {
-        width: 100%; padding: 11px 14px; font-size: 1rem;
+        width: 100%; padding: 13px 18px 13px 42px; font-size: 1rem;
+        font-family: var(--font-body);
         color: var(--paper); background: var(--surface-2);
-        border: 1px solid var(--line); border-radius: 10px;
+        border: 1px solid var(--line); border-radius: 999px;
       }
+      .pr-search-wrap input::placeholder { color: var(--muted); }
       .pr-search-wrap input:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
-      .pr-table-wrap {
-        overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+
+      /* Match cards — same card language as the site's event cards
+         (surface + hairline border + gold accent edge, 8-10px radius) */
+      .pr-matches {
+        list-style: none; margin: 0; padding: 0;
+        display: flex; flex-direction: column; gap: 8px;
       }
-      .pr-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-      .pr-table th {
-        text-align: left; font: 700 0.72rem var(--font-display); letter-spacing: 0.04em;
-        text-transform: uppercase; color: var(--muted); padding: 10px 14px;
-        border-bottom: 1px solid var(--line);
+      .pr-match {
+        display: flex; align-items: center; gap: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line); border-left: 4px solid var(--gold);
+        border-radius: 10px; padding: 12px 16px 12px 12px;
       }
-      .pr-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); }
-      .pr-table tr:last-child td { border-bottom: none; }
-      .pr-table-num { font-weight: 700; color: var(--gold); white-space: nowrap; }
+      .pr-match[hidden] { display: none; }
+      .pr-table-badge {
+        flex: 0 0 auto; min-width: 56px; padding: 7px 10px;
+        display: flex; flex-direction: column; align-items: center;
+        background: var(--gold); color: var(--ink); border-radius: 8px;
+        font-family: var(--font-display); text-align: center;
+      }
+      .pr-table-badge .tb-label {
+        font-size: 0.55rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+      }
+      .pr-table-badge .tb-num { font-size: 1.35rem; font-weight: 800; line-height: 1.05; }
+      .pr-table-badge.tb-unknown {
+        background: var(--surface-2); color: var(--muted); border: 1px dashed var(--line);
+      }
+      .pr-players {
+        display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; min-width: 0;
+      }
+      .pr-player { display: flex; flex-direction: column; min-width: 0; }
+      .pr-player .pr-name {
+        font: 700 1.02rem var(--font-display); line-height: 1.25; color: var(--paper);
+        overflow-wrap: anywhere;
+      }
+      .pr-player small {
+        font: 500 0.72rem var(--font-body); color: var(--muted); letter-spacing: 0.01em;
+      }
+      .pr-player.pr-hit .pr-name { color: var(--gold); }
+      .pr-vs {
+        color: var(--gold); font: 800 0.72rem var(--font-display);
+        text-transform: uppercase; letter-spacing: 0.1em;
+      }
+      .pr-nomatch { text-align: center; color: var(--muted); font-size: 0.92rem; padding: 26px 0 6px; }
+
       .pr-photo-link {
         background: none; border: none; color: var(--gold); font-weight: 700;
         font-size: 0.85rem; cursor: pointer; padding: 0; text-decoration: underline;
@@ -108,20 +161,18 @@
         <!-- Content -->
         <div id="pr-content" hidden>
           <div class="pr-head">
+            <p class="pr-eyebrow">Live pairings</p>
             <h1 id="pr-event">Pairings</h1>
             <div class="pr-round" id="pr-round"></div>
             <div class="pr-updated" id="pr-updated"></div>
           </div>
           <div id="pr-table-section" hidden>
             <div class="pr-search-wrap">
-              <input type="search" id="pr-search" placeholder="Find your name…" aria-label="Find your name">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+              <input type="search" id="pr-search" placeholder="Type your name to find your table…" aria-label="Find your name">
             </div>
-            <div class="pr-table-wrap">
-              <table class="pr-table">
-                <thead><tr><th>Table</th><th>Player 1</th><th>Player 2</th></tr></thead>
-                <tbody id="pr-table-body"></tbody>
-              </table>
-            </div>
+            <ul class="pr-matches" id="pr-matches"></ul>
+            <p class="pr-nomatch" id="pr-nomatch" hidden>No name matches — check the spelling, or ask staff.</p>
           </div>
           <figure class="pr-figure" id="pr-figure">
             <img id="pr-img" alt="Current round pairings">
@@ -163,7 +214,8 @@
         var $zoomImg = document.getElementById('pr-zoom-img');
         var $refresh = document.getElementById('pr-refresh');
         var $tableSection = document.getElementById('pr-table-section');
-        var $tableBody = document.getElementById('pr-table-body');
+        var $matches = document.getElementById('pr-matches');
+        var $nomatch = document.getElementById('pr-nomatch');
         var $search = document.getElementById('pr-search');
         var $hintImage = document.getElementById('pr-hint-image');
         var $hintTable = document.getElementById('pr-hint-table');
@@ -171,29 +223,72 @@
 
         var lastId = null; // avoid re-rendering (and image flicker) when unchanged
 
-        function esc(s) {
-          return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-          });
+        // One player cell: bold display-type name, with the "(record - div)"
+        // suffix (when present) split off as small muted text underneath.
+        function playerEl(full) {
+          full = full || '';
+          var el = document.createElement('span');
+          el.className = 'pr-player';
+          var cut = full.indexOf(' (');
+          var name = cut > 0 ? full.slice(0, cut) : full;
+          var meta = cut > 0 ? full.slice(cut + 1) : '';
+          var nm = document.createElement('span');
+          nm.className = 'pr-name';
+          nm.textContent = name;
+          el.appendChild(nm);
+          if (meta) {
+            var sm = document.createElement('small');
+            sm.textContent = meta;
+            el.appendChild(sm);
+          }
+          el.dataset.q = full.toLowerCase();
+          return el;
         }
 
         function renderRows(pairs) {
-          $tableBody.innerHTML = '';
+          $matches.innerHTML = '';
           pairs.forEach(function (p) {
-            var tr = document.createElement('tr');
-            tr.dataset.names = ((p.p1 || '') + ' ' + (p.p2 || '')).toLowerCase();
-            tr.innerHTML =
-              '<td class="pr-table-num">' + (p.table ? 'Table ' + esc(p.table) : '') + '</td>' +
-              '<td>' + esc(p.p1) + '</td><td>' + esc(p.p2) + '</td>';
-            $tableBody.appendChild(tr);
+            var li = document.createElement('li');
+            li.className = 'pr-match';
+            var badge = document.createElement('span');
+            badge.className = 'pr-table-badge' + (p.table ? '' : ' tb-unknown');
+            var lbl = document.createElement('span');
+            lbl.className = 'tb-label';
+            lbl.textContent = 'Table';
+            var num = document.createElement('span');
+            num.className = 'tb-num';
+            num.textContent = p.table ? p.table : '—';
+            badge.appendChild(lbl);
+            badge.appendChild(num);
+            li.appendChild(badge);
+            var players = document.createElement('div');
+            players.className = 'pr-players';
+            players.appendChild(playerEl(p.p1));
+            var vs = document.createElement('span');
+            vs.className = 'pr-vs';
+            vs.textContent = 'vs';
+            players.appendChild(vs);
+            players.appendChild(playerEl(p.p2));
+            li.appendChild(players);
+            li.dataset.names = ((p.p1 || '') + ' ' + (p.p2 || '')).toLowerCase();
+            $matches.appendChild(li);
           });
         }
 
         $search.addEventListener('input', function () {
           var q = $search.value.trim().toLowerCase();
-          $tableBody.querySelectorAll('tr').forEach(function (tr) {
-            tr.hidden = !!q && tr.dataset.names.indexOf(q) === -1;
+          var any = false;
+          $matches.querySelectorAll('.pr-match').forEach(function (li) {
+            var show = !q || li.dataset.names.indexOf(q) !== -1;
+            li.hidden = !show;
+            if (show) any = true;
+            // Gold-highlight the name that actually matched, so your own row
+            // jumps out of the pair.
+            li.querySelectorAll('.pr-player').forEach(function (pl) {
+              pl.classList.toggle('pr-hit', !!q && pl.dataset.q.indexOf(q) !== -1);
+            });
           });
+          $nomatch.hidden = !q || any;
         });
 
         $photoToggle.addEventListener('click', function () {
@@ -222,7 +317,8 @@
         }
 
         function render(doc, id) {
-          if (id !== lastId) {
+          var changed = id !== lastId;
+          if (changed) {
             $img.src = doc.img || '';
             lastId = id;
           }
@@ -232,8 +328,11 @@
           $updated.textContent = when ? 'Updated ' + timeAgo(when) : '';
 
           var hasPairs = doc.pairs && doc.pairs.length;
-          if (hasPairs) {
+          // Only rebuild the list on a new publish — the 25s auto-refresh
+          // must not clear a search someone is mid-typing.
+          if (hasPairs && changed) {
             $search.value = '';
+            $nomatch.hidden = true;
             renderRows(doc.pairs);
           }
           $tableSection.hidden = !hasPairs;

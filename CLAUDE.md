@@ -367,14 +367,24 @@ the Konami leaderboard (`p2w-leaderboard`).
   parser "smarter" for every possible screenshot layout** — the editable
   table is the correctness backstop by design, so a good-enough heuristic +
   human review beats a fragile do-everything parser.
-- **Player page rendering.** `pairings.html` shows a **styled, searchable
-  table** (`#pr-table-section`) when the newest doc has a non-empty `pairs`
-  array — a "Find your name" input (`#pr-search`) filters rows client-side by
-  substring match on `p1`+`p2`. Falls back to the **original image view**
-  (unchanged tap-to-zoom `#pr-figure`) when `pairs` is empty/absent, so older
-  docs and any round where OCR/staff didn't produce rows still display fine.
-  The source photo is never discarded even in table mode — a "View original
-  photo" link (`#pr-photo-toggle`) opens the same zoom overlay from `doc.img`.
+- **Player page rendering.** `pairings.html` shows a **searchable match-card
+  list** (`#pr-table-section` → `ul#pr-matches`) when the newest doc has a
+  non-empty `pairs` array, styled in the site's card language (surface card +
+  hairline border + 4px gold left edge, like `.event-card`; eyebrow +
+  Space Grotesk head; gold "TABLE n" badge per card, dashed placeholder chip
+  when a table number is blank). Each player renders as a bold display-type
+  name with the "(record - div)" suffix split onto a small muted line
+  (display-only split at `' ('` — the stored `p1`/`p2` strings are
+  unchanged). The pill "Find your name" input (`#pr-search`) filters cards
+  client-side by substring on `p1`+`p2` **and gold-highlights the matched
+  name** (`.pr-hit`) so your own row jumps out of the pair; an empty result
+  shows `#pr-nomatch`. The list is only rebuilt when the doc id changes —
+  the 25s auto-refresh must not clear a search someone is mid-typing.
+  Falls back to the **original image view** (unchanged tap-to-zoom
+  `#pr-figure`) when `pairs` is empty/absent, so older docs and any round
+  where OCR/staff didn't produce rows still display fine. The source photo
+  is never discarded even in card mode — a "View original photo" link
+  (`#pr-photo-toggle`) opens the same zoom overlay from `doc.img`.
 
 - **Image handling:** the pairings screenshot is stored **inline as a compressed
   base64 data URL** (no Firebase Storage). `pairings-admin.html` downscales to
