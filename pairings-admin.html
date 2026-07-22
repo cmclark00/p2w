@@ -508,7 +508,13 @@
           return tessWorkerPromise;
         }
 
+        // Bumped on every OCR-pipeline change — logged at the start of each
+        // run so a console paste immediately shows whether the browser is
+        // executing current code or a cached copy.
+        var OCR_BUILD = 'v7-sequence-fill';
+
         function runOcr(img) {
+          console.log('[pairings OCR] build: ' + OCR_BUILD);
           $rowsBody.innerHTML = '';
           $rowsCard.hidden = false;
           $ocrStatus.textContent = 'Reading pairings from the photo… (~10–20s)';
