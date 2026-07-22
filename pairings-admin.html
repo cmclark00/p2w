@@ -277,13 +277,26 @@
           return s.toLowerCase().replace(/\s+/g, ' ');
         }
 
-        function parsePairingLines(text) {
-          var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+        // Takes row objects ({ text, y0, y1, x0 } — geometry null/absent when
+        // coming from the plain-text fallback) and returns parsed pairings.
+        // Geometry rides along on each parsed row so recoverTableNumbers can
+        // re-OCR the table cell of rows whose number was dropped; it's never
+        // published (collectRows reads the DOM inputs, which only hold
+        // table/p1/p2).
+        function parsePairingLines(rowObjs) {
           var reVsSplit = /\s+(?:vs\.?|v\.?)\s+/i;
           var reLeadTable = /^(?:table\s*)?#?\s*(\d{1,3})\s*[:.\-]?\s+/i;
           var reNum = /^(?:table\s*)?#?\s*(\d{1,3})\s+(.+)$/i;
           var out = [];
-          lines.forEach(function (line) {
+          rowObjs.forEach(function (row) {
+            var line = (row.text || '').trim();
+            if (!line) return;
+            function push(table, p1, p2) {
+              out.push({ table: table, p1: p1, p2: p2,
+                         y0: row.y0 != null ? row.y0 : null,
+                         y1: row.y1 != null ? row.y1 : null,
+                         x0: row.x0 != null ? row.x0 : null });
+            }
             if (reVsSplit.test(line)) {
               var parts = line.split(reVsSplit);
               if (parts.length < 2) return;
@@ -292,34 +305,82 @@
               var table = '';
               var tm = left.match(reLeadTable);
               if (tm) { table = tm[1]; left = left.slice(tm[0].length); }
-              out.push({ table: table, p1: cleanCell(left), p2: cleanCell(right) });
+              push(table, cleanCell(left), cleanCell(right));
               return;
             }
             var m = line.match(reNum);
             if (!m) return;
             var restParts = m[2].split(/\s{2,}|\t/).filter(Boolean);
             if (restParts.length >= 2) {
-              out.push({ table: m[1], p1: cleanCell(restParts[0]), p2: cleanCell(restParts.slice(1).join(' ')) });
+              push(m[1], cleanCell(restParts[0]), cleanCell(restParts.slice(1).join(' ')));
             } else {
-              out.push({ table: m[1], p1: cleanCell(m[2]), p2: '' });
+              push(m[1], cleanCell(m[2]), '');
             }
           });
+          return out;
+        }
 
-          // Mirror-fill missing table numbers: this export format lists every
-          // pairing twice (once per player, sides swapped). Tesseract drops
-          // isolated table-number digits on many rows, but rarely on *both*
-          // mirrored copies — so recover a blank one from its mirror row.
+        // Mirror-fill missing table numbers: this export format lists every
+        // pairing twice (once per player, sides swapped) — recover a blank
+        // table number from its mirror row when one copy kept the digit.
+        function mirrorFillTables(rows) {
           var tableByKey = {};
-          out.forEach(function (r) {
+          rows.forEach(function (r) {
             if (r.table && r.p1 && r.p2) tableByKey[nameKey(r.p1) + '|' + nameKey(r.p2)] = r.table;
           });
-          out.forEach(function (r) {
+          rows.forEach(function (r) {
             if (!r.table && r.p1 && r.p2) {
               var t = tableByKey[nameKey(r.p2) + '|' + nameKey(r.p1)];
               if (t) r.table = t;
             }
           });
-          return out;
+        }
+
+        // Second, targeted OCR pass for table numbers Tesseract dropped in
+        // the full-page pass. Isolated 1–2 digit cells are exactly what it
+        // loses at page scale, but a single cell cropped out and blown up
+        // 3–6× in digits-only single-line mode is a far easier problem. Row
+        // bboxes are in the same coordinate space as `canvas` (the pass-1
+        // input), so each missing row's table cell — everything left of the
+        // name column — can be cropped precisely. The name-column x is taken
+        // as the median x0 of the rows that are missing their number (their
+        // recognized text starts at the name, since the digit was dropped).
+        function recoverTableNumbers(worker, canvas, rows) {
+          var missing = rows.filter(function (r) { return !r.table && r.y0 != null && r.x0 != null; });
+          if (!missing.length) return Promise.resolve();
+          var xs = missing.map(function (r) { return r.x0; }).sort(function (a, b) { return a - b; });
+          var cropX1 = Math.round(xs[Math.floor(xs.length / 2)]) - 3;
+          if (cropX1 < 8) return Promise.resolve();   // nothing left of the names — no table column
+          return worker.setParameters({
+            tessedit_char_whitelist: '0123456789',
+            tessedit_pageseg_mode: '7'                // single line
+          }).then(function () {
+            var chain = Promise.resolve();
+            missing.forEach(function (r) {
+              chain = chain.then(function () {
+                var pad = 4;
+                var sy = Math.max(0, Math.floor(r.y0) - pad);
+                var sh = Math.min(canvas.height - sy, Math.ceil(r.y1 - r.y0) + pad * 2);
+                if (sh <= 0) return;
+                var scale = Math.max(2, Math.min(6, 64 / sh));
+                var cc = document.createElement('canvas');
+                cc.width = Math.round(cropX1 * scale);
+                cc.height = Math.round(sh * scale);
+                var cctx = cc.getContext('2d');
+                cctx.fillStyle = '#ffffff';
+                cctx.fillRect(0, 0, cc.width, cc.height);
+                cctx.drawImage(canvas, 0, sy, cropX1, sh, 0, 0, cc.width, cc.height);
+                return worker.recognize(cc).then(function (res) {
+                  var m = ((res.data && res.data.text) || '').match(/\d{1,3}/);
+                  if (m) r.table = m[0];
+                });
+              });
+            });
+            return chain;
+          }).then(function () {
+            // Restore full-page settings for the next photo this session.
+            return worker.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '11' });
+          });
         }
 
         // Tesseract's own line-breaking gets confused by table gridlines — a
@@ -363,7 +424,11 @@
           });
           return rows.map(function (row) {
             row.items.sort(function (a, b) { return a.x0 - b.x0; });
-            return row.items.map(function (it) { return it.text; }).join(' ');
+            return {
+              text: row.items.map(function (it) { return it.text; }).join(' '),
+              y0: row.y0, y1: row.y1,
+              x0: row.items[0].x0
+            };
           });
         }
 
@@ -408,22 +473,37 @@
           ctx.drawImage(img, 0, 0, w, h);
 
           loadTesseractWorker().then(function (worker) {
-            return worker.recognize(c, {}, { blocks: true });
-          }).then(function (result) {
-            var geoLines = reconstructRows(flattenLines(result.data || {}));
-            var lines = geoLines.length ? geoLines : ((result.data && result.data.text) || '').split('\n');
-            var rows = parsePairingLines(lines.join('\n'));
-            // Debugging aid: if row extraction is missing/wrong entries, check
-            // these in the browser console — "reconstructed" shows what the
-            // parser actually saw, one row per line.
-            console.log('[pairings OCR] reconstructed rows:\n' + lines.join('\n'));
-            console.log('[pairings OCR] parsed:', rows);
+            return worker.recognize(c, {}, { blocks: true }).then(function (result) {
+              var rowObjs = reconstructRows(flattenLines(result.data || {}));
+              if (!rowObjs.length) {
+                rowObjs = ((result.data && result.data.text) || '').split('\n').map(function (t) {
+                  return { text: t };
+                });
+              }
+              var rows = parsePairingLines(rowObjs);
+              // Debugging aid: if row extraction is missing/wrong entries, check
+              // these in the browser console — "reconstructed" shows what the
+              // parser actually saw, one row per line.
+              console.log('[pairings OCR] reconstructed rows:\n' +
+                rowObjs.map(function (r) { return r.text; }).join('\n'));
+              if (rows.some(function (r) { return !r.table; })) {
+                $ocrStatus.textContent = 'Reading table numbers…';
+              }
+              return recoverTableNumbers(worker, c, rows).then(function () {
+                mirrorFillTables(rows);
+                console.log('[pairings OCR] parsed:', rows);
+                return rows;
+              });
+            });
+          }).then(function (rows) {
             if (!rows.length) {
               $ocrStatus.textContent = "Couldn't auto-read any rows — add them manually below, or just publish the photo as-is.";
               $ocrStatus.className = 'pa-status err';
             } else {
               rows.forEach(function (r) { addRow(r.table, r.p1, r.p2); });
+              var blanks = rows.filter(function (r) { return !r.table; }).length;
               $ocrStatus.textContent = 'Found ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') +
+                (blanks ? ' (' + blanks + ' missing a table # — fill those in)' : '') +
                 ' — check them before publishing.';
               $ocrStatus.className = 'pa-status ok';
             }

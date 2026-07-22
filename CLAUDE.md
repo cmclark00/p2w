@@ -302,12 +302,22 @@ the Konami leaderboard (`p2w-leaderboard`).
   division" parenthetical (e.g. "(1/1/0 (3) - MA)") is **deliberately kept**
   in displayed names (owner wants records + JR/SR/MA labels visible to
   players; an earlier version stripped it and that was reversed by request).
-  Missing table numbers get a **mirror-fill pass**: the export lists every
-  pairing twice (sides swapped), and Tesseract rarely drops the digit on
-  *both* copies, so a blank table number is recovered from its mirror row —
-  matched via `nameKey` (parentheticals stripped, case/whitespace
-  normalized, since the record text can OCR differently between the two
-  rows even when both names read fine). Lines matching neither pattern are
+  Missing table numbers get **two recovery passes**, in order:
+  (1) `recoverTableNumbers` — a second, targeted OCR pass per missing row:
+  the row's table cell (everything left of the name column, located via the
+  median x0 of the digit-dropped rows) is cropped from the pass-1 canvas,
+  upscaled 2–6×, and re-recognized in digits-only single-line mode
+  (`tessedit_char_whitelist: '0123456789'`, PSM 7) — isolated small digits
+  that the page-scale pass drops are an easy problem at cell scale. The
+  worker's whitelist/PSM are restored to full-page settings afterwards
+  (same worker is reused across photos in a session). (2) `mirrorFillTables`
+  — the export lists every pairing twice (sides swapped), so a still-blank
+  table number is recovered from its mirror row, matched via `nameKey`
+  (parentheticals stripped, case/whitespace normalized, since the record
+  text can OCR differently between the two rows even when both names read
+  fine). Parsed rows carry `y0/y1/x0` geometry from `reconstructRows` to
+  make the crop pass possible; geometry never reaches Firestore
+  (`collectRows` reads only the DOM inputs). Lines matching neither pattern are
   silently skipped rather than added as junk rows. Results populate an **editable
   review table** (`#pa-rows-card`) — staff must eyeball/fix names and table
   numbers, delete misreads, or add rows the OCR missed (`+ Add row`) before
