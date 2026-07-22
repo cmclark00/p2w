@@ -11,3 +11,15 @@ RewriteCond %{HTTPS} off
 RewriteCond %{HTTP:X-Forwarded-SSL} !on
 RewriteCond %{HTTP_HOST} ^play2wingames\.com$ [NC]
 RewriteRule ^(.*)$ https://play2wingames.com/$1 [R=301,L]
+
+# HTML must revalidate on every load ("no-cache" still allows ETag/304, so
+# unchanged pages stay cheap). Without this Apache sends no Cache-Control
+# and browsers heuristic-cache HTML — which repeatedly served stale JS on
+# pairings-admin.html mid-tournament (inline scripts ride inside the HTML)
+# and can leave players' phones on an outdated pairings.html. Push-to-deploy
+# means a page is only stale until its next request — keep it that way.
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

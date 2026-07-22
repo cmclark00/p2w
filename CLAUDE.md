@@ -39,8 +39,13 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
   See [[ftp-deploy-wrong-docroot]] for the war story (old creds hit a
   different non-serving account).
 - **`.htaccess` is tracked in the repo** and deploys like any other file —
-  it holds the canonical-host rules (www→apex + force-HTTPS, proxy-aware).
-  Edit it in the repo, not on the server, or a deploy will overwrite your
+  it holds the canonical-host rules (www→apex + force-HTTPS, proxy-aware)
+  **and a `Cache-Control: no-cache` header for all `.html`** (revalidate
+  every load; ETag/304 keeps unchanged pages cheap). The no-cache rule is
+  load-bearing: without it Apache sends no Cache-Control and browsers
+  heuristic-cache HTML, which repeatedly served stale inline JS on
+  `pairings-admin.html` mid-tournament even through hard refreshes. Edit it
+  in the repo, not on the server, or a deploy will overwrite your
   server-side change.
 - **Remaining 🔑 handoff items** (don't block the live site): turn off
   GitHub Pages, move Formspree/Calendar/Firebase to shop accounts, transfer
