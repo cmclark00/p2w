@@ -328,7 +328,18 @@
           if (!tessWorkerPromise) {
             tessWorkerPromise = import(TESS_SRC).then(function (mod) {
               var Tesseract = mod.default || mod;
-              return Tesseract.createWorker('eng');
+              return Tesseract.createWorker('eng').then(function (worker) {
+                // PSM 11 = sparse text: just find every text blob on the page
+                // rather than trying to intelligently segment it into
+                // blocks/columns/tables. The default AUTO mode's own layout
+                // analysis was silently dropping ~2/3 of a bordered table's
+                // rows (misclassifying them before recognition even ran) —
+                // we do our own row reconstruction from bboxes below, so we
+                // don't need Tesseract's structural grouping anyway.
+                return worker.setParameters({ tessedit_pageseg_mode: '11' }).then(function () {
+                  return worker;
+                });
+              });
             });
           }
           return tessWorkerPromise;

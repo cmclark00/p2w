@@ -263,8 +263,15 @@ the Konami leaderboard (`p2w-leaderboard`).
   dynamic-`import()` pattern as Firebase — no bundler, no npm dependency) on
   the selected photo, on a **separate, higher-res canvas** from the
   Firestore-bound compressed copy (OCR accuracy degrades badly on the heavily
-  compressed publish image). Recognition requests bounding boxes
-  (`worker.recognize(canvas, {}, { blocks: true })`); `reconstructRows`
+  compressed publish image). The worker is set to **PSM 11 (sparse text)** —
+  Tesseract's default `AUTO` layout analysis was silently dropping ~2/3 of a
+  real bordered-table export's rows (misclassifying them during its own
+  page-segmentation before recognition even ran, not a bug in our merging
+  logic — confirmed via the console diagnostics below). Sparse mode just
+  finds every text blob without trying to be clever about columns/tables,
+  which is fine since we do our own row reconstruction from bboxes.
+  Recognition also requests bounding boxes (`worker.recognize(canvas, {}, {
+  blocks: true })`); `reconstructRows`
   rebuilds each table row by **merging Tesseract's own per-cell Line objects
   across columns using vertical bbox overlap** (forgiving of cross-column
   baseline/padding jitter — an earlier version clustered on exact word
