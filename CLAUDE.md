@@ -198,7 +198,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `careers.html` | Application page for shop hires. Formspree form (endpoint `mvzyvwzb`, lands in `careers@play2wingames.com`) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
-| `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Reads the newest `pairings` Firestore doc and shows the screenshot big + tap-to-zoom, with event name / Round N / "updated X min ago"; auto-refreshes every 25s. `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
+| `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
 | `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + a pairings screenshot (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
@@ -237,6 +237,11 @@ the Konami leaderboard (`p2w-leaderboard`).
   (the QR target players scan). Both are `noindex`, out of the nav, and out of
   `sitemap.xml`. Both load Firebase with the **same dynamic-import pattern and
   public `FIREBASE_CONFIG`** as `konami.js` (config inlined on each page).
+  `pairings.html` carries the full standard site chrome (customers see it) and
+  therefore loads `konami.js` — its inline Firebase init uses a **named app**
+  (`'pairings'`) to avoid `app/duplicate-app` if the easter egg's leaderboard
+  loads on the same page. `pairings-admin.html` stays chrome-less (internal
+  staff tool, default app name is fine there — no `konami.js`).
 - **Storage:** a new Firestore collection **`pairings`**. Each publish is **one new
   doc** — nothing is ever updated or deleted, matching the existing "read all;
   create-only; no update/delete" rule philosophy. The player page reads the newest
