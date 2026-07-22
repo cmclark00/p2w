@@ -241,11 +241,21 @@
         }
 
         // ── OCR: read table/player rows out of the pairings photo ────────
-        // Heuristic, not a general parser — tuned for "Table N  PlayerA  PlayerB"
-        // / "N  PlayerA vs PlayerB" style layouts (e.g. the Pokémon Play app, or
-        // a bordered "Table | Name | Opponent" tournament-software export).
-        // Lines that don't match a leading table number are skipped rather than
-        // added as junk rows; staff fill in anything missed via "+ Add row".
+        // Heuristic, not a general parser. The reliable signal in every
+        // format seen so far — the Pokémon Play app, and bordered "Table |
+        // Name | Opponent" tournament-software exports — is the "vs"/"v."
+        // separator between two names; a line's leading table number is
+        // NOT reliable (isolated single/double-digit glyphs are exactly the
+        // kind of short, context-free text Tesseract most often drops, even
+        // when every name on the same row OCRs fine — confirmed from real
+        // console output, not a guess). So: split on "vs" first and always
+        // keep the row even with no table number, then opportunistically
+        // pull a leading number off the left side if one's there. A line
+        // with no "vs" falls back to the older "table# then two names"
+        // split for formats without an explicit separator word. Lines
+        // matching neither are skipped rather than added as junk rows;
+        // staff fill in anything missed (or a blank table #) via the
+        // review table before publishing.
         function cleanCell(s) {
           s = (s || '').replace(/^[\s:.\-|]+|[\s:.\-|]+$/g, '').trim();
           // Strip a trailing "(record) - division" style suffix some exports
@@ -260,17 +270,27 @@
 
         function parsePairingLines(text) {
           var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-          var reVs = /^(?:table\s*)?#?\s*(\d{1,3})\D+?(.+?)\s+(?:vs\.?|v\.?)\s+(.+)$/i;
+          var reVsSplit = /\s+(?:vs\.?|v\.?)\s+/i;
+          var reLeadTable = /^(?:table\s*)?#?\s*(\d{1,3})\s*[:.\-]?\s+/i;
           var reNum = /^(?:table\s*)?#?\s*(\d{1,3})\s+(.+)$/i;
           var out = [];
           lines.forEach(function (line) {
-            var m = line.match(reVs);
-            if (m) { out.push({ table: m[1], p1: cleanCell(m[2]), p2: cleanCell(m[3]) }); return; }
-            m = line.match(reNum);
+            if (reVsSplit.test(line)) {
+              var parts = line.split(reVsSplit);
+              if (parts.length < 2) return;
+              var left = parts[0];
+              var right = parts.slice(1).join(' vs ');
+              var table = '';
+              var tm = left.match(reLeadTable);
+              if (tm) { table = tm[1]; left = left.slice(tm[0].length); }
+              out.push({ table: table, p1: cleanCell(left), p2: cleanCell(right) });
+              return;
+            }
+            var m = line.match(reNum);
             if (!m) return;
-            var parts = m[2].split(/\s{2,}|\t/).filter(Boolean);
-            if (parts.length >= 2) {
-              out.push({ table: m[1], p1: cleanCell(parts[0]), p2: cleanCell(parts.slice(1).join(' ')) });
+            var restParts = m[2].split(/\s{2,}|\t/).filter(Boolean);
+            if (restParts.length >= 2) {
+              out.push({ table: m[1], p1: cleanCell(restParts[0]), p2: cleanCell(restParts.slice(1).join(' ')) });
             } else {
               out.push({ table: m[1], p1: cleanCell(m[2]), p2: '' });
             }

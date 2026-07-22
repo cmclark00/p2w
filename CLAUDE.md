@@ -284,11 +284,22 @@ the Konami leaderboard (`p2w-leaderboard`).
   console first when tuning this further, rather than guessing blind
   (bbox-clustering heuristics are hard to get right without seeing the
   actual OCR geometry for the image at hand).
-  `parsePairingLines` is a **heuristic parser, not a general one** — tuned
-  for "Table N  PlayerA  PlayerB" / "N  PlayerA vs PlayerB" layouts (matches
-  both the Pokémon Play app and TO-software table exports); `cleanCell` also
-  strips a trailing "(record) - division" parenthetical some exports append
-  to names. Lines that don't match a leading table number are silently
+  `parsePairingLines` is a **heuristic parser, not a general one** — it splits
+  on the "vs"/"v." separator first (the one reliable signal across formats
+  seen so far) and keeps the row even with **no leading table number**,
+  since real console output showed isolated single/double-digit table
+  numbers get dropped by Tesseract on a large fraction of rows even when
+  the rest of that same row OCRs fine (short, context-free glyphs are
+  exactly what Tesseract struggles with — this isn't fixable by better
+  row-reconstruction, since the number was never recognized as text at
+  all). A leading table number is pulled off opportunistically if present.
+  Lines with no "vs" fall back to the older "table# then two names,
+  multi-space-split" heuristic, for formats without an explicit separator
+  word (e.g. the Pokémon Play app). **Don't make table-number capture
+  mandatory again** — that regressed recall badly (only ~7 of 24 real rows
+  survived) versus keeping rows with a blank table number for staff to fill
+  in. `cleanCell` also strips a trailing "(record) - division" parenthetical
+  some exports append to names. Lines matching neither pattern are silently
   skipped rather than added as junk rows. Results populate an **editable
   review table** (`#pa-rows-card`) — staff must eyeball/fix names and table
   numbers, delete misreads, or add rows the OCR missed (`+ Add row`) before
