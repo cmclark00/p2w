@@ -69,6 +69,33 @@
         font-size: 0.82rem; color: var(--muted); line-height: 1.5;
         border-left: 3px solid var(--line); padding-left: 12px; margin-top: 22px;
       }
+      .pa-rows-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      .pa-rows-table { width: 100%; border-collapse: collapse; }
+      .pa-rows-table th {
+        text-align: left; font: 700 0.72rem var(--font-display); letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--muted); padding: 8px 10px;
+        border-bottom: 1px solid var(--line); background: var(--surface-2);
+      }
+      .pa-rows-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+      .pa-rows-table tr:last-child td { border-bottom: none; }
+      .pa-rows-table input {
+        width: 100%; padding: 7px 8px; font-size: 0.9rem;
+        color: var(--paper); background: var(--surface-2);
+        border: 1px solid var(--line); border-radius: 7px;
+      }
+      .pa-rows-table input.pa-row-table { width: 3.6em; }
+      .pa-row-del {
+        background: none; border: none; color: var(--muted); font-size: 1.1rem;
+        line-height: 1; cursor: pointer; padding: 4px 6px;
+      }
+      .pa-row-del:hover, .pa-row-del:focus-visible { color: #ff6b81; }
+      .pa-rows-actions {
+        display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px;
+      }
+      .pa-link-btn {
+        background: none; border: none; color: var(--gold); font: 700 0.85rem var(--font-display);
+        cursor: pointer; padding: 4px 0;
+      }
     </style>
   </head>
   <body>
@@ -111,6 +138,28 @@
         </div>
       </div>
 
+      <div class="pa-card" id="pa-rows-card" hidden>
+        <div class="pa-field">
+          <label>Extracted pairings
+            <span class="hint">— auto-read from the photo. Check names and table
+              numbers, fix typos, delete junk rows, or add any that were missed
+              before publishing.</span>
+          </label>
+          <div class="pa-rows-wrap">
+            <table class="pa-rows-table">
+              <thead>
+                <tr><th>Table</th><th>Player 1</th><th>Player 2</th><th></th></tr>
+              </thead>
+              <tbody id="pa-rows-body"></tbody>
+            </table>
+          </div>
+          <div class="pa-rows-actions">
+            <button type="button" class="pa-link-btn" id="pa-add-row">+ Add row</button>
+            <span class="pa-status" id="pa-ocr-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+
       <div class="pa-actions">
         <button class="pa-btn" id="pa-publish" disabled>Publish to players</button>
         <span class="pa-status" id="pa-status" role="status" aria-live="polite"></span>
@@ -140,6 +189,7 @@
         };
         var MAX_DIM = 1400;          // longest edge, px
         var TARGET_CHARS = 800000;   // keep base64 well under Firestore's 1MB doc cap
+        var TESS_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js';
 
         var $pass = document.getElementById('pa-pass');
         var $event = document.getElementById('pa-event');
@@ -150,8 +200,123 @@
         var $meta = document.getElementById('pa-meta');
         var $publish = document.getElementById('pa-publish');
         var $status = document.getElementById('pa-status');
+        var $rowsCard = document.getElementById('pa-rows-card');
+        var $rowsBody = document.getElementById('pa-rows-body');
+        var $addRow = document.getElementById('pa-add-row');
+        var $ocrStatus = document.getElementById('pa-ocr-status');
 
         var compressed = null; // { dataUrl, chars }
+
+        // ── Extracted-pairings review table (staff can fix/add/remove rows) ──
+        function addRow(table, p1, p2) {
+          var tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td><input type="text" class="pa-row-table" inputmode="numeric"></td>' +
+            '<td><input type="text" class="pa-row-p1"></td>' +
+            '<td><input type="text" class="pa-row-p2"></td>' +
+            '<td><button type="button" class="pa-row-del" aria-label="Remove row">×</button></td>';
+          tr.querySelector('.pa-row-table').value = table || '';
+          tr.querySelector('.pa-row-p1').value = p1 || '';
+          tr.querySelector('.pa-row-p2').value = p2 || '';
+          tr.querySelector('.pa-row-del').addEventListener('click', function () { tr.remove(); });
+          $rowsBody.appendChild(tr);
+        }
+
+        $addRow.addEventListener('click', function () {
+          addRow('', '', '');
+          $rowsCard.hidden = false;
+        });
+
+        function collectRows() {
+          var rows = [];
+          $rowsBody.querySelectorAll('tr').forEach(function (tr) {
+            var table = tr.querySelector('.pa-row-table').value.trim();
+            var p1 = tr.querySelector('.pa-row-p1').value.trim();
+            var p2 = tr.querySelector('.pa-row-p2').value.trim();
+            if (!p1 && !p2) return;
+            var tableNum = parseInt(table, 10);
+            rows.push({ table: table && !isNaN(tableNum) ? tableNum : table, p1: p1, p2: p2 });
+          });
+          return rows;
+        }
+
+        // ── OCR: read table/player rows out of the pairings photo ────────
+        // Heuristic, not a general parser — tuned for "Table N  PlayerA  PlayerB"
+        // / "N  PlayerA vs PlayerB" style layouts (e.g. the Pokémon Play app).
+        // Lines that don't match a leading table number are skipped rather than
+        // added as junk rows; staff fill in anything missed via "+ Add row".
+        function cleanCell(s) {
+          return (s || '').replace(/^[\s:.\-|]+|[\s:.\-|]+$/g, '').trim();
+        }
+
+        function parsePairingLines(text) {
+          var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+          var reVs = /^(?:table\s*)?#?\s*(\d{1,3})\D+?(.+?)\s+(?:vs\.?|v\.?)\s+(.+)$/i;
+          var reNum = /^(?:table\s*)?#?\s*(\d{1,3})\s+(.+)$/i;
+          var out = [];
+          lines.forEach(function (line) {
+            var m = line.match(reVs);
+            if (m) { out.push({ table: m[1], p1: cleanCell(m[2]), p2: cleanCell(m[3]) }); return; }
+            m = line.match(reNum);
+            if (!m) return;
+            var parts = m[2].split(/\s{2,}|\t/).filter(Boolean);
+            if (parts.length >= 2) {
+              out.push({ table: m[1], p1: cleanCell(parts[0]), p2: cleanCell(parts.slice(1).join(' ')) });
+            } else {
+              out.push({ table: m[1], p1: cleanCell(m[2]), p2: '' });
+            }
+          });
+          return out;
+        }
+
+        var tessWorkerPromise = null;
+        function loadTesseractWorker() {
+          if (!tessWorkerPromise) {
+            tessWorkerPromise = import(TESS_SRC).then(function (mod) {
+              var Tesseract = mod.default || mod;
+              return Tesseract.createWorker('eng');
+            });
+          }
+          return tessWorkerPromise;
+        }
+
+        function runOcr(img) {
+          $rowsBody.innerHTML = '';
+          $rowsCard.hidden = false;
+          $ocrStatus.textContent = 'Reading pairings from the photo… (~10–20s)';
+          $ocrStatus.className = 'pa-status busy';
+
+          // Independent, higher-res canvas for OCR — the publish copy above is
+          // compressed for Firestore size, which would hurt text recognition.
+          var dim = 2000;
+          var scale = Math.min(2, dim / Math.max(img.width, img.height));
+          var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+
+          loadTesseractWorker().then(function (worker) {
+            return worker.recognize(c);
+          }).then(function (result) {
+            var rows = parsePairingLines((result.data && result.data.text) || '');
+            if (!rows.length) {
+              $ocrStatus.textContent = "Couldn't auto-read any rows — add them manually below, or just publish the photo as-is.";
+              $ocrStatus.className = 'pa-status err';
+            } else {
+              rows.forEach(function (r) { addRow(r.table, r.p1, r.p2); });
+              $ocrStatus.textContent = 'Found ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') +
+                ' — check them before publishing.';
+              $ocrStatus.className = 'pa-status ok';
+            }
+          }).catch(function (err) {
+            $ocrStatus.textContent = 'Auto-read failed (' + (err && err.message ? err.message : 'error') +
+              ') — add rows manually below, or just publish the photo as-is.';
+            $ocrStatus.className = 'pa-status err';
+          });
+        }
 
         // Remember passphrase + event name per device so staff don't retype
         // every round. (Passphrase is validated server-side by the Firestore rule.)
@@ -220,6 +385,9 @@
           compressed = null;
           $preview.hidden = true;
           $meta.hidden = true;
+          $rowsCard.hidden = true;
+          $rowsBody.innerHTML = '';
+          $ocrStatus.textContent = '';
           refreshEnabled();
           if (!file) return;
           setStatus('Processing image…', 'busy');
@@ -235,6 +403,7 @@
             $meta.hidden = false;
             setStatus('');
             refreshEnabled();
+            runOcr(img);
           }).catch(function (err) {
             setStatus(err.message || 'Could not process that image.', 'err');
           });
@@ -275,6 +444,7 @@
               event: eventName,
               round: round,
               img: compressed.dataUrl,
+              pairs: collectRows(),
               pubkey: pass,
               ts: f.serverTimestamp()
             });

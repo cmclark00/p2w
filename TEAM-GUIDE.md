@@ -552,22 +552,34 @@ don't need a GitHub account for this one.
    time), the **event name** (e.g. "Friday Night Pokémon"), and the
    **round number**.
 4. Tap **"Pairings screenshot"** and pick the screenshot (or snap a photo).
-   Wait a second for the preview to appear.
-5. Tap **"Publish to players."** You'll see "Published! Players can see
+   Wait a second for the preview to appear — the page then automatically
+   tries to **read the pairings out of the photo** (takes ~10-20 seconds).
+5. Check the **"Extracted pairings"** table that appears. This is the
+   important step — the auto-read makes mistakes (misspelled names, a wrong
+   table number, a missed row). **Fix any typos, delete junk rows, and add
+   any pairings it missed** (tap **"+ Add row"**) before publishing. If it
+   couldn't read anything at all, that's OK — just publish the photo as-is
+   and players will see the picture instead of a table.
+6. Tap **"Publish to players."** You'll see "Published! Players can see
    Round N now."
 
-That's it. Players who scan the table QR now see that screenshot, and it
-updates within about 25 seconds (or they can tap Refresh). For the next
-round, just repeat — you never delete anything, the newest post always wins.
+That's it. Players who scan the table QR now see the pairings — as a clean,
+searchable table when the auto-read worked, or as the photo if it didn't —
+and it updates within about 25 seconds (or they can tap Refresh). For the
+next round, just repeat — you never delete anything, the newest post always
+wins.
 
 **Tips & gotchas:**
-- **Keep the screenshot readable.** A tight crop of just the pairings looks
-  better zoomed-in than a full, cluttered screen.
+- **Keep the screenshot readable.** A tight crop of just the pairings reads
+  better — both for players zooming an image and for the auto-read step.
+- **Always check the extracted table before publishing.** It's a best-effort
+  reader, not perfect — a quick glance to fix a misread name takes seconds
+  and saves confusion at the tables.
 - **"Rejected — check the passphrase"** means the passphrase was wrong, or
   the image was too big. Re-type the passphrase, or crop the screenshot
   tighter and try again.
-- Players can't search their name in an image — they scan, then pinch/tap to
-  zoom and find their table. That's expected.
+- When the table view shows, players get a **"Find your name"** search box
+  right on the page — no more pinch-zooming a photo to find their table.
 
 ---
 

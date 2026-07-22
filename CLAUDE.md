@@ -239,8 +239,41 @@ the Konami leaderboard (`p2w-leaderboard`).
 
   ```js
   { event:"Friday Night Pokémon", round:3, img:"data:image/webp;base64,…",
+    pairs:[{table:1, p1:"Alice Smith", p2:"Bob Jones"}, …],
     pubkey:"<passphrase>", ts: serverTimestamp() }
   ```
+
+  The existing Firestore rule (below) doesn't restrict the doc to specific
+  fields, so adding `pairs` needed **no rule change** — it was a front-end-only
+  addition.
+
+- **Auto-extracted pairings table (OCR).** `pairings-admin.html` runs
+  **Tesseract.js** (loaded on demand from jsDelivr as an ESM module, same
+  dynamic-`import()` pattern as Firebase — no bundler, no npm dependency) on
+  the selected photo, on a **separate, higher-res canvas** from the
+  Firestore-bound compressed copy (OCR accuracy degrades badly on the heavily
+  compressed publish image). `parsePairingLines` is a **heuristic parser, not
+  a general one** — tuned for "Table N  PlayerA  PlayerB" / "N  PlayerA vs
+  PlayerB" layouts (matches what the Pokémon Play app shows). Lines that don't
+  match a leading table number are silently skipped rather than added as junk
+  rows. Results populate an **editable review table** (`#pa-rows-card`) —
+  staff must eyeball/fix names and table numbers, delete misreads, or add
+  rows the OCR missed (`+ Add row`) before publishing; nothing auto-publishes
+  from OCR alone. `pairs` is sent to Firestore as whatever's in that table at
+  publish time (can be an empty array if OCR found nothing and staff added
+  nothing — in which case the player page just falls back to the photo).
+  **Don't try to make the regex parser "smarter" for every possible
+  screenshot layout** — the editable table is the correctness backstop by
+  design, so a good-enough heuristic + human review beats a fragile
+  do-everything parser.
+- **Player page rendering.** `pairings.html` shows a **styled, searchable
+  table** (`#pr-table-section`) when the newest doc has a non-empty `pairs`
+  array — a "Find your name" input (`#pr-search`) filters rows client-side by
+  substring match on `p1`+`p2`. Falls back to the **original image view**
+  (unchanged tap-to-zoom `#pr-figure`) when `pairs` is empty/absent, so older
+  docs and any round where OCR/staff didn't produce rows still display fine.
+  The source photo is never discarded even in table mode — a "View original
+  photo" link (`#pr-photo-toggle`) opens the same zoom overlay from `doc.img`.
 
 - **Image handling:** the pairings screenshot is stored **inline as a compressed
   base64 data URL** (no Firebase Storage). `pairings-admin.html` downscales to

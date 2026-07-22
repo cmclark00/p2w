@@ -38,6 +38,30 @@
       .pr-figure img { width: 100%; height: auto; display: block; }
       .pr-hint { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
 
+      .pr-search-wrap { margin: 0 0 12px; }
+      .pr-search-wrap input {
+        width: 100%; padding: 11px 14px; font-size: 1rem;
+        color: var(--paper); background: var(--surface-2);
+        border: 1px solid var(--line); border-radius: 10px;
+      }
+      .pr-search-wrap input:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+      .pr-table-wrap {
+        overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+      }
+      .pr-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+      .pr-table th {
+        text-align: left; font: 700 0.72rem var(--font-display); letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--muted); padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .pr-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .pr-table tr:last-child td { border-bottom: none; }
+      .pr-table-num { font-weight: 700; color: var(--gold); white-space: nowrap; }
+      .pr-photo-link {
+        background: none; border: none; color: var(--gold); font-weight: 700;
+        font-size: 0.85rem; cursor: pointer; padding: 0; text-decoration: underline;
+      }
+
       /* Tap-to-zoom fullscreen overlay */
       .pr-zoom {
         position: fixed; inset: 0; background: rgba(0,0,0,0.94);
@@ -88,10 +112,25 @@
             <div class="pr-round" id="pr-round"></div>
             <div class="pr-updated" id="pr-updated"></div>
           </div>
+          <div id="pr-table-section" hidden>
+            <div class="pr-search-wrap">
+              <input type="search" id="pr-search" placeholder="Find your name…" aria-label="Find your name">
+            </div>
+            <div class="pr-table-wrap">
+              <table class="pr-table">
+                <thead><tr><th>Table</th><th>Player 1</th><th>Player 2</th></tr></thead>
+                <tbody id="pr-table-body"></tbody>
+              </table>
+            </div>
+          </div>
           <figure class="pr-figure" id="pr-figure">
             <img id="pr-img" alt="Current round pairings">
           </figure>
-          <p class="pr-hint">Tap the image to zoom · this page refreshes automatically</p>
+          <p class="pr-hint" id="pr-hint-image">Tap the image to zoom · this page refreshes automatically</p>
+          <p class="pr-hint" id="pr-hint-table" hidden>
+            <button type="button" class="pr-photo-link" id="pr-photo-toggle">View original photo</button>
+            · this page refreshes automatically
+          </p>
         </div>
       </div>
     </main>
@@ -123,8 +162,46 @@
         var $zoom = document.getElementById('pr-zoom');
         var $zoomImg = document.getElementById('pr-zoom-img');
         var $refresh = document.getElementById('pr-refresh');
+        var $tableSection = document.getElementById('pr-table-section');
+        var $tableBody = document.getElementById('pr-table-body');
+        var $search = document.getElementById('pr-search');
+        var $hintImage = document.getElementById('pr-hint-image');
+        var $hintTable = document.getElementById('pr-hint-table');
+        var $photoToggle = document.getElementById('pr-photo-toggle');
 
         var lastId = null; // avoid re-rendering (and image flicker) when unchanged
+
+        function esc(s) {
+          return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
+        }
+
+        function renderRows(pairs) {
+          $tableBody.innerHTML = '';
+          pairs.forEach(function (p) {
+            var tr = document.createElement('tr');
+            tr.dataset.names = ((p.p1 || '') + ' ' + (p.p2 || '')).toLowerCase();
+            tr.innerHTML =
+              '<td class="pr-table-num">' + (p.table ? 'Table ' + esc(p.table) : '') + '</td>' +
+              '<td>' + esc(p.p1) + '</td><td>' + esc(p.p2) + '</td>';
+            $tableBody.appendChild(tr);
+          });
+        }
+
+        $search.addEventListener('input', function () {
+          var q = $search.value.trim().toLowerCase();
+          $tableBody.querySelectorAll('tr').forEach(function (tr) {
+            tr.hidden = !!q && tr.dataset.names.indexOf(q) === -1;
+          });
+        });
+
+        $photoToggle.addEventListener('click', function () {
+          if (!$img.src) return;
+          $zoomImg.src = $img.src;
+          $zoom.classList.add('open');
+          $zoom.setAttribute('aria-hidden', 'false');
+        });
 
         function timeAgo(date) {
           if (!date) return '';
@@ -153,6 +230,17 @@
           $round.textContent = doc.round ? 'Round ' + doc.round : '';
           var when = doc.ts && doc.ts.toDate ? doc.ts.toDate() : null;
           $updated.textContent = when ? 'Updated ' + timeAgo(when) : '';
+
+          var hasPairs = doc.pairs && doc.pairs.length;
+          if (hasPairs) {
+            $search.value = '';
+            renderRows(doc.pairs);
+          }
+          $tableSection.hidden = !hasPairs;
+          $figure.hidden = hasPairs;
+          $hintTable.hidden = !hasPairs;
+          $hintImage.hidden = hasPairs;
+
           show($content);
         }
 
