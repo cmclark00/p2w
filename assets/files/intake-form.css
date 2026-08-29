@@ -407,6 +407,15 @@
   line-height: 1.55;
 }
 
+.ptw-privacy-note {
+  font-size: 0.75rem;
+  color: var(--ptw-text-hint);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.ptw-privacy-note a { color: var(--ptw-text-muted); }
+
 /* ---- Success / Error ───────────────────────────────────────────────── */
 .ptw-success,
 .ptw-error {

@@ -7,8 +7,6 @@
    show inline success/error instead of navigating.
    ============================================ */
 
-const CAREERS_FORMSPREE_ENDPOINT = 'https://formspree.io/f/mvzyvwzb';
-
 function initCareersForm() {
   const form = document.getElementById('ptw-careers-form');
   const submitBtn = document.getElementById('ptw-careers-submit');
@@ -38,9 +36,10 @@ function initCareersForm() {
     const originalText = submitBtn.textContent;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending...';
+    form.setAttribute('aria-busy', 'true');
 
     try {
-      const response = await fetch(CAREERS_FORMSPREE_ENDPOINT, {
+      const response = await fetch(form.action, {
         method: 'POST',
         body: new FormData(form),
         headers: { Accept: 'application/json' }
@@ -66,6 +65,7 @@ function initCareersForm() {
       errorEl.style.display = 'block';
       errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } finally {
+      form.removeAttribute('aria-busy');
       submitBtn.disabled = false;
       submitBtn.textContent = originalText;
     }

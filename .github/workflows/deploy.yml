@@ -66,6 +66,8 @@ jobs:
             --exclude='*.md' \
             --exclude='team-guide-print.html' \
             --exclude='WEBSITE-AGREEMENT.md' \
+            --exclude='assets/files/index.html' \
+            --exclude='assets/files/ptw-intake-form.zip' \
             ./ _site/
           echo "Files staged for upload:"; find _site -type f | wc -l
 

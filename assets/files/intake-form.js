@@ -2,13 +2,10 @@
    Play2Win Games — Handheld Upgrades Form
    intake-form.js
    ============================================
-   Configuration:
-     Set FORMSPREE_ENDPOINT below to your
-     Formspree form URL after signing up at
-     https://formspree.io
+   The Formspree destination comes from the form's
+   action attribute so the HTML remains the single
+   source of truth and still works without JavaScript.
    ============================================ */
-
-const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xaqvrbjn';
 
 /* ------ Device & upgrade data ------ */
 
@@ -230,6 +227,13 @@ function initConditionBtns() {
 async function handleSubmit(e) {
   e.preventDefault();
 
+  const form = e.currentTarget;
+
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
   const authCheck = document.getElementById('ptw-auth-check');
   if (!authCheck || !authCheck.checked) {
     showError('Please check the authorization box before submitting.');
@@ -241,6 +245,7 @@ async function handleSubmit(e) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting…';
   }
+  form.setAttribute('aria-busy', 'true');
 
   hideMessages();
 
@@ -250,7 +255,6 @@ async function handleSubmit(e) {
   ).map(cb => cb.value);
 
   /* Build form data */
-  const form = document.getElementById('ptw-intake-form');
   const data = new FormData(form);
 
   /* Replace the raw checkbox entries with a clean comma-separated list */
@@ -258,7 +262,7 @@ async function handleSubmit(e) {
   data.append('upgrades', checkedUpgrades.length ? checkedUpgrades.join(', ') : 'None selected');
 
   try {
-    const res = await fetch(FORMSPREE_ENDPOINT, {
+    const res = await fetch(form.action, {
       method: 'POST',
       body: data,
       headers: { Accept: 'application/json' }
@@ -279,6 +283,7 @@ async function handleSubmit(e) {
   } catch {
     showError('Could not send the form. Please check your connection and try again.');
   } finally {
+    form.removeAttribute('aria-busy');
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Submit intake form';

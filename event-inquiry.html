@@ -4,8 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#111217">
-    <link rel="preconnect" href="https://playtowingames.crystalcommerce.com">
-    <link rel="dns-prefetch" href="https://playtowingames.crystalcommerce.com">
     <meta name="description" content="Host an event at Play2Win Games in Knoxville, TN. Tournaments, release parties, private gatherings, charity drives, and more. Submit an event inquiry.">
     <title>Event Inquiry | Play2Win Games</title>
     <link rel="stylesheet" href="styles.css">
@@ -287,18 +285,19 @@
                 Submitting this form starts the conversation &mdash; it does not automatically reserve the date or event space. A Play2Win Games team member will follow up to confirm availability, expectations, event details, and any pricing or product needs.
               </div>
               <label class="ptw-auth-check">
-                <input type="checkbox" id="event-acknowledgement" required>
+                <input type="checkbox" id="event-acknowledgement" name="event_acknowledgement" value="Agreed" required>
                 I understand Play2Win Games will contact me before the event is confirmed.
               </label>
               <button type="submit" class="ptw-submit-btn" id="ptw-event-submit">Submit event inquiry</button>
-              <p class="ptw-submit-note">Prefer to talk it through? Call <a href="tel:+186****8357">865-910-8357</a> or message us on Facebook.</p>
+              <p class="ptw-submit-note">Prefer to talk it through? Call <a href="tel:+18659108357">865-910-8357</a> or message us on Facebook.</p>
+              <p class="ptw-privacy-note">See our <a href="privacy.html">Privacy Policy</a> for how we handle submitted information.</p>
             </div>
 
-            <div class="ptw-success" id="ptw-event-success">
+            <div class="ptw-success" id="ptw-event-success" role="status" aria-live="polite" aria-atomic="true">
               <strong>Inquiry sent!</strong>
               Thanks! A Play2Win Games team member will follow up to talk through space, timing, and event details.
             </div>
-            <div class="ptw-error" id="ptw-event-error">
+            <div class="ptw-error" id="ptw-event-error" role="alert" aria-live="assertive" aria-atomic="true">
               <strong>Something went wrong.</strong>
               <span id="ptw-event-error-body">Please try again or give us a call at (865) 910-8357.</span>
             </div>

@@ -2,12 +2,9 @@
    Play2Win Games — Event Inquiry Form
    event-inquiry.js
    ============================================
-   Uses the same Formspree endpoint pattern as the
-   handheld upgrade request form. Replace this URL
-   with a dedicated Formspree form if desired.
+   Uses the form's action attribute as the Formspree
+   destination so HTML remains the single source of truth.
    ============================================ */
-
-const EVENT_FORMSPREE_ENDPOINT = 'https://formspree.io/f/xjglnaew';
 
 function initEventInquiryForm() {
   const form = document.getElementById('ptw-event-form');
@@ -38,9 +35,10 @@ function initEventInquiryForm() {
     const originalText = submitBtn.textContent;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending...';
+    form.setAttribute('aria-busy', 'true');
 
     try {
-      const response = await fetch(EVENT_FORMSPREE_ENDPOINT, {
+      const response = await fetch(form.action, {
         method: 'POST',
         body: new FormData(form),
         headers: { Accept: 'application/json' }
@@ -65,6 +63,7 @@ function initEventInquiryForm() {
       errorEl.style.display = 'block';
       errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } finally {
+      form.removeAttribute('aria-busy');
       submitBtn.disabled = false;
       submitBtn.textContent = originalText;
     }

@@ -4,8 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#111217">
-    <link rel="preconnect" href="https://playtowingames.crystalcommerce.com">
-    <link rel="dns-prefetch" href="https://playtowingames.crystalcommerce.com">
     <meta name="description" content="Submit a handheld upgrade request at Play2Win Games in Knoxville, TN. IPS screens, shell swaps, button upgrades, and custom builds.">
     <title>Upgrade Request | Play2Win Games</title>
     <link rel="stylesheet" href="styles.css">
@@ -87,7 +85,7 @@
 
       <section class="upgrade-form-section">
         <div class="ptw-form-page">
-          <form class="ptw-form-card" id="ptw-intake-form" novalidate>
+          <form class="ptw-form-card" id="ptw-intake-form" action="https://formspree.io/f/xaqvrbjn" method="POST">
             <input type="text" name="_gotcha" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true">
 
             <!-- ── Customer Info ── -->
@@ -252,19 +250,20 @@
                 All work is subject to parts availability &mdash; a team member will contact you before any work begins.
               </div>
               <label class="ptw-auth-check">
-                <input type="checkbox" id="ptw-auth-check" />
+                <input type="checkbox" id="ptw-auth-check" name="authorization_acknowledgement" value="Agreed" required>
                 I understand and agree to the above
               </label>
               <button type="submit" class="ptw-submit-btn" id="ptw-submit-btn">Submit intake form</button>
               <p class="ptw-submit-note">A team member will contact you to confirm parts availability and pricing before any work begins.</p>
+              <p class="ptw-privacy-note">See our <a href="privacy.html">Privacy Policy</a> for how we handle submitted information.</p>
             </div>
 
             <!-- Success / Error feedback -->
-            <div class="ptw-success" id="ptw-success">
+            <div class="ptw-success" id="ptw-success" role="status" aria-live="polite" aria-atomic="true">
               <strong>Form submitted!</strong>
               Thanks! The team will follow up to confirm parts availability and pricing.
             </div>
-            <div class="ptw-error" id="ptw-error">
+            <div class="ptw-error" id="ptw-error" role="alert" aria-live="assertive" aria-atomic="true">
               <strong>Something went wrong.</strong>
               <span class="ptw-error-body">Please try again or give us a call at (865) 910-8357.</span>
             </div>

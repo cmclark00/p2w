@@ -78,7 +78,7 @@ These are independent of GitHub and owned by Corey's accounts today:
 |---|---|---|
 | Google Calendar + service account | `sync-events.yml` → `events.json` | 🔑 Reissue a service account under the **shop's** Google account, share the shop calendar to it, reset repo secrets `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_CALENDAR_ID`. |
 | Firebase (`p2w-leaderboard`) | Konami leaderboard **+ tournament pairings** | 🔑 Add shop's Google account as Owner on the Firebase project, remove Corey's. Config in `konami.js` (and inlined on `pairings.html`/`pairings-admin.html`) is public by design — no code change. Keep the locked `scores` Firestore rules **and** the `pairings` create-only rule (which holds the pairings passphrase — see **Tournament pairings**). |
-| Formspree (`xaqvrbjn`, `xjglnaew`, `mvzyvwzb`) | Upgrade, event-inquiry, careers forms | 🔑 Recreate all three forms under the shop's Formspree account → **new endpoint IDs** → update them in `assets/files/intake-form.js`, `event-inquiry.html`, and `careers.html`. Routing: upgrade → `repairs@`; event → `inquiries@`; careers → `careers@`. |
+| Formspree (`xaqvrbjn`, `xjglnaew`, `mvzyvwzb`) | Upgrade, event-inquiry, careers forms | Careers endpoint `mvzyvwzb` was confirmed under the shop's `admin@play2wingames.com` account on Aug. 28, 2026. Verify ownership/routing of the other two endpoints during handoff. Endpoint IDs live in each form's HTML `action` attribute. |
 | Domain `play2wingames.com` | — | 🔑 Confirm it's in the shop's GoDaddy account. |
 
 ### Phase 3 — Hosting cutover (Pages → GoDaddy)
@@ -192,10 +192,10 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `upgrades.html` | Handheld upgrade before/after showcase **+ Upgrade Pricing section** (GB family / GBA SP / DS Lite / add-ons) **+ interactive cost estimator** (`.upgrade-calc`, inline JS — ranges mirror the pricing table on the same page); CTA → upgrade-request. (Renamed from `mods.html` — old URL is a redirect file.) |
 | `mods.html` | Redirect → `upgrades.html` (kept for old links). |
 | `upgrade-request.html` | Handheld upgrade intake form. Uses `assets/files/intake-form.css` + `intake-form.js` (Formspree `xaqvrbjn`). |
-| `team.html` | Owners + managers. Names filled; **bios & photos still placeholders.** |
+| `team.html` | Owners + managers with staff photos and bios. |
 | `faq.html` | 2-column accordion FAQ + `FAQPage` JSON-LD. |
 | `contact.html` | Store info (phone, email, Facebook, Discord), hours, **click-to-load** Google Map. |
-| `careers.html` | Application page for shop hires. Formspree form (endpoint `mvzyvwzb`, lands in `careers@play2wingames.com`) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
+| `careers.html` | Application page for shop hires. Formspree form (endpoint `mvzyvwzb`, owned by the shop's `admin@play2wingames.com` account) + separate "Email your resume" mailto button (Formspree free tier doesn't accept attachments). Linked from every page's footer. Uses `assets/files/intake-form.css` styling. |
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
@@ -217,8 +217,8 @@ hand-edit `events.json`.
 
 ```js
 { id, title, game, gameLabel, date:"YYYY-MM-DD", time:"H:MM AM/PM",
-  time24:"HH:MM", entry:"$X.XX"|"Free"|"TBA", format, capacity, registered,
-  registerUrl, facebookUrl, recurring, prizing, description }
+  time24:"HH:MM", startISO, endISO, entry:"$X.XX"|"Free"|"TBA", format,
+  capacity, registered, registerUrl, facebookUrl, recurring, prizing, description }
 ```
 
 Calendar descriptions may be HTML (Google's web editor wraps lines in
@@ -475,12 +475,14 @@ the Konami leaderboard (`p2w-leaderboard`).
 ## Forms
 
 Three via **Formspree** (endpoints are public client-side by design):
-- Upgrade request: `assets/files/intake-form.js` →
-  `FORMSPREE_ENDPOINT = formspree.io/f/xaqvrbjn` (→ `repairs@`).
-- Event inquiry: inline form in `event-inquiry.html` →
+- Upgrade request: form action in `upgrade-request.html` →
+  `formspree.io/f/xaqvrbjn` (→ `repairs@`).
+- Event inquiry: form action in `event-inquiry.html` →
   `formspree.io/f/xjglnaew` (→ `inquiries@`).
-- Careers application: inline form in `careers.html` →
-  `formspree.io/f/mvzyvwzb` (→ `careers@`, separate inbox).
+- Careers application: form action in `careers.html` →
+  `formspree.io/f/mvzyvwzb` (confirmed in the shop's `admin@` account).
+- The JavaScript submit handlers read `form.action`; do not duplicate endpoint
+  constants in JavaScript.
 - Form styling: `assets/files/intake-form.css` (dark theme, scoped to
   `.ptw-form-page` / `.ptw-form-card`).
 

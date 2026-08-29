@@ -2,15 +2,31 @@
   var toggle = document.querySelector('.nav-toggle');
   var nav = document.querySelector('.nav');
   if (toggle && nav) {
-    toggle.addEventListener('click', function () {
-      var open = nav.classList.toggle('nav-open');
+    if (!nav.id) nav.id = 'main-navigation';
+    toggle.setAttribute('aria-controls', nav.id);
+
+    function setNavOpen(open, returnFocus) {
+      nav.classList.toggle('nav-open', open);
       toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+      if (!open && returnFocus) toggle.focus();
+    }
+
+    setNavOpen(false, false);
+
+    toggle.addEventListener('click', function () {
+      setNavOpen(!nav.classList.contains('nav-open'), false);
     });
 
     nav.addEventListener('click', function (e) {
       if (e.target.tagName === 'A') {
-        nav.classList.remove('nav-open');
-        toggle.setAttribute('aria-expanded', 'false');
+        setNavOpen(false, false);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && nav.classList.contains('nav-open')) {
+        setNavOpen(false, true);
       }
     });
   }

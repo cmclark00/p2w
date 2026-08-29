@@ -3121,12 +3121,18 @@ h3 {
   padding: 0;
   position: relative;
   overflow: hidden;
-  cursor: pointer;
   border-radius: 3px;
   border: 2px solid transparent;
   background:
     linear-gradient(var(--surface-2), var(--surface-2)) padding-box,
     linear-gradient(135deg, var(--red), var(--gold)) border-box;
+}
+
+.showcase-card[role="button"] { cursor: zoom-in; }
+
+.showcase-card[role="button"]:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .showcase-card::after {

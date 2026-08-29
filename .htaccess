@@ -12,14 +12,28 @@ RewriteCond %{HTTP:X-Forwarded-SSL} !on
 RewriteCond %{HTTP_HOST} ^play2wingames\.com$ [NC]
 RewriteRule ^(.*)$ https://play2wingames.com/$1 [R=301,L]
 
-# HTML must revalidate on every load ("no-cache" still allows ETag/304, so
-# unchanged pages stay cheap). Without this Apache sends no Cache-Control
-# and browsers heuristic-cache HTML — which repeatedly served stale JS on
-# pairings-admin.html mid-tournament (inline scripts ride inside the HTML)
-# and can leave players' phones on an outdated pairings.html. Push-to-deploy
-# means a page is only stale until its next request — keep it that way.
+# Server-side redirects for retired page names (the HTML files keep their
+# meta-refresh fallback in case the site is previewed without Apache).
+RewriteRule ^mods\.html$ /upgrades.html [R=301,L]
+RewriteRule ^showcase\.html$ /sell-trade.html#showcase [NE,R=301,L]
+
+# Serve the branded error page for unknown URLs.
+ErrorDocument 404 /404.html
+
+<IfModule mod_mime.c>
+  AddType image/avif .avif
+</IfModule>
+
+# Site code and event data must revalidate on every load ("no-cache" still
+# allows ETag/304, so unchanged files stay cheap). This prevents old HTML,
+# JavaScript, CSS, or events.json from lingering after a deploy, including
+# inline pairings code and the external form/navigation scripts.
 <IfModule mod_headers.c>
-  <FilesMatch "\.html$">
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  <FilesMatch "\.(?:html|css|js|json)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>

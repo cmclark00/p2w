@@ -1,0 +1,25 @@
+name: Site checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Check HTML links, forms, and event data
+        run: python .github/scripts/check_site.py
+      - name: Check JavaScript syntax
+        run: node .github/scripts/check_javascript.mjs

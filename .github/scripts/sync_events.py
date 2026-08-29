@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -23,6 +24,51 @@ GAME_PATTERNS = [
     (r"smash", "smash", "Super Smash Bros."),
     (r"riftbound", "riftbound", "Riftbound"),
 ]
+
+ALLOWED_GAMES = {
+    "pokemon", "magic", "yugioh", "lorcana", "digimon", "gundam",
+    "smash", "riftbound", "other",
+}
+CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def clean_text(value, default="", max_length=2000):
+    """Return bounded display text without browser-hostile control chars."""
+    if value is None:
+        return default
+    text = CONTROL_CHARS.sub("", str(value)).strip()
+    return text[:max_length] or default
+
+
+def safe_http_url(value):
+    """Keep only absolute HTTP(S) links supplied in calendar metadata."""
+    if not value:
+        return None
+    url = clean_text(value, max_length=2000)
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        return None
+    return url
+
+
+def nonnegative_int(value):
+    """Normalize optional capacity fields to safe, bounded integers."""
+    if value in (None, ""):
+        return None
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return None
+    return result if 0 <= result <= 100000 else None
+
+
+def boundary_iso(boundary):
+    """Preserve Google's timezone-aware start/end value for JSON-LD and ICS."""
+    if not isinstance(boundary, dict):
+        return None
+    if boundary.get("dateTime"):
+        return datetime.fromisoformat(boundary["dateTime"]).isoformat()
+    return boundary.get("date") or None
 
 
 def detect_game(title: str):
@@ -87,10 +133,12 @@ def format_time_12h(dt: datetime) -> str:
 
 
 def process_event(item: dict, idx: int) -> dict:
-    title = item.get("summary", "Untitled Event")
-    description, meta = parse_description(item.get("description", ""))
+    title = clean_text(item.get("summary"), "Untitled Event", 180)
+    description, meta = parse_description(str(item.get("description") or ""))
+    description = clean_text(description, title, 5000)
 
     start = item["start"]
+    end = item.get("end") or {}
     if "dateTime" in start:
         dt = datetime.fromisoformat(start["dateTime"])
         date_str = dt.strftime("%Y-%m-%d")
@@ -103,9 +151,10 @@ def process_event(item: dict, idx: int) -> dict:
 
     game, game_label = detect_game(title)
     if "game" in meta:
-        game = str(meta["game"])
+        requested_game = clean_text(meta["game"], max_length=40).lower()
+        game = requested_game if requested_game in ALLOWED_GAMES else "other"
     if "gameLabel" in meta:
-        game_label = str(meta["gameLabel"])
+        game_label = clean_text(meta["gameLabel"], "Other", 80)
 
     return {
         "id": idx + 1,
@@ -115,15 +164,17 @@ def process_event(item: dict, idx: int) -> dict:
         "date": date_str,
         "time": time_str,
         "time24": time24_str,
-        "entry": str(meta.get("entry", "TBA")),
-        "format": str(meta.get("format", "See description")),
-        "capacity": meta.get("capacity") or None,
-        "registered": meta.get("registered") or None,
-        "registerUrl": meta.get("registerUrl") or None,
-        "facebookUrl": meta.get("facebookUrl") or None,
-        "recurring": meta.get("recurring") or None,
-        "prizing": str(meta["prizing"]) if meta.get("prizing") else None,
-        "description": description or title,
+        "startISO": boundary_iso(start),
+        "endISO": boundary_iso(end),
+        "entry": clean_text(meta.get("entry"), "TBA", 80),
+        "format": clean_text(meta.get("format"), "See description", 160),
+        "capacity": nonnegative_int(meta.get("capacity")),
+        "registered": nonnegative_int(meta.get("registered")),
+        "registerUrl": safe_http_url(meta.get("registerUrl")),
+        "facebookUrl": safe_http_url(meta.get("facebookUrl")),
+        "recurring": clean_text(meta.get("recurring"), max_length=160) or None,
+        "prizing": clean_text(meta.get("prizing"), max_length=300) or None,
+        "description": description,
     }
 
 

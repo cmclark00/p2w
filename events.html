@@ -4,8 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#111217">
-    <link rel="preconnect" href="https://playtowingames.crystalcommerce.com">
-    <link rel="dns-prefetch" href="https://playtowingames.crystalcommerce.com">
     <meta name="description" content="Upcoming tournaments, league nights, and community events at Play2Win Games in Knoxville, TN.">
     <title>Events | Play2Win Games</title>
     <link rel="stylesheet" href="styles.css">
@@ -149,6 +147,33 @@
       let EVENTS = [];
 
       // ─── Utilities ──────────────────────────────────────────────────────────────
+      const ALLOWED_GAMES = new Set([
+        "pokemon", "magic", "yugioh", "lorcana", "digimon", "gundam",
+        "smash", "riftbound", "other"
+      ]);
+      const DEFAULT_INFO_URL = "https://www.facebook.com/P2WGames/";
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char]);
+      }
+
+      function safeHttpUrl(value, fallback = "") {
+        if (!value) return fallback;
+        try {
+          const url = new URL(String(value), window.location.href);
+          return url.protocol === "https:" || url.protocol === "http:" ? url.href : fallback;
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function safeGame(value) {
+        const game = String(value || "other").toLowerCase();
+        return ALLOWED_GAMES.has(game) ? game : "other";
+      }
+
       function daysUntil(dateStr) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -171,9 +196,12 @@
       }
 
       function spotsHtml(capacity, registered) {
-        if (!capacity) return "";
-        const remaining = capacity - registered;
-        const pct = Math.round((registered / capacity) * 100);
+        capacity = Math.trunc(Number(capacity));
+        registered = Math.trunc(Number(registered)) || 0;
+        if (!Number.isFinite(capacity) || capacity <= 0) return "";
+        registered = Math.min(capacity, Math.max(0, registered));
+        const remaining = Math.max(0, capacity - registered);
+        const pct = Math.max(0, Math.min(100, Math.round((registered / capacity) * 100)));
         const cls = remaining === 0 ? "full" : remaining <= 5 ? "limited" : "open";
         const label = remaining === 0 ? "Event full" : `${remaining} of ${capacity} spots open`;
         return `
@@ -185,46 +213,95 @@
           </div>`;
       }
 
-      function downloadICS(ev) {
-        const d = ev.date.replace(/-/g, "");
-        const [h, m] = ev.time24.split(":").map(Number);
+      function icsEscape(value) {
+        return String(value ?? "")
+          .replace(/\\/g, "\\\\")
+          .replace(/\r?\n/g, "\\n")
+          .replace(/;/g, "\\;")
+          .replace(/,/g, "\\,");
+      }
+
+      function compactLocalDateTime(value, fallbackDate, fallbackTime) {
+        const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+        if (match) return `${match[1]}${match[2]}${match[3]}T${match[4]}${match[5]}00`;
+        return `${String(fallbackDate || "").replace(/-/g, "")}T${String(fallbackTime || "00:00").replace(":", "")}00`;
+      }
+
+      function addTwoHours(dateStr, timeStr) {
+        const [year, month, day] = String(dateStr).split("-").map(Number);
+        const [hour, minute] = String(timeStr || "00:00").split(":").map(Number);
+        const end = new Date(Date.UTC(year, month - 1, day, hour + 2, minute));
         const pad = n => String(n).padStart(2, "0");
-        const dtStart = `${d}T${pad(h)}${pad(m)}00`;
-        const dtEnd   = `${d}T${pad(h + 2)}${pad(m)}00`;
-        const uid     = `p2w-event-${ev.id}-${d}@play2wingames`;
+        return `${end.getUTCFullYear()}${pad(end.getUTCMonth() + 1)}${pad(end.getUTCDate())}T${pad(end.getUTCHours())}${pad(end.getUTCMinutes())}00`;
+      }
+
+      function nextDate(dateStr) {
+        const [year, month, day] = String(dateStr).split("-").map(Number);
+        const next = new Date(Date.UTC(year, month - 1, day + 1));
+        const pad = n => String(n).padStart(2, "0");
+        return `${next.getUTCFullYear()}${pad(next.getUTCMonth() + 1)}${pad(next.getUTCDate())}`;
+      }
+
+      function downloadICS(ev) {
+        const d = String(ev.date || "").replace(/-/g, "");
+        const uid = `p2w-event-${Number(ev.id) || d}-${d}@play2wingames.com`;
+        const allDay = ev.time === "TBA" || !/^\d{2}:\d{2}$/.test(String(ev.time24 || ""));
+        const startLine = allDay
+          ? `DTSTART;VALUE=DATE:${d}`
+          : `DTSTART;TZID=America/New_York:${compactLocalDateTime(ev.startISO, ev.date, ev.time24)}`;
+        const endLine = allDay
+          ? `DTEND;VALUE=DATE:${/^\d{4}-\d{2}-\d{2}$/.test(String(ev.endISO || "")) ? ev.endISO.replace(/-/g, "") : nextDate(ev.date)}`
+          : `DTEND;TZID=America/New_York:${ev.endISO ? compactLocalDateTime(ev.endISO, ev.date, ev.time24) : addTwoHours(ev.date, ev.time24)}`;
+        const infoUrl = safeHttpUrl(ev.registerUrl, DEFAULT_INFO_URL);
         const ics = [
-          "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Play2Win Games//Events//EN",
+          "BEGIN:VCALENDAR", "VERSION:2.0", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+          "PRODID:-//Play2Win Games//Events//EN",
           "BEGIN:VEVENT",
-          `UID:${uid}`,
-          `DTSTART:${dtStart}`,
-          `DTEND:${dtEnd}`,
-          `SUMMARY:${ev.title} @ Play2Win Games`,
+          `UID:${icsEscape(uid)}`,
+          startLine,
+          endLine,
+          `SUMMARY:${icsEscape(ev.title)} @ Play2Win Games`,
           "LOCATION:Play2Win Games\\, 3903 Western Avenue\\, Knoxville\\, TN 37921",
-          `DESCRIPTION:${ev.description.replace(/\n/g, "\\n")}`,
-          `URL:${ev.registerUrl || "https://www.facebook.com/P2WGames/"}`,
+          `DESCRIPTION:${icsEscape(ev.description)}`,
+          `URL:${icsEscape(infoUrl)}`,
           "END:VEVENT", "END:VCALENDAR"
         ].join("\r\n");
         const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
         const url  = URL.createObjectURL(blob);
-        const a    = Object.assign(document.createElement("a"), {
-          href: url, download: `${ev.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ics`
+        const safeName = String(ev.title || "play2win-event").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "play2win-event";
+        const a = Object.assign(document.createElement("a"), {
+          href: url, download: `${safeName}.ics`
         });
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
       // ─── Card template ──────────────────────────────────────────────────────────
       function renderCard(ev) {
         const days   = daysUntil(ev.date);
         const isPast = days < 0;
-        const hasFee = ev.entry !== "TBA" && ev.entry !== "Free";
+        const game = safeGame(ev.game);
+        const title = escapeHtml(ev.title || "Untitled Event");
+        const gameLabel = escapeHtml(ev.gameLabel || "Other");
+        const time = escapeHtml(ev.time || "TBA");
+        const format = escapeHtml(ev.format || "See description");
+        const entry = String(ev.entry || "TBA");
+        const entryLabel = entry === "Free" ? "Free entry" : entry === "TBA"
+          ? "Entry fee TBA — check Facebook" : `${escapeHtml(entry)} entry fee`;
+        const description = escapeHtml(ev.description || ev.title || "");
+        const prizing = ev.prizing ? escapeHtml(ev.prizing) : "";
+        const recurring = ev.recurring ? escapeHtml(ev.recurring) : "";
+        const registerUrl = safeHttpUrl(ev.registerUrl);
+        const moreInfoUrl = safeHttpUrl(ev.facebookUrl, DEFAULT_INFO_URL);
         return `
-          <article class="event-card${isPast ? " past" : ""}" data-game="${ev.game}">
+          <article class="event-card${isPast ? " past" : ""}" data-game="${game}">
             <div class="event-card-top">
-              <span class="event-badge" data-game="${ev.game}">${ev.gameLabel}</span>
+              <span class="event-badge" data-game="${game}">${gameLabel}</span>
               ${daysPill(days)}
             </div>
-            <h3 class="event-card-title">${ev.title}</h3>
+            <h3 class="event-card-title">${title}</h3>
             <ul class="event-meta">
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -232,35 +309,35 @@
               </li>
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                <span>${ev.time} EDT</span>
+                <span>${time} ET</span>
               </li>
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-                <span>${ev.format}</span>
+                <span>${format}</span>
               </li>
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7" stroke-linecap="round" stroke-width="3"/></svg>
-                <span>${ev.entry === "Free" ? "Free entry" : ev.entry === "TBA" ? "Entry fee TBA — check Facebook" : ev.entry + " entry fee"}</span>
+                <span>${entryLabel}</span>
               </li>
-              ${ev.prizing ? `
+              ${prizing ? `
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-                <span>${ev.prizing}</span>
+                <span>${prizing}</span>
               </li>` : ""}
-              ${ev.recurring ? `
+              ${recurring ? `
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-                <span>${ev.recurring}</span>
+                <span>${recurring}</span>
               </li>` : ""}
             </ul>
-            <p class="event-desc">${ev.description}</p>
+            <p class="event-desc">${description}</p>
             ${spotsHtml(ev.capacity, ev.registered)}
             <div class="event-card-footer">
-              ${ev.registerUrl
-                ? `<a class="button primary event-btn" href="${ev.registerUrl}" target="_blank" rel="noopener">Register Now</a>`
-                : `<a class="button secondary event-btn" href="${ev.facebookUrl || "https://www.facebook.com/P2WGames/"}" target="_blank" rel="noopener">More Info</a>`
+              ${registerUrl
+                ? `<a class="button primary event-btn" href="${escapeHtml(registerUrl)}" target="_blank" rel="noopener">Register Now</a>`
+                : `<a class="button secondary event-btn" href="${escapeHtml(moreInfoUrl)}" target="_blank" rel="noopener">More Info</a>`
               }
-              ${!isPast ? `<button class="cal-btn" data-id="${ev.id}" aria-label="Add ${ev.title} to calendar">
+              ${!isPast ? `<button class="cal-btn" data-id="${Number(ev.id) || 0}" aria-label="Add ${title} to calendar">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
                 Add to Calendar
               </button>` : ""}
@@ -277,7 +354,7 @@
         const list = EVENTS
           .filter(ev => {
             const days = daysUntil(ev.date);
-            return days >= 0 && days <= 7 && (activeFilter === "all" || ev.game === activeFilter);
+            return days >= 0 && days <= 7 && (activeFilter === "all" || safeGame(ev.game) === activeFilter);
           })
           .sort((a, b) => new Date(a.date) - new Date(b.date));
         grid.innerHTML = list.map(renderCard).join("");
@@ -305,15 +382,15 @@
         const upcoming = events.filter(ev => daysUntil(ev.date) >= 0);
         if (!upcoming.length) return;
         const schema = upcoming.map(ev => {
-          const [h, m] = ev.time24.split(":").map(Number);
-          const startISO = `${ev.date}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00-04:00`;
-          const endISO   = `${ev.date}T${String(h+2).padStart(2,"0")}:${String(m).padStart(2,"0")}:00-04:00`;
+          const startISO = ev.startISO || `${ev.date}T${ev.time24 || "00:00"}:00`;
+          const endISO = ev.endISO || null;
+          const offerUrl = safeHttpUrl(ev.registerUrl, DEFAULT_INFO_URL);
           return {
             "@context": "https://schema.org",
             "@type": "Event",
             "name": ev.title,
             "startDate": startISO,
-            "endDate": endISO,
+            ...(endISO ? { "endDate": endISO } : {}),
             "eventStatus": "https://schema.org/EventScheduled",
             "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
             "location": {
@@ -331,10 +408,10 @@
             "description": ev.description,
             "offers": ev.entry && ev.entry !== "TBA" ? {
               "@type": "Offer",
-              "price": ev.entry.replace(/[^0-9.]/g, "") || "0",
+              "price": String(ev.entry).replace(/[^0-9.]/g, "") || "0",
               "priceCurrency": "USD",
               "availability": "https://schema.org/InStock",
-              "url": ev.registerUrl || "https://www.facebook.com/P2WGames/"
+              "url": offerUrl
             } : undefined,
             "organizer": {
               "@type": "Organization",
@@ -350,8 +427,16 @@
       }
 
       fetch("events.json")
-        .then(r => r.json())
-        .then(data => { EVENTS = data; render(); injectEventSchema(data); })
+        .then(r => {
+          if (!r.ok) throw new Error(`events.json returned ${r.status}`);
+          return r.json();
+        })
+        .then(data => {
+          if (!Array.isArray(data)) throw new Error("events.json is not an array");
+          EVENTS = data;
+          render();
+          injectEventSchema(data);
+        })
         .catch(() => { grid.hidden = true; empty.hidden = false; });
     </script>
     <script src="nav.js" defer></script>
