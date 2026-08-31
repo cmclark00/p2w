@@ -199,7 +199,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `privacy.html` | Privacy policy (GDPR/CCPA-style). `.legal` styling. |
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
-| `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + a pairings screenshot (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
+| `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + required Masters/Open screenshot + optional Junior/Senior screenshots (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -252,6 +252,12 @@ the Konami leaderboard (`p2w-leaderboard`).
     pairs:[{table:1, p1:"Alice Smith", p2:"Bob Jones"}, …],
     pubkey:"<passphrase>", ts: serverTimestamp() }
   ```
+
+  `img` remains a string for Firestore-rule compatibility. A normal one-photo
+  publish stores the legacy data URL directly. When Junior or Senior photos are
+  included, `img` stores a compact JSON string shaped like
+  `{v:1, main:"data:image/…", junior:"data:image/…", senior:"data:image/…"}`.
+  The player page accepts both forms, so all older documents still render.
 
   The rule *as documented* below doesn't restrict the doc to specific fields,
   so `pairs` should need no rule change — but the **live console rule may be
@@ -373,14 +379,20 @@ the Konami leaderboard (`p2w-leaderboard`).
   table is the correctness backstop by design, so a good-enough heuristic +
   human review beats a fragile do-everything parser.
 - **Player page rendering.** `pairings.html` shows a **searchable match-card
-  list** (`#pr-table-section` → `ul#pr-matches`) when the newest doc has a
+  list** (`#pr-table-section` → `div#pr-matches` containing one or more lists) when the newest doc has a
   non-empty `pairs` array, styled in the site's card language (surface card +
   hairline border + 4px gold left edge, like `.event-card`; eyebrow +
   Space Grotesk head; gold "TABLE n" badge per card, dashed placeholder chip
   when a table number is blank). Each player renders as a bold display-type
   name with the "(record - div)" suffix split onto a small muted line
   (display-only split at `' ('` — the stored `p1`/`p2` strings are
-  unchanged). The pill "Find your name" input (`#pr-search`) filters cards
+  unchanged). When any pairing name ends in a recognized `- JR` or `- SR`
+  division marker, the player page automatically groups the full list into
+  **Junior**, **Senior**, and **Masters / Open** sections. `- MA` rows go to
+  Masters; unmarked rows are kept in Masters / Open so no pairing is lost.
+  Events without JR/SR markers retain the original flat list. This is a
+  display-only grouping and does not change the Firestore document shape.
+  The pill "Find your name" input (`#pr-search`) filters cards
   client-side by substring on `p1`+`p2` **and gold-highlights the matched
   name** (`.pr-hit`) so your own row jumps out of the pair; an empty result
   shows `#pr-nomatch`. The list is only rebuilt when the doc id changes —
@@ -391,12 +403,16 @@ the Konami leaderboard (`p2w-leaderboard`).
   is never discarded even in card mode — a "View original photo" link
   (`#pr-photo-toggle`) opens the same zoom overlay from `doc.img`.
 
-- **Image handling:** the pairings screenshot is stored **inline as a compressed
-  base64 data URL** (no Firebase Storage). `pairings-admin.html` downscales to
-  ≤1400px and re-encodes WebP→JPEG, stepping quality/size down until under
-  ~800 000 chars so it stays clear of Firestore's 1 MB/doc limit. (If a screenshot
-  can't get under the limit, the fix is to crop tighter — or, longer term, move to
-  Firebase Storage.)
+- **Image handling:** pairings screenshots are stored **inline in the existing
+  `img` string** (no Firebase Storage). `pairings-admin.html` downscales to
+  ≤1400px and re-encodes WebP→JPEG, stepping quality/size down until all selected
+  screenshots share a combined ~800 000-character budget and stay clear of
+  Firestore's 1 MB/doc limit. A one-photo publish remains a plain data URL; a
+  multi-photo publish uses the JSON-string envelope described above. If the
+  screenshots cannot fit, crop them tighter — or, longer term, move to Firebase
+  Storage. If a stricter live rule rejects the JSON-string envelope, the admin
+  page retries with the legacy Masters/Open photo only and clearly reports that
+  the optional division photos were not published, so a round is never blocked.
 - **Passphrase / access:** publishing requires a passphrase that lives **only in
   the Firestore security rule** (server-side), never in the page source. The admin
   page sends whatever staff type as the `pubkey` field; a wrong/blank one is

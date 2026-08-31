@@ -30,6 +30,12 @@
       }
       .pr-figure img { width: 100%; height: auto; display: block; }
       .pr-hint { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
+      .pr-photo-section { margin-top: 24px; }
+      .pr-photo-section[hidden] { display: none; }
+      .pr-photo-title {
+        margin: 20px 2px 9px; color: var(--paper);
+        font: 800 1rem var(--font-display); letter-spacing: 0.03em;
+      }
 
       /* Header block — mirrors the site's eyebrow + display-type pattern */
       .pr-eyebrow {
@@ -65,6 +71,16 @@
         list-style: none; margin: 0; padding: 0;
         display: flex; flex-direction: column; gap: 8px;
       }
+      .pr-division-list { display: flex; flex-direction: column; gap: 24px; }
+      .pr-division-head {
+        display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+        margin: 0 2px 9px;
+      }
+      .pr-division-title {
+        margin: 0; color: var(--paper); font: 800 1rem var(--font-display);
+        letter-spacing: 0.03em;
+      }
+      .pr-division-count { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
       .pr-match {
         display: flex; align-items: center; gap: 14px;
         background: var(--surface);
@@ -188,13 +204,26 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
               <input type="search" id="pr-search" placeholder="Type your name to find your table…" aria-label="Find your name">
             </div>
-            <ul class="pr-matches" id="pr-matches"></ul>
+            <div class="pr-division-list" id="pr-matches"></div>
             <p class="pr-nomatch" id="pr-nomatch" hidden>No name matches — check the spelling, or ask staff.</p>
           </div>
+          <h2 class="pr-photo-title" id="pr-main-photo-title" hidden>Masters / Open Division</h2>
           <figure class="pr-figure" id="pr-figure">
             <img id="pr-img" alt="Current round pairings">
           </figure>
-          <p class="pr-hint" id="pr-hint-image">Tap the image to zoom · this page refreshes automatically</p>
+          <section class="pr-photo-section" id="pr-junior-photo" aria-labelledby="pr-junior-photo-title" hidden>
+            <h2 class="pr-photo-title" id="pr-junior-photo-title">Junior Division</h2>
+            <figure class="pr-figure">
+              <img id="pr-junior-img" alt="Current round Junior pairings">
+            </figure>
+          </section>
+          <section class="pr-photo-section" id="pr-senior-photo" aria-labelledby="pr-senior-photo-title" hidden>
+            <h2 class="pr-photo-title" id="pr-senior-photo-title">Senior Division</h2>
+            <figure class="pr-figure">
+              <img id="pr-senior-img" alt="Current round Senior pairings">
+            </figure>
+          </section>
+          <p class="pr-hint" id="pr-hint-image">Tap an image to zoom · this page refreshes automatically</p>
           <p class="pr-hint" id="pr-hint-table" hidden>
             <button type="button" class="pr-photo-link" id="pr-photo-toggle">View original photo</button>
             · this page refreshes automatically
@@ -251,6 +280,11 @@
         var $updated = document.getElementById('pr-updated');
         var $img = document.getElementById('pr-img');
         var $figure = document.getElementById('pr-figure');
+        var $mainPhotoTitle = document.getElementById('pr-main-photo-title');
+        var $juniorPhoto = document.getElementById('pr-junior-photo');
+        var $juniorImg = document.getElementById('pr-junior-img');
+        var $seniorPhoto = document.getElementById('pr-senior-photo');
+        var $seniorImg = document.getElementById('pr-senior-img');
         var $zoom = document.getElementById('pr-zoom');
         var $zoomImg = document.getElementById('pr-zoom-img');
         var $refresh = document.getElementById('pr-refresh');
@@ -263,6 +297,31 @@
         var $photoToggle = document.getElementById('pr-photo-toggle');
 
         var lastId = null; // avoid re-rendering (and image flicker) when unchanged
+
+        function safeImage(value) {
+          value = String(value || '');
+          return /^data:image\/(?:png|jpe?g|webp);base64,/i.test(value) ? value : '';
+        }
+
+        function pairingImages(value) {
+          var fallback = { main: safeImage(value), junior: '', senior: '' };
+          if (typeof value !== 'string' || value.charAt(0) !== '{') return fallback;
+          try {
+            var parsed = JSON.parse(value);
+            return {
+              main: safeImage(parsed.main),
+              junior: safeImage(parsed.junior),
+              senior: safeImage(parsed.senior)
+            };
+          } catch (_) {
+            return fallback;
+          }
+        }
+
+        function setPairingImage(img, value) {
+          if (value) img.src = value;
+          else img.removeAttribute('src');
+        }
 
         // One player cell: bold display-type name, with the "(record - div)"
         // suffix (when present) split off as small muted text underneath.
@@ -286,34 +345,96 @@
           return el;
         }
 
+        function divisionFromName(full) {
+          var match = String(full || '').match(/(?:-|–|—)\s*(JR|SR|MA|JUNIOR(?:S)?|SENIOR(?:S)?|MASTER(?:S)?)\s*\)?\s*$/i);
+          if (!match) return '';
+          var code = match[1].toUpperCase();
+          if (code === 'JR' || code.indexOf('JUNIOR') === 0) return 'junior';
+          if (code === 'SR' || code.indexOf('SENIOR') === 0) return 'senior';
+          return 'masters';
+        }
+
+        function pairingDivision(pair) {
+          var p1Division = divisionFromName(pair.p1);
+          var p2Division = divisionFromName(pair.p2);
+          if (p1Division && p2Division && p1Division !== p2Division) return 'open';
+          return p1Division || p2Division || 'open';
+        }
+
+        function matchEl(pair) {
+          var li = document.createElement('li');
+          li.className = 'pr-match';
+          li.dataset.division = pairingDivision(pair);
+          var badge = document.createElement('span');
+          badge.className = 'pr-table-badge' + (pair.table ? '' : ' tb-unknown');
+          var lbl = document.createElement('span');
+          lbl.className = 'tb-label';
+          lbl.textContent = 'Table';
+          var num = document.createElement('span');
+          num.className = 'tb-num';
+          num.textContent = pair.table ? pair.table : '—';
+          badge.appendChild(lbl);
+          badge.appendChild(num);
+          li.appendChild(badge);
+          var players = document.createElement('div');
+          players.className = 'pr-players';
+          players.appendChild(playerEl(pair.p1));
+          var vs = document.createElement('span');
+          vs.className = 'pr-vs';
+          vs.textContent = 'vs';
+          players.appendChild(vs);
+          players.appendChild(playerEl(pair.p2));
+          li.appendChild(players);
+          li.dataset.names = ((pair.p1 || '') + ' ' + (pair.p2 || '')).toLowerCase();
+          return li;
+        }
+
+        function pairList(pairs) {
+          var list = document.createElement('ul');
+          list.className = 'pr-matches';
+          pairs.forEach(function (pair) { list.appendChild(matchEl(pair)); });
+          return list;
+        }
+
+        function appendDivision(key, label, pairs) {
+          if (!pairs.length) return;
+          var section = document.createElement('section');
+          section.className = 'pr-division';
+          section.dataset.division = key;
+          var headingId = 'pr-division-' + key;
+          section.setAttribute('aria-labelledby', headingId);
+          var head = document.createElement('div');
+          head.className = 'pr-division-head';
+          var heading = document.createElement('h2');
+          heading.className = 'pr-division-title';
+          heading.id = headingId;
+          heading.textContent = label;
+          var count = document.createElement('span');
+          count.className = 'pr-division-count';
+          count.textContent = pairs.length + (pairs.length === 1 ? ' pairing' : ' pairings');
+          head.appendChild(heading);
+          head.appendChild(count);
+          section.appendChild(head);
+          section.appendChild(pairList(pairs));
+          $matches.appendChild(section);
+        }
+
         function renderRows(pairs) {
           $matches.innerHTML = '';
-          pairs.forEach(function (p) {
-            var li = document.createElement('li');
-            li.className = 'pr-match';
-            var badge = document.createElement('span');
-            badge.className = 'pr-table-badge' + (p.table ? '' : ' tb-unknown');
-            var lbl = document.createElement('span');
-            lbl.className = 'tb-label';
-            lbl.textContent = 'Table';
-            var num = document.createElement('span');
-            num.className = 'tb-num';
-            num.textContent = p.table ? p.table : '—';
-            badge.appendChild(lbl);
-            badge.appendChild(num);
-            li.appendChild(badge);
-            var players = document.createElement('div');
-            players.className = 'pr-players';
-            players.appendChild(playerEl(p.p1));
-            var vs = document.createElement('span');
-            vs.className = 'pr-vs';
-            vs.textContent = 'vs';
-            players.appendChild(vs);
-            players.appendChild(playerEl(p.p2));
-            li.appendChild(players);
-            li.dataset.names = ((p.p1 || '') + ' ' + (p.p2 || '')).toLowerCase();
-            $matches.appendChild(li);
-          });
+          var grouped = { junior: [], senior: [], masters: [], open: [] };
+          pairs.forEach(function (pair) { grouped[pairingDivision(pair)].push(pair); });
+
+          // Keep the original flat list for events without age divisions.
+          // Once a JR or SR marker is present, separate all rows into clear
+          // Pokémon-style division sections while preserving every pairing.
+          if (!grouped.junior.length && !grouped.senior.length) {
+            $matches.appendChild(pairList(pairs));
+            return;
+          }
+
+          appendDivision('junior', 'Junior Division', grouped.junior);
+          appendDivision('senior', 'Senior Division', grouped.senior);
+          appendDivision('masters', 'Masters / Open Division', grouped.masters.concat(grouped.open));
         }
 
         $search.addEventListener('input', function () {
@@ -329,12 +450,19 @@
               pl.classList.toggle('pr-hit', !!q && pl.dataset.q.indexOf(q) !== -1);
             });
           });
+          $matches.querySelectorAll('.pr-division').forEach(function (section) {
+            var visible = Array.from(section.querySelectorAll('.pr-match')).some(function (li) {
+              return !li.hidden;
+            });
+            section.hidden = !visible;
+          });
           $nomatch.hidden = !q || any;
         });
 
         $photoToggle.addEventListener('click', function () {
-          if (!$img.src) return;
-          $zoomImg.src = $img.src;
+          if (!$img.hasAttribute('src')) return;
+          $zoomImg.src = $img.currentSrc || $img.src;
+          $zoomImg.alt = $img.alt + ', zoomed';
           $zoom.classList.add('open');
           $zoom.setAttribute('aria-hidden', 'false');
         });
@@ -360,7 +488,12 @@
         function render(doc, id) {
           var changed = id !== lastId;
           if (changed) {
-            $img.src = doc.img || '';
+            var images = pairingImages(doc.img);
+            setPairingImage($img, images.main);
+            setPairingImage($juniorImg, images.junior);
+            setPairingImage($seniorImg, images.senior);
+            $juniorPhoto.hidden = !images.junior;
+            $seniorPhoto.hidden = !images.senior;
             lastId = id;
           }
           $event.textContent = doc.event || 'Pairings';
@@ -378,6 +511,7 @@
           }
           $tableSection.hidden = !hasPairs;
           $figure.hidden = hasPairs;
+          $mainPhotoTitle.hidden = hasPairs || ($juniorPhoto.hidden && $seniorPhoto.hidden);
           $hintTable.hidden = !hasPairs;
           $hintImage.hidden = hasPairs;
 
@@ -421,16 +555,20 @@
         }
 
         // Zoom overlay
-        $figure.addEventListener('click', function () {
-          if (!$img.src) return;
-          $zoomImg.src = $img.src;
-          $zoom.classList.add('open');
-          $zoom.setAttribute('aria-hidden', 'false');
+        document.querySelectorAll('.pr-figure').forEach(function (figure) {
+          figure.addEventListener('click', function () {
+            var image = figure.querySelector('img');
+            if (!image || !image.hasAttribute('src')) return;
+            $zoomImg.src = image.currentSrc || image.src;
+            $zoomImg.alt = image.alt + ', zoomed';
+            $zoom.classList.add('open');
+            $zoom.setAttribute('aria-hidden', 'false');
+          });
         });
         $zoom.addEventListener('click', function () {
           $zoom.classList.remove('open');
           $zoom.setAttribute('aria-hidden', 'true');
-          $zoomImg.src = '';
+          $zoomImg.removeAttribute('src');
         });
         document.addEventListener('keydown', function (e) {
           if (e.key === 'Escape' && $zoom.classList.contains('open')) $zoom.click();

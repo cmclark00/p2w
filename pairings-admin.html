@@ -52,6 +52,11 @@
       }
       .pa-preview img { width: 100%; height: auto; }
       .pa-meta { color: var(--muted); font-size: 0.82rem; margin: 8px 2px 0; }
+      .pa-division-files {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px; margin-top: 16px;
+      }
+      .pa-division-files .pa-field { margin-bottom: 0; }
       .pa-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
       .pa-status { font-size: 0.9rem; font-weight: 600; }
       .pa-status.ok { color: #3ddc84; }
@@ -96,6 +101,9 @@
         background: none; border: none; color: var(--gold); font: 700 0.85rem var(--font-display);
         cursor: pointer; padding: 4px 0;
       }
+      @media (max-width: 560px) {
+        .pa-division-files { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
@@ -109,8 +117,9 @@
         <span class="pa-badge" id="pa-build" style="background: var(--surface-2); color: var(--muted);"></span>
       </div>
       <h1>Post Tournament Pairings</h1>
-      <p class="pa-sub">Snap or upload a screenshot of the current round's pairings.
-        Players see it instantly on the table QR page.</p>
+      <p class="pa-sub">Upload the current round's Masters / Open pairings, plus
+        optional Junior and Senior screenshots. Players see them instantly on
+        the table QR page.</p>
 
       <div class="pa-card">
         <div class="pa-field">
@@ -130,15 +139,38 @@
           </div>
         </div>
         <div class="pa-field">
-          <label for="pa-file">Pairings screenshot
-            <span class="hint">— take a photo or pick from your gallery.</span>
+          <label for="pa-file">Masters / Open pairings screenshot
+            <span class="hint">— required. Take a photo or pick from your gallery.</span>
           </label>
           <input type="file" id="pa-file" accept="image/*" capture="environment">
           <div class="pa-preview" id="pa-preview" hidden>
-            <img id="pa-preview-img" alt="Selected pairings preview">
+            <img id="pa-preview-img" alt="Selected Masters or Open pairings preview">
           </div>
           <p class="pa-meta" id="pa-meta" hidden></p>
         </div>
+        <div class="pa-division-files">
+          <div class="pa-field">
+            <label for="pa-junior-file">Junior pairings
+              <span class="hint">— optional</span>
+            </label>
+            <input type="file" id="pa-junior-file" accept="image/*" capture="environment">
+            <div class="pa-preview" id="pa-junior-preview" hidden>
+              <img id="pa-junior-preview-img" alt="Selected Junior pairings preview">
+            </div>
+            <p class="pa-meta" id="pa-junior-meta" hidden></p>
+          </div>
+          <div class="pa-field">
+            <label for="pa-senior-file">Senior pairings
+              <span class="hint">— optional</span>
+            </label>
+            <input type="file" id="pa-senior-file" accept="image/*" capture="environment">
+            <div class="pa-preview" id="pa-senior-preview" hidden>
+              <img id="pa-senior-preview-img" alt="Selected Senior pairings preview">
+            </div>
+            <p class="pa-meta" id="pa-senior-meta" hidden></p>
+          </div>
+        </div>
+        <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget, so no Firestore rule change is required. The searchable OCR review below uses the Masters / Open screenshot.</p>
       </div>
 
       <div class="pa-card" id="pa-rows-card" hidden>
@@ -156,6 +188,7 @@
               <tbody id="pa-rows-body"></tbody>
             </table>
           </div>
+          <p class="pa-meta">Player names ending in JR, SR, or MA are automatically grouped into Junior, Senior, and Masters sections on the player page.</p>
           <div class="pa-rows-actions">
             <button type="button" class="pa-link-btn" id="pa-add-row">+ Add row</button>
             <span class="pa-status" id="pa-ocr-status" role="status" aria-live="polite"></span>
@@ -191,7 +224,7 @@
           appId: "1:900204827002:web:4a3950730e0e79bce246c3"
         };
         var MAX_DIM = 1400;          // longest edge, px
-        var TARGET_CHARS = 800000;   // keep base64 well under Firestore's 1MB doc cap
+        var TARGET_CHARS = 800000;   // combined image payload; leaves room for pair rows under Firestore's 1MB cap
         var TESS_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js';
 
         var $pass = document.getElementById('pa-pass');
@@ -201,6 +234,14 @@
         var $preview = document.getElementById('pa-preview');
         var $previewImg = document.getElementById('pa-preview-img');
         var $meta = document.getElementById('pa-meta');
+        var $juniorFile = document.getElementById('pa-junior-file');
+        var $juniorPreview = document.getElementById('pa-junior-preview');
+        var $juniorPreviewImg = document.getElementById('pa-junior-preview-img');
+        var $juniorMeta = document.getElementById('pa-junior-meta');
+        var $seniorFile = document.getElementById('pa-senior-file');
+        var $seniorPreview = document.getElementById('pa-senior-preview');
+        var $seniorPreviewImg = document.getElementById('pa-senior-preview-img');
+        var $seniorMeta = document.getElementById('pa-senior-meta');
         var $publish = document.getElementById('pa-publish');
         var $status = document.getElementById('pa-status');
         var $rowsCard = document.getElementById('pa-rows-card');
@@ -208,7 +249,8 @@
         var $addRow = document.getElementById('pa-add-row');
         var $ocrStatus = document.getElementById('pa-ocr-status');
 
-        var compressed = null; // { dataUrl, chars }
+        var selectedImages = { main: null, junior: null, senior: null };
+        var compressed = { main: null, junior: null, senior: null };
 
         // ── Extracted-pairings review table (staff can fix/add/remove rows) ──
         function addRow(table, p1, p2) {
@@ -661,7 +703,9 @@
         }
 
         function refreshEnabled() {
-          $publish.disabled = !($pass.value.trim() && compressed && $round.value);
+          var imagePayload = buildImagePayload();
+          $publish.disabled = !($pass.value.trim() && compressed.main && $round.value &&
+            imagePayload.length <= TARGET_CHARS);
         }
 
         $pass.addEventListener('input', refreshEnabled);
@@ -695,48 +739,109 @@
           return url;
         }
 
-        function compress(img) {
+        function compress(img, targetChars) {
           // Step down quality, then dimensions, until under the char budget.
-          var dims = [MAX_DIM, 1200, 1000, 850];
-          var qualities = [0.82, 0.72, 0.62, 0.5];
+          var dims = [MAX_DIM, 1200, 1000, 850, 700];
+          var qualities = [0.82, 0.72, 0.62, 0.5, 0.4];
           var best = null;
           for (var d = 0; d < dims.length; d++) {
             for (var q = 0; q < qualities.length; q++) {
               var url = encode(img, dims[d], qualities[q]);
               best = url;
-              if (url.length <= TARGET_CHARS) return url;
+              if (url.length <= targetChars) return url;
             }
           }
           return best; // smallest we could get, even if still over target
         }
 
-        $file.addEventListener('change', function () {
-          var file = $file.files && $file.files[0];
-          compressed = null;
-          $preview.hidden = true;
-          $meta.hidden = true;
-          $rowsCard.hidden = true;
-          $rowsBody.innerHTML = '';
-          $ocrStatus.textContent = '';
-          refreshEnabled();
-          if (!file) return;
-          setStatus('Processing image…', 'busy');
-          loadImage(file).then(function (img) {
-            var url = compress(img);
-            compressed = { dataUrl: url, chars: url.length };
-            $previewImg.src = url;
-            $preview.hidden = false;
-            var kb = Math.round(url.length / 1024);
-            var over = url.length > 1000000;
-            $meta.textContent = 'Ready · ~' + kb + ' KB' +
-              (over ? ' ⚠ still large — this may fail to publish; crop tighter and retry.' : '');
-            $meta.hidden = false;
-            setStatus('');
+        var imageControls = {
+          main: { file: $file, preview: $preview, img: $previewImg, meta: $meta },
+          junior: { file: $juniorFile, preview: $juniorPreview, img: $juniorPreviewImg, meta: $juniorMeta },
+          senior: { file: $seniorFile, preview: $seniorPreview, img: $seniorPreviewImg, meta: $seniorMeta }
+        };
+
+        function buildImagePayload() {
+          if (!compressed.main) return '';
+          if (!compressed.junior && !compressed.senior) return compressed.main.dataUrl;
+          return JSON.stringify({
+            v: 1,
+            main: compressed.main.dataUrl,
+            junior: compressed.junior ? compressed.junior.dataUrl : '',
+            senior: compressed.senior ? compressed.senior.dataUrl : ''
+          });
+        }
+
+        function recompressImages() {
+          var keys = Object.keys(selectedImages).filter(function (key) { return selectedImages[key]; });
+          if (!keys.length) {
+            compressed = { main: null, junior: null, senior: null };
             refreshEnabled();
-            runOcr(img);
+            return;
+          }
+
+          var perImageBudget = Math.floor((TARGET_CHARS - 4000) / keys.length);
+          Object.keys(imageControls).forEach(function (key) {
+            var controls = imageControls[key];
+            if (!selectedImages[key]) {
+              compressed[key] = null;
+              controls.preview.hidden = true;
+              controls.meta.hidden = true;
+              controls.img.removeAttribute('src');
+              return;
+            }
+            var url = compress(selectedImages[key], perImageBudget);
+            compressed[key] = { dataUrl: url, chars: url.length };
+            controls.img.src = url;
+            controls.preview.hidden = false;
+          });
+
+          var payloadChars = buildImagePayload().length || keys.reduce(function (total, key) {
+            return total + compressed[key].chars;
+          }, 0);
+          keys.forEach(function (key) {
+            var controls = imageControls[key];
+            controls.meta.textContent = 'Ready · ~' + Math.round(compressed[key].chars / 1024) + ' KB' +
+              (keys.length > 1 ? ' · combined ~' + Math.round(payloadChars / 1024) + ' KB' : '');
+            controls.meta.hidden = false;
+          });
+          if (payloadChars > TARGET_CHARS) {
+            setStatus('The combined images are still too large. Crop them tighter and try again.', 'err');
+          } else {
+            setStatus('');
+          }
+          refreshEnabled();
+        }
+
+        function handleImageChange(key) {
+          var controls = imageControls[key];
+          var file = controls.file.files && controls.file.files[0];
+          if (key === 'main') {
+            $rowsCard.hidden = true;
+            $rowsBody.innerHTML = '';
+            $ocrStatus.textContent = '';
+          }
+          if (!file) {
+            selectedImages[key] = null;
+            recompressImages();
+            return;
+          }
+
+          setStatus('Processing image' + (key === 'main' ? '' : 's') + '…', 'busy');
+          loadImage(file).then(function (img) {
+            selectedImages[key] = img;
+            recompressImages();
+            if (key === 'main') runOcr(img);
           }).catch(function (err) {
+            selectedImages[key] = null;
+            compressed[key] = null;
+            controls.file.value = '';
+            recompressImages();
             setStatus(err.message || 'Could not process that image.', 'err');
           });
+        }
+
+        Object.keys(imageControls).forEach(function (key) {
+          imageControls[key].file.addEventListener('change', function () { handleImageChange(key); });
         });
 
         // ── Firebase (same dynamic-import pattern as konami.js) ───────────
@@ -760,7 +865,8 @@
           var pass = $pass.value.trim();
           var eventName = $event.value.trim() || 'Pairings';
           var round = parseInt($round.value, 10);
-          if (!compressed || !pass || !round) return;
+          var imagePayload = buildImagePayload();
+          if (!compressed.main || !imagePayload || imagePayload.length > TARGET_CHARS || !pass || !round) return;
 
           $publish.disabled = true;
           setStatus('Publishing…', 'busy');
@@ -775,7 +881,7 @@
             var base = {
               event: eventName,
               round: round,
-              img: compressed.dataUrl,
+              img: imagePayload,
               pubkey: pass,
               ts: f.serverTimestamp()
             };
@@ -791,10 +897,26 @@
               return f.addDoc(f.collection(f.db, 'pairings'), base).then(function (ref) {
                 ref._pairsDropped = true;
                 return ref;
+              }).catch(function (baseErr) {
+                var baseDenied = baseErr && (baseErr.code === 'permission-denied' ||
+                  /permission|insufficient/i.test(baseErr.message || ''));
+                var hasDivisionPhotos = compressed.junior || compressed.senior;
+                if (!baseDenied || !hasDivisionPhotos) throw baseErr;
+                // A stricter live rule may require `img` to be a plain data
+                // URL. Preserve the existing main-photo workflow rather than
+                // blocking the round, but report that the optional photos fell
+                // back so staff know they were not published.
+                var legacyBase = Object.assign({}, base, { img: compressed.main.dataUrl });
+                return f.addDoc(f.collection(f.db, 'pairings'), legacyBase).then(function (ref) {
+                  ref._divisionPhotosDropped = true;
+                  return ref;
+                });
               });
             });
           }).then(function (ref) {
-            if (ref && ref._pairsDropped) {
+            if (ref && ref._divisionPhotosDropped) {
+              setStatus('Published Masters / Open photo only — the live Firestore rule rejected the Junior/Senior photo bundle. Ask a dev to review the rule.', 'ok');
+            } else if (ref && ref._pairsDropped) {
               setStatus('Published (photo only) — Round ' + round + '. The pairings ' +
                 'table needs a Firestore rule update to save; ask a dev.', 'ok');
             } else {
