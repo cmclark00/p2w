@@ -185,8 +185,58 @@ def check_events() -> list[str]:
     return errors
 
 
+def check_security_configuration() -> list[str]:
+    """Guard the security-sensitive static configuration against regressions."""
+    errors: list[str] = []
+
+    admin = (ROOT / "pairings-admin.html").read_text(encoding="utf-8")
+    player = (ROOT / "pairings.html").read_text(encoding="utf-8")
+    konami = (ROOT / "konami.js").read_text(encoding="utf-8")
+    htaccess = (ROOT / ".htaccess").read_text(encoding="utf-8")
+    home = (ROOT / "index.html").read_text(encoding="utf-8")
+
+    stores_retired_pass = re.search(
+        r"localStorage\.setItem\(\s*['\"]p2w-pair-pass", admin
+    )
+    if re.search(r"\bpubkey\s*:", admin) or stores_retired_pass:
+        errors.append("pairings-admin.html: must not store or publish the retired pairings passphrase")
+    for marker in (
+        "signInWithEmailAndPassword",
+        "f.doc(f.db, 'pairings', 'current')",
+        "f.setDoc",
+    ):
+        if marker not in admin:
+            errors.append(f"pairings-admin.html: missing authenticated current-doc marker {marker!r}")
+    if "f.getDoc(f.doc(f.db, 'pairings', 'current'))" not in player:
+        errors.append("pairings.html: must read pairings/current before the legacy fallback")
+
+    firebase_version = "firebasejs/12.18.0/"
+    for name, source in (
+        ("pairings-admin.html", admin),
+        ("pairings.html", player),
+        ("konami.js", konami),
+    ):
+        if firebase_version not in source or "firebasejs/10.7.0/" in source:
+            errors.append(f"{name}: Firebase SDK version is inconsistent")
+    if "tesseract.js@7.0.0/" not in admin:
+        errors.append("pairings-admin.html: Tesseract.js must stay on the tested exact version")
+
+    for header in (
+        "Strict-Transport-Security",
+        "Permissions-Policy",
+        "Content-Security-Policy-Report-Only",
+    ):
+        if header not in htaccess:
+            errors.append(f".htaccess: missing {header} header")
+
+    if re.search(r'<span class="review-when">[^<]*\b\d+\s+months?\s+ago', home, re.I):
+        errors.append("index.html: review dates must not use stale relative month labels")
+
+    return errors
+
+
 def main() -> int:
-    errors = check_html() + check_events()
+    errors = check_html() + check_events() + check_security_configuration()
     if errors:
         print("Site checks failed:")
         for error in errors:

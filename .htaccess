@@ -32,6 +32,15 @@ ErrorDocument 404 /404.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set Permissions-Policy "camera=(self), geolocation=(), microphone=(), payment=(), usb=()"
+
+  # Observe violations before enforcing a CSP. The current site deliberately
+  # uses inline scripts/styles plus Firebase, Formspree, Google Maps, Google
+  # Fonts (404 only), and on-demand Tesseract workers. Report-only protects the
+  # rollout from breaking those integrations while exposing unexpected loads
+  # in browser developer tools.
+  Header always set Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https://formspree.io; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://formspree.io https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; frame-src https://maps.google.com https://www.google.com; worker-src 'self' blob: https://cdn.jsdelivr.net; child-src blob:; manifest-src 'self'"
 
   <FilesMatch "\.(?:html|css|js|json)$">
     Header set Cache-Control "no-cache"
