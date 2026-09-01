@@ -36,6 +36,7 @@
       }
       .pa-field .hint { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
       .pa-field input[type="text"],
+      .pa-field input[type="email"],
       .pa-field input[type="number"],
       .pa-field input[type="password"],
       .pa-field input[type="file"] {
@@ -101,8 +102,15 @@
         background: none; border: none; color: var(--gold); font: 700 0.85rem var(--font-display);
         cursor: pointer; padding: 4px 0;
       }
+      .pa-auth-title { margin: 0 0 14px; font-size: 1rem; }
+      .pa-auth-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+      .pa-auth-row .pa-field { margin-bottom: 0; }
+      .pa-auth-user { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .pa-auth-user strong { color: var(--paper); }
+      .pa-btn.pa-btn-small { padding: 10px 20px; font-size: 0.9rem; white-space: nowrap; }
       @media (max-width: 560px) {
         .pa-division-files { grid-template-columns: 1fr; }
+        .pa-auth-row { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -121,13 +129,27 @@
         optional Junior and Senior screenshots. Players see them instantly on
         the table QR page.</p>
 
-      <div class="pa-card">
-        <div class="pa-field">
-          <label for="pa-pass">Staff passphrase
-            <span class="hint">— required to publish. Remembered on this device.</span>
-          </label>
-          <input type="password" id="pa-pass" autocomplete="off" placeholder="Ask a manager">
+      <section class="pa-card" aria-labelledby="pa-auth-title">
+        <h2 class="pa-auth-title" id="pa-auth-title">Staff sign-in</h2>
+        <div class="pa-auth-row" id="pa-auth-signed-out">
+          <div class="pa-field">
+            <label for="pa-email">Staff email</label>
+            <input type="email" id="pa-email" value="admin@play2wingames.com" autocomplete="username" inputmode="email">
+          </div>
+          <div class="pa-field">
+            <label for="pa-password">Password</label>
+            <input type="password" id="pa-password" autocomplete="current-password">
+          </div>
+          <button type="button" class="pa-btn pa-btn-small" id="pa-sign-in">Sign in</button>
         </div>
+        <div class="pa-auth-user" id="pa-auth-signed-in" hidden>
+          <span>Signed in as <strong id="pa-auth-user-email"></strong></span>
+          <button type="button" class="pa-link-btn" id="pa-sign-out">Sign out</button>
+        </div>
+        <p class="pa-status" id="pa-auth-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <div class="pa-card">
         <div class="pa-row">
           <div class="pa-field">
             <label for="pa-event">Event name</label>
@@ -170,7 +192,7 @@
             <p class="pa-meta" id="pa-senior-meta" hidden></p>
           </div>
         </div>
-        <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget, so no Firestore rule change is required. The searchable OCR review below uses the Masters / Open screenshot.</p>
+        <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget inside the authenticated current-round document. The searchable OCR review below uses the Masters / Open screenshot.</p>
       </div>
 
       <div class="pa-card" id="pa-rows-card" hidden>
@@ -206,10 +228,9 @@
       </p>
 
       <p class="pa-note">
-        Each publish adds a new entry; players always see the newest one, so you
-        never overwrite or delete — just post the next round when it's ready.
-        Nothing here is bank-grade security: the passphrase keeps casual/accidental
-        posts out, but keep this page's link to staff only.
+        Publishing replaces the single current-round entry; new history is not
+        accumulated. Access requires the authorized staff account, but keep this
+        page's link with staff so customers do not land on the sign-in screen.
       </p>
     </main>
 
@@ -225,9 +246,17 @@
         };
         var MAX_DIM = 1400;          // longest edge, px
         var TARGET_CHARS = 800000;   // combined image payload; leaves room for pair rows under Firestore's 1MB cap
-        var TESS_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js';
+        var STAFF_EMAIL = 'admin@play2wingames.com';
+        var TESS_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.esm.min.js';
 
-        var $pass = document.getElementById('pa-pass');
+        var $email = document.getElementById('pa-email');
+        var $password = document.getElementById('pa-password');
+        var $signIn = document.getElementById('pa-sign-in');
+        var $signOut = document.getElementById('pa-sign-out');
+        var $authSignedOut = document.getElementById('pa-auth-signed-out');
+        var $authSignedIn = document.getElementById('pa-auth-signed-in');
+        var $authUserEmail = document.getElementById('pa-auth-user-email');
+        var $authStatus = document.getElementById('pa-auth-status');
         var $event = document.getElementById('pa-event');
         var $round = document.getElementById('pa-round');
         var $file = document.getElementById('pa-file');
@@ -251,6 +280,8 @@
 
         var selectedImages = { main: null, junior: null, senior: null };
         var compressed = { main: null, junior: null, senior: null };
+        var authUser = null;
+        if (!$email.value) $email.value = STAFF_EMAIL;
 
         // ── Extracted-pairings review table (staff can fix/add/remove rows) ──
         function addRow(table, p1, p2) {
@@ -614,7 +645,7 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v10';
+        var OCR_BUILD = 'v11';
         var $build = document.getElementById('pa-build');
         if ($build) $build.textContent = OCR_BUILD;
 
@@ -690,11 +721,12 @@
           });
         }
 
-        // Remember passphrase + event name per device so staff don't retype
-        // every round. (Passphrase is validated server-side by the Firestore rule.)
+        // Remember only the non-sensitive event name. Firebase Authentication
+        // persists the signed-in session without storing a password in page
+        // data or in the public pairings document.
         try {
-          $pass.value = localStorage.getItem('p2w-pair-pass') || '';
           $event.value = localStorage.getItem('p2w-pair-event') || '';
+          localStorage.removeItem('p2w-pair-pass');
         } catch (e) {}
 
         function setStatus(msg, cls) {
@@ -704,11 +736,12 @@
 
         function refreshEnabled() {
           var imagePayload = buildImagePayload();
-          $publish.disabled = !($pass.value.trim() && compressed.main && $round.value &&
+          var authorized = authUser && authUser.email &&
+            authUser.email.toLowerCase() === STAFF_EMAIL;
+          $publish.disabled = !(authorized && compressed.main && $round.value &&
             imagePayload.length <= TARGET_CHARS);
         }
 
-        $pass.addEventListener('input', refreshEnabled);
         $round.addEventListener('input', refreshEnabled);
 
         // ── Client-side image compression ────────────────────────────────
@@ -844,92 +877,146 @@
           imageControls[key].file.addEventListener('change', function () { handleImageChange(key); });
         });
 
-        // ── Firebase (same dynamic-import pattern as konami.js) ───────────
+        // ── Firebase Authentication + current-pairings document ──────────
         var fb = null;
+        var fbLoading = null;
+
+        function setAuthStatus(msg, cls) {
+          $authStatus.textContent = msg || '';
+          $authStatus.className = 'pa-status' + (cls ? ' ' + cls : '');
+        }
+
+        function showAuthUser(user) {
+          authUser = user || null;
+          $authSignedOut.hidden = !!authUser;
+          $authSignedIn.hidden = !authUser;
+          $authUserEmail.textContent = authUser && authUser.email ? authUser.email : '';
+          if (authUser) {
+            $password.value = '';
+            if (authUser.email && authUser.email.toLowerCase() === STAFF_EMAIL) {
+              setAuthStatus('Authenticated and ready to publish.', 'ok');
+            } else {
+              setAuthStatus('This Firebase account is signed in but is not authorized to publish.', 'err');
+            }
+          } else {
+            setAuthStatus('Sign in with the authorized Firebase staff account.');
+          }
+          refreshEnabled();
+        }
+
+        function authErrorMessage(err) {
+          var code = err && err.code ? err.code : '';
+          if (code === 'auth/operation-not-allowed') {
+            return 'Email/password sign-in is not enabled in Firebase yet. Ask an owner to finish the one-time setup.';
+          }
+          if (code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials' ||
+              code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+            return 'Sign-in failed — check the staff email and password.';
+          }
+          if (code === 'auth/too-many-requests') {
+            return 'Too many sign-in attempts. Wait a few minutes and try again.';
+          }
+          return 'Sign-in failed: ' + (err && err.message ? err.message : 'unknown error');
+        }
+
         function loadFirebase() {
           if (fb) return Promise.resolve(fb);
-          return Promise.all([
-            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'),
-            import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js')
+          if (fbLoading) return fbLoading;
+          fbLoading = Promise.all([
+            import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),
+            import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'),
+            import('https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js')
           ]).then(function (mods) {
             var app = mods[0].initializeApp(FIREBASE_CONFIG);
             var fs = mods[1];
-            fb = { db: fs.getFirestore(app), collection: fs.collection,
-                   addDoc: fs.addDoc, serverTimestamp: fs.serverTimestamp };
-            return fb;
+            var authMod = mods[2];
+            var auth = authMod.getAuth(app);
+            return authMod.setPersistence(auth, authMod.browserLocalPersistence).catch(function () {
+              // Private browsing can reject durable storage; session auth still
+              // works, so don't block staff from publishing a round.
+            }).then(function () {
+              fb = {
+                db: fs.getFirestore(app), doc: fs.doc, setDoc: fs.setDoc,
+                serverTimestamp: fs.serverTimestamp, auth: auth,
+                signIn: authMod.signInWithEmailAndPassword, signOut: authMod.signOut
+              };
+              authMod.onAuthStateChanged(auth, showAuthUser);
+              return fb;
+            });
+          }).catch(function (err) {
+            fbLoading = null;
+            throw err;
           });
+          return fbLoading;
         }
+
+        $signIn.addEventListener('click', function () {
+          var email = $email.value.trim();
+          var password = $password.value;
+          if (!email || !password) {
+            setAuthStatus('Enter the staff email and password.', 'err');
+            return;
+          }
+          $signIn.disabled = true;
+          setAuthStatus('Signing in…', 'busy');
+          loadFirebase().then(function (f) {
+            return f.signIn(f.auth, email, password);
+          }).catch(function (err) {
+            setAuthStatus(authErrorMessage(err), 'err');
+          }).finally(function () {
+            $signIn.disabled = false;
+          });
+        });
+
+        $password.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') $signIn.click();
+        });
+
+        $signOut.addEventListener('click', function () {
+          loadFirebase().then(function (f) { return f.signOut(f.auth); }).catch(function (err) {
+            setAuthStatus('Could not sign out: ' + (err && err.message ? err.message : 'unknown error'), 'err');
+          });
+        });
+
+        loadFirebase().catch(function (err) {
+          setAuthStatus('Authentication could not load: ' + (err && err.message ? err.message : 'unknown error'), 'err');
+        });
 
         $publish.addEventListener('click', function () {
           if ($publish.disabled) return;
-          var pass = $pass.value.trim();
           var eventName = $event.value.trim() || 'Pairings';
           var round = parseInt($round.value, 10);
           var imagePayload = buildImagePayload();
-          if (!compressed.main || !imagePayload || imagePayload.length > TARGET_CHARS || !pass || !round) return;
+          var authorized = authUser && authUser.email &&
+            authUser.email.toLowerCase() === STAFF_EMAIL;
+          if (!authorized || !compressed.main || !imagePayload || imagePayload.length > TARGET_CHARS || !round) return;
 
           $publish.disabled = true;
           setStatus('Publishing…', 'busy');
           try {
-            localStorage.setItem('p2w-pair-pass', pass);
             localStorage.setItem('p2w-pair-event', eventName);
           } catch (e) {}
 
           var rows = collectRows();
 
           loadFirebase().then(function (f) {
-            var base = {
+            return f.setDoc(f.doc(f.db, 'pairings', 'current'), {
               event: eventName,
               round: round,
               img: imagePayload,
-              pubkey: pass,
+              pairs: rows,
               ts: f.serverTimestamp()
-            };
-            var withPairs = Object.assign({}, base, { pairs: rows });
-            return f.addDoc(f.collection(f.db, 'pairings'), withPairs).catch(function (err) {
-              var denied = err && (err.code === 'permission-denied' ||
-                /permission|insufficient/i.test(err.message || ''));
-              if (!denied) throw err;
-              // The `pairs` field may be tripping an older Firestore rule that
-              // doesn't know about it yet. Retry without it so staff aren't
-              // blocked from publishing; if this also fails, the real cause
-              // (bad passphrase / oversized image) surfaces normally below.
-              return f.addDoc(f.collection(f.db, 'pairings'), base).then(function (ref) {
-                ref._pairsDropped = true;
-                return ref;
-              }).catch(function (baseErr) {
-                var baseDenied = baseErr && (baseErr.code === 'permission-denied' ||
-                  /permission|insufficient/i.test(baseErr.message || ''));
-                var hasDivisionPhotos = compressed.junior || compressed.senior;
-                if (!baseDenied || !hasDivisionPhotos) throw baseErr;
-                // A stricter live rule may require `img` to be a plain data
-                // URL. Preserve the existing main-photo workflow rather than
-                // blocking the round, but report that the optional photos fell
-                // back so staff know they were not published.
-                var legacyBase = Object.assign({}, base, { img: compressed.main.dataUrl });
-                return f.addDoc(f.collection(f.db, 'pairings'), legacyBase).then(function (ref) {
-                  ref._divisionPhotosDropped = true;
-                  return ref;
-                });
-              });
             });
-          }).then(function (ref) {
-            if (ref && ref._divisionPhotosDropped) {
-              setStatus('Published Masters / Open photo only — the live Firestore rule rejected the Junior/Senior photo bundle. Ask a dev to review the rule.', 'ok');
-            } else if (ref && ref._pairsDropped) {
-              setStatus('Published (photo only) — Round ' + round + '. The pairings ' +
-                'table needs a Firestore rule update to save; ask a dev.', 'ok');
-            } else {
-              setStatus('Published! Players can see Round ' + round + ' now.', 'ok');
-            }
-            $publish.disabled = false;
+          }).then(function () {
+            setStatus('Published! Players can see Round ' + round + ' now.', 'ok');
+            refreshEnabled();
           }).catch(function (err) {
             var denied = err && (err.code === 'permission-denied' ||
               /permission|insufficient/i.test(err.message || ''));
             setStatus(denied
-              ? 'Rejected — check the passphrase (or the image is too large).'
+              ? 'Rejected — this account is not authorized, or the new Firestore rule has not been installed yet.'
               : 'Publish failed: ' + (err && err.message ? err.message : 'unknown error'), 'err');
-            $publish.disabled = false;
+            refreshEnabled();
           });
         });
       })();

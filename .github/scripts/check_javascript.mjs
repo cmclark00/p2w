@@ -45,11 +45,12 @@ function checkPairingsHelpers() {
     const code = [
       between('function safeImage', 'function setPairingImage'),
       between('function divisionFromName', 'function matchEl'),
-      'this.helpers = { pairingImages, divisionFromName, pairingDivision };'
+      between('function pairingVersion', 'function render'),
+      'this.helpers = { pairingImages, divisionFromName, pairingDivision, pairingVersion };'
     ].join('\n');
     const context = {};
     runInNewContext(code, context);
-    const { pairingImages, pairingDivision } = context.helpers;
+    const { pairingImages, pairingDivision, pairingVersion } = context.helpers;
     const main = 'data:image/webp;base64,AAAA';
     const junior = 'data:image/jpeg;base64,BBBB';
     const senior = 'data:image/png;base64,CCCC';
@@ -64,6 +65,12 @@ function checkPairingsHelpers() {
     }
     if (pairingImages('javascript:alert(1)').main) {
       throw new Error('unsafe image source was accepted');
+    }
+
+    const firstVersion = pairingVersion({ ts: { seconds: 100, nanoseconds: 1 } }, 'current');
+    const nextVersion = pairingVersion({ ts: { seconds: 101, nanoseconds: 1 } }, 'current');
+    if (firstVersion === nextVersion) {
+      throw new Error('overwriting pairings/current would not trigger a fresh render');
     }
 
     const adminHtml = readFileSync(join(root, 'pairings-admin.html'), 'utf8');

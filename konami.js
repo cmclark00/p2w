@@ -96,8 +96,8 @@
     if (fbLoading) return fbLoading;
     fbLoading = (async function () {
       const [appMod, fsMod] = await Promise.all([
-        import('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'),
-        import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js')
+        import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')
       ]);
       const app = appMod.initializeApp(FIREBASE_CONFIG);
       fb = {
