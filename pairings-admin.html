@@ -13,7 +13,8 @@
     <style>
       /* Scoped utility-page styles — this is an internal staff tool, so it
          skips the full site header/nav and keeps a single focused column. */
-      .pa-wrap { max-width: 640px; margin: 0 auto; padding: 28px var(--page-x) 64px; }
+      .pa-wrap { max-width: 900px; margin: 0 auto; padding: clamp(22px, 3vw, 36px) var(--page-x) 64px; }
+      .pa-wrap [hidden] { display: none !important; }
       .pa-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
       .pa-brand img { height: 40px; width: auto; }
       .pa-badge {
@@ -26,8 +27,9 @@
       .pa-sub { color: var(--muted); margin: 0 0 24px; }
       .pa-card {
         background: var(--surface); border: 1px solid var(--line);
-        border-radius: 16px; padding: 20px; margin-bottom: 18px;
+        border-radius: 16px; padding: clamp(16px, 3vw, 24px); margin-bottom: 18px;
       }
+      .pa-card-title { margin: 0 0 18px; font-size: 1.05rem; }
       .pa-field { margin-bottom: 16px; }
       .pa-field:last-child { margin-bottom: 0; }
       .pa-field label {
@@ -42,11 +44,22 @@
       .pa-field input[type="file"] {
         width: 100%; padding: 11px 13px; font-size: 1rem;
         color: var(--paper); background: var(--surface-2);
-        border: 1px solid var(--line); border-radius: 10px;
+        border: 1px solid var(--line); border-radius: 10px; min-height: 48px;
+      }
+      .pa-field input[type="file"] { padding: 7px; color: var(--muted); }
+      .pa-field input[type="file"]::file-selector-button {
+        border: 0; border-radius: 8px; margin-right: 10px; padding: 8px 12px;
+        color: var(--ink); background: var(--gold);
+        font: 700 0.82rem var(--font-display); cursor: pointer;
       }
       .pa-field input:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
-      .pa-row { display: flex; gap: 14px; }
-      .pa-row .pa-field { flex: 1; }
+      .pa-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 14px; }
+      .pa-round-field { min-width: 0; }
+      .pa-upload-field {
+        padding: 16px; border: 1px solid var(--line); border-radius: 12px;
+        background: var(--surface-2);
+      }
+      .pa-upload-primary { margin-top: 2px; }
       .pa-preview {
         margin-top: 12px; border-radius: 10px; overflow: hidden;
         border: 1px solid var(--line); background: var(--ink);
@@ -58,7 +71,13 @@
         gap: 14px; margin-top: 16px;
       }
       .pa-division-files .pa-field { margin-bottom: 0; }
+      .pa-publish-panel {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 16px; padding: clamp(16px, 3vw, 22px); margin-top: 2px;
+      }
       .pa-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      .pa-ready-hint { margin: 10px 0 0; color: var(--muted); font-size: 0.84rem; }
+      .pa-ready-hint.ok { color: #3ddc84; font-weight: 600; }
       .pa-status { font-size: 0.9rem; font-weight: 600; }
       .pa-status.ok { color: #3ddc84; }
       .pa-status.err { color: #ff6b81; }
@@ -87,7 +106,7 @@
       .pa-rows-table input {
         width: 100%; padding: 7px 8px; font-size: 0.9rem;
         color: var(--paper); background: var(--surface-2);
-        border: 1px solid var(--line); border-radius: 7px;
+        border: 1px solid var(--line); border-radius: 7px; min-width: 0;
       }
       .pa-rows-table input.pa-row-table { width: 3.6em; }
       .pa-row-del {
@@ -102,15 +121,46 @@
         background: none; border: none; color: var(--gold); font: 700 0.85rem var(--font-display);
         cursor: pointer; padding: 4px 0;
       }
-      .pa-auth-title { margin: 0 0 14px; font-size: 1rem; }
       .pa-auth-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
       .pa-auth-row .pa-field { margin-bottom: 0; }
       .pa-auth-user { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
       .pa-auth-user strong { color: var(--paper); }
       .pa-btn.pa-btn-small { padding: 10px 20px; font-size: 0.9rem; white-space: nowrap; }
-      @media (max-width: 560px) {
+      @media (max-width: 720px) {
         .pa-division-files { grid-template-columns: 1fr; }
+        .pa-auth-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .pa-auth-row .pa-btn { grid-column: 1 / -1; justify-self: start; }
+      }
+      @media (max-width: 560px) {
         .pa-auth-row { grid-template-columns: 1fr; }
+        .pa-auth-row .pa-btn { width: 100%; }
+        .pa-row { grid-template-columns: 1fr; }
+        .pa-round-field { max-width: none; }
+        .pa-publish-panel .pa-btn { width: 100%; }
+
+        .pa-rows-wrap { overflow: visible; border: 0; border-radius: 0; }
+        .pa-rows-table, .pa-rows-table tbody { display: block; }
+        .pa-rows-table thead {
+          position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+          overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+        .pa-rows-table tbody { display: grid; gap: 12px; }
+        .pa-rows-table tr {
+          display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px;
+          padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+          background: var(--surface-2);
+        }
+        .pa-rows-table td { display: block; padding: 0; border: 0; min-width: 0; }
+        .pa-rows-table td::before {
+          content: attr(data-label); display: block; margin-bottom: 4px;
+          color: var(--muted); font: 700 0.7rem var(--font-display);
+          letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        .pa-rows-table td:nth-child(2),
+        .pa-rows-table td:nth-child(3) { grid-column: 1 / -1; }
+        .pa-rows-table td:nth-child(4) { grid-column: 2; grid-row: 1; align-self: end; }
+        .pa-rows-table td:nth-child(4)::before { content: none; }
+        .pa-rows-table input.pa-row-table { width: 100%; }
       }
     </style>
   </head>
@@ -130,7 +180,7 @@
         the table QR page.</p>
 
       <section class="pa-card" aria-labelledby="pa-auth-title">
-        <h2 class="pa-auth-title" id="pa-auth-title">Staff sign-in</h2>
+        <h2 class="pa-card-title" id="pa-auth-title">Staff sign-in</h2>
         <div class="pa-auth-row" id="pa-auth-signed-out">
           <div class="pa-field">
             <label for="pa-email">Staff email</label>
@@ -149,18 +199,19 @@
         <p class="pa-status" id="pa-auth-status" role="status" aria-live="polite"></p>
       </section>
 
-      <div class="pa-card">
+      <section class="pa-card" aria-labelledby="pa-pairing-title">
+        <h2 class="pa-card-title" id="pa-pairing-title">Round &amp; screenshots</h2>
         <div class="pa-row">
           <div class="pa-field">
             <label for="pa-event">Event name</label>
             <input type="text" id="pa-event" placeholder="Friday Night Pokémon" autocomplete="off">
           </div>
-          <div class="pa-field" style="max-width: 120px;">
+          <div class="pa-field pa-round-field">
             <label for="pa-round">Round #</label>
-            <input type="number" id="pa-round" min="1" step="1" inputmode="numeric" placeholder="1">
+            <input type="number" id="pa-round" min="1" max="99" step="1" inputmode="numeric" placeholder="1">
           </div>
         </div>
-        <div class="pa-field">
+        <div class="pa-field pa-upload-field pa-upload-primary">
           <label for="pa-file">Masters / Open pairings screenshot
             <span class="hint">— required. Take a photo or pick from your gallery.</span>
           </label>
@@ -171,7 +222,7 @@
           <p class="pa-meta" id="pa-meta" hidden></p>
         </div>
         <div class="pa-division-files">
-          <div class="pa-field">
+          <div class="pa-field pa-upload-field">
             <label for="pa-junior-file">Junior pairings
               <span class="hint">— optional</span>
             </label>
@@ -181,7 +232,7 @@
             </div>
             <p class="pa-meta" id="pa-junior-meta" hidden></p>
           </div>
-          <div class="pa-field">
+          <div class="pa-field pa-upload-field">
             <label for="pa-senior-file">Senior pairings
               <span class="hint">— optional</span>
             </label>
@@ -193,7 +244,7 @@
           </div>
         </div>
         <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget inside the authenticated current-round document. The searchable OCR review below uses the Masters / Open screenshot.</p>
-      </div>
+      </section>
 
       <div class="pa-card" id="pa-rows-card" hidden>
         <div class="pa-field">
@@ -218,14 +269,17 @@
         </div>
       </div>
 
-      <div class="pa-actions">
-        <button class="pa-btn" id="pa-publish" disabled>Publish to players</button>
-        <span class="pa-status" id="pa-status" role="status" aria-live="polite"></span>
+      <div class="pa-publish-panel">
+        <div class="pa-actions">
+          <button class="pa-btn" id="pa-publish" disabled>Publish to players</button>
+          <span class="pa-status" id="pa-status" role="status" aria-live="polite"></span>
+        </div>
+        <p class="pa-ready-hint" id="pa-ready-hint" aria-live="polite">Sign in, choose a Masters / Open screenshot, and enter the round number.</p>
+        <p class="pa-meta" style="margin-top:14px">
+          <a class="pa-link" id="pa-viewlink" href="pairings.html" target="_blank" rel="noopener">Open the player page ↗</a>
+          — this is what the table QR code points to.
+        </p>
       </div>
-      <p class="pa-meta" style="margin-top:14px">
-        <a class="pa-link" id="pa-viewlink" href="pairings.html" target="_blank" rel="noopener">Open the player page ↗</a>
-        — this is what the table QR code points to.
-      </p>
 
       <p class="pa-note">
         Publishing replaces the single current-round entry; new history is not
@@ -273,6 +327,7 @@
         var $seniorMeta = document.getElementById('pa-senior-meta');
         var $publish = document.getElementById('pa-publish');
         var $status = document.getElementById('pa-status');
+        var $readyHint = document.getElementById('pa-ready-hint');
         var $rowsCard = document.getElementById('pa-rows-card');
         var $rowsBody = document.getElementById('pa-rows-body');
         var $addRow = document.getElementById('pa-add-row');
@@ -287,9 +342,9 @@
         function addRow(table, p1, p2) {
           var tr = document.createElement('tr');
           tr.innerHTML =
-            '<td><input type="text" class="pa-row-table" inputmode="numeric"></td>' +
-            '<td><input type="text" class="pa-row-p1"></td>' +
-            '<td><input type="text" class="pa-row-p2"></td>' +
+            '<td data-label="Table"><input type="text" class="pa-row-table" inputmode="numeric" aria-label="Table number"></td>' +
+            '<td data-label="Player 1"><input type="text" class="pa-row-p1" aria-label="Player 1"></td>' +
+            '<td data-label="Player 2"><input type="text" class="pa-row-p2" aria-label="Player 2"></td>' +
             '<td><button type="button" class="pa-row-del" aria-label="Remove row">×</button></td>';
           tr.querySelector('.pa-row-table').value = table || '';
           tr.querySelector('.pa-row-p1').value = p1 || '';
@@ -738,8 +793,24 @@
           var imagePayload = buildImagePayload();
           var authorized = authUser && authUser.email &&
             authUser.email.toLowerCase() === STAFF_EMAIL;
-          $publish.disabled = !(authorized && compressed.main && $round.value &&
-            imagePayload.length <= TARGET_CHARS);
+          var roundNumber = parseInt($round.value, 10);
+          var validRound = roundNumber >= 1 && roundNumber <= 99;
+          var withinBudget = imagePayload.length <= TARGET_CHARS;
+          var ready = authorized && compressed.main && validRound && withinBudget;
+          $publish.disabled = !ready;
+
+          if (!authorized) {
+            $readyHint.textContent = 'Sign in with the authorized staff account to continue.';
+          } else if (!compressed.main) {
+            $readyHint.textContent = 'Choose a Masters / Open screenshot to continue.';
+          } else if (!validRound) {
+            $readyHint.textContent = 'Enter a round number from 1 to 99.';
+          } else if (!withinBudget) {
+            $readyHint.textContent = 'The image bundle is too large. Crop the screenshots tighter and try again.';
+          } else {
+            $readyHint.textContent = 'Everything is ready to publish.';
+          }
+          $readyHint.className = 'pa-ready-hint' + (ready ? ' ok' : '');
         }
 
         $round.addEventListener('input', refreshEnabled);
@@ -859,6 +930,8 @@
             return;
           }
 
+          compressed[key] = null;
+          refreshEnabled();
           setStatus('Processing image' + (key === 'main' ? '' : 's') + '…', 'busy');
           loadImage(file).then(function (img) {
             selectedImages[key] = img;
@@ -989,7 +1062,8 @@
           var imagePayload = buildImagePayload();
           var authorized = authUser && authUser.email &&
             authUser.email.toLowerCase() === STAFF_EMAIL;
-          if (!authorized || !compressed.main || !imagePayload || imagePayload.length > TARGET_CHARS || !round) return;
+          if (!authorized || !compressed.main || !imagePayload || imagePayload.length > TARGET_CHARS ||
+              round < 1 || round > 99) return;
 
           $publish.disabled = true;
           setStatus('Publishing…', 'busy');
