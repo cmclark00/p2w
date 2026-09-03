@@ -74,6 +74,57 @@ function checkPairingsHelpers() {
     }
 
     const adminHtml = readFileSync(join(root, 'pairings-admin.html'), 'utf8');
+    for (const marker of [
+      'pa-main-rows-body',
+      'pa-junior-rows-body',
+      'pa-senior-rows-body',
+      'division: controls.division',
+      'queueOcr(key, img, generation)'
+    ]) {
+      if (!adminHtml.includes(marker)) {
+        throw new Error(`admin multi-division OCR marker is missing: ${marker}`);
+      }
+    }
+
+    const collectStart = adminHtml.indexOf('function collectRows');
+    const collectEnd = adminHtml.indexOf('// ── OCR:', collectStart);
+    if (collectStart < 0 || collectEnd < 0) throw new Error('could not extract collectRows');
+    function fakeRow(table, p1, p2) {
+      const values = {
+        '.pa-row-table': { value: table },
+        '.pa-row-p1': { value: p1 },
+        '.pa-row-p2': { value: p2 }
+      };
+      return { querySelector: (selector) => values[selector] };
+    }
+    const collectContext = {
+      rowControls: {
+        main: {
+          division: 'masters',
+          body: { querySelectorAll: () => [fakeRow('1', 'Alice', 'Bob')] }
+        },
+        junior: {
+          division: 'junior',
+          body: { querySelectorAll: () => [fakeRow('11', 'Carol', 'Dana')] }
+        },
+        senior: {
+          division: 'senior',
+          body: { querySelectorAll: () => [fakeRow('21', 'Evan', 'Fran')] }
+        }
+      }
+    };
+    runInNewContext(
+      adminHtml.slice(collectStart, collectEnd) + '\nthis.collectRows = collectRows;',
+      collectContext
+    );
+    const collected = collectContext.collectRows();
+    if (collected.map((row) => row.division).join(',') !== 'masters,junior,senior') {
+      throw new Error('published pairing rows lost their explicit division labels');
+    }
+    if (collected.map((row) => row.table).join(',') !== '1,11,21') {
+      throw new Error('multi-division table numbers were not collected correctly');
+    }
+
     const buildStart = adminHtml.indexOf('function buildImagePayload');
     const buildEnd = adminHtml.indexOf('function recompressImages', buildStart);
     if (buildStart < 0 || buildEnd < 0) throw new Error('could not extract buildImagePayload');
@@ -93,6 +144,9 @@ function checkPairingsHelpers() {
     }
 
     const cases = [
+      [{ division: 'junior', p1: 'Alice', p2: 'Bob' }, 'junior'],
+      [{ division: 'senior', p1: 'Carol', p2: 'Dana' }, 'senior'],
+      [{ division: 'masters', p1: 'Evan', p2: 'Fran' }, 'masters'],
       [{ p1: 'A (1/0/0 - JR)', p2: 'B (1/0/0 - JR)' }, 'junior'],
       [{ p1: 'A (1/0/0 - SR)', p2: 'B (1/0/0 - SR)' }, 'senior'],
       [{ p1: 'A (1/0/0 - MA)', p2: 'B (1/0/0 - MA)' }, 'masters'],
@@ -127,10 +181,10 @@ function checkPairingsHelpers() {
       renderContext
     );
     renderContext.renderRows([
-      { table: 1, p1: 'A (1/0/0 - JR)', p2: 'B (1/0/0 - JR)' },
-      { table: 2, p1: 'C (1/0/0 - SR)', p2: 'D (1/0/0 - SR)' },
-      { table: 3, p1: 'E (1/0/0 - MA)', p2: 'F (1/0/0 - MA)' },
-      { table: 4, p1: 'G', p2: 'H' }
+      { division: 'junior', table: 1, p1: 'A', p2: 'B' },
+      { division: 'senior', table: 2, p1: 'C', p2: 'D' },
+      { division: 'masters', table: 3, p1: 'E', p2: 'F' },
+      { division: 'open', table: 4, p1: 'G', p2: 'H' }
     ]);
     if (matchesRoot.children.map((section) => section.dataset.division).join(',') !==
         'junior,senior,masters') {

@@ -117,6 +117,18 @@
       .pa-rows-actions {
         display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px;
       }
+      .pa-rows-intro { color: var(--muted); margin: -8px 0 18px; }
+      .pa-division-editors { display: grid; gap: 14px; }
+      .pa-division-editor {
+        padding: 16px; border: 1px solid var(--line); border-radius: 12px;
+        background: var(--surface-2);
+      }
+      .pa-division-editor-head {
+        display: flex; align-items: baseline; justify-content: space-between;
+        gap: 12px; margin-bottom: 12px;
+      }
+      .pa-division-editor h3 { margin: 0; font-size: 0.98rem; }
+      .pa-division-source { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
       .pa-link-btn {
         background: none; border: none; color: var(--gold); font: 700 0.85rem var(--font-display);
         cursor: pointer; padding: 4px 0;
@@ -148,7 +160,7 @@
         .pa-rows-table tr {
           display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px;
           padding: 12px; border: 1px solid var(--line); border-radius: 10px;
-          background: var(--surface-2);
+          background: var(--surface);
         }
         .pa-rows-table td { display: block; padding: 0; border: 0; min-width: 0; }
         .pa-rows-table td::before {
@@ -161,6 +173,8 @@
         .pa-rows-table td:nth-child(4) { grid-column: 2; grid-row: 1; align-self: end; }
         .pa-rows-table td:nth-child(4)::before { content: none; }
         .pa-rows-table input.pa-row-table { width: 100%; }
+        .pa-division-editor { padding: 12px; }
+        .pa-division-editor-head { align-items: flex-start; flex-direction: column; gap: 2px; }
       }
     </style>
   </head>
@@ -243,29 +257,64 @@
             <p class="pa-meta" id="pa-senior-meta" hidden></p>
           </div>
         </div>
-        <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget inside the authenticated current-round document. The searchable OCR review below uses the Masters / Open screenshot.</p>
+        <p class="pa-meta">Optional division screenshots appear as separate sections on the player page. Images share one safe upload budget inside the authenticated current-round document. Every selected screenshot gets its own searchable OCR review below.</p>
       </section>
 
       <div class="pa-card" id="pa-rows-card" hidden>
-        <div class="pa-field">
-          <label>Extracted pairings
-            <span class="hint">— auto-read from the photo. Check names and table
-              numbers, fix typos, delete junk rows, or add any that were missed
-              before publishing.</span>
-          </label>
-          <div class="pa-rows-wrap">
-            <table class="pa-rows-table">
-              <thead>
-                <tr><th>Table</th><th>Player 1</th><th>Player 2</th><th></th></tr>
-              </thead>
-              <tbody id="pa-rows-body"></tbody>
-            </table>
-          </div>
-          <p class="pa-meta">Player names ending in JR, SR, or MA are automatically grouped into Junior, Senior, and Masters sections on the player page.</p>
-          <div class="pa-rows-actions">
-            <button type="button" class="pa-link-btn" id="pa-add-row">+ Add row</button>
-            <span class="pa-status" id="pa-ocr-status" role="status" aria-live="polite"></span>
-          </div>
+        <h2 class="pa-card-title">Extracted pairings</h2>
+        <p class="pa-rows-intro">Each selected screenshot is read separately. Check names and table numbers, fix typos, delete junk rows, or add anything that was missed before publishing.</p>
+
+        <div class="pa-division-editors">
+          <section class="pa-division-editor" id="pa-main-rows-section" aria-labelledby="pa-main-rows-title" hidden>
+            <div class="pa-division-editor-head">
+              <h3 id="pa-main-rows-title">Masters / Open</h3>
+              <span class="pa-division-source">Main screenshot</span>
+            </div>
+            <div class="pa-rows-wrap">
+              <table class="pa-rows-table">
+                <thead><tr><th>Table</th><th>Player 1</th><th>Player 2</th><th></th></tr></thead>
+                <tbody id="pa-main-rows-body"></tbody>
+              </table>
+            </div>
+            <div class="pa-rows-actions">
+              <button type="button" class="pa-link-btn" id="pa-main-add-row">+ Add Masters / Open row</button>
+              <span class="pa-status" id="pa-main-ocr-status" role="status" aria-live="polite"></span>
+            </div>
+          </section>
+
+          <section class="pa-division-editor" id="pa-junior-rows-section" aria-labelledby="pa-junior-rows-title" hidden>
+            <div class="pa-division-editor-head">
+              <h3 id="pa-junior-rows-title">Junior</h3>
+              <span class="pa-division-source">Junior screenshot</span>
+            </div>
+            <div class="pa-rows-wrap">
+              <table class="pa-rows-table">
+                <thead><tr><th>Table</th><th>Player 1</th><th>Player 2</th><th></th></tr></thead>
+                <tbody id="pa-junior-rows-body"></tbody>
+              </table>
+            </div>
+            <div class="pa-rows-actions">
+              <button type="button" class="pa-link-btn" id="pa-junior-add-row">+ Add Junior row</button>
+              <span class="pa-status" id="pa-junior-ocr-status" role="status" aria-live="polite"></span>
+            </div>
+          </section>
+
+          <section class="pa-division-editor" id="pa-senior-rows-section" aria-labelledby="pa-senior-rows-title" hidden>
+            <div class="pa-division-editor-head">
+              <h3 id="pa-senior-rows-title">Senior</h3>
+              <span class="pa-division-source">Senior screenshot</span>
+            </div>
+            <div class="pa-rows-wrap">
+              <table class="pa-rows-table">
+                <thead><tr><th>Table</th><th>Player 1</th><th>Player 2</th><th></th></tr></thead>
+                <tbody id="pa-senior-rows-body"></tbody>
+              </table>
+            </div>
+            <div class="pa-rows-actions">
+              <button type="button" class="pa-link-btn" id="pa-senior-add-row">+ Add Senior row</button>
+              <span class="pa-status" id="pa-senior-ocr-status" role="status" aria-live="polite"></span>
+            </div>
+          </section>
         </div>
       </div>
 
@@ -329,18 +378,57 @@
         var $status = document.getElementById('pa-status');
         var $readyHint = document.getElementById('pa-ready-hint');
         var $rowsCard = document.getElementById('pa-rows-card');
-        var $rowsBody = document.getElementById('pa-rows-body');
-        var $addRow = document.getElementById('pa-add-row');
-        var $ocrStatus = document.getElementById('pa-ocr-status');
 
         var selectedImages = { main: null, junior: null, senior: null };
         var compressed = { main: null, junior: null, senior: null };
         var authUser = null;
+        var rowControls = {
+          main: {
+            division: 'masters', label: 'Masters / Open',
+            section: document.getElementById('pa-main-rows-section'),
+            body: document.getElementById('pa-main-rows-body'),
+            add: document.getElementById('pa-main-add-row'),
+            status: document.getElementById('pa-main-ocr-status')
+          },
+          junior: {
+            division: 'junior', label: 'Junior',
+            section: document.getElementById('pa-junior-rows-section'),
+            body: document.getElementById('pa-junior-rows-body'),
+            add: document.getElementById('pa-junior-add-row'),
+            status: document.getElementById('pa-junior-ocr-status')
+          },
+          senior: {
+            division: 'senior', label: 'Senior',
+            section: document.getElementById('pa-senior-rows-section'),
+            body: document.getElementById('pa-senior-rows-body'),
+            add: document.getElementById('pa-senior-add-row'),
+            status: document.getElementById('pa-senior-ocr-status')
+          }
+        };
+        var ocrGeneration = { main: 0, junior: 0, senior: 0 };
+        var ocrQueue = Promise.resolve();
         if (!$email.value) $email.value = STAFF_EMAIL;
 
         // ── Extracted-pairings review table (staff can fix/add/remove rows) ──
-        function addRow(table, p1, p2) {
+        function updateRowsCardVisibility() {
+          $rowsCard.hidden = !Object.keys(rowControls).some(function (key) {
+            return !rowControls[key].section.hidden;
+          });
+        }
+
+        function clearRows(key, hideSection) {
+          var controls = rowControls[key];
+          controls.body.innerHTML = '';
+          controls.status.textContent = '';
+          controls.status.className = 'pa-status';
+          controls.section.hidden = !!hideSection;
+          updateRowsCardVisibility();
+        }
+
+        function addRow(key, table, p1, p2) {
+          var controls = rowControls[key];
           var tr = document.createElement('tr');
+          tr.dataset.division = controls.division;
           tr.innerHTML =
             '<td data-label="Table"><input type="text" class="pa-row-table" inputmode="numeric" aria-label="Table number"></td>' +
             '<td data-label="Player 1"><input type="text" class="pa-row-p1" aria-label="Player 1"></td>' +
@@ -350,23 +438,34 @@
           tr.querySelector('.pa-row-p1').value = p1 || '';
           tr.querySelector('.pa-row-p2').value = p2 || '';
           tr.querySelector('.pa-row-del').addEventListener('click', function () { tr.remove(); });
-          $rowsBody.appendChild(tr);
+          controls.section.hidden = false;
+          $rowsCard.hidden = false;
+          controls.body.appendChild(tr);
         }
 
-        $addRow.addEventListener('click', function () {
-          addRow('', '', '');
-          $rowsCard.hidden = false;
+        Object.keys(rowControls).forEach(function (key) {
+          rowControls[key].add.addEventListener('click', function () {
+            addRow(key, '', '', '');
+          });
         });
 
         function collectRows() {
           var rows = [];
-          $rowsBody.querySelectorAll('tr').forEach(function (tr) {
-            var table = tr.querySelector('.pa-row-table').value.trim();
-            var p1 = tr.querySelector('.pa-row-p1').value.trim();
-            var p2 = tr.querySelector('.pa-row-p2').value.trim();
-            if (!p1 && !p2) return;
-            var tableNum = parseInt(table, 10);
-            rows.push({ table: table && !isNaN(tableNum) ? tableNum : table, p1: p1, p2: p2 });
+          Object.keys(rowControls).forEach(function (key) {
+            var controls = rowControls[key];
+            controls.body.querySelectorAll('tr').forEach(function (tr) {
+              var table = tr.querySelector('.pa-row-table').value.trim();
+              var p1 = tr.querySelector('.pa-row-p1').value.trim();
+              var p2 = tr.querySelector('.pa-row-p2').value.trim();
+              if (!p1 && !p2) return;
+              var tableNum = parseInt(table, 10);
+              rows.push({
+                division: controls.division,
+                table: table && !isNaN(tableNum) ? tableNum : table,
+                p1: p1,
+                p2: p2
+              });
+            });
           });
           return rows;
         }
@@ -700,16 +799,32 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v11';
+        var OCR_BUILD = 'v12';
         var $build = document.getElementById('pa-build');
         if ($build) $build.textContent = OCR_BUILD;
 
-        function runOcr(img) {
-          console.log('[pairings OCR] build: ' + OCR_BUILD);
-          $rowsBody.innerHTML = '';
+        function isCurrentOcr(key, img, generation) {
+          return ocrGeneration[key] === generation && selectedImages[key] === img;
+        }
+
+        function queueOcr(key, img, generation) {
+          var controls = rowControls[key];
+          controls.section.hidden = false;
           $rowsCard.hidden = false;
-          $ocrStatus.textContent = 'Reading pairings from the photo… (~10–20s)';
-          $ocrStatus.className = 'pa-status busy';
+          controls.status.textContent = 'Waiting to read ' + controls.label + ' pairings…';
+          controls.status.className = 'pa-status busy';
+          ocrQueue = ocrQueue.catch(function () {}).then(function () {
+            return runOcr(key, img, generation);
+          });
+        }
+
+        function runOcr(key, img, generation) {
+          var controls = rowControls[key];
+          if (!isCurrentOcr(key, img, generation)) return Promise.resolve();
+          console.log('[pairings OCR] ' + controls.label + ' build: ' + OCR_BUILD);
+          controls.body.innerHTML = '';
+          controls.status.textContent = 'Reading ' + controls.label + ' pairings… (~10–20s)';
+          controls.status.className = 'pa-status busy';
 
           // Independent, higher-res canvas for OCR — the publish copy above is
           // compressed for Firestore size, which would hurt text recognition.
@@ -723,8 +838,10 @@
           ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
 
-          loadTesseractWorker().then(function (worker) {
+          return loadTesseractWorker().then(function (worker) {
+            if (!isCurrentOcr(key, img, generation)) return [];
             return worker.recognize(c, {}, { blocks: true }).then(function (result) {
+              if (!isCurrentOcr(key, img, generation)) return [];
               var rowObjs = reconstructRows(flattenLines(result.data || {}));
               if (!rowObjs.length) {
                 rowObjs = ((result.data && result.data.text) || '').split('\n').map(function (t) {
@@ -735,13 +852,13 @@
               // Debugging aid: if row extraction is missing/wrong entries, check
               // these in the browser console — "reconstructed" shows what the
               // parser actually saw, one row per line.
-              console.log('[pairings OCR] reconstructed rows:\n' +
+              console.log('[pairings OCR] ' + controls.label + ' reconstructed rows:\n' +
                 rowObjs.map(function (r) { return r.text; }).join('\n'));
               if (rows.some(function (r) { return !r.table; })) {
-                $ocrStatus.textContent = 'Reading table numbers…';
+                controls.status.textContent = 'Reading ' + controls.label + ' table numbers…';
               }
               function logBlanks(label) {
-                console.log('[pairings OCR] table# blanks after ' + label + ': ' +
+                console.log('[pairings OCR] ' + controls.label + ' table# blanks after ' + label + ': ' +
                   rows.filter(function (r) { return !r.table; }).length + '/' + rows.length);
               }
               logBlanks('page pass');
@@ -751,28 +868,30 @@
                 logBlanks('mirror fill');
                 sequenceFillTables(rows);
                 logBlanks('sequence fill');
-                console.log('[pairings OCR] tables: ' +
+                console.log('[pairings OCR] ' + controls.label + ' tables: ' +
                   rows.map(function (r) { return r.table || '·'; }).join(' '));
-                console.log('[pairings OCR] parsed:', rows);
+                console.log('[pairings OCR] ' + controls.label + ' parsed:', rows);
                 return rows;
               });
             });
           }).then(function (rows) {
+            if (!isCurrentOcr(key, img, generation)) return;
             if (!rows.length) {
-              $ocrStatus.textContent = "Couldn't auto-read any rows — add them manually below, or just publish the photo as-is.";
-              $ocrStatus.className = 'pa-status err';
+              controls.status.textContent = "Couldn't auto-read any rows — add them manually, or publish the photo as-is.";
+              controls.status.className = 'pa-status err';
             } else {
-              rows.forEach(function (r) { addRow(r.table, r.p1, r.p2); });
+              rows.forEach(function (r) { addRow(key, r.table, r.p1, r.p2); });
               var blanks = rows.filter(function (r) { return !r.table; }).length;
-              $ocrStatus.textContent = 'Found ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') +
+              controls.status.textContent = 'Found ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') +
                 (blanks ? ' (' + blanks + ' missing a table # — fill those in)' : '') +
                 ' — check them before publishing.';
-              $ocrStatus.className = 'pa-status ok';
+              controls.status.className = 'pa-status ok';
             }
           }).catch(function (err) {
-            $ocrStatus.textContent = 'Auto-read failed (' + (err && err.message ? err.message : 'error') +
-              ') — add rows manually below, or just publish the photo as-is.';
-            $ocrStatus.className = 'pa-status err';
+            if (!isCurrentOcr(key, img, generation)) return;
+            controls.status.textContent = 'Auto-read failed (' + (err && err.message ? err.message : 'error') +
+              ') — add rows manually, or publish the photo as-is.';
+            controls.status.className = 'pa-status err';
           });
         }
 
@@ -919,28 +1038,28 @@
         function handleImageChange(key) {
           var controls = imageControls[key];
           var file = controls.file.files && controls.file.files[0];
-          if (key === 'main') {
-            $rowsCard.hidden = true;
-            $rowsBody.innerHTML = '';
-            $ocrStatus.textContent = '';
-          }
+          var generation = ++ocrGeneration[key];
+          selectedImages[key] = null;
+          compressed[key] = null;
+          clearRows(key, true);
           if (!file) {
-            selectedImages[key] = null;
             recompressImages();
             return;
           }
 
-          compressed[key] = null;
           refreshEnabled();
-          setStatus('Processing image' + (key === 'main' ? '' : 's') + '…', 'busy');
+          setStatus('Processing ' + rowControls[key].label + ' image…', 'busy');
           loadImage(file).then(function (img) {
+            if (generation !== ocrGeneration[key]) return;
             selectedImages[key] = img;
             recompressImages();
-            if (key === 'main') runOcr(img);
+            queueOcr(key, img, generation);
           }).catch(function (err) {
+            if (generation !== ocrGeneration[key]) return;
             selectedImages[key] = null;
             compressed[key] = null;
             controls.file.value = '';
+            clearRows(key, true);
             recompressImages();
             setStatus(err.message || 'Could not process that image.', 'err');
           });

@@ -207,25 +207,27 @@
             <div class="pr-division-list" id="pr-matches"></div>
             <p class="pr-nomatch" id="pr-nomatch" hidden>No name matches — check the spelling, or ask staff.</p>
           </div>
-          <h2 class="pr-photo-title" id="pr-main-photo-title" hidden>Masters / Open Division</h2>
-          <figure class="pr-figure" id="pr-figure">
-            <img id="pr-img" alt="Current round pairings">
-          </figure>
-          <section class="pr-photo-section" id="pr-junior-photo" aria-labelledby="pr-junior-photo-title" hidden>
-            <h2 class="pr-photo-title" id="pr-junior-photo-title">Junior Division</h2>
-            <figure class="pr-figure">
-              <img id="pr-junior-img" alt="Current round Junior pairings">
+          <div id="pr-photo-gallery">
+            <h2 class="pr-photo-title" id="pr-main-photo-title" hidden>Masters / Open Division</h2>
+            <figure class="pr-figure" id="pr-figure">
+              <img id="pr-img" alt="Current round pairings">
             </figure>
-          </section>
-          <section class="pr-photo-section" id="pr-senior-photo" aria-labelledby="pr-senior-photo-title" hidden>
-            <h2 class="pr-photo-title" id="pr-senior-photo-title">Senior Division</h2>
-            <figure class="pr-figure">
-              <img id="pr-senior-img" alt="Current round Senior pairings">
-            </figure>
-          </section>
+            <section class="pr-photo-section" id="pr-junior-photo" aria-labelledby="pr-junior-photo-title" hidden>
+              <h2 class="pr-photo-title" id="pr-junior-photo-title">Junior Division</h2>
+              <figure class="pr-figure">
+                <img id="pr-junior-img" alt="Current round Junior pairings">
+              </figure>
+            </section>
+            <section class="pr-photo-section" id="pr-senior-photo" aria-labelledby="pr-senior-photo-title" hidden>
+              <h2 class="pr-photo-title" id="pr-senior-photo-title">Senior Division</h2>
+              <figure class="pr-figure">
+                <img id="pr-senior-img" alt="Current round Senior pairings">
+              </figure>
+            </section>
+          </div>
           <p class="pr-hint" id="pr-hint-image">Tap an image to zoom · this page refreshes automatically</p>
           <p class="pr-hint" id="pr-hint-table" hidden>
-            <button type="button" class="pr-photo-link" id="pr-photo-toggle">View original photo</button>
+            <button type="button" class="pr-photo-link" id="pr-photo-toggle">View original screenshots</button>
             · this page refreshes automatically
           </p>
         </div>
@@ -280,6 +282,7 @@
         var $updated = document.getElementById('pr-updated');
         var $img = document.getElementById('pr-img');
         var $figure = document.getElementById('pr-figure');
+        var $photoGallery = document.getElementById('pr-photo-gallery');
         var $mainPhotoTitle = document.getElementById('pr-main-photo-title');
         var $juniorPhoto = document.getElementById('pr-junior-photo');
         var $juniorImg = document.getElementById('pr-junior-img');
@@ -354,7 +357,19 @@
           return 'masters';
         }
 
+        function normalizeDivision(value) {
+          var division = String(value || '').trim().toLowerCase();
+          if (division === 'junior' || division === 'juniors' || division === 'jr') return 'junior';
+          if (division === 'senior' || division === 'seniors' || division === 'sr') return 'senior';
+          if (division === 'master' || division === 'masters' || division === 'ma' || division === 'main') return 'masters';
+          if (division === 'open') return 'open';
+          return '';
+        }
+
         function pairingDivision(pair) {
+          pair = pair || {};
+          var explicitDivision = normalizeDivision(pair.division);
+          if (explicitDivision) return explicitDivision;
           var p1Division = divisionFromName(pair.p1);
           var p2Division = divisionFromName(pair.p2);
           if (p1Division && p2Division && p1Division !== p2Division) return 'open';
@@ -424,9 +439,9 @@
           var grouped = { junior: [], senior: [], masters: [], open: [] };
           pairs.forEach(function (pair) { grouped[pairingDivision(pair)].push(pair); });
 
-          // Keep the original flat list for events without age divisions.
-          // Once a JR or SR marker is present, separate all rows into clear
-          // Pokémon-style division sections while preserving every pairing.
+          // Keep the original flat list for legacy events without age divisions.
+          // Explicit uploader labels (or legacy JR/SR name suffixes) separate
+          // rows into clear Pokémon-style sections while preserving every pair.
           if (!grouped.junior.length && !grouped.senior.length) {
             $matches.appendChild(pairList(pairs));
             return;
@@ -460,11 +475,10 @@
         });
 
         $photoToggle.addEventListener('click', function () {
-          if (!$img.hasAttribute('src')) return;
-          $zoomImg.src = $img.currentSrc || $img.src;
-          $zoomImg.alt = $img.alt + ', zoomed';
-          $zoom.classList.add('open');
-          $zoom.setAttribute('aria-hidden', 'false');
+          $photoGallery.hidden = !$photoGallery.hidden;
+          $photoToggle.textContent = $photoGallery.hidden
+            ? 'View original screenshots'
+            : 'Hide original screenshots';
         });
 
         function timeAgo(date) {
@@ -502,8 +516,10 @@
             setPairingImage($img, images.main);
             setPairingImage($juniorImg, images.junior);
             setPairingImage($seniorImg, images.senior);
+            $figure.hidden = !images.main;
             $juniorPhoto.hidden = !images.junior;
             $seniorPhoto.hidden = !images.senior;
+            $mainPhotoTitle.hidden = !images.main || (!images.junior && !images.senior);
             lastVersion = version;
           }
           $event.textContent = doc.event || 'Pairings';
@@ -520,10 +536,14 @@
             renderRows(doc.pairs);
           }
           $tableSection.hidden = !hasPairs;
-          $figure.hidden = hasPairs;
-          $mainPhotoTitle.hidden = hasPairs || ($juniorPhoto.hidden && $seniorPhoto.hidden);
           $hintTable.hidden = !hasPairs;
           $hintImage.hidden = hasPairs;
+          if (hasPairs && changed) {
+            $photoGallery.hidden = true;
+            $photoToggle.textContent = 'View original screenshots';
+          } else if (!hasPairs) {
+            $photoGallery.hidden = false;
+          }
 
           show($content);
         }
