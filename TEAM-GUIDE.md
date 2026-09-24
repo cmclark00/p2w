@@ -24,6 +24,7 @@ is nothing here you can permanently break.
   - [Update an FAQ answer](#update-an-faq-answer)
   - [Add or edit a calendar event](#add-or-edit-a-calendar-event)
   - [Post tournament pairings for players](#post-tournament-pairings)
+  - [Use the trade-in calculator](#trade-in-calculator)
   - [Edit the careers page](#edit-the-careers-page)
   - [Swap out a featured Google review](#swap-out-a-featured-google-review)
   - [Update the Google review link](#update-the-google-review-link)
@@ -583,6 +584,68 @@ wins.
 
 ---
 
+### Use the trade-in calculator <a id="trade-in-calculator"></a>
+
+**What it is:** a staff-only page at **`play2wingames.com/trade-in/`**
+(bookmark it; it isn't linked anywhere and search engines are told to
+ignore it). It works out cash and store credit offers for every item.
+
+- **Games:** scan the barcode or type the name. Prices come from
+  PriceCharting and follow the Game Buying Guide rules.
+- **Consoles, handhelds, and controllers:** type the name. Prices come
+  from the buying guide.
+
+**This is NOT the GitHub editor.** Nothing here needs a GitHub account,
+and prices are changed on the page itself, not in the code.
+
+**Logging in:** there are two passwords (get them from a manager):
+- **Staff password:** run trade-ins.
+- **Manager password:** also change prices (Hardware Prices tab), the
+  cash/credit percentages and buying guide lists (Settings tab), and the
+  PriceCharting token.
+
+A device stays logged in for 30 days. After 8 wrong passwords in a row,
+that device is locked out for 15 minutes.
+
+**At the counter:**
+
+1. Scan each game's barcode into the big box. It's selected
+   automatically, and the scanner types into it like a keyboard. Scanning
+   the same game again adds 1 to its quantity.
+2. For consoles, handhelds, and controllers, type part of the name (for
+   example `ps2`, `wavebird`, or `3ds xl`), then click **Complete**,
+   **Console only**, **Working**, or **Parts**.
+3. Set each game's condition (**Loose / CIB / New**). Use a line's
+   **+ Deduction** menu for scratches, a broken case, or missing cords and
+   controllers.
+4. Read the badges. They explain guide rules (disc-only, shitbox game,
+   don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
+   Mark".
+5. The bottom bar shows the **cash** and **store credit** totals. **Print
+   quote** prints a copy for the customer, and **New trade** clears the list.
+
+**Changing prices (managers):**
+- **Buying guide prices:** edit them on the **Hardware Prices** tab and
+  click **Save changes**.
+- **Everything else:** percentages, deductions, and the dead-games and
+  sports lists are on the **Settings** tab.
+- Changes apply to every device right away.
+
+**If staff turnover happens:** a manager can change either password under
+**Settings → Passwords**. Changing a password logs out every other device.
+
+**Tips & gotchas:**
+- **Demo mode (yellow bar)** means no PriceCharting token is saved, so game
+  prices are fake. A manager adds the token under **Settings**.
+- **"Looking up…" rows** when scanning a stack quickly are normal.
+  PriceCharting allows one lookup per second, so they fill in one at a time.
+- **Forgot the manager password, or need a fresh start?** Contact the dev.
+  The saved passwords, token, and prices live in a private folder on the
+  GoDaddy hosting account (`p2w-trade-in-data`, next to `public_html`),
+  **not** in GitHub.
+
+---
+
 ### Edit the careers page
 
 **When to do this:** You want to change the listed roles, the
@@ -807,6 +870,7 @@ certainly break the site. **Always contact the dev for these.**
 | `sitemap.xml`, `robots.txt` | Tell Google what to index | Not user-visible but important for being found in search |
 | `CLAUDE.md` | Technical-developer documentation | Not the team guide — that's this file |
 | `.gitignore` | Tells Git what to skip | Editing wrong can leak private info |
+| `trade-in/` | The staff trade-in calculator's code | Prices and settings are changed **on the page** by a manager, never in these files |
 
 **Rule of thumb:** if it doesn't end in `.html`, and you're not sure,
 **ask first.**

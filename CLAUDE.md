@@ -200,6 +200,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
 | `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + required Masters/Open screenshot + optional Junior/Senior screenshots (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
+| `trade-in/` | **Hidden staff trade-in calculator** (`index.html` + `app.js` + `styles.css` + PHP back end `api.php`). Scan/search games (PriceCharting API) and consoles/controllers (Game Buying Guide prices) → cash + store credit per line. Staff/manager logins. `noindex` (meta + `X-Robots-Tag` in `trade-in/.htaccess`), not in nav, not in sitemap. See **Trade-in calculator** below. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -441,6 +442,71 @@ the Konami leaderboard (`p2w-leaderboard`).
   NFC/printed signage at the same URL. (If a shorter URL is wanted later, add a
   `/pairings/` redirect folder mirroring `discord/index.html`.)
 
+## Trade-in calculator (staff tool, `trade-in/`)
+
+The site's **only server-side code**. Everything else is static.
+
+- **Why PHP:** the PriceCharting API token must never reach a browser.
+  `api.php` proxies PriceCharting (keeps to its 1 call/sec limit with a
+  file lock, caches successful lookups for 30 min) and stores settings and
+  prices. GoDaddy cPanel runs it natively; the code avoids PHP 8-only
+  syntax so it works on 7.4+.
+- **Private data lives OUTSIDE the docroot** in
+  `<home>/p2w-trade-in-data/`, next to `public_html`. It holds
+  `config.json` (bcrypt password hashes, cookie-signing secret, token),
+  `settings.json`, `hardware.json` (each with a `.bak`), and `cache/`.
+  Two reasons, both load-bearing:
+  1. The repo is public.
+  2. The deploy's `lftp mirror --delete` prunes anything in `public_html`
+     that isn't in the repo; the FTP account is chrooted there and can't
+     reach the data folder.
+
+  **Never commit tokens or passwords, and never move this data into the
+  repo.** Override the location with the `P2W_TRADEIN_DATA` env var (used
+  for local testing).
+- **Auth:** two roles, **staff** (run trade-ins) and **manager** (also edit
+  Hardware Prices, Settings, token, and passwords).
+  - The login cookie is HMAC-signed (`payload.sig`, 30 days, HttpOnly,
+    Secure on HTTPS, `SameSite=Strict`, path `/trade-in/`). There are no
+    PHP sessions, so shared-host session GC can't log staff out.
+  - Changing a password bumps `sessionVersion`, which logs out every device.
+  - Login and setup are limited to 8 failures per IP per 15 minutes
+    (`login-attempts.json`).
+  - Writes must be JSON (`415` otherwise), and `Sec-Fetch-Site: cross-site`
+    is refused.
+- **First-time setup** needs a one-time setup code. Only its SHA-256 is in
+  `api.php` (`SETUP_CODE_SHA256`); the code was given to the owner. Setup
+  locks itself once `config.json` exists. **To reset everything:** delete
+  `p2w-trade-in-data/config.json` in cPanel File Manager, put a new code's
+  hash in `SETUP_CODE_SHA256` (SHA-256 of the code, uppercase, no dashes),
+  and deploy.
+- **`trade-in/.htaccess` must not contain `RewriteEngine`.** A per-directory
+  rewrite block stops the root `.htaccess` HTTPS/www rules from applying to
+  these URLs. It only sets headers (`noindex` + `no-cache` on html/js/css).
+- **Same front end runs offline on the shop PC.** The
+  `TradeInCalculator` folder (outside this repo) runs a PowerShell server
+  (`server.ps1`) with no logins (`status.auth: false`, role `manager`).
+  - It answers the same `api.php?route=…` URLs.
+  - The front end uses `../assets/…` paths, which resolve to the site's
+    `/assets` online and to the local copy's `/assets` offline.
+  - `index.html`, `app.js`, and `styles.css` are byte-identical in both
+    places. **Keep them in sync** when editing; this repo is the source of
+    truth.
+- **Pricing rules live in `app.js`** as `DEFAULT_SETTINGS` and
+  `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
+  Sheet). Once a manager saves, the server copy wins. Code defaults only
+  seed a fresh install.
+  - Games: credit = 100% of PriceCharting retail buy, cash = 50%.
+  - Pokémon games: 75% / 50% of market.
+  - Hardware: guide cash price, credit +20%.
+  - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
+    ÷5 resurfacing rule, and the $0.25 stack.
+- ⚠ **Public copy disagrees with the calculator's game percentages.**
+  `faq.html` / `sell-trade.html` say game credit is "50% more than cash".
+  The calculator's policy (credit = retail buy, cash = half) makes credit
+  **100% more**. The owner needs to decide which is right; see **Notes**
+  below.
+
 ## Konami easter egg (BULKY-TRIS)
 
 - `konami.js` loaded (deferred) on all standard pages. Code
@@ -638,7 +704,11 @@ Three via **Formspree** (endpoints are public client-side by design):
   store credit" entry (visible + JSON-LD), `sell-trade.html` step 3 of
   the How-it-works flow, `bulk-rates.html` centered disclaimer (the
   "flat" half of the rule). All four must stay in sync if the numbers
-  ever change.
+  ever change. **Open question (Sept. 2026):** the owner described the
+  in-store game policy as credit = PriceCharting retail buy and cash = 50%
+  of that. That is credit **100%** more than cash, not 50%, and it's what
+  the `trade-in/` calculator uses. Confirm with the owner before changing
+  either side.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
   sell-framed copy (home "What we carry" 5th card, home split-section

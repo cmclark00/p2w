@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Trade-In Calculator · Play2Win</title>
+  <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
+  <link rel="icon" href="../favicon-32.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../assets/logo.jpg" alt="Play2Win Games">
+      <span>Trade-In Calculator</span>
+    </div>
+    <nav class="tabs" aria-label="Sections" hidden>
+      <button type="button" data-view="trade" class="active">Trade-In</button>
+      <button type="button" data-view="hardware">Hardware Prices</button>
+      <button type="button" data-view="settings">Settings</button>
+    </nav>
+    <div id="account" class="account" hidden>
+      <span id="accountRole" class="muted"></span>
+      <button id="logoutBtn" type="button" class="btn small">Log out</button>
+    </div>
+  </header>
+
+  <div id="demoBanner" class="banner" hidden>
+    <strong>Demo mode.</strong> Game prices are fake sample data until a PriceCharting API token is added.
+    <button type="button" class="link" data-goto="settings">Add token</button>
+  </div>
+
+  <main>
+    <!-- ============================================================ LOGIN / SETUP (website only) -->
+    <section id="view-auth" class="view" hidden>
+      <form id="authForm" class="panel auth-panel" novalidate>
+        <h1 id="authTitle">Staff login</h1>
+        <div id="loginFields">
+          <label>Password
+            <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password">
+          </label>
+          <p class="muted small-print">Staff and managers each have their own password. This device stays logged in for 30 days.</p>
+        </div>
+        <div id="setupFields" hidden>
+          <p class="muted">Enter the one-time setup code, then choose two passwords: a <strong>manager</strong> password (can change prices, settings, and the token) and a <strong>staff</strong> password (can run trade-ins).</p>
+          <label>Setup code
+            <input id="setupCode" name="setupCode" type="text" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-XXXXX-XXXXX">
+          </label>
+          <label>Manager password (8+ characters)
+            <input name="managerPassword" type="password" autocomplete="new-password">
+          </label>
+          <label>Manager password again
+            <input name="managerPassword2" type="password" autocomplete="new-password">
+          </label>
+          <label>Staff password (8+ characters, different from the manager's)
+            <input name="staffPassword" type="password" autocomplete="new-password">
+          </label>
+          <label>PriceCharting API token (optional, can be added later in Settings)
+            <input name="setupToken" type="password" autocomplete="off">
+          </label>
+        </div>
+        <p id="authError" class="error-text" role="alert"></p>
+        <button id="authSubmit" type="submit" class="btn primary">Log in</button>
+      </form>
+    </section>
+
+    <!-- ============================================================ TRADE -->
+    <section id="view-trade" class="view" hidden>
+      <div class="trade-head">
+        <div class="scan">
+          <label for="scanInput" class="eyebrow">Scan a barcode or search</label>
+          <div class="scan-row">
+            <input id="scanInput" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="Scan a UPC, or type a game / console name and press Enter">
+            <button id="searchBtn" type="button" class="btn primary">Search</button>
+            <button id="customBtn" type="button" class="btn">+ Custom item</button>
+          </div>
+          <div id="results" class="results" hidden></div>
+        </div>
+        <label class="customer">
+          <span class="eyebrow">Customer</span>
+          <input id="customerName" type="text" autocomplete="off" placeholder="Optional">
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table class="lines">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Type</th>
+              <th>Condition</th>
+              <th class="num">Qty</th>
+              <th class="num">Value ea.</th>
+              <th class="num">Cash</th>
+              <th class="num">Credit</th>
+              <th><span class="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody id="lineBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty">
+          <p><strong>No items yet.</strong></p>
+          <p>Scan a game's barcode, type a name and press Enter, or start typing a console or handheld to use your set prices.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ HARDWARE -->
+    <section id="view-hardware" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <h1>Hardware prices</h1>
+          <p class="muted">Cash prices from the Game Buying Guide for consoles, handhelds, controllers, and accessories. <span id="hwRuleNote"></span> Missing cords and controllers are deductions (Settings tab).</p>
+        </div>
+        <div class="toolbar">
+          <input id="hwFilter" type="search" placeholder="Filter…" autocomplete="off">
+          <button id="hwAdd" type="button" class="btn">+ Add item</button>
+          <button id="hwPasteToggle" type="button" class="btn">Paste from spreadsheet</button>
+          <button id="hwSave" type="button" class="btn primary" disabled>Save changes</button>
+        </div>
+      </div>
+
+      <div id="hwPastePanel" class="panel" hidden>
+        <p>Paste rows from Excel or Google Sheets (or type them), one item per line. Consoles and handhelds: <code>Name, Category, Complete, Console only, Parts</code>. Accessories: <code>Name, Accessory, Working, Parts</code>. Category can be Console, Handheld, Accessory, or Other. Rows whose name already exists update that item's prices.</p>
+        <textarea id="hwPasteText" rows="6" placeholder="PS2 Fat / Slim (PlayStation 2)	Console	65	20	5&#10;PS5 Controller (DualSense)	Accessory	20	2"></textarea>
+        <div class="row-end">
+          <button id="hwPasteCancel" type="button" class="btn">Cancel</button>
+          <button id="hwPasteApply" type="button" class="btn primary">Add rows</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="hw">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th class="num">Complete</th>
+              <th class="num">Console only / Working</th>
+              <th class="num">Parts</th>
+              <th><span class="sr-only">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody id="hwBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ SETTINGS -->
+    <section id="view-settings" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <h1>Settings</h1>
+          <p class="muted">Saved on this computer's calculator server, so every browser tab uses the same numbers.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>PriceCharting API token</h2>
+        <p class="muted">Find it on PriceCharting under <em>Subscription → API/Download</em>. It stays on this computer; the browser never sees it.</p>
+        <div class="token-row">
+          <input id="tokenInput" type="password" autocomplete="off" placeholder="Paste your 40-character token">
+          <button id="tokenSave" type="button" class="btn primary">Save token</button>
+          <button id="tokenTest" type="button" class="btn">Test connection</button>
+        </div>
+        <p id="tokenStatus" class="status"></p>
+      </div>
+
+      <div id="passwordPanel" class="panel" hidden>
+        <h2>Passwords</h2>
+        <p class="muted">Change either password (leave a box blank to keep it). Changing a password logs out every other device, so staff will need the new one.</p>
+        <div class="token-row">
+          <input id="newStaffPassword" type="password" autocomplete="new-password" placeholder="New staff password">
+          <input id="newManagerPassword" type="password" autocomplete="new-password" placeholder="New manager password">
+          <button id="passwordSave" type="button" class="btn primary">Change passwords</button>
+        </div>
+        <p id="passwordStatus" class="status"></p>
+      </div>
+
+      <form id="settingsForm" class="panel" novalidate>
+        <h2>Cash &amp; credit percentages</h2>
+        <p class="muted">Each item's value (its PriceCharting price or buying guide price, minus any deductions) × these percentages. Pokémon games are detected by name. Staff can switch any line's type.</p>
+        <div class="table-wrap">
+          <table class="rules">
+            <thead><tr><th>Category</th><th>Value comes from</th><th class="num">Cash % of value</th><th class="num">Credit % of value</th><th class="num">Example: $10.00 value</th></tr></thead>
+            <tbody id="rulesBody"></tbody>
+          </table>
+        </div>
+        <div class="grid-2 spaced">
+          <label>Default condition for scanned games
+            <select name="defaultCondition">
+              <option value="loose">Loose</option>
+              <option value="cib">CIB</option>
+              <option value="new">New / Sealed</option>
+            </select>
+          </label>
+        </div>
+
+        <h2>Deductions</h2>
+        <p class="muted">Staff add these to a line from its <em>+ Deduction</em> menu. They come off the item value before the percentages. For games, if deductions are more than the value, the item goes in the $0.25 stack. Tick <em>Resurfacing</em> for scratch deductions: the guide's flat prices are divided by 5 when resurfacing is needed.</p>
+        <div class="table-wrap">
+          <table class="deductions">
+            <thead><tr><th>Deduction</th><th>Applies to</th><th class="num">Amount</th><th class="center">Resurfacing</th><th><span class="sr-only">Delete</span></th></tr></thead>
+            <tbody id="dedBody"></tbody>
+          </table>
+        </div>
+        <div class="row-start"><button id="dedAdd" type="button" class="btn">+ Add deduction</button></div>
+
+        <h2>Game buying guide rules</h2>
+        <label class="check"><input type="checkbox" name="guideEnabled"> Apply the buying guide automatically to games</label>
+        <ul class="guide-summary muted">
+          <li><strong>Don't buy:</strong> PC games and the dead games below.</li>
+          <li><strong>Disc-only</strong> (Loose on a disc system): shitbox games $0.10 · under $10 $0.50 · $10–$20 $1.00 · over $20 priced normally.</li>
+          <li><strong>Shitbox games in box</strong> (CIB or New) $0.25 when worth $20 or less.</li>
+          <li><strong>Shitbox games:</strong> games needing an accessory, sports games (except the exceptions), and the listed titles. Staff can mark or unmark any game from its <em>+ Deduction</em> menu.</li>
+          <li>Flat guide amounts are paid the same in cash and credit. One title or keyword per line in each box.</li>
+        </ul>
+        <div class="grid-3 guide-lists">
+          <label>Dead games (don't buy)
+            <textarea name="deadGames" rows="8"></textarea>
+          </label>
+          <label>Needs-an-accessory keywords
+            <textarea name="accessoryKeywords" rows="8"></textarea>
+          </label>
+          <label>Other shitbox titles
+            <textarea name="lowValueTitles" rows="8"></textarea>
+          </label>
+          <label>Sports keywords
+            <textarea name="sportsKeywords" rows="8"></textarea>
+          </label>
+          <label>Sports exceptions (priced normally)
+            <textarea name="sportsExceptions" rows="8"></textarea>
+          </label>
+        </div>
+
+        <h2>Rounding &amp; flags</h2>
+        <div class="grid-3">
+          <label>Round offers
+            <select name="roundMode">
+              <option value="down">Down</option>
+              <option value="nearest">To nearest</option>
+            </select>
+          </label>
+          <label>to the nearest
+            <select name="roundStep">
+              <option value="1">$0.01</option>
+              <option value="5">$0.05</option>
+              <option value="25">$0.25</option>
+              <option value="50">$0.50</option>
+              <option value="100">$1.00</option>
+            </select>
+          </label>
+          <label>Flag items with cash offer under
+            <span class="money-input"><span>$</span><input name="lowValue" type="text" inputmode="decimal"></span>
+          </label>
+        </div>
+
+        <h2>Printed quote</h2>
+        <label>Shop name
+          <input name="shopName" type="text">
+        </label>
+        <label>Footer text
+          <textarea name="quoteFooter" rows="3"></textarea>
+        </label>
+
+        <div class="row-end">
+          <span id="settingsStatus" class="status"></span>
+          <button type="submit" class="btn primary">Save settings</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer id="totalsBar" class="totals">
+    <div class="count"><strong id="itemCount">0</strong> items<span id="needsPrice" class="warn-text" hidden></span></div>
+    <div class="total cash"><span>Cash</span><strong id="totalCash">$0.00</strong></div>
+    <div class="total credit"><span>Store credit</span><strong id="totalCredit">$0.00</strong></div>
+    <div class="actions">
+      <button id="printBtn" type="button" class="btn">Print quote</button>
+      <button id="clearBtn" type="button" class="btn danger">New trade</button>
+    </div>
+  </footer>
+
+  <div id="printArea" aria-hidden="true"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

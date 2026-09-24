@@ -1,0 +1,10 @@
+# Staff-only trade-in calculator. No rewrite rules here on purpose - a
+# RewriteEngine line in this folder would stop the root .htaccess
+# HTTPS/canonical-host rules from applying to these URLs.
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+  # Revalidate on every load so staff always get the latest calculator code.
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
