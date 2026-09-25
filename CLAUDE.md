@@ -500,7 +500,8 @@ The site's **only server-side code**. Everything else is static.
     (`GAME_CASH_PCT = 100 / 1.5`, kept exact rather than 66.67). This
     matches the public "games: credit 50% more than cash" copy.
   - Pokémon games: credit 75% of market, cash 50% (also credit ÷ 1.5).
-  - Hardware: guide cash price, credit +20%.
+  - Hardware: guide cash price, credit +20%. **Parts** is a flat parts
+    price: `takesDeductions()` skips deductions on hardware Parts lines.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack.
   - Saved settings carry a `version`. `mergeSettings` migrates older saves

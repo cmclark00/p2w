@@ -617,7 +617,8 @@ that device is locked out for 15 minutes.
    **Console only**, **Working**, or **Parts**.
 3. Set each game's condition (**Loose / CIB / New**). Use a line's
    **+ Deduction** menu for scratches, a broken case, or missing cords and
-   controllers.
+   controllers. (Parts is a flat price, so hardware on **Parts** has no
+   deductions.)
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".

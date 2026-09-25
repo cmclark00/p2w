@@ -367,7 +367,11 @@ function autoBase(line, rule) {
   return null;
 }
 
+// Hardware bought for parts is a flat parts price - missing cables/controllers don't matter.
+const takesDeductions = (line) => !(line.source === 'hw' && line.condition === 'parts');
+
 function lineDeductions(line, s = settings) {
+  if (!takesDeductions(line)) return []; // kept on the line in case it's switched back from Parts
   return (line.deductions || []).map((id) => s.deductions.find((d) => d.id === id)).filter(Boolean);
 }
 
@@ -564,7 +568,7 @@ function adjustHtml(line) {
   }
   const applied = new Set(line.deductions || []);
   const target = isGameCat(line.category) ? 'game' : 'hardware';
-  const dedOpts = settings.deductions.filter((d) => d.appliesTo === target && !applied.has(d.id))
+  const dedOpts = settings.deductions.filter((d) => takesDeductions(line) && d.appliesTo === target && !applied.has(d.id))
     .map((d) => `<option value="ded:${esc(d.id)}">${esc(d.label)} (−${money(d.amount)})</option>`).join('');
   let guideOpt = '';
   if (line.source === 'pc' && isGameCat(line.category) && settings.guide.enabled && !line.guideFlag) {
@@ -704,7 +708,7 @@ function onLineChange(e) {
   if (field === 'category') {
     line.category = v;
     const target = isGameCat(v) ? 'game' : 'hardware';
-    line.deductions = lineDeductions(line).filter((d) => d.appliesTo === target).map((d) => d.id);
+    line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === target);
     if (!isGameCat(v)) delete line.guideFlag;
     commit();
     return;
@@ -720,6 +724,7 @@ function onLineChange(e) {
     e.target.value = plain(line.override ?? auto);
   } else if (field === 'condition') {
     line.condition = v;
+    if (line.source === 'hw') { commit(); return; } // Parts hides/shows the deduction menu
   } else if (field === 'name') {
     line.name = v.trim();
   }
