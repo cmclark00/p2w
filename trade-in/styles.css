@@ -312,3 +312,40 @@ label.check { flex-direction: row; align-items: center; gap: 10px; color: var(--
 .auth-panel p { margin: 0; }
 .small-print { font-size: 0.85rem; }
 .error-text { color: #ff8a99; min-height: 1.2em; }
+
+/* ---------------------------------------------------------------- slow seller, split payout, complete trade, trade log */
+.badge.slow { background: rgba(241, 140, 60, 0.18); color: #ffb37a; }
+
+.split { display: flex; align-items: center; }
+.split-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+.split-box label { flex-direction: row; align-items: center; gap: 6px; color: var(--muted); }
+.split-box .money-input input { width: 80px; }
+.split-credit strong { color: var(--gold); }
+
+.dialog {
+  width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto;
+  padding: 22px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); color: var(--paper);
+}
+.dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.dialog form { display: flex; flex-direction: column; gap: 14px; }
+.dialog h2 { margin: 0; }
+.payout { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.payout legend { color: var(--muted); font-size: 0.85rem; padding: 0 6px; }
+.payout .choice { flex-direction: row; align-items: center; gap: 8px; color: var(--paper); flex-wrap: wrap; }
+.payout .choice input[type="radio"] { width: 18px; height: 18px; accent-color: var(--red); }
+.payout .money-input input { width: 90px; }
+#serialFields { display: flex; flex-direction: column; gap: 10px; }
+#serialFields:empty { display: none; }
+.dialog .row-end { margin-top: 4px; flex-wrap: wrap; }
+
+table.log tr.log-row { cursor: pointer; }
+table.log tr.log-row:hover td, table.log tr.log-row.open td { background: rgba(49, 94, 203, 0.12); }
+table.log tr.log-detail > td { background: var(--ink); padding: 14px 16px; }
+table.log-items { margin-bottom: 8px; }
+table.log-items th, table.log-items td { padding: 6px 8px; }
+
+@media print {
+  #printArea .print-payout { margin-top: 12px; font-size: 12pt; }
+  #printArea .print-sign { margin-top: 28px; }
+}

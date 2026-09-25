@@ -492,6 +492,29 @@ The site's **only server-side code**. Everything else is static.
   - `index.html`, `app.js`, and `styles.css` are byte-identical in both
     places. **Keep them in sync** when editing; this repo is the source of
     truth.
+- **Trade log** (`POST`/`GET api.php?route=trades`): "Complete trade" saves
+  a JSON record per trade to `p2w-trade-in-data/trades/YYYY-MM.jsonl`.
+  - Each file holds one object per line, one file per UTC month.
+  - The log is **append-only by design** (no edit or delete route).
+  - The server adds `id`, `time` (UTC ISO), and `role`. The client sends
+    staff name, customer, payout (`cash` / `credit` / `split` with cents),
+    totals, per-item snapshot (incl. serials), `idChecked`, and notes.
+  - Search is a case-insensitive substring match on the raw JSON line,
+    newest first. It returns at most 100 results from the last 36 months.
+  - Both roles can read and write it.
+  - It holds customer names, so it lives with the other private data. Don't
+    add ID numbers or DOBs to it; only an "ID checked" flag is stored.
+  - The shop PC's `server.ps1` implements the same two routes with its own
+    `data\trades` folder, so the offline log is separate from the website's.
+- **Split payouts** are proportional (`splitPayout()`): taking $X of the
+  cash total converts the rest at the trade's own credit/cash ratio, so
+  mixed categories (games +50%, hardware +20%) stay fair.
+- **PriceCharting extras** kept on each line:
+  - `sales-volume` (units sold per year) drives the "Slow seller" badge
+    (`settings.slowSalesPerYear`, default 50, only on items worth $10+).
+  - `gamestop-trade-price` / `gamestop-price` (GameStop's cash trade and
+    pre-owned sell price) show on the reference line. PriceCharting uses
+    `0` when GameStop doesn't carry an item, so those are hidden.
 - **Pricing rules live in `app.js`** as `DEFAULT_SETTINGS` and
   `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
   Sheet). Once a manager saves, the server copy wins. Code defaults only

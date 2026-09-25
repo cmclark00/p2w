@@ -20,6 +20,7 @@
  *   PUT  settings | hardware     manager
  *   PUT  token | passwords       manager
  *   GET  pc/product (id|upc|q), pc/products (q)   any logged-in user
+ *   POST trades / GET trades (q) completed-trade log, any logged-in user
  */
 
 declare(strict_types=1);
@@ -415,6 +416,38 @@ switch ("$method $route") {
     $q = (string)($_GET['q'] ?? '');
     if ($q === '') fail(400, 'Pass q.');
     pricecharting('products', 'q', $q);
+
+  // Trade log: one JSON object per line, one file per month (trades/2026-09.jsonl). Append-only -
+  // there is deliberately no edit or delete route.
+  case 'POST trades':
+    require_role('staff');
+    $raw = (string)file_get_contents('php://input');
+    if (strlen($raw) > 262144) fail(413, 'That trade is too large to save.');
+    $record = json_decode($raw, true);
+    if (!is_array($record) || array_values($record) === $record || !is_array($record['items'] ?? null) || !$record['items']) {
+      fail(400, 'That trade is not in the right format.');
+    }
+    $record = ['id' => bin2hex(random_bytes(6)), 'time' => gmdate('c'), 'role' => current_role()] + $record;
+    $dir = data_path('trades');
+    if (!is_dir($dir) && !@mkdir($dir, 0700)) fail(500, 'Could not create the trade log folder.');
+    $line = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+    if (file_put_contents($dir . '/' . gmdate('Y-m') . '.jsonl', $line, FILE_APPEND | LOCK_EX) === false) fail(500, 'Could not save the trade.');
+    respond(200, ['ok' => true, 'id' => $record['id'], 'time' => $record['time']]);
+
+  case 'GET trades':
+    require_role('staff');
+    $q = strtolower(trim((string)($_GET['q'] ?? '')));
+    $found = [];
+    $files = glob(data_path('trades') . '/*.jsonl') ?: [];
+    rsort($files); // newest month first
+    foreach (array_slice($files, 0, 36) as $file) { // search back 3 years
+      $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+      for ($i = count($lines) - 1; $i >= 0 && count($found) < 100; $i--) {
+        if ($q === '' || strpos(strtolower($lines[$i]), $q) !== false) $found[] = $lines[$i];
+      }
+      if (count($found) >= 100) break;
+    }
+    respond_raw(200, '[' . implode(',', $found) . ']');
 
   default:
     fail(404, "No route for $method $route");

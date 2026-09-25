@@ -17,6 +17,7 @@
     </div>
     <nav class="tabs" aria-label="Sections" hidden>
       <button type="button" data-view="trade" class="active">Trade-In</button>
+      <button type="button" data-view="log">Trade Log</button>
       <button type="button" data-view="hardware">Hardware Prices</button>
       <button type="button" data-view="settings">Settings</button>
     </nav>
@@ -150,6 +151,27 @@
       </div>
     </section>
 
+    <!-- ============================================================ TRADE LOG -->
+    <section id="view-log" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <h1>Trade log</h1>
+          <p class="muted">Every completed trade, newest first. Search by customer, staff name, item, or serial number. Click a trade for details.</p>
+        </div>
+        <div class="toolbar">
+          <input id="logSearch" type="search" placeholder="Search trades…" autocomplete="off">
+          <button id="logSearchBtn" type="button" class="btn">Search</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="log">
+          <thead><tr><th>Date</th><th>Customer</th><th>Staff</th><th class="num">Items</th><th>Payout</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+      <p id="logNote" class="muted small-print"></p>
+    </section>
+
     <!-- ============================================================ SETTINGS -->
     <section id="view-settings" class="view" hidden>
       <div class="section-head">
@@ -257,6 +279,9 @@
           <label>Flag items with cash offer under
             <span class="money-input"><span>$</span><input name="lowValue" type="text" inputmode="decimal"></span>
           </label>
+          <label>Flag slow sellers (worth $10+) selling fewer than
+            <span class="pct-input"><input name="slowSalesPerYear" type="number" min="0" step="1"><span>a year (0 = off)</span></span>
+          </label>
         </div>
 
         <h2>Printed quote</h2>
@@ -279,11 +304,54 @@
     <div class="count"><strong id="itemCount">0</strong> items<span id="needsPrice" class="warn-text" hidden></span></div>
     <div class="total cash"><span>Cash</span><strong id="totalCash">$0.00</strong></div>
     <div class="total credit"><span>Store credit</span><strong id="totalCredit">$0.00</strong></div>
+    <div class="split">
+      <button id="splitBtn" type="button" class="btn small">Split payout</button>
+      <div id="splitBox" class="split-box" hidden>
+        <label>Cash <span class="money-input"><span>$</span><input id="splitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></span></label>
+        <span class="split-credit">+ <strong id="splitCredit">$0.00</strong> credit</span>
+        <button id="splitClear" type="button" class="icon-btn" title="Cancel split" aria-label="Cancel split">×</button>
+      </div>
+    </div>
     <div class="actions">
       <button id="printBtn" type="button" class="btn">Print quote</button>
+      <button id="completeBtn" type="button" class="btn primary">Complete trade</button>
       <button id="clearBtn" type="button" class="btn danger">New trade</button>
     </div>
   </footer>
+
+  <!-- Complete trade: payout choice, serials, ID check -> saved to the trade log -->
+  <dialog id="completeDialog" class="dialog">
+    <form id="completeForm" method="dialog" novalidate>
+      <h2>Complete trade</h2>
+      <fieldset class="payout">
+        <legend>Customer is taking</legend>
+        <label class="choice"><input type="radio" name="payout" value="cash"> Cash <strong id="payCash"></strong></label>
+        <label class="choice"><input type="radio" name="payout" value="credit"> Store credit <strong id="payCredit"></strong></label>
+        <label class="choice"><input type="radio" name="payout" value="split"> Split:
+          <span class="money-input"><span>$</span><input id="paySplitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></span>
+          cash + <strong id="paySplitCredit">$0.00</strong> credit</label>
+      </fieldset>
+      <div class="grid-2">
+        <label>Your name
+          <input id="staffName" type="text" autocomplete="off" placeholder="Who bought this in">
+        </label>
+        <label>Customer
+          <input id="completeCustomer" type="text" autocomplete="off" placeholder="Optional">
+        </label>
+      </div>
+      <div id="serialFields"></div>
+      <label id="idCheckRow" class="check" hidden><input id="idChecked" type="checkbox"> Photo ID checked (required for consoles and handhelds with serial numbers)</label>
+      <label>Notes
+        <textarea id="completeNotes" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <p id="completeError" class="error-text" role="alert"></p>
+      <div class="row-end">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button id="completePrint" type="button" class="btn">Save &amp; print receipt</button>
+        <button id="completeSave" type="button" class="btn primary">Save trade</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="printArea" aria-hidden="true"></div>
   <div id="toast" role="status" aria-live="polite"></div>

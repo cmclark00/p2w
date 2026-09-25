@@ -624,6 +624,29 @@ that device is locked out for 15 minutes.
    Mark".
 5. The bottom bar shows the **cash** and **store credit** totals. **Print
    quote** prints a copy for the customer, and **New trade** clears the list.
+6. **Part cash, part credit?** Click **Split payout** and type how much
+   they want in cash. The rest is shown as store credit at the same rates.
+7. When the customer agrees, click **Complete trade**:
+   - Pick what they're taking: cash, store credit, or the split.
+   - Type your name. It's remembered on that device.
+   - Enter serial numbers for consoles and handhelds, and tick **Photo ID
+     checked**. The trade won't save without it when there's serialized
+     hardware.
+   - **Save trade**, or **Save & print receipt** for a copy with a
+     signature line.
+   The trade is saved to the **Trade Log** and the screen clears for the
+   next customer.
+
+**Trade Log tab:** every completed trade, newest first. Search by customer,
+staff name, item, or serial number, and click a trade to see its items or
+reprint the receipt. Trades can't be edited or deleted, so if one is saved
+wrong, add a note on the next one or tell a manager.
+
+**Extra info on game lines:**
+- **"Slow seller" badge:** fewer than 50 copies sell per year and it's worth
+  $10+. Check eBay sold listings before making an offer.
+- **"GameStop: pays $X cash":** what GameStop would give in cash, which is
+  handy when a customer mentions GameStop.
 
 **Changing prices (managers):**
 - **Your price instead of PriceCharting's:** add an item on the

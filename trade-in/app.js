@@ -31,6 +31,8 @@ const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| 
 
 // Game cash = PriceCharting price ÷ 1.5 (store credit is 50% more than cash). Kept exact, not 66.67.
 const GAME_CASH_PCT = 100 / 1.5;
+// Slow-seller flags only matter on items worth this much (cents); cheap items get the guide's flat prices.
+const SLOW_SELLER_MIN_VALUE = 1000;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
@@ -47,6 +49,7 @@ const DEFAULT_SETTINGS = {
   roundMode: 'down',
   roundStep: 1,   // cents
   lowValue: 100,  // cents - flag items whose cash offer is under this
+  slowSalesPerYear: 50, // flag items selling fewer copies a year than this on PriceCharting (0 = off)
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
     { id: 'scratch-heavy', label: 'Heavy scratching (resurface)', amount: 300, appliesTo: 'game', resurface: true },
@@ -142,7 +145,7 @@ const SEED_HARDWARE = {
 
 // Fake sample products used until an API token is saved (same shape as the PriceCharting API).
 const DEMO_PRODUCTS = [
-  { id: 'demo-1', 'product-name': 'Super Mario 64', 'console-name': 'Nintendo 64', upc: '045496870010', genre: 'Platformer', 'loose-price': 3150, 'cib-price': 8900, 'new-price': 52000, 'retail-loose-buy': 1900, 'retail-cib-buy': 5300, 'retail-new-buy': 31000 },
+  { id: 'demo-1', 'product-name': 'Super Mario 64', 'console-name': 'Nintendo 64', upc: '045496870010', genre: 'Platformer', 'sales-volume': 6709, 'gamestop-trade-price': 1540, 'gamestop-price': 5499, 'loose-price': 3150, 'cib-price': 8900, 'new-price': 52000, 'retail-loose-buy': 1900, 'retail-cib-buy': 5300, 'retail-new-buy': 31000 },
   { id: 'demo-2', 'product-name': 'Zelda Ocarina of Time', 'console-name': 'Nintendo 64', upc: '045496870027', genre: 'Action & Adventure', 'loose-price': 3800, 'cib-price': 11500, 'new-price': 61000, 'retail-loose-buy': 2300, 'retail-cib-buy': 6900, 'retail-new-buy': 36500 },
   { id: 'demo-3', 'product-name': 'Pokemon Emerald', 'console-name': 'GameBoy Advance', upc: '045496736897', genre: 'RPG', 'loose-price': 11000, 'cib-price': 29500, 'new-price': 98000, 'retail-loose-buy': 6600, 'retail-cib-buy': 17700, 'retail-new-buy': 58800 },
   { id: 'demo-4', 'product-name': 'Halo 3', 'console-name': 'Xbox 360', upc: '882224445508', genre: 'FPS', 'loose-price': 450, 'cib-price': 800, 'new-price': 2600, 'retail-loose-buy': 200, 'retail-cib-buy': 450, 'retail-new-buy': 1500 },
@@ -154,6 +157,7 @@ const DEMO_PRODUCTS = [
   { id: 'demo-10', 'product-name': 'God of War', 'console-name': 'Playstation 2', upc: '711719735728', genre: 'Action & Adventure', 'loose-price': 1450, 'cib-price': 2100, 'new-price': 9000, 'retail-loose-buy': 800, 'retail-cib-buy': 1200, 'retail-new-buy': 5400 },
   { id: 'demo-11', 'product-name': 'Kinect Adventures', 'console-name': 'Xbox 360', upc: '885370201915', genre: 'Party', 'loose-price': 300, 'cib-price': 500, 'new-price': 1500, 'retail-loose-buy': 100, 'retail-cib-buy': 250, 'retail-new-buy': 900 },
   { id: 'demo-12', 'product-name': 'Anthem', 'console-name': 'Playstation 4', upc: '014633736977', genre: 'Action & Adventure', 'loose-price': 250, 'cib-price': 350, 'new-price': 900, 'retail-loose-buy': 100, 'retail-cib-buy': 150, 'retail-new-buy': 500 },
+  { id: 'demo-13', 'product-name': 'Super Mario 64 [Not for Resale]', 'console-name': 'Nintendo 64', upc: '045496870034', genre: 'Platformer', 'sales-volume': 14, 'loose-price': 17235, 'cib-price': 45000, 'new-price': 120000, 'retail-loose-buy': 9000, 'retail-cib-buy': 25000, 'retail-new-buy': 70000 },
 ];
 
 /* ================================================================== helpers */
@@ -195,7 +199,7 @@ const store = {
 function mergeSettings(saved) {
   const s = clone(DEFAULT_SETTINGS);
   if (!saved || typeof saved !== 'object') return s;
-  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'shopName', 'quoteFooter']) {
+  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'shopName', 'quoteFooter']) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
   if (saved.version >= 2) { // version 1 saves used a different percentage format - keep the new defaults
@@ -297,9 +301,12 @@ const PC = {
 function slimProduct(p) {
   const prices = {};
   for (const k of PRICE_KEYS) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
+  const positive = (v) => (Number(v) > 0 ? Number(v) : null); // PriceCharting uses 0 for "GameStop doesn't carry it"
   return {
     id: String(p.id), name: p['product-name'] || 'Unknown item', platform: p['console-name'] || '',
     upc: p.upc || '', genre: p.genre || '', prices,
+    salesVolume: p['sales-volume'] != null && p['sales-volume'] !== '' ? Number(p['sales-volume']) : null, // units sold per year
+    gamestop: { trade: positive(p['gamestop-trade-price']), sell: positive(p['gamestop-price']) }, // trade = GameStop's cash offer
   };
 }
 
@@ -512,7 +519,8 @@ function addPcProduct(raw, condition, replaceId = null) {
   }
   const line = {
     id: replaceId || uid(), source: 'pc', pcId: p.id, name: p.name, platform: p.platform, upc: p.upc, genre: p.genre,
-    prices: p.prices, condition, category: guessCategory(p.name), qty: 1, override: null, deductions: [],
+    prices: p.prices, salesVolume: p.salesVolume, gamestop: p.gamestop,
+    condition, category: guessCategory(p.name), qty: 1, override: null, deductions: [],
   };
   placeLine(line, replaceId);
   commit();
@@ -602,7 +610,9 @@ function conditionLabel(line) {
 function refLine(line) {
   const p = line.prices || {};
   const fmt = (basis) => Object.entries(PC_FIELDS[basis]).map(([c, k]) => `${GAME_CONDITIONS[c]} ${money(p[k] > 0 ? p[k] : null)}`).join(' · ');
-  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}`;
+  const gs = line.gamestop || {};
+  const gamestop = gs.trade || gs.sell ? `<br>GameStop: pays ${money(gs.trade)} cash · sells for ${money(gs.sell)}` : '';
+  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}${gamestop}`;
 }
 
 function conditionSelect(line) {
@@ -698,6 +708,10 @@ function updateRow(tr, line) {
   if (!p.flat && !p.dontBuy && p.cash != null && p.cash < settings.lowValue) flags.push('<span class="badge low">Low value</span>');
   if (line.category === 'pokemon') flags.push('<span class="badge info">Check authenticity – fakes exist</span>');
   if (isGameCat(line.category) && p.base >= 10000) flags.push('<span class="badge info">Over $100: anything missing or damaged? Ask Keith or Mark</span>');
+  // Front End Processes: expensive, slow-selling, or rare items get checked against eBay sold listings.
+  if (line.salesVolume != null && line.salesVolume < settings.slowSalesPerYear && p.base >= SLOW_SELLER_MIN_VALUE && !p.flat && !p.dontBuy) {
+    flags.push(`<span class="badge slow">Slow seller: ${line.salesVolume} sold/yr – check eBay solds</span>`);
+  }
   if (line.override != null) flags.push('<span class="badge edited">Price edited</span>');
   $('[data-cell="flags"]', tr).innerHTML = flags.join('');
 }
@@ -746,6 +760,7 @@ function renderTotals() {
   const warn = $('#needsPrice');
   warn.hidden = !notes.length;
   warn.textContent = notes.map((n) => ` · ${n}`).join('');
+  renderSplit(t);
 }
 
 function onLineChange(e) {
@@ -1172,6 +1187,7 @@ function fillSettingsForm() {
   f.roundMode.value = settings.roundMode;
   f.roundStep.value = String(settings.roundStep);
   f.lowValue.value = plain(settings.lowValue);
+  f.slowSalesPerYear.value = settings.slowSalesPerYear;
   f.shopName.value = settings.shopName;
   f.quoteFooter.value = settings.quoteFooter;
   f.guideEnabled.checked = settings.guide.enabled;
@@ -1200,6 +1216,7 @@ async function saveSettings(e) {
     roundMode: f.roundMode.value,
     roundStep: Number(f.roundStep.value),
     lowValue: Number.isNaN(lowValue) || lowValue == null ? 0 : lowValue,
+    slowSalesPerYear: Math.max(0, Math.round(Number(f.slowSalesPerYear.value) || 0)),
     shopName: f.shopName.value.trim(),
     quoteFooter: f.quoteFooter.value.trim(),
     rules: rulesFromForm(),
@@ -1256,35 +1273,219 @@ async function testToken() {
 
 /* ================================================================== print */
 
-function printQuote() {
-  const items = trade.lines.filter((l) => !l.pending && !l.failed);
-  if (!items.length) { toast('Add some items first.'); return; }
-  const t = tradeTotals();
-  const rows = items.map((l) => {
+const fmtTime = (iso) => new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+function payoutText(p) {
+  if (!p) return '';
+  if (p.type === 'cash') return `${money(p.cash)} cash`;
+  if (p.type === 'credit') return `${money(p.credit)} store credit`;
+  return `${money(p.cash)} cash + ${money(p.credit)} store credit`;
+}
+
+// Snapshot of the current trade's lines, in the same shape the trade log stores.
+function tradeItems() {
+  return trade.lines.filter((l) => !l.pending && !l.failed).map((l) => {
     const p = priceLine(l);
-    const detail = [l.platform, conditionLabel(l), ...lineDeductions(l).map((d) => d.label)].filter(Boolean).join(' · ');
-    const cell = (c) => (p.dontBuy ? 'Not buying' : c == null ? '—' : money(c * l.qty));
-    return `<tr><td>${esc(l.name || 'Custom item')}${detail ? `<div class="sub">${esc(detail)}</div>` : ''}</td>
-      <td class="num">${l.qty}</td><td class="num">${cell(p.cash)}</td><td class="num">${cell(p.credit)}</td></tr>`;
+    return {
+      name: l.name || 'Custom item', platform: l.platform || '', type: CATEGORIES[l.category] || '', condition: conditionLabel(l),
+      qty: l.qty, cash: p.cash, credit: p.credit, dontBuy: p.dontBuy || undefined,
+      deductions: lineDeductions(l).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
+    };
+  });
+}
+
+// One printed sheet for both quotes (current trade) and receipts (a logged trade).
+function printSheet({ receipt, time, customer, items, totals, payout, staff }) {
+  const rows = items.map((it) => {
+    const detail = [it.platform, it.condition, ...(it.deductions || []), it.serial ? `Serial ${it.serial}` : ''].filter(Boolean).join(' · ');
+    const cell = (c) => (it.dontBuy ? 'Not buying' : c == null ? '—' : money(c * it.qty));
+    return `<tr><td>${esc(it.name)}${detail ? `<div class="sub">${esc(detail)}</div>` : ''}</td>
+      <td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
   }).join('');
-  const now = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  const meta = [receipt ? 'Trade-in receipt' : 'Trade-in quote', fmtTime(time), customer, receipt && staff ? `Bought in by ${staff}` : ''].filter(Boolean);
   $('#printArea').innerHTML = `
     <h1>${esc(settings.shopName)}</h1>
-    <p class="print-meta">Trade-in quote · ${esc(now)}${trade.customer ? ` · ${esc(trade.customer)}` : ''}</p>
+    <p class="print-meta">${meta.map(esc).join(' · ')}</p>
     <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Store credit</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td>Total (${t.count} items)</td><td></td><td class="num">${money(t.cash)}</td><td class="num">${money(t.credit)}</td></tr></tfoot></table>
+    <tfoot><tr><td>Total (${totals.count} items)</td><td></td><td class="num">${money(totals.cash)}</td><td class="num">${money(totals.credit)}</td></tr></tfoot></table>
+    ${payout ? `<p class="print-payout">${receipt ? 'Paid' : 'Customer is taking'}: <strong>${esc(payoutText(payout))}</strong></p>` : ''}
+    ${receipt ? '<p class="print-sign">Customer signature: ______________________________</p>' : ''}
     ${settings.quoteFooter ? `<p class="print-footer">${esc(settings.quoteFooter)}</p>` : ''}`;
   window.print();
 }
 
+function printQuote() {
+  const items = tradeItems();
+  if (!items.length) { toast('Add some items first.'); return; }
+  const t = tradeTotals();
+  const split = trade.split ? splitPayout(t, trade.split.cash ?? 0) : null;
+  printSheet({
+    time: new Date().toISOString(), customer: trade.customer, items, totals: t,
+    payout: split ? { type: 'split', ...split } : null,
+  });
+}
+
+/* ================================================================== split payout */
+
+// Customer takes part in cash; the rest becomes store credit in proportion
+// (credit rates differ by category, so this keeps every item's cash/credit ratio).
+function splitPayout(t, cashWanted) {
+  if (cashWanted == null || Number.isNaN(cashWanted) || t.cash <= 0) return null;
+  const cash = Math.min(Math.max(0, cashWanted), t.cash);
+  return { cash, credit: roundOffer(t.credit * (1 - cash / t.cash), settings) };
+}
+
+function renderSplit(t) {
+  const open = !!trade.split;
+  $('#splitBtn').hidden = open;
+  $('#splitBox').hidden = !open;
+  if (!open) return;
+  const s = splitPayout(t, trade.split.cash ?? 0);
+  $('#splitCredit').textContent = money(s ? s.credit : t.credit);
+  const input = $('#splitCash');
+  if (document.activeElement !== input) input.value = plain(trade.split.cash);
+}
+
+/* ================================================================== complete trade + trade log */
+
+const SERIAL_CATEGORIES = ['console', 'handheld'];
+
+function openComplete() {
+  const t = tradeTotals();
+  const lines = trade.lines.filter((l) => !l.pending && !l.failed);
+  if (!lines.length) { toast('Add some items first.'); return; }
+  if (trade.lines.some((l) => l.pending)) { toast('Wait for the lookups to finish.'); return; }
+  if (t.missing) { toast(`${t.missing} item${t.missing === 1 ? '' : 's'} still need a price.`, 'error'); return; }
+  const f = $('#completeForm').elements;
+  $('#payCash').textContent = money(t.cash);
+  $('#payCredit').textContent = money(t.credit);
+  f.payout.value = trade.split ? 'split' : 'credit';
+  $('#paySplitCash').value = plain(trade.split?.cash ?? null);
+  updateDialogSplit();
+  $('#staffName').value = store.get('p2w-staff-name', '');
+  $('#completeCustomer').value = trade.customer || '';
+  $('#completeNotes').value = '';
+  const serialLines = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
+  $('#serialFields').innerHTML = serialLines.map((l) => `<label>Serial number – ${esc(l.name)}${l.qty > 1 ? ` (×${l.qty}, separate with commas)` : ''}
+    <input type="text" data-serial="${l.id}" value="${esc(l.serial || '')}" autocomplete="off" spellcheck="false"></label>`).join('');
+  $('#idCheckRow').hidden = !serialLines.length;
+  $('#idChecked').checked = false;
+  $('#completeError').textContent = '';
+  $('#completeDialog').showModal();
+  $(store.get('p2w-staff-name', '') ? '#completeCustomer' : '#staffName').focus();
+}
+
+function updateDialogSplit() {
+  const s = splitPayout(tradeTotals(), parseMoney($('#paySplitCash').value) ?? 0);
+  $('#paySplitCredit').textContent = money(s ? s.credit : null);
+}
+
+async function saveCompleted(print) {
+  const error = $('#completeError');
+  error.textContent = '';
+  const t = tradeTotals();
+  const staff = $('#staffName').value.trim();
+  if (!staff) { error.textContent = 'Enter your name.'; return; }
+  let payout;
+  const type = $('#completeForm').elements.payout.value;
+  if (type === 'cash') payout = { type, cash: t.cash, credit: 0 };
+  else if (type === 'credit') payout = { type, cash: 0, credit: t.credit };
+  else {
+    const s = splitPayout(t, parseMoney($('#paySplitCash').value));
+    if (!s) { error.textContent = 'Enter how much of it is cash.'; return; }
+    payout = { type: 'split', ...s };
+  }
+  $$('#serialFields [data-serial]').forEach((input) => {
+    const line = trade.lines.find((l) => l.id === input.dataset.serial);
+    if (line) line.serial = input.value.trim();
+  });
+  const needsId = !$('#idCheckRow').hidden;
+  if (needsId && !$('#idChecked').checked) { error.textContent = "Check the customer's photo ID before buying consoles or handhelds."; return; }
+  trade.customer = $('#completeCustomer').value.trim();
+  saveTrade();
+  const record = {
+    staff, customer: trade.customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count },
+    idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
+  };
+  store.set('p2w-staff-name', staff);
+  let saved;
+  try {
+    saved = await api('trades', { method: 'POST', body: record });
+  } catch (err) {
+    error.textContent = `Couldn't save the trade: ${err.message}`;
+    return;
+  }
+  $('#completeDialog').close();
+  if (print) printSheet({ ...record, receipt: true, time: saved.time });
+  trade.lines = [];
+  trade.customer = '';
+  trade.split = null;
+  $('#customerName').value = '';
+  commit();
+  focusScan();
+  toast('Trade saved to the trade log.');
+}
+
+let logRecords = [];
+
+async function loadLog() {
+  const q = $('#logSearch').value.trim();
+  $('#logNote').textContent = 'Loading…';
+  try {
+    logRecords = (await api('trades', { params: q ? { q } : {} })) || [];
+  } catch (err) {
+    $('#logNote').textContent = err.message;
+    return;
+  }
+  $('#logBody').innerHTML = logRecords.map((r, i) => `<tr class="log-row" data-i="${i}">
+      <td>${esc(fmtTime(r.time))}</td><td>${esc(r.customer || '—')}</td><td>${esc(r.staff || '')}</td>
+      <td class="num">${r.totals?.count ?? (r.items || []).length}</td><td>${esc(payoutText(r.payout))}</td></tr>`).join('')
+    || `<tr><td colspan="5" class="empty-cell">${q ? 'No trades match that search.' : 'No trades yet. They show up here after “Complete trade”.'}</td></tr>`;
+  $('#logNote').textContent = logRecords.length >= 100 ? 'Showing the newest 100. Search to find older trades.' : '';
+}
+
+function logDetailHtml(r, i) {
+  const items = (r.items || []).map((it) => {
+    const detail = [it.platform, it.type, it.condition, ...(it.deductions || []), it.serial ? `Serial ${it.serial}` : '', it.note].filter(Boolean).join(' · ');
+    const cell = (c) => (it.dontBuy ? 'Not buying' : money(c == null ? null : c * it.qty));
+    return `<tr><td>${esc(it.name)}<div class="sub">${esc(detail)}</div></td><td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
+  }).join('');
+  const facts = [r.idChecked ? 'Photo ID checked' : '', r.notes ? `Notes: ${r.notes}` : '', `Logged by ${r.staff}${r.role ? ` (${r.role} login)` : ''}`].filter(Boolean);
+  return `<tr class="log-detail"><td colspan="5">
+    <table class="log-items"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Credit</th></tr></thead><tbody>${items}</tbody></table>
+    <p class="muted small-print">${facts.map(esc).join(' · ')}</p>
+    <button type="button" class="btn small" data-reprint="${i}">Print receipt</button></td></tr>`;
+}
+
+function onLogClick(e) {
+  const reprint = e.target.closest('[data-reprint]');
+  if (reprint) {
+    const r = logRecords[Number(reprint.dataset.reprint)];
+    printSheet({ ...r, receipt: true });
+    return;
+  }
+  const row = e.target.closest('tr.log-row');
+  if (!row) return;
+  const open = row.nextElementSibling?.classList.contains('log-detail');
+  $$('#logBody tr.log-detail').forEach((d) => d.remove());
+  $$('#logBody tr.log-row').forEach((r) => r.classList.remove('open'));
+  if (!open) {
+    row.insertAdjacentHTML('afterend', logDetailHtml(logRecords[Number(row.dataset.i)], row.dataset.i));
+    row.classList.add('open');
+  }
+}
+
 /* ================================================================== views + init */
+
+const VIEWS = ['trade', 'log', 'hardware', 'settings'];
 
 function showView(name) {
   currentView = name;
-  for (const v of ['trade', 'hardware', 'settings']) $(`#view-${v}`).hidden = v !== name;
+  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== name;
   $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   $('#totalsBar').hidden = name !== 'trade';
+  if (name === 'log') loadLog();
   if (name === 'hardware') renderHardware();
   if (name === 'settings') fillSettingsForm();
   if (name === 'trade') { renderLines(); focusScan(); }
@@ -1320,6 +1521,7 @@ function wireEvents() {
   $('#clearBtn').addEventListener('click', () => {
     if (trade.lines.length && !confirm('Clear this trade and start a new one?')) return;
     trade.lines = [];
+    trade.split = null;
     trade.customer = '';
     $('#customerName').value = '';
     commit();
@@ -1370,6 +1572,53 @@ function wireEvents() {
   $('#authForm').addEventListener('submit', submitAuth);
   $('#logoutBtn').addEventListener('click', logout);
 
+  // Split payout (totals bar)
+  $('#splitBtn').addEventListener('click', () => {
+    trade.split = { cash: null };
+    saveTrade();
+    renderTotals();
+    $('#splitCash').focus();
+  });
+  $('#splitCash').addEventListener('input', (e) => {
+    const cents = parseMoney(e.target.value);
+    if (!Number.isNaN(cents)) trade.split.cash = cents;
+    saveTrade();
+    renderTotals();
+  });
+  $('#splitCash').addEventListener('change', (e) => {
+    const t = tradeTotals();
+    if (trade.split.cash > t.cash) {
+      trade.split.cash = t.cash;
+      toast(`Cash can't be more than the ${money(t.cash)} cash total.`);
+    }
+    e.target.value = plain(trade.split.cash);
+    saveTrade();
+    renderTotals();
+  });
+  $('#splitCash').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.target.blur(); focusScan(); } });
+  $('#splitClear').addEventListener('click', () => {
+    trade.split = null;
+    saveTrade();
+    renderTotals();
+    focusScan();
+  });
+
+  // Complete trade dialog
+  $('#completeBtn').addEventListener('click', openComplete);
+  $('#completeSave').addEventListener('click', () => saveCompleted(false));
+  $('#completePrint').addEventListener('click', () => saveCompleted(true));
+  $('#completeDialog [data-close]').addEventListener('click', () => $('#completeDialog').close());
+  $('#completeDialog').addEventListener('close', focusScan);
+  $('#paySplitCash').addEventListener('input', () => {
+    $('#completeForm').elements.payout.value = 'split';
+    updateDialogSplit();
+  });
+
+  // Trade log
+  $('#logSearchBtn').addEventListener('click', loadLog);
+  $('#logSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadLog(); });
+  $('#logBody').addEventListener('click', onLogClick);
+
   window.addEventListener('beforeunload', (e) => { if (hwDirty) { e.preventDefault(); e.returnValue = ''; } });
 }
 
@@ -1378,7 +1627,7 @@ function wireEvents() {
 function showAuth(mode) {
   auth.mode = mode;
   currentView = 'auth';
-  for (const v of ['trade', 'hardware', 'settings']) $(`#view-${v}`).hidden = true;
+  for (const v of VIEWS) $(`#view-${v}`).hidden = true;
   $('#view-auth').hidden = false;
   $('.tabs').hidden = true;
   $('#totalsBar').hidden = true;
