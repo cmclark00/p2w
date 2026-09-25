@@ -841,12 +841,21 @@ function focusScan() {
   if (currentView === 'trade') $('#scanInput').focus();
 }
 
+// "joycons" -> "joycon", "joy-cons" -> "joy-con". Only words over 3 letters ending in a single "s".
+const singular = (q) => q.split(/\s+/).map((w) => (w.length > 3 && /[^s]s$/i.test(w) ? w.slice(0, -1) : w)).join(' ');
+
+// Buying-guide items for the dropdown. Spaces, hyphens, and a trailing "s" don't matter,
+// so "joycons", "joy cons", and "Joy-Con" all find "Joy-Con Neon Blue".
 function matchHardware(q) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = norm(q).split(' ').filter(Boolean);
   if (!words.length) return [];
   return hardware
-    .filter((h) => h.name && words.every((w) => `${h.name} ${CATEGORIES[h.category] || ''}`.toLowerCase().includes(w)))
-    .slice(0, 10);
+    .filter((h) => {
+      if (!h.name) return false;
+      const hay = norm(`${h.name} ${CATEGORIES[h.category] || ''}`).replace(/ /g, '');
+      return words.every((w) => hay.includes(w) || hay.includes(singular(w)));
+    })
+    .slice(0, 25);
 }
 
 function closeResults() {
@@ -857,11 +866,24 @@ function closeResults() {
 
 async function runPcSearch(q) {
   const seq = ++search.seq;
-  Object.assign(search, { q, hw: matchHardware(q), pc: null, loading: true, error: null, active: -1 });
+  Object.assign(search, { q, hw: matchHardware(q), pc: null, loading: true, error: null, active: -1, alt: null });
   renderResults();
   try {
-    const results = await PC.search(q);
+    let results = await PC.search(q);
     if (seq !== search.seq) return;
+    // PriceCharting's search doesn't match plurals ("joycons" finds 2 items, "joycon" finds 80+),
+    // so when a plural search comes back thin, also search the singular and add those results.
+    const alt = singular(q);
+    if (results.length < 5 && alt.toLowerCase() !== q.toLowerCase()) {
+      const more = await PC.search(alt);
+      if (seq !== search.seq) return;
+      const seen = new Set(results.map((p) => String(p.id)));
+      const added = more.filter((p) => !seen.has(String(p.id)));
+      if (added.length) {
+        results = [...results, ...added];
+        search.alt = alt;
+      }
+    }
     search.pc = results;
   } catch (err) {
     if (seq !== search.seq) return;
@@ -899,7 +921,7 @@ function renderResults() {
   } else if (search.error) {
     html += `<div class="results-group">PriceCharting</div><div class="results-note error">${esc(search.error)}</div>`;
   } else if (search.pc) {
-    html += '<div class="results-group">PriceCharting <span>click a condition to add</span></div>';
+    html += `<div class="results-group">PriceCharting <span>${search.alt ? `including results for “${esc(search.alt)}” · ` : ''}click a condition to add</span></div>`;
     if (!search.pc.length) html += '<div class="results-note">No matches. Try fewer words, or add it as a custom item.</div>';
     for (const p of search.pc) {
       const hw = hardwareMatch(p);
