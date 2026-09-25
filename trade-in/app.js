@@ -127,6 +127,16 @@ const SEED_HARDWARE = {
     ['PS Vita Memory Card', 5, 0], ['Xbox Memory Unit', 5, 0], ['Dreamcast Memory Card', 5, 0], ['Dreamcast VMU', 15, 1],
     ['N64 Rumble Pak', 5, 0], ['N64 Expansion Pak', 20, 2], ['N64 Transfer Pak', 5, 1], ['Super Game Boy', 10, 1],
     ['Game Boy Player (GameCube)', 15, 0],
+    // Standard-color Joy-Cons, named exactly as PriceCharting lists them so scans match (see hardwareMatch).
+    // One entry covers PriceCharting's [Left]/[Right] and PAL versions. Singles $10 / pairs $20; Switch 2
+    // singles $20 / pairs $40. Special editions (Zelda, Pikachu & Eevee, etc.) stay on PriceCharting pricing.
+    ['Joy-Con Neon Blue', 10, 2], ['Joy-Con Neon Red', 10, 2], ['Joy-Con Neon Green', 10, 2], ['Joy-Con Neon Yellow', 10, 2],
+    ['Joy-Con Gray', 10, 2], ['Joy-Con Grey', 10, 2], ['Joy-Con Red', 10, 2], ['Joy-Con Pink', 10, 2], ['Joy-Con Pastel Pink', 10, 2],
+    ['Joy-Con Neon Red & Neon Blue', 20, 4], ['Joy-Con Neon Pink & Neon Green', 20, 4], ['Joy-Con Neon Green & Neon Pink', 20, 4],
+    ['Joy-Con Neon Purple & Neon Orange', 20, 4], ['Joy-Con Blue & Yellow', 20, 4],
+    ['Joy-Con Pastel Pink & Pastel Yellow', 20, 4], ['Joy-Con Pastel Purple & Pastel Green', 20, 4],
+    ['Joy Con 2 Light Blue', 20, 2], ['Joy Con 2 Light Red', 20, 2], ['Joy Con 2 Light Blue & Light Red', 40, 4],
+    ['Nintendo Switch 2 Joy-Con 2 Light Purple / Light Green', 40, 4], ['Nintendo Switch 2 Joy Cons', 40, 4],
   ],
 };
 
@@ -983,6 +993,9 @@ function renderHardware() {
   const r = settings.rules.console;
   $('#hwRuleNote').textContent = `Store credit is ${r.creditPct}% of these prices and cash is ${r.cashPct}% (change on the Settings tab). Parts pay the same in cash and credit.`;
   $('#hwSave').disabled = !hwDirty;
+  const missing = missingBuiltIns().length;
+  $('#hwBuiltIn').hidden = !missing;
+  $('#hwBuiltIn').textContent = `+ ${missing} built-in item${missing === 1 ? '' : 's'}`;
 }
 
 function setHwDirty(dirty) {
@@ -1067,6 +1080,25 @@ function applyPaste() {
   renderHardware();
   refreshComputed();
   toast(`${added} added, ${updated} updated${skipped ? `, ${skipped} skipped (no price found)` : ''}. Click Save changes to keep them.`);
+}
+
+// Built-in items whose name isn't on the saved list yet (compared the same loose way as hardwareMatch).
+function missingBuiltIns() {
+  const key = (name) => norm(name).replace(/ /g, '');
+  const have = new Set(hardware.map((h) => key(h.name)));
+  return seedHardware().filter((h) => !have.has(key(h.name)));
+}
+
+function addBuiltIns() {
+  const add = missingBuiltIns();
+  if (!add.length) return;
+  hardware.push(...add);
+  sortHardware();
+  $('#hwFilter').value = '';
+  setHwDirty(true);
+  renderHardware();
+  refreshComputed();
+  toast(`${add.length} built-in item${add.length === 1 ? '' : 's'} added. Click Save changes to keep them.`);
 }
 
 function seedHardware() {
@@ -1319,6 +1351,7 @@ function wireEvents() {
     $(`#hwBody tr[data-id="${h.id}"] [data-field="name"]`).focus();
   });
   $('#hwSave').addEventListener('click', saveHardware);
+  $('#hwBuiltIn').addEventListener('click', addBuiltIns);
   $('#hwPasteToggle').addEventListener('click', () => { $('#hwPastePanel').hidden = false; $('#hwPasteText').focus(); });
   $('#hwPasteCancel').addEventListener('click', () => { $('#hwPastePanel').hidden = true; });
   $('#hwPasteApply').addEventListener('click', applyPaste);

@@ -631,6 +631,10 @@ that device is locked out for 15 minutes.
   example `Joy-Con Neon Blue`). Scanning or searching that item then uses
   your price. Tags like `[Left]` or `[V2]` can be left off unless that
   version needs its own price.
+- **"+ N built-in items" button:** when a calculator update adds new
+  buying-guide items (like the standard Joy-Con colors), this button on
+  the **Hardware Prices** tab adds the ones you don't have yet. Click it,
+  then **Save changes**. Nothing you already have is changed.
 - **Buying guide prices:** edit them on the **Hardware Prices** tab and
   click **Save changes**.
 - **Everything else:** percentages, deductions, and the dead-games and

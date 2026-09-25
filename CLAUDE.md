@@ -506,6 +506,10 @@ The site's **only server-side code**. Everything else is static.
     tags; console name allowed before/after). Loose → Console only, CIB/New
     → Complete, accessories → Working. This is how managers override
     PriceCharting for specific products (e.g. every Joy-Con color).
+  - **New built-in items reach live sites via a button, not automatically.**
+    Adding rows to `SEED_HARDWARE` only seeds fresh installs; the Hardware
+    tab's "+ N built-in items" button (`missingBuiltIns()`) appends seed
+    items whose name isn't on the saved list, for a manager to Save.
   - Hardware: guide cash price, credit +20%. **Parts** is a flat parts
     price: no deductions (`takesDeductions()`) and no credit bump
     (credit = cash, via `isPartsLine()`).
