@@ -449,15 +449,34 @@ function placeLine(line, replaceId) {
 // A PriceCharting item whose name matches a Hardware Prices item uses the buying-guide price instead.
 // An exact name wins; otherwise [bracket]/(paren) tags are ignored, so "Joy-Con Neon Blue [Left]"
 // matches an item named "Joy-Con Neon Blue". The console name may be included either side of the name.
+// Spaces and hyphens are ignored too, so "Joycon", "Joy Con", and "Joy-Con" all match.
 function hardwareMatch(raw) {
   const name = raw['product-name'] || '';
   const system = raw['console-name'] || '';
+  const squash = (s) => s.replace(/ /g, '');
   const variants = [name, `${system} ${name}`, `${name} ${system}`];
-  const exact = variants.map(norm);
-  const loose = variants.map(baseTitle);
-  return hardware.find((h) => h.name && exact.includes(norm(h.name)))
-    || hardware.find((h) => h.name && loose.includes(baseTitle(h.name)))
+  const exact = variants.map((v) => squash(norm(v)));
+  const loose = variants.map((v) => squash(baseTitle(v)));
+  return hardware.find((h) => h.name && exact.includes(squash(norm(h.name))))
+    || hardware.find((h) => h.name && loose.includes(squash(baseTitle(h.name))))
     || null;
+}
+
+// PriceCharting lines already in the trade (added before a matching Hardware Prices item existed,
+// or before an update) switch to the buying-guide price. Lines with a typed-in value are left alone.
+function applyHardwareMatches() {
+  let changed = false;
+  trade.lines = trade.lines.map((l) => {
+    if (l.source !== 'pc' || l.override != null) return l;
+    const hw = hardwareMatch({ 'product-name': l.name, 'console-name': l.platform });
+    if (!hw) return l;
+    changed = true;
+    return {
+      id: l.id, source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition: hwConditionFor(hw, l.condition),
+      qty: l.qty, override: null, deductions: [], hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom: l.name,
+    };
+  });
+  if (changed) saveTrade();
 }
 
 // PriceCharting condition -> buying-guide condition: accessories are "Working"; loose consoles are "Console only".
@@ -1004,6 +1023,7 @@ async function saveHardware() {
     await api('hardware', { method: 'PUT', body: hardware });
     setHwDirty(false);
     toast('Hardware prices saved');
+    applyHardwareMatches();
   } catch (err) {
     toast(`Save failed: ${err.message}`, 'error');
   }
@@ -1407,6 +1427,7 @@ async function startApp(status) {
     if (isManager()) await api('hardware', { method: 'PUT', body: hardware });
   }
   $('#view-auth').hidden = true;
+  applyHardwareMatches();
   applyRole();
   renderTokenStatus();
   showView('trade');
