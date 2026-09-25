@@ -626,6 +626,11 @@ that device is locked out for 15 minutes.
    quote** prints a copy for the customer, and **New trade** clears the list.
 
 **Changing prices (managers):**
+- **Your price instead of PriceCharting's:** add an item on the
+  **Hardware Prices** tab named exactly like PriceCharting names it (for
+  example `Joy-Con Neon Blue`). Scanning or searching that item then uses
+  your price. Tags like `[Left]` or `[V2]` can be left off unless that
+  version needs its own price.
 - **Buying guide prices:** edit them on the **Hardware Prices** tab and
   click **Save changes**.
 - **Everything else:** percentages, deductions, and the dead-games and

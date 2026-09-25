@@ -446,7 +446,32 @@ function placeLine(line, replaceId) {
   else trade.lines.unshift(line);
 }
 
+// A PriceCharting item whose name matches a Hardware Prices item uses the buying-guide price instead.
+// An exact name wins; otherwise [bracket]/(paren) tags are ignored, so "Joy-Con Neon Blue [Left]"
+// matches an item named "Joy-Con Neon Blue". The console name may be included either side of the name.
+function hardwareMatch(raw) {
+  const name = raw['product-name'] || '';
+  const system = raw['console-name'] || '';
+  const variants = [name, `${system} ${name}`, `${name} ${system}`];
+  const exact = variants.map(norm);
+  const loose = variants.map(baseTitle);
+  return hardware.find((h) => h.name && exact.includes(norm(h.name)))
+    || hardware.find((h) => h.name && loose.includes(baseTitle(h.name)))
+    || null;
+}
+
+// PriceCharting condition -> buying-guide condition: accessories are "Working"; loose consoles are "Console only".
+function hwConditionFor(hw, pcCondition) {
+  const want = hw.category === 'accessory' || pcCondition === 'loose' ? 'unit' : 'complete';
+  return want in hwConditionLabels(hw.category) && hw[want] != null ? want : defaultHwCondition(hw);
+}
+
 function addPcProduct(raw, condition, replaceId = null) {
+  const hw = hardwareMatch(raw);
+  if (hw) {
+    addHardware(hw, hwConditionFor(hw, condition), replaceId, raw['product-name']);
+    return;
+  }
   const p = slimProduct(raw);
   const same = trade.lines.find((l) => l.source === 'pc' && l.pcId === p.id && l.condition === condition && isPlain(l) && l.id !== replaceId);
   if (same) {
@@ -469,19 +494,21 @@ function defaultHwCondition(hw) {
   return Object.keys(hwConditionLabels(hw.category)).find((f) => hw[f] != null) || Object.keys(hwConditionLabels(hw.category))[0];
 }
 
-function addHardware(hw, condition = defaultHwCondition(hw)) {
-  const same = trade.lines.find((l) => l.source === 'hw' && l.hwId === hw.id && l.condition === condition && isPlain(l));
+// matchedFrom: the PriceCharting name when a scanned/searched item was matched to this hardware item.
+function addHardware(hw, condition = defaultHwCondition(hw), replaceId = null, matchedFrom = null) {
+  const same = trade.lines.find((l) => l.source === 'hw' && l.hwId === hw.id && l.condition === condition && isPlain(l) && l.id !== replaceId);
   if (same) {
     same.qty += 1;
+    if (replaceId) trade.lines = trade.lines.filter((l) => l.id !== replaceId);
     commit();
     flash(same.id);
     return;
   }
   const line = {
-    id: uid(), source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition, qty: 1, override: null, deductions: [],
-    hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts },
+    id: replaceId || uid(), source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition, qty: 1, override: null, deductions: [],
+    hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom,
   };
-  trade.lines.unshift(line);
+  placeLine(line, replaceId);
   commit();
   flash(line.id);
 }
@@ -599,7 +626,7 @@ function rowHtml(line) {
   if (line.source === 'custom') {
     item = `<input type="text" class="name-input" data-field="name" value="${esc(line.name)}" placeholder="Describe the item">`;
   } else if (line.source === 'hw') {
-    item = `<div class="item-name">${esc(line.name)}</div><div class="sub">Buying guide price</div>`;
+    item = `<div class="item-name">${esc(line.name)}</div><div class="sub">Buying guide price${line.matchedFrom ? ` · scanned as PriceCharting “${esc(line.matchedFrom)}”` : ''}</div>`;
   } else {
     item = `<div class="item-name">${esc(line.name)}</div>
       <div class="sub">${esc(line.platform)}${line.upc ? ` · UPC ${esc(line.upc)}` : ''}</div>
@@ -831,6 +858,16 @@ function renderResults() {
     html += '<div class="results-group">PriceCharting <span>click a condition to add</span></div>';
     if (!search.pc.length) html += '<div class="results-note">No matches. Try fewer words, or add it as a custom item.</div>';
     for (const p of search.pc) {
+      const hw = hardwareMatch(p);
+      if (hw) { // priced from the buying guide, so offer the guide's conditions
+        const i = search.items.push({ kind: 'hw', hw, matchedFrom: p['product-name'] }) - 1;
+        const conds = Object.entries(hwConditionLabels(hw.category)).filter(([f]) => hw[f] != null)
+          .map(([f, label]) => `<button type="button" class="cond-btn" data-cond="${f}">${label} <b>${money(hw[f])}</b></button>`).join('');
+        html += `<div class="result" data-i="${i}">
+          <div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])} · buying guide price (${esc(hw.name)})</div></div>
+          <div class="r-conds">${conds || '<span class="badge warn">No price yet</span>'}</div></div>`;
+        continue;
+      }
       const i = search.items.push({ kind: 'pc', product: p }) - 1;
       const conds = Object.entries(GAME_CONDITIONS)
         .map(([c, label]) => `<button type="button" class="cond-btn" data-cond="${c}">${label} <b>${money(basisPrice(p, c))}</b></button>`).join('');
@@ -853,7 +890,7 @@ function choose(item, condition) {
   input.value = '';
   closeResults();
   input.focus();
-  if (item.kind === 'hw') addHardware(item.hw, condition || defaultHwCondition(item.hw));
+  if (item.kind === 'hw') addHardware(item.hw, condition || defaultHwCondition(item.hw), null, item.matchedFrom || null);
   else addFromSearch(item.product, condition || settings.defaultCondition);
 }
 

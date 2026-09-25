@@ -500,6 +500,12 @@ The site's **only server-side code**. Everything else is static.
     (`GAME_CASH_PCT = 100 / 1.5`, kept exact rather than 66.67). This
     matches the public "games: credit 50% more than cash" copy.
   - Pokémon games: credit 75% of market, cash 50% (also credit ÷ 1.5).
+  - **PriceCharting → hardware matching:** `hardwareMatch()` sends a
+    scanned/searched PriceCharting item to a Hardware Prices item with the
+    same name (normalized; exact first, then ignoring [bracket]/(paren)
+    tags; console name allowed before/after). Loose → Console only, CIB/New
+    → Complete, accessories → Working. This is how managers override
+    PriceCharting for specific products (e.g. every Joy-Con color).
   - Hardware: guide cash price, credit +20%. **Parts** is a flat parts
     price: no deductions (`takesDeductions()`) and no credit bump
     (credit = cash, via `isPartsLine()`).
