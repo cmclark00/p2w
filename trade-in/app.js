@@ -367,8 +367,10 @@ function autoBase(line, rule) {
   return null;
 }
 
-// Hardware bought for parts is a flat parts price - missing cables/controllers don't matter.
-const takesDeductions = (line) => !(line.source === 'hw' && line.condition === 'parts');
+// Hardware bought for parts is a flat parts price: missing cables/controllers don't matter,
+// and there's no store credit bump (credit = cash).
+const isPartsLine = (line) => line.source === 'hw' && line.condition === 'parts';
+const takesDeductions = (line) => !isPartsLine(line);
 
 function lineDeductions(line, s = settings) {
   if (!takesDeductions(line)) return []; // kept on the line in case it's switched back from Parts
@@ -415,7 +417,7 @@ function priceLine(line, s = settings) {
     return out;
   }
   out.cash = roundOffer((Math.max(0, value) * rule.cashPct) / 100, s);
-  out.credit = roundOffer((Math.max(0, value) * rule.creditPct) / 100, s);
+  out.credit = isPartsLine(line) ? out.cash : roundOffer((Math.max(0, value) * rule.creditPct) / 100, s);
   return out;
 }
 
@@ -923,7 +925,7 @@ function renderHardware() {
   $('#hwBody').innerHTML = shown.map(hwRowHtml).join('')
     || '<tr><td colspan="6" class="empty-cell">No items match. Use “+ Add item” to create one.</td></tr>';
   const r = settings.rules.console;
-  $('#hwRuleNote').textContent = `Store credit is ${r.creditPct}% of these prices and cash is ${r.cashPct}% (change on the Settings tab).`;
+  $('#hwRuleNote').textContent = `Store credit is ${r.creditPct}% of these prices and cash is ${r.cashPct}% (change on the Settings tab). Parts pay the same in cash and credit.`;
   $('#hwSave').disabled = !hwDirty;
 }
 
