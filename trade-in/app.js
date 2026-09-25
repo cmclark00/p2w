@@ -115,7 +115,7 @@ const SEED_HARDWARE = {
     ['Xbox Series Controller', 20, 2], ['Xbox Elite Series 2 Controller', 25, 3], ['Xbox Elite Series 1 Controller', 20, 2],
     ['Xbox One Wireless Controller', 15, 2], ['Xbox 360 Wireless Controller', 15, 1], ['Xbox Original Controller (OG)', 10, 1],
     ['GameCube Controller (GC)', 20, 1], ['GameCube WaveBird Controller w/ Dongle', 40, 1], ['Switch 2 Pro Controller', 35, 4],
-    ['Switch Pro Controller', 15, 2], ['Switch 2 Joy-Con (1, any color)', 20, 2], ['Switch Joy-Con (1, any color)', 20, 2],
+    ['Switch Pro Controller', 15, 2], ['Switch 2 Joy-Con (1)', 20, 2], ['Switch Joy-Con (1)', 10, 2],
     ['Switch GameCube Controller', 35, 5], ['Wii Remote', 10, 2], ['Wii Remote Motion Plus (M+)', 15, 2],
     ['Wii Motion Plus Adapter (M+)', 5, 1], ['Wii Nunchuk', 5, 0], ['Wii Classic Controller', 10, 1], ['Wii U Pro Controller', 5, 1],
     ['N64 Controller', 10, 1], ['SNES Controller', 5, 1], ['NES Controller', 3, 0], ['NES Zapper', 3, 1],
