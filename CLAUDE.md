@@ -496,16 +496,17 @@ The site's **only server-side code**. Everything else is static.
   `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
   Sheet). Once a manager saves, the server copy wins. Code defaults only
   seed a fresh install.
-  - Games: credit = 100% of PriceCharting retail buy, cash = 50%.
-  - Pokémon games: 75% / 50% of market.
+  - Games: credit = 100% of PriceCharting retail buy, cash = that ÷ 1.5
+    (`GAME_CASH_PCT = 100 / 1.5`, kept exact rather than 66.67). This
+    matches the public "games: credit 50% more than cash" copy.
+  - Pokémon games: credit 75% of market, cash 50% (also credit ÷ 1.5).
   - Hardware: guide cash price, credit +20%.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack.
-- ⚠ **Public copy disagrees with the calculator's game percentages.**
-  `faq.html` / `sell-trade.html` say game credit is "50% more than cash".
-  The calculator's policy (credit = retail buy, cash = half) makes credit
-  **100% more**. The owner needs to decide which is right; see **Notes**
-  below.
+  - Saved settings carry a `version`. `mergeSettings` migrates older saves
+    (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5 unless a manager had
+    set a custom number). Bump `version` and add a migration line when a
+    default policy changes, or live saved settings keep the old number.
 
 ## Konami easter egg (BULKY-TRIS)
 
@@ -704,11 +705,9 @@ Three via **Formspree** (endpoints are public client-side by design):
   store credit" entry (visible + JSON-LD), `sell-trade.html` step 3 of
   the How-it-works flow, `bulk-rates.html` centered disclaimer (the
   "flat" half of the rule). All four must stay in sync if the numbers
-  ever change. **Open question (Sept. 2026):** the owner described the
-  in-store game policy as credit = PriceCharting retail buy and cash = 50%
-  of that. That is credit **100%** more than cash, not 50%, and it's what
-  the `trade-in/` calculator uses. Confirm with the owner before changing
-  either side.
+  ever change. The `trade-in/` calculator uses the same games rule
+  (credit = PriceCharting retail buy, cash = credit ÷ 1.5), so update its
+  Settings defaults too.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
   sell-framed copy (home "What we carry" 5th card, home split-section

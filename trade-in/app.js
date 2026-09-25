@@ -29,12 +29,15 @@ const PRICE_KEYS = [...Object.values(PC_FIELDS['retail-buy']), ...Object.values(
 // PriceCharting console names for disc-based systems (the guide's "disc only" rules apply to these).
 const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
 
+// Game cash = PriceCharting price ÷ 1.5 (store credit is 50% more than cash). Kept exact, not 66.67.
+const GAME_CASH_PCT = 100 / 1.5;
+
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 2,
+  version: 3,
   defaultCondition: 'loose',
   rules: {
-    game:      { basis: 'retail-buy', cashPct: 50, creditPct: 100 },
+    game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: 100 },
     pokemon:   { basis: 'market', cashPct: 50, creditPct: 75 },
     console:   { cashPct: 100, creditPct: 120 },
     handheld:  { cashPct: 100, creditPct: 120 },
@@ -152,6 +155,7 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const money = (c) => (c == null ? '—' : (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
 const plain = (c) => (c == null ? '' : (c / 100).toFixed(2));
+const pctText = (n) => Number(Number(n).toFixed(4)); // 66.666… -> 66.6667 for display
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const lines = (text) => String(text || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
@@ -184,11 +188,13 @@ function mergeSettings(saved) {
   for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'shopName', 'quoteFooter']) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
-  if (saved.version === s.version) { // older saves used a different percentage format - keep the new defaults
+  if (saved.version >= 2) { // version 1 saves used a different percentage format - keep the new defaults
     for (const cat of Object.keys(s.rules)) Object.assign(s.rules[cat], saved.rules?.[cat] || {});
     if (Array.isArray(saved.deductions)) s.deductions = saved.deductions;
     Object.assign(s.guide, saved.guide || {});
   }
+  // Version 3: game cash changed from half of the PriceCharting price to the price ÷ 1.5.
+  if (saved.version < 3 && s.rules.game.cashPct === 50) s.rules.game.cashPct = GAME_CASH_PCT;
   return s;
 }
 
@@ -1016,7 +1022,8 @@ function rulesFromForm() {
   for (const cat of Object.keys(rules)) {
     for (const key of ['cashPct', 'creditPct']) {
       const n = Number($(`#rulesBody [name="${key}-${cat}"]`).value);
-      if (Number.isFinite(n) && n >= 0) rules[cat][key] = n;
+      // The box shows 4 decimals; keep the exact stored value (e.g. 100/1.5) if it wasn't changed.
+      if (Number.isFinite(n) && n >= 0 && n !== pctText(rules[cat][key])) rules[cat][key] = n;
     }
     const basis = $(`#rulesBody [name="basis-${cat}"]`);
     if (basis) rules[cat].basis = basis.value;
@@ -1076,8 +1083,8 @@ function fillSettingsForm() {
   $('#rulesBody').innerHTML = Object.entries(settings.rules).map(([cat, rule]) => `<tr>
     <td>${esc(CATEGORIES[cat])}</td>
     <td>${basisCell(cat, rule)}</td>
-    <td class="num"><span class="pct-input"><input type="number" min="0" step="1" name="cashPct-${cat}" value="${rule.cashPct}"><span>%</span></span></td>
-    <td class="num"><span class="pct-input"><input type="number" min="0" step="1" name="creditPct-${cat}" value="${rule.creditPct}"><span>%</span></span></td>
+    <td class="num"><span class="pct-input"><input type="number" min="0" step="any" name="cashPct-${cat}" value="${pctText(rule.cashPct)}"><span>%</span></span></td>
+    <td class="num"><span class="pct-input"><input type="number" min="0" step="any" name="creditPct-${cat}" value="${pctText(rule.creditPct)}"><span>%</span></span></td>
     <td class="num muted" data-example="${cat}"></td>
   </tr>`).join('');
   $('#dedBody').innerHTML = settings.deductions.map(dedRowHtml).join('');

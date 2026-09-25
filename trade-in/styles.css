@@ -85,6 +85,8 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: transparent; }
 textarea { width: 100%; resize: vertical; }
+/* Windows draws an open dropdown list with the select's own colors - keep options solid and readable. */
+select option, select optgroup { background: var(--surface-2); color: var(--paper); }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--muted); }
 label input, label select, label textarea { color: var(--paper); }
 
@@ -107,7 +109,7 @@ label input, label select, label textarea { color: var(--paper); }
 .money-input, .pct-input { display: inline-flex; align-items: center; gap: 4px; }
 .money-input > span, .pct-input > span { color: var(--muted); }
 .money-input input { width: 90px; text-align: right; }
-.pct-input input { width: 76px; text-align: right; }
+.pct-input input { width: 96px; text-align: right; }
 
 /* ---------------------------------------------------------------- trade head */
 .trade-head { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
@@ -197,7 +199,7 @@ td.cash small, td.credit small { display: block; font-size: 0.75rem; font-weight
 .chip button:hover { color: #fff; }
 .adjust-select {
   font-size: 0.78rem; padding: 2px 6px; color: var(--muted);
-  background: transparent; border: 1px dashed var(--line); border-radius: 999px; max-width: 180px;
+  background: var(--surface-2); border: 1px dashed var(--line); border-radius: 999px; max-width: 180px;
 }
 .adjust-select:hover { color: var(--paper); border-color: rgba(255, 255, 255, 0.3); }
 tr.dont-buy td.cash, tr.dont-buy td.credit { color: var(--muted); text-decoration: line-through; }
