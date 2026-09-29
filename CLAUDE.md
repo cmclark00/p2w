@@ -509,6 +509,16 @@ The site's **only server-side code**. Everything else is static.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
   mixed categories (games +50%, hardware +20%) stay fair.
+- **Custom store credit %** (per item, `line.creditBonus`): the line's
+  "+ Deduction…" menu has a **Store credit → Custom store credit %…**
+  option. It adds an editable chip, starting at the line's normal bump
+  (`normalCreditBonus()`: 50 for games, 20 for hardware, 0 for Parts).
+  Credit becomes cash × (100 + %)/100, and cash is unchanged. `priceLine()`
+  applies it on top of `priceBeforeCredit()`, which holds the normal
+  pricing and scratch rule. It's skipped for not-buying items. It shows
+  as a badge, on the printout and in the trade log (`creditBonus` on the
+  item). Lines with it don't merge on re-add (`isPlain`). Both roles can
+  use it; it's meant for when management approves more credit.
 - **Totals round to whole dollars** (`roundTotal()`, `TOTAL_ROUND`).
   `tradeTotals()` returns cash/credit rounded to the nearest $1 (.50 rounds
   up), plus `itemsCash`/`itemsCredit` (the exact item sums). Rounding

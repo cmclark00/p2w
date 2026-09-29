@@ -636,6 +636,10 @@ that device is locked out for 15 minutes.
    controllers. (Parts is a flat price: hardware on **Parts** has no
    deductions, and store credit is the same as cash. Items worth $0.50 or
    less aren't docked for scratches; the calculator skips it for you.)
+   **Management giving extra store credit on something?** Open that line's
+   **+ Deduction** menu, pick **Custom store credit %…**, and type how
+   much more than cash it pays in credit (e.g. 35 for +35%). Click the ×
+   on it to go back to normal.
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".

@@ -200,6 +200,7 @@ td.cash small, td.credit small { display: block; font-size: 0.75rem; font-weight
 }
 .chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 4px; }
 .chip button:hover { color: #fff; }
+.credit-chip input { width: 52px; padding: 1px 4px; margin: 0 2px; font: inherit; text-align: right; }
 .adjust-select {
   font-size: 0.78rem; padding: 2px 6px; color: var(--muted);
   background: var(--surface-2); border: 1px dashed var(--line); border-radius: 999px; max-width: 180px;
