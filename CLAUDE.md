@@ -509,6 +509,17 @@ The site's **only server-side code**. Everything else is static.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
   mixed categories (games +50%, hardware +20%) stay fair.
+- **Editable cash total** (`#totalCash` input, `trade.cashTotal`): staff
+  can type a different cash total in the totals bar. It rounds to whole
+  dollars. Store credit then scales by the same ratio (items' credit ×
+  typed ÷ items' cash). Item prices stay as they are; `tradeTotals()`
+  returns the adjusted cash/credit plus `adjustedFrom`. Split payout, the
+  Complete dialog, the printout (with a "Totals adjusted from…" note) and
+  the trade log (`totals.adjustedFrom`) all use the adjusted totals.
+  `trade.cashTotal` stores `base`, the items' cash when it was typed.
+  Once the items no longer add up to that (added, removed, repriced),
+  `renderTotals()` drops the adjustment with a toast so it can't go
+  stale. "↺ auto" resets it, and so does typing the calculated total.
 - **Custom store credit %** (per item, `line.creditBonus`): the line's
   "+ Deduction…" menu has a **Store credit → Custom store credit %…**
   option. It adds an editable chip, starting at the line's normal bump

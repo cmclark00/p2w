@@ -240,6 +240,18 @@ tr.flash td { animation: flash 1.2s ease-out; }
 .total span { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .total strong { font-size: 1.9rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .total.credit strong { color: var(--gold); }
+/* Editable cash total: reads like the credit total until hovered/focused. */
+.total-input {
+  width: 7.5ch; padding: 0 4px; margin-right: -5px; text-align: right;
+  font: 700 1.9rem/1.1 var(--font-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  color: var(--paper); background: transparent; border: 1px dashed transparent; border-radius: 6px;
+}
+@supports (field-sizing: content) { .total-input { width: auto; min-width: 4ch; field-sizing: content; } }
+.total-input:hover { border-color: var(--line); }
+.total-input:focus { background: var(--surface-2); border-color: var(--blue); outline: none; }
+.total-input.adjusted { border-color: var(--blue); }
+.total-reset { border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0; }
+.total-reset:hover { color: var(--paper); text-decoration: underline; }
 .actions { display: flex; gap: 8px; }
 
 /* ---------------------------------------------------------------- hardware / settings */
@@ -302,7 +314,7 @@ label.check { flex-direction: row; align-items: center; gap: 10px; color: var(--
 }
 
 @media (max-width: 700px) {
-  .total strong { font-size: 1.4rem; }
+  .total strong, .total-input { font-size: 1.4rem; }
   .actions { width: 100%; }
   .actions .btn { flex: 1; }
 }

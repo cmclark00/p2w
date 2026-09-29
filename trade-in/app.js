@@ -965,21 +965,56 @@ function tradeTotals() {
     cash += p.cash * l.qty;
     credit += p.credit * l.qty;
   }
-  return { count, cash: roundTotal(cash), credit: roundTotal(credit), itemsCash: cash, itemsCredit: credit, missing, notBuying };
+  const t = { count, cash: roundTotal(cash), credit: roundTotal(credit), itemsCash: cash, itemsCredit: credit, missing, notBuying };
+  // Staff typed a different cash total: store credit scales by the same ratio. The adjustment only
+  // counts while the items still add up to what they did when it was typed (see renderTotals).
+  const adj = trade.cashTotal;
+  if (adj && adj.base === cash && cash > 0) {
+    t.adjustedFrom = { cash: t.cash, credit: t.credit };
+    t.cash = adj.cash;
+    t.credit = roundTotal((credit * adj.cash) / cash);
+  }
+  return t;
 }
 
-// "Items add up to $8.40 cash · $12.60 credit", or '' when rounding changed nothing.
-function roundingNote(t) {
+// Explains why the totals differ from what the items add up to, or '' when they don't.
+function totalsNote(t) {
+  if (t.adjustedFrom) {
+    return `Totals adjusted from ${money(t.adjustedFrom.cash)} cash · ${money(t.adjustedFrom.credit)} credit (store credit scaled to match).`;
+  }
   if (t.itemsCash == null || (t.itemsCash === t.cash && t.itemsCredit === t.credit)) return '';
   return `Totals are rounded to the nearest dollar (items add up to ${money(t.itemsCash)} cash · ${money(t.itemsCredit)} credit).`;
 }
 
-function renderTotals() {
+// Staff typed a cash total: store it with what the items added up to at the time.
+function setCashTotal(input) {
   const t = tradeTotals();
+  const auto = t.adjustedFrom ? t.adjustedFrom.cash : t.cash;
+  const cents = parseMoney(input.value);
+  if (Number.isNaN(cents)) toast('Enter a cash total like 50', 'error');
+  else if (cents == null || t.itemsCash <= 0 || roundTotal(cents) === auto) trade.cashTotal = null;
+  else trade.cashTotal = { cash: roundTotal(cents), base: t.itemsCash };
+  saveTrade();
+  renderTotals();
+  input.value = money(tradeTotals().cash);
+}
+
+function renderTotals() {
+  let t = tradeTotals();
+  if (trade.cashTotal && !t.adjustedFrom) { // items changed since the cash total was typed
+    trade.cashTotal = null;
+    saveTrade();
+    toast('The trade changed, so the adjusted cash total was cleared.');
+    t = tradeTotals();
+  }
   $('#itemCount').textContent = t.count;
-  $('#totalCash').textContent = money(t.cash);
+  const cashInput = $('#totalCash');
+  if (document.activeElement !== cashInput) cashInput.value = money(t.cash);
+  cashInput.classList.toggle('adjusted', !!t.adjustedFrom);
+  $('#cashReset').hidden = !t.adjustedFrom;
   $('#totalCredit').textContent = money(t.credit);
-  $('#totalCash').title = $('#totalCredit').title = roundingNote(t);
+  cashInput.title = totalsNote(t) || 'Type a different cash total to adjust the offer. Store credit scales to match.';
+  $('#totalCredit').title = totalsNote(t);
   const notes = [];
   if (t.missing) notes.push(`${t.missing} need${t.missing === 1 ? 's' : ''} a price`);
   if (t.notBuying) notes.push(`${t.notBuying} not buying`);
@@ -1645,7 +1680,7 @@ function printSheet({ receipt, time, customer, items, totals, payout, staff }) {
     <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Store credit</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>Total (${totals.count} items)</td><td></td><td class="num">${money(totals.cash)}</td><td class="num">${money(totals.credit)}</td></tr></tfoot></table>
-    ${roundingNote(totals) ? `<p class="print-meta">${esc(roundingNote(totals))}</p>` : ''}
+    ${totalsNote(totals) ? `<p class="print-meta">${esc(totalsNote(totals))}</p>` : ''}
     ${payout ? `<p class="print-payout">${receipt ? 'Paid' : 'Customer is taking'}: <strong>${esc(payoutText(payout))}</strong></p>` : ''}
     ${receipt ? '<p class="print-sign">Customer signature: ______________________________</p>' : ''}
     ${settings.quoteFooter ? `<p class="print-footer">${esc(settings.quoteFooter)}</p>` : ''}`;
@@ -1743,7 +1778,7 @@ async function saveCompleted(print) {
   trade.customer = $('#completeCustomer').value.trim();
   saveTrade();
   const record = {
-    staff, customer: trade.customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count },
+    staff, customer: trade.customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom },
     idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
   };
   store.set('p2w-staff-name', staff);
@@ -1759,6 +1794,7 @@ async function saveCompleted(print) {
   trade.lines = [];
   trade.customer = '';
   trade.split = null;
+  trade.cashTotal = null;
   $('#customerName').value = '';
   commit();
   focusScan();
@@ -1861,10 +1897,26 @@ function wireEvents() {
     if (trade.lines.length && !confirm('Clear this trade and start a new one?')) return;
     trade.lines = [];
     trade.split = null;
+    trade.cashTotal = null;
     trade.customer = '';
     $('#customerName').value = '';
     commit();
     focusScan();
+  });
+
+  // Editable cash total (totals bar)
+  const cashTotal = $('#totalCash');
+  cashTotal.addEventListener('focus', () => cashTotal.select());
+  cashTotal.addEventListener('change', () => setCashTotal(cashTotal));
+  cashTotal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { cashTotal.blur(); focusScan(); }
+    if (e.key === 'Escape') { cashTotal.value = money(tradeTotals().cash); cashTotal.blur(); focusScan(); }
+  });
+  $('#cashReset').addEventListener('click', () => {
+    trade.cashTotal = null;
+    saveTrade();
+    renderTotals();
+    cashTotal.value = money(tradeTotals().cash);
   });
 
   // A barcode scanner types like a keyboard - if focus drifted off an input, send keystrokes to the scan box.

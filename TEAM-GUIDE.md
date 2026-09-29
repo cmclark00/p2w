@@ -647,7 +647,10 @@ that device is locked out for 15 minutes.
    Mark".
 5. The bottom bar shows the **cash** and **store credit** totals. Both
    round to the nearest whole dollar ($8.50 → $9, $8.49 → $8), so the
-   total can differ a little from the items added up. **Print quote**
+   total can differ a little from the items added up. **Agreed on a
+   different cash amount?** Click the cash total, type the new amount,
+   and press Enter. Store credit adjusts to match. **↺ auto** puts it
+   back, and changing the items clears it. **Print quote**
    prints a copy for the customer, and **New trade** clears the list.
 6. **Part cash, part credit?** Click **Split payout** and type how much
    they want in cash. The rest is shown as store credit at the same rates.

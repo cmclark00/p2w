@@ -323,7 +323,10 @@
 
   <footer id="totalsBar" class="totals">
     <div class="count"><strong id="itemCount">0</strong> items<span id="needsPrice" class="warn-text" hidden></span></div>
-    <div class="total cash"><span>Cash</span><strong id="totalCash">$0.00</strong></div>
+    <div class="total cash"><span>Cash</span>
+      <input id="totalCash" class="total-input" type="text" inputmode="decimal" autocomplete="off" value="$0.00" aria-label="Cash total. Type a different amount to adjust the offer.">
+      <button id="cashReset" type="button" class="total-reset" title="Back to the calculated total" hidden>↺ auto</button>
+    </div>
     <div class="total credit"><span>Store credit</span><strong id="totalCredit">$0.00</strong></div>
     <div class="split">
       <button id="splitBtn" type="button" class="btn small">Split payout</button>
