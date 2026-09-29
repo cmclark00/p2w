@@ -259,6 +259,27 @@ tr.flash td { animation: flash 1.2s ease-out; }
 .section-head p { margin: 0; max-width: 70ch; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
 .toolbar input { width: 200px; }
+/* TCG bulk tab */
+.bulk-groups { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+.bulk-group caption {
+  caption-side: top; text-align: left; padding: 12px 12px 8px;
+  font: 700 1.05rem var(--font-display); color: var(--gold);
+}
+.bulk-group caption span { display: block; margin-top: 3px; font: 400 0.82rem var(--font-body); }
+.bulk-count { width: 90px; text-align: right; }
+.bulk-foot {
+  position: sticky; bottom: 0; z-index: 5; margin-top: 16px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.4);
+}
+.bulk-sum { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.bulk-sum strong { font: 700 1.9rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
+#bulkGroups .error { color: #ff8a99; }
+td.item .link { padding: 0; margin-top: 4px; font-size: 0.82rem; color: var(--muted); }
+td.item .link:hover { color: var(--paper); }
+
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
 .panel > p { margin-top: 0; }
 .panel .table-wrap { background: var(--ink); }

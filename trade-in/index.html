@@ -17,6 +17,7 @@
     </div>
     <nav class="tabs" aria-label="Sections" hidden>
       <button type="button" data-view="trade" class="active">Trade-In</button>
+      <button type="button" data-view="bulk">TCG Bulk</button>
       <button type="button" data-view="log">Trade Log</button>
       <button type="button" data-view="hardware">Hardware Prices</button>
       <button type="button" data-view="settings">Settings</button>
@@ -105,6 +106,29 @@
           <p><strong>No items yet.</strong></p>
           <p>Scan a game's barcode, type a name and press Enter, or start typing a console or handheld to use your set prices.</p>
         </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ TCG BULK -->
+    <!-- Rates come from ../assets/bulk-rates.json, the same file as the website's Bulk Rates page. -->
+    <section id="view-bulk" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <h1>TCG bulk</h1>
+          <p class="muted">Type how many cards of each kind, then add the bulk to the trade. Rates are the ones on the website's Bulk Rates page. English cards only; cash and store credit pay the same.</p>
+        </div>
+        <div class="toolbar">
+          <button id="bulkClear" type="button" class="btn">Clear counts</button>
+        </div>
+      </div>
+      <div id="bulkGroups" class="bulk-groups"></div>
+      <div class="bulk-foot">
+        <div class="bulk-sum">
+          <span class="eyebrow">Bulk total</span>
+          <strong id="bulkTotal">$0.00</strong>
+          <span id="bulkCount" class="muted"></span>
+        </div>
+        <button id="bulkAdd" type="button" class="btn primary" disabled>Add to trade</button>
       </div>
     </section>
 

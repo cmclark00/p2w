@@ -1,0 +1,55 @@
+{
+  "_help": [
+    "TCG bulk rates. This one file feeds BOTH the public Bulk Rates page (bulk-rates.html)",
+    "and the TCG Bulk tab in the staff trade-in calculator, so they always match.",
+    "price = dollars we pay. per = how many cards that price is for: 1000 for per-1k rates, 1 for per-card rates.",
+    "Keep each id unique and don't change an existing id (the calculator uses it to remember counts).",
+    "A group's note (optional) shows under its heading."
+  ],
+  "groups": [
+    {
+      "id": "pokemon",
+      "name": "Pokémon",
+      "items": [
+        { "id": "pkmn-wotc", "name": "WOTC era (NM/LP)", "price": 200, "per": 1000 },
+        { "id": "pkmn-holo", "name": "Holos / reverse holos", "price": 40, "per": 1000 },
+        { "id": "pkmn-common", "name": "Commons (no codes or energy)", "price": 15, "per": 1000 },
+        { "id": "pkmn-code", "name": "Unused code cards", "price": 5, "per": 1000 },
+        { "id": "pkmn-energy", "name": "Basic energy", "price": 3, "per": 1000 },
+        { "id": "pkmn-vstar", "name": "Vstar / Vmax", "price": 1.10, "per": 1 },
+        { "id": "pkmn-break", "name": "Break rare", "price": 1, "per": 1 },
+        { "id": "pkmn-tg", "name": "Trainer Gallery", "price": 1, "per": 1 },
+        { "id": "pkmn-ex", "name": "EX / GX / V", "price": 0.70, "per": 1 },
+        { "id": "pkmn-fa-trainer", "name": "Full art trainers", "price": 0.50, "per": 1 },
+        { "id": "pkmn-baby-shiny", "name": "Baby shinies", "price": 0.50, "per": 1 },
+        { "id": "pkmn-radiant", "name": "Radiant / Amazing / Prism rares", "price": 0.25, "per": 1 }
+      ]
+    },
+    {
+      "id": "other",
+      "name": "Other TCGs",
+      "items": [
+        { "id": "ygo-foil", "name": "Yu-Gi-Oh! — foils", "price": 20, "per": 1000 },
+        { "id": "mtg-land", "name": "Magic: The Gathering — base lands", "price": 10, "per": 1000 },
+        { "id": "lorcana", "name": "Lorcana", "price": 5, "per": 1000 },
+        { "id": "mtg-common", "name": "Magic: The Gathering — commons", "price": 5, "per": 1000 },
+        { "id": "one-piece", "name": "One Piece", "price": 5, "per": 1000 },
+        { "id": "riftbound", "name": "Riftbound", "price": 5, "per": 1000 },
+        { "id": "digimon", "name": "Digimon", "price": 3, "per": 1000 },
+        { "id": "fab", "name": "Flesh and Blood", "price": 3, "per": 1000 },
+        { "id": "gundam", "name": "Gundam", "price": 3, "per": 1000 },
+        { "id": "ygo-common", "name": "Yu-Gi-Oh! — commons", "price": 3, "per": 1000 }
+      ]
+    },
+    {
+      "id": "slabs",
+      "name": "Graded slabs",
+      "note": "Any slab worth less than $15 is paid at the bulk slab rate. Slabs worth more are priced individually.",
+      "items": [
+        { "id": "slab-psa-bgs", "name": "PSA / BGS", "price": 5, "per": 1 },
+        { "id": "slab-cgc", "name": "CGC", "price": 3, "per": 1 },
+        { "id": "slab-other", "name": "Other (TAG, etc.)", "price": 1, "per": 1 }
+      ]
+    }
+  ]
+}

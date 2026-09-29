@@ -1774,6 +1774,14 @@ h3 {
   margin: 0 auto;
 }
 
+/* Loading / error message while bulk-rates.html fetches assets/bulk-rates.json. */
+.bulk-rates-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
 .pricing-group {
   padding: clamp(20px, 2.4vw, 28px);
   background: var(--surface-2);

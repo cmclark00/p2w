@@ -185,6 +185,49 @@ def check_events() -> list[str]:
     return errors
 
 
+def check_bulk_rates() -> list[str]:
+    """assets/bulk-rates.json is hand-edited and feeds both bulk-rates.html and the trade-in calculator."""
+    errors: list[str] = []
+    path = ROOT / "assets" / "bulk-rates.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"assets/bulk-rates.json: invalid JSON (check for a missing or extra comma): {exc}"]
+
+    groups = data.get("groups") if isinstance(data, dict) else None
+    if not isinstance(groups, list) or not groups:
+        return ["assets/bulk-rates.json: needs a non-empty \"groups\" list"]
+
+    seen_ids: set[str] = set()
+    for g_index, group in enumerate(groups):
+        g_label = f"assets/bulk-rates.json groups[{g_index}]"
+        if not isinstance(group, dict) or not group.get("name") or not isinstance(group.get("items"), list):
+            errors.append(f"{g_label}: needs a name and an items list")
+            continue
+        for i_index, item in enumerate(group["items"]):
+            label = f"{g_label} ({group['name']}) items[{i_index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label}: item must be an object")
+                continue
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or not item_id:
+                errors.append(f"{label}: missing id")
+            elif item_id in seen_ids:
+                errors.append(f"{label}: duplicate id {item_id!r}")
+            else:
+                seen_ids.add(item_id)
+            if not item.get("name"):
+                errors.append(f"{label}: missing name")
+            price = item.get("price")
+            if isinstance(price, bool) or not isinstance(price, (int, float)) or price < 0:
+                errors.append(f"{label}: price must be a number of dollars (no $ sign)")
+            per = item.get("per")
+            if isinstance(per, bool) or not isinstance(per, int) or per <= 0:
+                errors.append(f"{label}: per must be 1 (per card) or 1000 (per 1k)")
+
+    return errors
+
+
 def check_security_configuration() -> list[str]:
     """Guard the security-sensitive static configuration against regressions."""
     errors: list[str] = []
@@ -236,7 +279,7 @@ def check_security_configuration() -> list[str]:
 
 
 def main() -> int:
-    errors = check_html() + check_events() + check_security_configuration()
+    errors = check_html() + check_events() + check_bulk_rates() + check_security_configuration()
     if errors:
         print("Site checks failed:")
         for error in errors:

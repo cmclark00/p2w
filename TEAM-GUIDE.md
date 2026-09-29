@@ -271,57 +271,56 @@ end = parts + (high labor).
 ### Update TCG bulk rates
 
 **When to do this:** Market shifted on a TCG, you want to bump or drop
-what we pay for a category, or a new TCG launched and you want to
-publish a rate for it.
+what we pay for a category, a new TCG launched, or slab rates change.
 
-**File to edit:** `bulk-rates.html` (only).
+**File to edit:** `assets/bulk-rates.json` (only).
 
-The page has **two** `<div class="pricing-group">` blocks: **Pokémon**
-(the long one — bulk per-1k rates plus per-card rates for things like
-Vstar/Vmax and EX/GX/V) and **Other TCGs (per 1000)** (one flat per-1k
-rate per game).
+That one file feeds **both** the public Bulk Rates page and the **TCG
+Bulk** tab in the staff trade-in calculator, so they always match. Don't
+edit the rates in `bulk-rates.html`; that page just displays this file.
+
+The file has three groups: **Pokémon**, **Other TCGs**, and **Graded
+slabs**. Every rate is one line like this:
+
+```json
+{ "id": "lorcana", "name": "Lorcana", "price": 5, "per": 1000 },
+```
+
+- `name` is what people see.
+- `price` is the **dollars** we pay, with no `$` sign (e.g. `5`, `1.10`).
+- `per` is how many cards that price is for: `1000` for per-1k rates
+  (shows as "$5 / 1k"), or `1` for per-card rates (shows as "$1.10 each").
+- `id` is a short unique label the calculator uses. Never change an
+  existing one.
 
 #### Changing an existing rate
 
-1. Open `bulk-rates.html` in the GitHub editor.
-2. **Ctrl + F** and search for the game name (e.g., `Lorcana`) or the
-   current price (e.g., `$5`).
-3. Change the number between `<dd>` and `</dd>`. Leave everything else
-   alone.
-4. Commit.
+1. Open `assets/bulk-rates.json` in the GitHub editor.
+2. **Ctrl + F** for the game or item name (e.g., `Lorcana`).
+3. Change only the number after `"price":`.
+4. Commit. The website and the calculator both pick it up after the
+   deploy.
 
-**Example.** To bump Lorcana from $5 to $7 per 1000:
+**Example.** To bump Lorcana from $5 to $7 per 1000, change
+`"price": 5` to `"price": 7` on the Lorcana line.
 
-```html
-<div class="price-row"><dt>Lorcana</dt><dd>$5</dd></div>
-```
+#### Adding a new rate
 
-becomes:
+1. Copy an existing line in the right group (e.g., the **Digimon** line
+   for a per-1k TCG, or a slab line for a per-slab rate).
+2. Paste it below and change the `id` (anything unique, lowercase with
+   dashes, e.g. `star-wars`), the `name`, the `price`, and `per`.
+3. **Every line except the last one in a group ends with a comma.** A
+   missing or extra comma breaks the file. If the Bulk Rates page shows
+   "Our rates didn't load" after your commit, check the commas first.
+4. Keep each group sorted by price, highest first.
+5. Commit with a message like *"Bulk rates: add Star Wars Unlimited at
+   $5/1k"*.
 
-```html
-<div class="price-row"><dt>Lorcana</dt><dd>$7</dd></div>
-```
+#### Removing a rate
 
-#### Adding a new game to the "Other TCGs" card
-
-1. Find any existing row in the **Other TCGs** group (e.g., the
-   `<div class="price-row"><dt>Digimon</dt>…` line).
-2. **Copy that whole line** and paste it below.
-3. Change the game name and the price in the new row.
-4. Keep the list sorted by **price descending** (highest pay rate at
-   the top). If multiple games share a price, group them together.
-5. Commit with a message like *"Bulk rates: add Star Wars Unlimited at $5/1k"*.
-
-**Important — units convention.** The "Other TCGs" header says
-**"(per 1000)"**, so each row only writes the dollar amount (e.g.,
-`$5`, not `$5 / 1k`). Pokémon rows are mixed (some are per-1k like
-`$15 / 1k`, others are per-card like `$0.70 each`) so each row
-**must** spell out its unit. Match the style of the rows already there.
-
-#### Removing a game
-
-Delete the entire `<div class="price-row">…</div>` line for that game.
-Commit.
+Delete that item's whole line, and make sure the line above it still
+ends with a comma only if another line follows it. Commit.
 
 ---
 

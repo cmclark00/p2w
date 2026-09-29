@@ -77,56 +77,29 @@
       </section>
 
       <!-- ── TCG bulk pricing ─────────────────────────────────────────────
-           Update rates as needed. Pokémon has the most line items; other
-           TCGs share a single card. All prices assume English cards.
+           Rates live in assets/bulk-rates.json and are rendered below by the
+           script at the bottom of this page. All prices assume English cards.
       ──────────────────────────────────────────────────────────────────── -->
       <section class="pricing">
         <div class="pricing-disclaimer pricing-disclaimer--centered">
           <p><strong>English cards only.</strong> Bulk rates are flat &mdash; cash and store credit pay the same.</p>
         </div>
 
-        <div class="pricing-groups">
-          <div class="pricing-group">
-            <h3>Pok&eacute;mon</h3>
-            <dl class="price-list">
-              <div class="price-row"><dt>WOTC era (NM/LP)</dt><dd>$200 / 1k</dd></div>
-              <div class="price-row"><dt>Holos / reverse holos</dt><dd>$40 / 1k</dd></div>
-              <div class="price-row"><dt>Commons (no codes or energy)</dt><dd>$15 / 1k</dd></div>
-              <div class="price-row"><dt>Unused code cards</dt><dd>$5 / 1k</dd></div>
-              <div class="price-row"><dt>Basic energy</dt><dd>$3 / 1k</dd></div>
-              <div class="price-row"><dt>Vstar / Vmax</dt><dd>$1.10 each</dd></div>
-              <div class="price-row"><dt>Break rare</dt><dd>$1 each</dd></div>
-              <div class="price-row"><dt>Trainer Gallery</dt><dd>$1 each</dd></div>
-              <div class="price-row"><dt>EX / GX / V</dt><dd>$0.70 each</dd></div>
-              <div class="price-row"><dt>Full art trainers</dt><dd>$0.50 each</dd></div>
-              <div class="price-row"><dt>Baby shinies</dt><dd>$0.50 each</dd></div>
-              <div class="price-row"><dt>Radiant / Amazing / Prism rares</dt><dd>$0.25 each</dd></div>
-            </dl>
-          </div>
-
-          <div class="pricing-group">
-            <h3>Other TCGs (per 1000)</h3>
-            <dl class="price-list">
-              <div class="price-row"><dt>Yu-Gi-Oh! &mdash; foils</dt><dd>$20</dd></div>
-              <div class="price-row"><dt>Magic: The Gathering &mdash; base lands</dt><dd>$10</dd></div>
-              <div class="price-row"><dt>Lorcana</dt><dd>$5</dd></div>
-              <div class="price-row"><dt>Magic: The Gathering &mdash; commons</dt><dd>$5</dd></div>
-              <div class="price-row"><dt>One Piece</dt><dd>$5</dd></div>
-              <div class="price-row"><dt>Riftbound</dt><dd>$5</dd></div>
-              <div class="price-row"><dt>Digimon</dt><dd>$3</dd></div>
-              <div class="price-row"><dt>Flesh and Blood</dt><dd>$3</dd></div>
-              <div class="price-row"><dt>Gundam</dt><dd>$3</dd></div>
-              <div class="price-row"><dt>Yu-Gi-Oh! &mdash; commons</dt><dd>$3</dd></div>
-            </dl>
-          </div>
+        <!-- Rates come from assets/bulk-rates.json (shared with the staff
+             trade-in calculator's TCG Bulk tab). Edit that file, not this page. -->
+        <div class="pricing-groups" id="bulkRates" aria-live="polite">
+          <p class="bulk-rates-status">Loading rates&hellip;</p>
         </div>
+        <noscript>
+          <p class="bulk-rates-status">Turn on JavaScript to see our bulk rates, or call us at <a href="tel:+18659108357">865-910-8357</a>.</p>
+        </noscript>
       </section>
 
       <section class="inventory-band">
         <div>
           <p class="eyebrow">More than bulk?</p>
           <h2>Singles, sealed product, and full collections.</h2>
-          <p>Chase singles, graded slabs, sealed boxes, or whole collections get priced individually &mdash; see the full sell/trade walkthrough for how that process works.</p>
+          <p>Chase singles, graded slabs worth $15 or more, sealed boxes, or whole collections get priced individually &mdash; see the full sell/trade walkthrough for how that process works.</p>
         </div>
         <a class="button primary" href="sell-trade.html">Sell &amp; Trade Process</a>
       </section>
@@ -153,6 +126,32 @@
         </nav>
       </div>
     </footer>
+    <script>
+      // Renders the rate cards from assets/bulk-rates.json (the same file the
+      // staff trade-in calculator uses).
+      (function () {
+        var box = document.getElementById('bulkRates');
+        var esc = function (s) {
+          return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+        };
+        var dollars = function (n) { return '$' + (Number(n) % 1 ? Number(n).toFixed(2) : String(Number(n))); };
+        var rate = function (it) { return Number(it.per) === 1 ? dollars(it.price) + ' each' : dollars(it.price) + ' / ' + (Number(it.per) === 1000 ? '1k' : it.per); };
+        fetch('assets/bulk-rates.json', { cache: 'no-cache' })
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function (data) {
+            box.innerHTML = (data.groups || []).filter(function (g) { return g.items && g.items.length; }).map(function (g) {
+              return '<div class="pricing-group"><h3>' + esc(g.name) + '</h3>'
+                + (g.note ? '<p>' + esc(g.note) + '</p>' : '')
+                + '<dl class="price-list">' + g.items.map(function (it) {
+                  return '<div class="price-row"><dt>' + esc(it.name) + '</dt><dd>' + esc(rate(it)) + '</dd></div>';
+                }).join('') + '</dl></div>';
+            }).join('');
+          })
+          .catch(function () {
+            box.innerHTML = '<p class="bulk-rates-status">Our rates didn’t load. Refresh the page, or call us at <a href="tel:+18659108357">865-910-8357</a>.</p>';
+          });
+      })();
+    </script>
     <script src="nav.js" defer></script>
     <script src="konami.js" defer></script>
   </body>

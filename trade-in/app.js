@@ -467,6 +467,7 @@ function boxedPrice(prices, unit, category, condition, s = settings) {
 }
 
 function autoBase(line, rule, s = settings) {
+  if (line.source === 'bulk') return line.bulkTotal ?? null;
   if (line.source === 'pc' && line.condition === 'parts') return pcPartsPrice(line, s)?.price ?? null;
   if (line.source === 'hw' && isPcCondition(line.condition)) return boxedPrice(line.prices, lineHw(line).unit, line.category, line.condition, s);
   if (line.source === 'pc') {
@@ -484,7 +485,7 @@ function autoBase(line, rule, s = settings) {
 // Hardware bought for parts is a flat parts price: missing cables/controllers don't matter,
 // and there's no store credit bump (credit = cash).
 const isPartsLine = (line) => (line.source === 'hw' || line.source === 'pc') && line.condition === 'parts';
-const takesDeductions = (line) => !isPartsLine(line);
+const takesDeductions = (line) => !isPartsLine(line) && line.source !== 'bulk';
 
 function lineDeductions(line, s = settings) {
   if (!takesDeductions(line)) return []; // kept on the line in case it's switched back from Parts
@@ -548,6 +549,10 @@ function priceWith(line, s, deds) {
     return out;
   }
   if (out.base == null) return out;
+  if (line.source === 'bulk') { // TCG bulk rates are flat: cash and store credit pay the same
+    Object.assign(out, { cash: out.base, credit: out.base });
+    return out;
+  }
   if (line.source === 'custom') {
     // Custom items: the typed price is the cash offer. Deductions come off it the way they would
     // off any other line's cash, and credit keeps the category's credit-to-cash ratio.
@@ -853,7 +858,14 @@ function rowHtml(line) {
   const catOpts = Object.entries(CATEGORIES)
     .map(([v, label]) => `<option value="${v}"${v === line.category ? ' selected' : ''}>${esc(label)}</option>`).join('');
   let item;
-  if (line.source === 'custom') {
+  let typeCell = `<select data-field="category">${catOpts}</select>`;
+  let qtyCell = `<input type="number" class="qty" data-field="qty" min="1" step="1" value="${line.qty}">`;
+  if (line.source === 'bulk') {
+    item = `<div class="item-name">${esc(line.name)}</div><div class="sub">${esc(bulkBreakdown(line.bulkItems))}</div>
+      <button type="button" class="link" data-action="editbulk">Edit counts</button>`;
+    typeCell = '<span class="muted">TCG bulk</span>';
+    qtyCell = '<span class="muted">—</span>';
+  } else if (line.source === 'custom') {
     item = `<input type="text" class="name-input" data-field="name" value="${esc(line.name)}" placeholder="Describe the item">
       <div class="sub">The price you type is the cash offer</div>`;
   } else if (line.source === 'hw') {
@@ -871,9 +883,9 @@ function rowHtml(line) {
   }
   return `<tr data-id="${line.id}">
     <td class="item">${item}<div class="flags" data-cell="flags"></div>${adjustHtml(line)}</td>
-    <td><select data-field="category">${catOpts}</select></td>
+    <td>${typeCell}</td>
     <td>${conditionSelect(line)}</td>
-    <td class="num"><input type="number" class="qty" data-field="qty" min="1" step="1" value="${line.qty}"></td>
+    <td class="num">${qtyCell}</td>
     <td class="num value-cell"><span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="${line.source === 'custom' ? 'Cash' : 'Price'}"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button></td>
     <td class="num cash" data-cell="cash"></td>
     <td class="num credit" data-cell="credit"></td>
@@ -1114,6 +1126,8 @@ function onLineClick(e) {
   } else if (action === 'uncredit') {
     delete line.creditBonus;
     commit();
+  } else if (action === 'editbulk') {
+    editBulkLine(line);
   }
 }
 
@@ -1659,6 +1673,7 @@ function tradeItems() {
       qty: l.qty, cash: p.cash, credit: p.credit, dontBuy: p.dontBuy || undefined,
       deductions: lineDeductions(l).filter((d) => !(p.scratchWaived && d.resurface)).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
       creditBonus: p.customCredit ? l.creditBonus : undefined,
+      ...(l.source === 'bulk' ? { type: 'TCG bulk', condition: '', detail: bulkBreakdown(l.bulkItems) } : {}),
     };
   });
 }
@@ -1668,7 +1683,7 @@ const creditBonusText = (it) => (it.creditBonus != null ? `Custom store credit +
 // One printed sheet for both quotes (current trade) and receipts (a logged trade).
 function printSheet({ receipt, time, customer, items, totals, payout, staff }) {
   const rows = items.map((it) => {
-    const detail = [it.platform, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : ''].filter(Boolean).join(' · ');
+    const detail = [it.detail, it.platform, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : ''].filter(Boolean).join(' · ');
     const cell = (c) => (it.dontBuy ? 'Not buying' : c == null ? '—' : money(c * it.qty));
     return `<tr><td>${esc(it.name)}${detail ? `<div class="sub">${esc(detail)}</div>` : ''}</td>
       <td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
@@ -1795,6 +1810,7 @@ async function saveCompleted(print) {
   trade.customer = '';
   trade.split = null;
   trade.cashTotal = null;
+  trade.bulk = { counts: {}, lineId: null };
   $('#customerName').value = '';
   commit();
   focusScan();
@@ -1821,7 +1837,7 @@ async function loadLog() {
 
 function logDetailHtml(r, i) {
   const items = (r.items || []).map((it) => {
-    const detail = [it.platform, it.type, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : '', it.note].filter(Boolean).join(' · ');
+    const detail = [it.detail, it.platform, it.type, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : '', it.note].filter(Boolean).join(' · ');
     const cell = (c) => (it.dontBuy ? 'Not buying' : money(c == null ? null : c * it.qty));
     return `<tr><td>${esc(it.name)}<div class="sub">${esc(detail)}</div></td><td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
   }).join('');
@@ -1852,7 +1868,130 @@ function onLogClick(e) {
 
 /* ================================================================== views + init */
 
-const VIEWS = ['trade', 'log', 'hardware', 'settings'];
+/* ================================================================== TCG bulk tab */
+
+// Rates come from the website's assets/bulk-rates.json (also shown on bulk-rates.html).
+// price is dollars per `per` cards: per 1000 for per-1k rates, per 1 for per-card rates.
+let bulkRates = null;
+let bulkError = '';
+// Counts being entered; lineId is set while editing a bulk line already on the trade.
+trade.bulk = trade.bulk || { counts: {}, lineId: null };
+
+const bulkRateText = (it) => (Number(it.per) === 1 ? `${money(Math.round(it.price * 100))} each`
+  : `${money(Math.round(it.price * 100))} / ${Number(it.per) === 1000 ? '1k' : it.per}`);
+const bulkItemTotal = (it, count) => Math.round((count * Math.round(it.price * 100)) / Number(it.per || 1));
+// "2,350 × Pokémon – Commons"; Other TCGs items already name their game.
+const bulkBreakdown = (items) => (items || []).map((i) => `${Number(i.count).toLocaleString('en-US')} × ${i.groupId === 'other' || !i.group ? i.name : `${i.group} – ${i.name}`}`).join(' · ');
+
+async function loadBulkRates() {
+  bulkError = '';
+  try {
+    const res = await fetch('../assets/bulk-rates.json', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    bulkRates = await res.json();
+  } catch (err) {
+    bulkError = `Couldn't load the bulk rates (${err.message}).`;
+  }
+  renderBulk();
+}
+
+function bulkGroups() {
+  return (bulkRates?.groups || []).filter((g) => g.items?.length);
+}
+
+function renderBulk() {
+  const box = $('#bulkGroups');
+  if (bulkError) {
+    box.innerHTML = `<div class="panel"><p class="error">${esc(bulkError)}</p><button type="button" class="btn" data-bulk-retry>Try again</button></div>`;
+  } else if (!bulkRates) {
+    box.innerHTML = '<p class="muted"><span class="spinner"></span>Loading bulk rates…</p>';
+  } else {
+    const counts = trade.bulk.counts;
+    box.innerHTML = bulkGroups().map((g) => `<div class="table-wrap bulk-group">
+      <table>
+        <caption>${esc(g.name)}${g.note ? `<span class="muted">${esc(g.note)}</span>` : ''}</caption>
+        <thead><tr><th>Item</th><th class="num">Rate</th><th class="num">Cards</th><th class="num">Pays</th></tr></thead>
+        <tbody>${g.items.map((it) => `<tr>
+          <td>${esc(it.name)}</td>
+          <td class="num muted">${esc(bulkRateText(it))}</td>
+          <td class="num"><input type="number" class="bulk-count" data-bulk="${esc(it.id)}" min="0" step="1" inputmode="numeric"
+            value="${counts[it.id] || ''}" placeholder="0" aria-label="${esc(it.name)} cards"></td>
+          <td class="num" data-bulk-total="${esc(it.id)}"></td></tr>`).join('')}</tbody>
+      </table></div>`).join('');
+  }
+  updateBulkTotals();
+}
+
+// The rate items with a count, snapshotted (name/rate/total) so a logged trade keeps today's rates.
+function bulkSelection() {
+  const counts = trade.bulk.counts;
+  return bulkGroups().flatMap((g) => g.items
+    .filter((it) => counts[it.id] > 0)
+    .map((it) => ({ id: it.id, name: it.name, group: g.name, groupId: g.id, count: counts[it.id], price: it.price, per: it.per, total: bulkItemTotal(it, counts[it.id]) })));
+}
+
+function updateBulkTotals() {
+  for (const g of bulkGroups()) {
+    for (const it of g.items) {
+      const cell = $(`[data-bulk-total="${CSS.escape(it.id)}"]`);
+      const n = trade.bulk.counts[it.id] || 0;
+      if (cell) cell.innerHTML = n ? money(bulkItemTotal(it, n)) : '<span class="muted">—</span>';
+    }
+  }
+  const sel = bulkSelection();
+  const total = sel.reduce((sum, i) => sum + i.total, 0);
+  const cards = sel.reduce((sum, i) => sum + i.count, 0);
+  $('#bulkTotal').textContent = money(total);
+  $('#bulkCount').textContent = cards ? `${cards.toLocaleString('en-US')} cards` : '';
+  const editing = trade.lines.some((l) => l.id === trade.bulk.lineId);
+  const btn = $('#bulkAdd');
+  btn.textContent = editing ? 'Update trade line' : 'Add to trade';
+  btn.disabled = total <= 0;
+}
+
+function addBulkToTrade() {
+  const items = bulkSelection();
+  const total = items.reduce((sum, i) => sum + i.total, 0);
+  if (total <= 0) return;
+  const i = trade.lines.findIndex((l) => l.id === trade.bulk.lineId);
+  const existing = trade.lines[i];
+  const line = {
+    id: existing?.id || uid(), source: 'bulk', name: 'TCG bulk', category: 'other', qty: 1, override: null, deductions: [],
+    bulkItems: items, bulkTotal: total, creditBonus: existing?.creditBonus,
+  };
+  if (existing) trade.lines[i] = line; // editing keeps its place (and any custom store credit %)
+  else trade.lines.unshift(line);
+  trade.bulk = { counts: {}, lineId: null };
+  saveTrade();
+  showView('trade');
+  flash(line.id);
+  toast(`${existing ? 'Updated' : 'Added'} TCG bulk: ${money(total)}`);
+}
+
+function editBulkLine(line) {
+  const counts = {};
+  for (const i of line.bulkItems || []) counts[i.id] = i.count;
+  trade.bulk = { counts, lineId: line.id };
+  saveTrade();
+  showView('bulk');
+}
+
+function onBulkInput(e) {
+  const id = e.target.dataset.bulk;
+  if (!id) return;
+  const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+  if (n) trade.bulk.counts[id] = n;
+  else delete trade.bulk.counts[id];
+  saveTrade();
+  updateBulkTotals();
+}
+
+function showBulk() {
+  if (!bulkRates && !bulkError) loadBulkRates();
+  else renderBulk();
+}
+
+const VIEWS = ['trade', 'bulk', 'log', 'hardware', 'settings'];
 
 function showView(name) {
   currentView = name;
@@ -1862,6 +2001,7 @@ function showView(name) {
   if (name === 'log') loadLog();
   if (name === 'hardware') renderHardware();
   if (name === 'settings') fillSettingsForm();
+  if (name === 'bulk') showBulk();
   if (name === 'trade') { renderLines(); focusScan(); }
 }
 
@@ -1898,10 +2038,28 @@ function wireEvents() {
     trade.lines = [];
     trade.split = null;
     trade.cashTotal = null;
+    trade.bulk = { counts: {}, lineId: null };
     trade.customer = '';
     $('#customerName').value = '';
     commit();
     focusScan();
+  });
+
+  // TCG bulk tab
+  const bulkBox = $('#bulkGroups');
+  bulkBox.addEventListener('input', onBulkInput);
+  bulkBox.addEventListener('click', (e) => { if (e.target.closest('[data-bulk-retry]')) loadBulkRates(); });
+  bulkBox.addEventListener('keydown', (e) => { // Enter moves to the next count, then to "Add to trade"
+    if (e.key !== 'Enter' || !e.target.dataset.bulk) return;
+    e.preventDefault();
+    const all = $$('.bulk-count');
+    (all[all.indexOf(e.target) + 1] || $('#bulkAdd')).focus();
+  });
+  $('#bulkAdd').addEventListener('click', addBulkToTrade);
+  $('#bulkClear').addEventListener('click', () => {
+    trade.bulk.counts = {};
+    saveTrade();
+    renderBulk();
   });
 
   // Editable cash total (totals bar)

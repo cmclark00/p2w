@@ -183,7 +183,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `about.html` | About the shop; links to team page. Its **"Meet the mascot" Bulky split-section** carries a `.coin-hunt-teaser` card (cut-out coin + copy) linking to `bulky-coin-hunt.html`. |
 | `bulky-coin-hunt.html` | **Bulky's Coin Hunt** — every Saturday Bulky loses a coin within a 5-mile radius of the shop; find it + bring it in = **$50 store credit**. Bad weather = Bulky stays indoors, no coin that week. Floating hero coin, 3 "how it works" cards (reuses `.community-first`/`.cf-rules` styling), and a `.weather-note` rain-check callout. Reached from the about-page teaser; not in primary nav. |
 | `sell-trade.html` | Buy/sell/trade info **+ merged showcase galleries** (Video Games / TCG / Toys-to-Life) with lightbox. |
-| `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown + per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB). Promoted to its own primary nav item. |
+| `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown, per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB, and **graded slab** bulk rates). Promoted to its own primary nav item. **The rate cards are rendered by an inline script from `assets/bulk-rates.json`**, the single source of truth shared with the trade-in calculator's TCG Bulk tab. Edit rates there, never in this page. Shape: `groups[] → { id, name, note?, items[] → { id, name, price (dollars), per (1000 or 1) } }`. Item `id`s must stay stable (the calculator snapshots them on trade lines). Groups with no items are hidden. On fetch failure it shows a call-us message. |
 | `card-conditions.html` | Standalone card condition guide — Near Mint / LP / MP / HP / Damaged with photo reference and criteria for each grade. Reachable from the FAQ ("How do you grade card condition?"). Not in the primary nav. Images live in `assets/conditions/`. |
 | `events.html` | Event calendar — JS-rendered from `events.json`, next **7 days** only, game filter tabs, injects `Event` JSON-LD. Host-an-event CTA. |
 | `community-first.html` | Community First Release Program — regulars get new core set product at **true MSRP**. The four program rules (one item/person, consistent in-store players, must be present, seal cut at pickup) + "ask staff" footer. Reached from the **header CTA pill** (`.header-cta`) on every standard page. Was originally a section on `events.html`; moved to its own page. |
@@ -492,6 +492,20 @@ The site's **only server-side code**. Everything else is static.
   - `index.html`, `app.js`, and `styles.css` are byte-identical in both
     places. **Keep them in sync** when editing; this repo is the source of
     truth.
+- **TCG Bulk tab** (`#view-bulk`, both roles): loads
+  `../assets/bulk-rates.json` (same file as the public Bulk Rates page).
+  Staff type card counts per rate item. Each row pays count × price ÷
+  per, rounded to cents. **Add to trade** puts one `source: 'bulk'` line
+  on the trade. It carries `bulkItems` (a snapshot of name/group/
+  count/price/total, so logged trades keep that day's rates) and
+  `bulkTotal`. It pays flat, cash = credit, with no deductions and no
+  qty or type editing; custom store credit % and a typed price still
+  work. The line's **Edit counts** reopens the tab with its counts, and
+  saving replaces that line in place. Draft counts live in `trade.bulk`
+  (`{ counts, lineId }`), which New trade and Complete trade reset. The
+  breakdown ("2,350 × Pokémon – Commons …") shows on the line, the
+  printout and the log (`item.detail`). **The shop PC's offline copy
+  also needs `assets/bulk-rates.json`** in its local `assets` folder.
 - **Trade log** (`POST`/`GET api.php?route=trades`): "Complete trade" saves
   a JSON record per trade to `p2w-trade-in-data/trades/YYYY-MM.jsonl`.
   - Each file holds one object per line, one file per UTC month.
