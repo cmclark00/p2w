@@ -563,6 +563,12 @@ The site's **only server-side code**. Everything else is static.
     PriceCharting search. Staff pick the exact product. Nothing is
     remembered between lines. Scans still default to the guide condition
     (`hwConditionFor`), so the guide price wins unless staff pick CIB or New.
+    **Controller minimums** (`boxedPrice()`, `settings.boxedStepPct`,
+    default 10%): for guide **accessories**, CIB pays at least Working +
+    10% and New at least that CIB + 10%. PriceCharting is used when higher,
+    because PC's buy price for some colors was below the Working price. A
+    "CIB/New minimum" badge shows when the minimum wins. Consoles are
+    unaffected. Search/picker buttons show the same numbers.
   - **Special-edition Parts** (PriceCharting hardware with no guide row):
     PriceCharting lines typed console/handheld/accessory also offer
     **Parts**. The price is `settings.partsPctOfLoose` (default 15%,

@@ -67,6 +67,7 @@ const DEFAULT_SETTINGS = {
   lowValue: 100,  // cents - flag items whose cash offer is under this
   slowSalesPerYear: 50, // flag items selling fewer copies a year than this on PriceCharting (0 = off)
   thirdPartyPct: 20, // third-party controllers: % of the first-party controller's guide Working price
+  boxedStepPct: 10, // guide controllers: CIB pays at least Working + this %, New at least CIB + this %
   // Steering wheels and the like: anything whose name has one of these phrases pays a flat amount (cents),
   // cash and credit, in any condition.
   flatItems: {
@@ -223,7 +224,7 @@ const store = {
 function mergeSettings(saved) {
   const s = clone(DEFAULT_SETTINGS);
   if (!saved || typeof saved !== 'object') return s;
-  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'partsPctOfLoose', 'thirdPartyPct', 'shopName', 'quoteFooter']) {
+  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'partsPctOfLoose', 'thirdPartyPct', 'boxedStepPct', 'shopName', 'quoteFooter']) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
   if (saved.flatItems && typeof saved.flatItems === 'object') Object.assign(s.flatItems, saved.flatItems);
@@ -454,9 +455,21 @@ function pcPartsPrice(line, s = settings) {
   return { price: Math.max(pct ?? 0, regular?.parts ?? 0), pct, regular };
 }
 
+// A guide controller bought CIB/New: PriceCharting's price, but CIB at least Working + boxedStepPct
+// and New at least that CIB + boxedStepPct, so boxed never pays less than loose.
+function boxedPrice(prices, unit, category, condition, s = settings) {
+  const rule = s.rules[category] || s.rules.other;
+  const pc = (c) => { const v = prices?.[PC_FIELDS[rule.basis || 'retail-buy'][c]]; return v > 0 ? v : null; };
+  if (category !== 'accessory' || unit == null) return pc(condition);
+  const step = 1 + (Number(s.boxedStepPct) || 0) / 100;
+  const cib = Math.max(pc('cib') ?? 0, Math.round(unit * step));
+  return condition === 'cib' ? cib : Math.max(pc('new') ?? 0, Math.round(cib * step));
+}
+
 function autoBase(line, rule, s = settings) {
   if (line.source === 'pc' && line.condition === 'parts') return pcPartsPrice(line, s)?.price ?? null;
-  if (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition))) {
+  if (line.source === 'hw' && isPcCondition(line.condition)) return boxedPrice(line.prices, lineHw(line).unit, line.category, line.condition, s);
+  if (line.source === 'pc') {
     const v = line.prices?.[pcPriceKey(line, rule)];
     return v > 0 ? v : null;
   }
@@ -905,6 +918,13 @@ function updateRow(tr, line) {
   }
   if (line.condition === THIRD_PARTY) flags.push('<span class="badge info">Premium brand (8BitDo, Hori, Scuf, Nacon…)? Search PriceCharting instead</span>');
   if (p.scratchWaived) flags.push(`<span class="badge guide">${money(SCRATCH_FREE_MAX)} or less – no scratch deduction</span>`);
+  if (line.source === 'hw' && isPcCondition(line.condition) && line.override == null && !p.flat && p.base != null) {
+    const pcValue = line.prices?.[pcPriceKey(line, settings.rules[line.category] || settings.rules.other)];
+    if (!(pcValue >= p.base)) { // the controller minimum beat PriceCharting's price
+      const from = line.condition === 'cib' ? 'Working' : 'CIB';
+      flags.push(`<span class="badge info">${HW_PC_CONDITIONS[line.condition]} minimum: ${from} +${pctText(settings.boxedStepPct)}%</span>`);
+    }
+  }
   if (p.customCredit) flags.push(`<span class="badge edited">Custom store credit +${line.creditBonus}%</span>`);
   if (line.override != null) flags.push('<span class="badge edited">Price edited</span>');
   $('[data-cell="flags"]', tr).innerHTML = flags.join('');
@@ -1064,7 +1084,7 @@ function onLineClick(e) {
 
 /* ================================================================== scan / search box */
 
-// attachTo: { lineId, name, category, condition } while picking a PriceCharting product for a hardware line's CIB/New price.
+// attachTo: { lineId, name, category, unit, condition } while picking a PriceCharting product for a hardware line's CIB/New price.
 const search = { q: '', hw: [], pc: null, loading: false, error: null, active: -1, items: [], seq: 0, attachTo: null };
 
 function focusScan() {
@@ -1110,7 +1130,7 @@ function openPcPicker(line, condition) {
   input.focus();
   input.scrollIntoView({ block: 'nearest' });
   runPcSearch(q);
-  search.attachTo = { lineId: line.id, name: line.name, category: line.category, condition };
+  search.attachTo = { lineId: line.id, name: line.name, category: line.category, unit: lineHw(line).unit, condition };
   renderResults();
 }
 
@@ -1154,8 +1174,9 @@ function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '
 const flatOr = (name, price) => (flatItemMatch(name) ? settings.flatItems.amount : price);
 const condBtn = (cond, label, price) => `<button type="button" class="cond-btn" data-cond="${cond}">${label} <b>${money(price)}</b></button>`;
 const thirdPartyBtn = (hw) => (takesThirdParty(hw) ? condBtn(THIRD_PARTY, '3rd party', flatOr(hw.name, thirdPartyPrice(hw))) : '');
-// CIB/New buttons for hardware, priced from a PriceCharting product.
-const pcCondBtns = (p, category) => Object.entries(HW_PC_CONDITIONS).map(([c, label]) => condBtn(c, label, basisPrice(p, c, category))).join('');
+// CIB/New buttons for hardware, priced from a PriceCharting product (with the controller minimums when unit is given).
+const pcCondBtns = (p, category, unit = null) => Object.entries(HW_PC_CONDITIONS).map(([c, label]) => condBtn(c, label,
+  flatOr(p['product-name'], boxedPrice(slimProduct(p).prices, unit, category, c)))).join('');
 
 function renderResults() {
   const el = $('#results');
@@ -1189,7 +1210,7 @@ function renderResults() {
       const sub = `<div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}`;
       if (attach) {
         const i = search.items.push({ kind: 'pc', product: p }) - 1;
-        html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${pcCondBtns(p, attach.category)}</div></div>`;
+        html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${pcCondBtns(p, attach.category, attach.unit)}</div></div>`;
         continue;
       }
       const hw = hardwareMatch(p);
@@ -1198,7 +1219,7 @@ function renderResults() {
         const conds = Object.entries(hwConditionLabels(hw.category)).filter(([f]) => hw[f] != null)
           .map(([f, label]) => condBtn(f, label, flatOr(hw.name, hw[f]))).join('') + thirdPartyBtn(hw);
         html += `<div class="result" data-i="${i}">${sub} · buying guide price (${esc(hw.name)})</div></div>
-          <div class="r-conds">${conds}${pcCondBtns(p, hw.category)}</div></div>`;
+          <div class="r-conds">${conds}${pcCondBtns(p, hw.category, hw.unit)}</div></div>`;
         continue;
       }
       const i = search.items.push({ kind: 'pc', product: p }) - 1;
@@ -1489,6 +1510,7 @@ function fillSettingsForm() {
   f.slowSalesPerYear.value = settings.slowSalesPerYear;
   f.partsPctOfLoose.value = pctText(settings.partsPctOfLoose);
   f.thirdPartyPct.value = pctText(settings.thirdPartyPct);
+  f.boxedStepPct.value = pctText(settings.boxedStepPct);
   f.flatKeywords.value = settings.flatItems.keywords.join('\n');
   f.flatAmount.value = plain(settings.flatItems.amount);
   f.shopName.value = settings.shopName;
@@ -1523,6 +1545,7 @@ async function saveSettings(e) {
     slowSalesPerYear: Math.max(0, Math.round(Number(f.slowSalesPerYear.value) || 0)),
     partsPctOfLoose: Math.max(0, Number(f.partsPctOfLoose.value) || 0),
     thirdPartyPct: Math.max(0, Number(f.thirdPartyPct.value) || 0),
+    boxedStepPct: Math.max(0, Number(f.boxedStepPct.value) || 0),
     flatItems: {
       amount: Number.isNaN(flatAmount) || flatAmount == null ? settings.flatItems.amount : flatAmount,
       keywords: lines(f.flatKeywords.value),

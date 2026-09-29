@@ -618,6 +618,8 @@ that device is locked out for 15 minutes.
    hardware, set the line's condition to **CIB** or **New**. Those use
    PriceCharting prices: a search opens in the big box, and you click the
    exact model/color that matches what the customer brought in.
+   Controllers always pay more boxed: CIB is at least the Working price
+   + 10%, and New at least CIB + 10% (or PriceCharting's price, if higher).
    **Special editions** (a Spider-Man PS4, a Halo controller) come from
    PriceCharting and can also be set to **Parts**. That pays 15% of the
    PriceCharting loose price, but never less than the regular model's
