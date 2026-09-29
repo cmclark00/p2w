@@ -18,6 +18,20 @@ const isGameCat = (cat) => GAME_CATEGORIES.includes(cat);
 const hwConditionLabels = (cat) => (cat === 'accessory'
   ? { unit: 'Working', parts: 'Parts' }
   : { complete: 'Complete', unit: 'Console only', parts: 'Parts' });
+// Hardware can also be CIB or New, priced from the PriceCharting product attached to the line.
+const HW_PC_CONDITIONS = { cib: 'CIB', new: 'New' };
+const isPcCondition = (c) => c in HW_PC_CONDITIONS;
+// PriceCharting hardware (special editions with no buying-guide row) can also be bought for Parts.
+const isHwCat = (cat) => ['console', 'handheld', 'accessory'].includes(cat);
+// A third-party version of a buying-guide controller pays a % of the first-party Working price.
+const THIRD_PARTY = 'thirdparty';
+const CONTROLLER_RE = /\b(controller|joy ?cons?|remote|nunchuk|joystick|pad|zapper)\b/;
+const NOT_CONTROLLER_RE = /\b(memory|adapter|3rd party|third party)\b/;
+const takesThirdParty = (hw) => hw.category === 'accessory' && hw.unit != null
+  && CONTROLLER_RE.test(norm(hw.name)) && !NOT_CONTROLLER_RE.test(norm(hw.name));
+const thirdPartyPrice = (hw, s = settings) => Math.round((hw.unit * (Number(s.thirdPartyPct) || 0)) / 100);
+// The guide item behind a hardware line, or the prices saved on the line if it was deleted since.
+const lineHw = (line) => hwItem(line) || { ...line.hwPrices, name: line.name, category: line.category };
 
 // PriceCharting returns every price as an integer number of pennies.
 const PC_FIELDS = {
@@ -33,6 +47,8 @@ const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| 
 const GAME_CASH_PCT = 100 / 1.5;
 // Slow-seller flags only matter on items worth this much (cents); cheap items get the guide's flat prices.
 const SLOW_SELLER_MIN_VALUE = 1000;
+// Trade-ins worth this much or less (cents) get no scratch/resurfacing deduction.
+const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
@@ -50,6 +66,14 @@ const DEFAULT_SETTINGS = {
   roundStep: 1,   // cents
   lowValue: 100,  // cents - flag items whose cash offer is under this
   slowSalesPerYear: 50, // flag items selling fewer copies a year than this on PriceCharting (0 = off)
+  thirdPartyPct: 20, // third-party controllers: % of the first-party controller's guide Working price
+  // Steering wheels and the like: anything whose name has one of these phrases pays a flat amount (cents),
+  // cash and credit, in any condition.
+  flatItems: {
+    amount: 500,
+    keywords: ['Racing Wheel', 'Steering Wheel', 'Speed Wheel', 'Driving Force', 'Speed Force', 'Pedals', 'Flight Stick', 'HOTAS'],
+  },
+  partsPctOfLoose: 15, // PriceCharting hardware (special editions) on Parts: % of loose price, min = regular model's Parts price
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
     { id: 'scratch-heavy', label: 'Heavy scratching (resurface)', amount: 300, appliesTo: 'game', resurface: true },
@@ -199,9 +223,10 @@ const store = {
 function mergeSettings(saved) {
   const s = clone(DEFAULT_SETTINGS);
   if (!saved || typeof saved !== 'object') return s;
-  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'shopName', 'quoteFooter']) {
+  for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'partsPctOfLoose', 'thirdPartyPct', 'shopName', 'quoteFooter']) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
+  if (saved.flatItems && typeof saved.flatItems === 'object') Object.assign(s.flatItems, saved.flatItems);
   if (saved.version >= 2) { // version 1 saves used a different percentage format - keep the new defaults
     for (const cat of Object.keys(s.rules)) Object.assign(s.rules[cat], saved.rules?.[cat] || {});
     if (Array.isArray(saved.deductions)) s.deductions = saved.deductions;
@@ -298,6 +323,14 @@ const PC = {
   },
 };
 
+// PriceCharting redirects /game/<product id> to that product's page.
+const pcUrl = (id) => `https://www.pricecharting.com/game/${encodeURIComponent(id)}`;
+function pcLink(id, text, cls = '') {
+  const c = cls ? ` class="${cls}"` : '';
+  if (!/^\d+$/.test(id || '')) return `<span${c}>${esc(text)}</span>`; // demo items have no real page
+  return `<a${c} href="${esc(pcUrl(id))}" target="_blank" rel="noopener noreferrer" title="Open on PriceCharting">${esc(text)}</a>`;
+}
+
 function slimProduct(p) {
   const prices = {};
   for (const k of PRICE_KEYS) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
@@ -312,6 +345,7 @@ function slimProduct(p) {
 
 function guessCategory(name) {
   const n = name.toLowerCase();
+  if (flatItemMatch(name)) return 'accessory';
   if (/\b(controller|joy-?cons?|remote|nunchuk|memory card|adapter|cable|charger|headset|dock)\b/.test(n)) return 'accessory';
   if (/\b(console|system)\b/.test(n)) {
     return /game ?boy|\bds\b|\b[23]ds\b|\bdsi\b|psp|vita|game gear|switch lite/.test(n) ? 'handheld' : 'console';
@@ -340,9 +374,17 @@ function shitboxReason(line, g) {
   return autoShitboxReason(line, g);
 }
 
-// Applies the Game Buying Guide to a PriceCharting game line.
+// The flat-price phrase (steering wheels etc.) an item's name contains, or undefined.
+const flatItemMatch = (name, s = settings) => {
+  const text = norm(name);
+  return (s.flatItems?.keywords || []).find((k) => hasPhrase(text, k));
+};
+
+// Applies the flat-price items rule to any scanned/guide item, then the Game Buying Guide to a PriceCharting game line.
 // Returns null (price normally), { dontBuy, note }, { flat, note } (fixed offer in cents), or { info, note }.
 function guideCheck(line, s) {
+  const flatKey = (line.source === 'pc' || line.source === 'hw') && flatItemMatch(line.name, s);
+  if (flatKey) return { flat: s.flatItems.amount, note: `${flatKey} → ${money(s.flatItems.amount)}` };
   const g = s.guide;
   if (!g.enabled || line.source !== 'pc' || !isGameCat(line.category)) return null;
   if (/\bpc games?\b/.test(norm(line.platform))) return { dontBuy: true, note: "PC game – we don't buy PC games" };
@@ -372,21 +414,63 @@ function guideCheck(line, s) {
 
 const hwItem = (line) => hardware.find((h) => h.id === line.hwId);
 
-function autoBase(line, rule) {
-  if (line.source === 'pc') {
-    const v = line.prices?.[PC_FIELDS[rule.basis || 'retail-buy'][line.condition]];
+const pcPriceKey = (line, rule, condition = line.condition) => PC_FIELDS[rule.basis || 'retail-buy'][condition];
+
+// Buying-guide names use short system names ("PS4 Controller"); PriceCharting spells systems out.
+const SYSTEM_ALIASES = {
+  playstation: 'ps1 psone', 'playstation 2': 'ps2', 'playstation 3': 'ps3', 'playstation 4': 'ps4', 'playstation 5': 'ps5',
+  psp: 'playstation portable', 'playstation vita': 'ps vita', 'nintendo 64': 'n64', 'super nintendo': 'snes',
+  nes: 'nintendo entertainment system', gamecube: 'gc', gameboy: 'game boy', 'gameboy color': 'game boy color gbc',
+  'gameboy advance': 'game boy advance gba', 'nintendo switch': 'switch', 'nintendo switch 2': 'switch 2',
+  xbox: 'xbox original og', 'xbox series x': 'xbox series',
+};
+const MATCH_FILLER = new Set(['the', 'of', 'and', 'edition', 'w', 'with']);
+const matchWords = (s) => new Set(norm(s).split(' ').filter((w) => w && !MATCH_FILLER.has(w)));
+
+// The regular buying-guide model behind a PriceCharting hardware item (e.g. a special edition):
+// the same-type guide item whose name shares the most words with it (ties go to the lower Parts price).
+// Numbers only count from the system name: "Splatoon 2" must not match "Switch 2 Pro Controller".
+function regularModel(line) {
+  const have = matchWords(`${line.platform} ${SYSTEM_ALIASES[norm(line.platform)] || ''}`);
+  for (const w of matchWords(line.name)) if (!/^\d+$/.test(w)) have.add(w);
+  let best = null;
+  for (const h of hardware) {
+    if (h.category !== line.category || h.parts == null || !h.name) continue;
+    const want = matchWords(h.name);
+    let shared = 0;
+    for (const w of want) if (have.has(w)) shared += 1;
+    const score = shared - (want.size - shared) / 2;
+    if (shared >= 2 && (!best || score > best.score || (score === best.score && h.parts < best.hw.parts))) best = { hw: h, score };
+  }
+  return best?.hw || null;
+}
+
+// PriceCharting hardware on Parts: a % of the loose price, never below the regular model's guide Parts price.
+function pcPartsPrice(line, s = settings) {
+  const loose = line.prices?.['loose-price'];
+  const pct = loose > 0 ? Math.round((loose * (Number(s.partsPctOfLoose) || 0)) / 100) : null;
+  const regular = regularModel(line);
+  if (pct == null && !regular) return null;
+  return { price: Math.max(pct ?? 0, regular?.parts ?? 0), pct, regular };
+}
+
+function autoBase(line, rule, s = settings) {
+  if (line.source === 'pc' && line.condition === 'parts') return pcPartsPrice(line, s)?.price ?? null;
+  if (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition))) {
+    const v = line.prices?.[pcPriceKey(line, rule)];
     return v > 0 ? v : null;
   }
   if (line.source === 'hw') {
-    const v = (hwItem(line) || line.hwPrices || {})[line.condition];
-    return v ?? null;
+    const hw = lineHw(line);
+    if (line.condition === THIRD_PARTY) return hw.unit != null ? thirdPartyPrice(hw, s) : null;
+    return hw[line.condition] ?? null;
   }
   return null;
 }
 
 // Hardware bought for parts is a flat parts price: missing cables/controllers don't matter,
 // and there's no store credit bump (credit = cash).
-const isPartsLine = (line) => line.source === 'hw' && line.condition === 'parts';
+const isPartsLine = (line) => (line.source === 'hw' || line.source === 'pc') && line.condition === 'parts';
 const takesDeductions = (line) => !isPartsLine(line);
 
 function lineDeductions(line, s = settings) {
@@ -400,14 +484,23 @@ function roundOffer(cents, s) {
   return fn(cents / step + 1e-9) * step;
 }
 
+// A trade-in worth SCRATCH_FREE_MAX or less without its scratch (resurfacing) deductions isn't docked for them.
+function priceLine(line, s = settings) {
+  const deds = lineDeductions(line, s);
+  const out = priceWith(line, s, deds);
+  if (!deds.some((d) => d.resurface)) return out;
+  const clean = priceWith(line, s, deds.filter((d) => !d.resurface));
+  if (!clean.dontBuy && clean.cash != null && clean.cash <= SCRATCH_FREE_MAX) return { ...clean, scratchWaived: true };
+  return out;
+}
+
 // value = item value (PriceCharting price or guide price) minus deductions; cash/credit = value x category %.
 // Guide flat amounts (disc-only, shitbox, $0.25 stack) are paid as-is in both cash and credit.
-function priceLine(line, s = settings) {
+function priceWith(line, s, deds) {
   const out = { base: null, cash: null, credit: null, guide: null, flat: false, dontBuy: false };
   if (line.pending || line.failed) return out;
   const rule = s.rules[line.category] || s.rules.other;
-  out.base = line.override ?? autoBase(line, rule);
-  const deds = lineDeductions(line, s);
+  out.base = line.override ?? autoBase(line, rule, s);
   const dedTotal = deds.reduce((sum, d) => sum + d.amount, 0);
   // Guide rules run first: their tiers use the market price, so they work even without a retail buy price.
   out.guide = line.override == null ? guideCheck(line, s) : null;
@@ -427,6 +520,13 @@ function priceLine(line, s = settings) {
     return out;
   }
   if (out.base == null) return out;
+  if (line.source === 'custom') {
+    // Custom items: the typed price is the cash offer. Deductions come off it the way they would
+    // off any other line's cash, and credit keeps the category's credit-to-cash ratio.
+    out.cash = Math.max(0, Math.round(out.base - (dedTotal * rule.cashPct) / 100));
+    out.credit = rule.cashPct > 0 ? roundOffer((out.cash * rule.creditPct) / rule.cashPct, s) : out.cash;
+    return out;
+  }
   const value = out.base - dedTotal;
   if (isGameCat(line.category) && dedTotal > 0 && value < 25) {
     out.guide = { note: 'Deductions exceed value → $0.25 stack' };
@@ -490,7 +590,8 @@ function applyHardwareMatches() {
     changed = true;
     return {
       id: l.id, source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition: hwConditionFor(hw, l.condition),
-      qty: l.qty, override: null, deductions: [], hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom: l.name,
+      qty: l.qty, override: null, deductions: [], hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom: l.name, matchedPcId: l.pcId,
+      prices: l.prices,
     };
   });
   if (changed) saveTrade();
@@ -498,6 +599,7 @@ function applyHardwareMatches() {
 
 // PriceCharting condition -> buying-guide condition: accessories are "Working"; loose consoles are "Console only".
 function hwConditionFor(hw, pcCondition) {
+  if (pcCondition === 'parts' && hw.parts != null) return 'parts';
   const want = hw.category === 'accessory' || pcCondition === 'loose' ? 'unit' : 'complete';
   return want in hwConditionLabels(hw.category) && hw[want] != null ? want : defaultHwCondition(hw);
 }
@@ -505,14 +607,15 @@ function hwConditionFor(hw, pcCondition) {
 function addPcProduct(raw, condition, replaceId = null) {
   const hw = hardwareMatch(raw);
   if (hw) {
-    addHardware(hw, hwConditionFor(hw, condition), replaceId, raw['product-name']);
+    addHardware(hw, hwConditionFor(hw, condition), replaceId, pcInfo(raw));
     return;
   }
   const p = slimProduct(raw);
   const same = trade.lines.find((l) => l.source === 'pc' && l.pcId === p.id && l.condition === condition && isPlain(l) && l.id !== replaceId);
   if (same) {
     same.qty += 1;
-    if (replaceId) trade.lines = trade.lines.filter((l) => l.id !== replaceId);
+    // An item added again moves to the top of the list.
+    trade.lines = [same, ...trade.lines.filter((l) => l !== same && l.id !== replaceId)];
     commit();
     flash(same.id);
     return;
@@ -531,19 +634,25 @@ function defaultHwCondition(hw) {
   return Object.keys(hwConditionLabels(hw.category)).find((f) => hw[f] != null) || Object.keys(hwConditionLabels(hw.category))[0];
 }
 
-// matchedFrom: the PriceCharting name when a scanned/searched item was matched to this hardware item.
-function addHardware(hw, condition = defaultHwCondition(hw), replaceId = null, matchedFrom = null) {
-  const same = trade.lines.find((l) => l.source === 'hw' && l.hwId === hw.id && l.condition === condition && isPlain(l) && l.id !== replaceId);
+// The parts of a PriceCharting product a hardware line keeps, for its CIB/New prices and link.
+const pcInfo = (raw) => ({ id: String(raw.id), name: raw['product-name'] || '', prices: slimProduct(raw).prices });
+
+// pc: the PriceCharting product ({ id, name, prices }) when a scanned/searched item was matched to this hardware item.
+function addHardware(hw, condition = defaultHwCondition(hw), replaceId = null, pc = null) {
+  const same = trade.lines.find((l) => l.source === 'hw' && l.hwId === hw.id && l.condition === condition && isPlain(l) && l.id !== replaceId
+    && (!isPcCondition(condition) || l.matchedPcId === pc?.id));
   if (same) {
     same.qty += 1;
-    if (replaceId) trade.lines = trade.lines.filter((l) => l.id !== replaceId);
+    // An item added again moves to the top of the list.
+    trade.lines = [same, ...trade.lines.filter((l) => l !== same && l.id !== replaceId)];
     commit();
     flash(same.id);
     return;
   }
   const line = {
     id: replaceId || uid(), source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition, qty: 1, override: null, deductions: [],
-    hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom,
+    hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts },
+    matchedFrom: pc?.name || null, matchedPcId: pc?.id || null, prices: pc?.prices,
   };
   placeLine(line, replaceId);
   commit();
@@ -585,7 +694,12 @@ async function scanUpc(code) {
   }
 }
 
-// Search results may lack some price fields; fetch the full product before adding.
+// Search results may lack some price fields; fetch the full product when they do.
+async function withFullPrices(raw) {
+  if (!tokenSet || PRICE_KEYS.every((k) => k in raw)) return raw;
+  return { ...raw, ...(await PC.byId(raw.id)) };
+}
+
 async function addFromSearch(raw, condition) {
   if (!tokenSet || PRICE_KEYS.every((k) => k in raw)) {
     addPcProduct(raw, condition);
@@ -594,16 +708,57 @@ async function addFromSearch(raw, condition) {
   const pending = addPending(`Loading ${raw['product-name'] || 'item'}…`);
   let full = raw;
   try {
-    full = { ...raw, ...(await PC.byId(raw.id)) };
+    full = await withFullPrices(raw);
   } catch (err) {
     toast(`Couldn't load full prices: ${err.message}`, 'error');
   }
   if (trade.lines.some((l) => l.id === pending.id)) addPcProduct(full, condition, pending.id);
 }
 
+// A buying-guide item added as CIB/New from a matched PriceCharting search result.
+async function addHardwareFromSearch(hw, raw, condition) {
+  let full = raw;
+  try {
+    full = await withFullPrices(raw);
+  } catch (err) {
+    toast(`Couldn't load full prices: ${err.message}`, 'error');
+  }
+  addHardware(hw, condition, null, pcInfo(full));
+}
+
+// Attaches the PriceCharting product staff picked (see openPcPicker) to a hardware line.
+async function attachPcProduct(target, raw, condition) {
+  let full = raw;
+  try {
+    full = await withFullPrices(raw);
+  } catch (err) {
+    toast(`Couldn't load full prices: ${err.message}`, 'error');
+  }
+  const line = trade.lines.find((l) => l.id === target.lineId);
+  if (!line) return; // removed meanwhile
+  const pc = pcInfo(full);
+  Object.assign(line, { condition, matchedFrom: pc.name, matchedPcId: pc.id, prices: pc.prices });
+  commit();
+  flash(line.id);
+}
+
+// A hardware line switched to CIB/New whose stored PriceCharting prices lack that condition's price
+// (e.g. it came from a search result with partial prices): fetch the full product once.
+async function loadLinePrices(line) {
+  try {
+    const full = await PC.byId(line.matchedPcId);
+    if (!full) return;
+    line.prices = pcInfo(full).prices;
+    commit();
+  } catch (err) {
+    toast(`Couldn't load PriceCharting prices: ${err.message}`, 'error');
+  }
+}
+
 function conditionLabel(line) {
-  if (line.source === 'pc') return GAME_CONDITIONS[line.condition];
-  if (line.source === 'hw') return hwConditionLabels((hwItem(line) || line).category)[line.condition] || '';
+  if (line.source === 'pc') return line.condition === 'parts' ? 'Parts' : GAME_CONDITIONS[line.condition];
+  if (line.source === 'hw' && line.condition === THIRD_PARTY) return '3rd party';
+  if (line.source === 'hw') return HW_PC_CONDITIONS[line.condition] ||hwConditionLabels((hwItem(line) || line).category)[line.condition] || '';
   return '';
 }
 
@@ -616,17 +771,20 @@ function refLine(line) {
 }
 
 function conditionSelect(line) {
-  let opts;
+  const opt = ([v, label]) => `<option value="${v}"${v === line.condition ? ' selected' : ''}>${label}</option>`;
   if (line.source === 'pc') {
-    opts = GAME_CONDITIONS;
-  } else if (line.source === 'hw') {
-    const hw = hwItem(line) || { ...line.hwPrices, category: line.category };
-    opts = Object.fromEntries(Object.entries(hwConditionLabels(hw.category)).filter(([f]) => hw[f] != null || f === line.condition));
-  } else {
-    return '<span class="muted">—</span>';
+    const conds = Object.entries(GAME_CONDITIONS);
+    if (isHwCat(line.category) || line.condition === 'parts') conds.push(['parts', 'Parts']);
+    return `<select data-field="condition">${conds.map(opt).join('')}</select>`;
   }
-  return `<select data-field="condition">${Object.entries(opts)
-    .map(([v, label]) => `<option value="${v}"${v === line.condition ? ' selected' : ''}>${label}</option>`).join('')}</select>`;
+  if (line.source === 'hw') {
+    const hw = lineHw(line);
+    const guide = Object.entries(hwConditionLabels(hw.category)).filter(([f]) => hw[f] != null || f === line.condition);
+    if (takesThirdParty(hw) || line.condition === THIRD_PARTY) guide.push([THIRD_PARTY, '3rd party']);
+    return `<select data-field="condition"><optgroup label="Buying guide">${guide.map(opt).join('')}</optgroup>
+      <optgroup label="PriceCharting">${Object.entries(HW_PC_CONDITIONS).map(opt).join('')}</optgroup></select>`;
+  }
+  return '<span class="muted">—</span>';
 }
 
 function adjustHtml(line) {
@@ -663,11 +821,18 @@ function rowHtml(line) {
     .map(([v, label]) => `<option value="${v}"${v === line.category ? ' selected' : ''}>${esc(label)}</option>`).join('');
   let item;
   if (line.source === 'custom') {
-    item = `<input type="text" class="name-input" data-field="name" value="${esc(line.name)}" placeholder="Describe the item">`;
+    item = `<input type="text" class="name-input" data-field="name" value="${esc(line.name)}" placeholder="Describe the item">
+      <div class="sub">The price you type is the cash offer</div>`;
   } else if (line.source === 'hw') {
-    item = `<div class="item-name">${esc(line.name)}</div><div class="sub">Buying guide price${line.matchedFrom ? ` · scanned as PriceCharting “${esc(line.matchedFrom)}”` : ''}</div>`;
+    const fromPc = isPcCondition(line.condition);
+    const pcName = line.matchedFrom ? ` · PriceCharting “${pcLink(line.matchedPcId, line.matchedFrom)}”` : '';
+    let source = 'Buying guide price';
+    if (fromPc) source = 'PriceCharting price';
+    else if (line.condition === THIRD_PARTY) source = `3rd party: ${pctText(settings.thirdPartyPct)}% of the first-party Working price`;
+    item = `<div class="item-name">${esc(line.name)}</div><div class="sub">${source}${pcName}</div>
+      ${fromPc && line.prices ? `<div class="ref">${refLine(line)}</div>` : ''}`;
   } else {
-    item = `<div class="item-name">${esc(line.name)}</div>
+    item = `<div>${pcLink(line.pcId, line.name, 'item-name')}</div>
       <div class="sub">${esc(line.platform)}${line.upc ? ` · UPC ${esc(line.upc)}` : ''}</div>
       <div class="ref">${refLine(line)}</div>`;
   }
@@ -676,7 +841,7 @@ function rowHtml(line) {
     <td><select data-field="category">${catOpts}</select></td>
     <td>${conditionSelect(line)}</td>
     <td class="num"><input type="number" class="qty" data-field="qty" min="1" step="1" value="${line.qty}"></td>
-    <td class="num value-cell"><span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="Price"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button></td>
+    <td class="num value-cell"><span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="${line.source === 'custom' ? 'Cash' : 'Price'}"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button></td>
     <td class="num cash" data-cell="cash"></td>
     <td class="num credit" data-cell="credit"></td>
     <td>${removeBtn}</td>
@@ -712,6 +877,14 @@ function updateRow(tr, line) {
   if (line.salesVolume != null && line.salesVolume < settings.slowSalesPerYear && p.base >= SLOW_SELLER_MIN_VALUE && !p.flat && !p.dontBuy) {
     flags.push(`<span class="badge slow">Slow seller: ${line.salesVolume} sold/yr – check eBay solds</span>`);
   }
+  if (line.source === 'pc' && line.condition === 'parts' && line.override == null && !p.flat) {
+    const parts = pcPartsPrice(line);
+    const pct = parts?.pct != null ? `${pctText(settings.partsPctOfLoose)}% of loose = ${money(parts.pct)}` : 'no loose price';
+    const min = parts?.regular ? `min ${money(parts.regular.parts)} (${esc(parts.regular.name)} parts)` : 'no regular model found – no minimum';
+    flags.push(`<span class="badge info">Parts: ${pct} · ${min}</span>`);
+  }
+  if (line.condition === THIRD_PARTY) flags.push('<span class="badge info">Premium brand (8BitDo, Hori, Scuf, Nacon…)? Search PriceCharting instead</span>');
+  if (p.scratchWaived) flags.push(`<span class="badge guide">${money(SCRATCH_FREE_MAX)} or less – no scratch deduction</span>`);
   if (line.override != null) flags.push('<span class="badge edited">Price edited</span>');
   $('[data-cell="flags"]', tr).innerHTML = flags.join('');
 }
@@ -735,6 +908,11 @@ function refreshComputed() {
   renderTotals();
 }
 
+// Trade totals (cash and credit) round to the nearest dollar: $8.50 → $9, $8.49 → $8. Items keep their cents.
+const TOTAL_ROUND = 100;
+const roundTotal = (cents) => Math.round(cents / TOTAL_ROUND) * TOTAL_ROUND;
+
+// cash/credit are the rounded totals; itemsCash/itemsCredit what the items add up to.
 function tradeTotals() {
   let count = 0, cash = 0, credit = 0, missing = 0, notBuying = 0;
   for (const l of trade.lines) {
@@ -746,7 +924,13 @@ function tradeTotals() {
     cash += p.cash * l.qty;
     credit += p.credit * l.qty;
   }
-  return { count, cash, credit, missing, notBuying };
+  return { count, cash: roundTotal(cash), credit: roundTotal(credit), itemsCash: cash, itemsCredit: credit, missing, notBuying };
+}
+
+// "Items add up to $8.40 cash · $12.60 credit", or '' when rounding changed nothing.
+function roundingNote(t) {
+  if (t.itemsCash == null || (t.itemsCash === t.cash && t.itemsCredit === t.credit)) return '';
+  return `Totals are rounded to the nearest dollar (items add up to ${money(t.itemsCash)} cash · ${money(t.itemsCredit)} credit).`;
 }
 
 function renderTotals() {
@@ -754,6 +938,7 @@ function renderTotals() {
   $('#itemCount').textContent = t.count;
   $('#totalCash').textContent = money(t.cash);
   $('#totalCredit').textContent = money(t.credit);
+  $('#totalCash').title = $('#totalCredit').title = roundingNote(t);
   const notes = [];
   if (t.missing) notes.push(`${t.missing} need${t.missing === 1 ? 's' : ''} a price`);
   if (t.notBuying) notes.push(`${t.notBuying} not buying`);
@@ -783,6 +968,7 @@ function onLineChange(e) {
     const target = isGameCat(v) ? 'game' : 'hardware';
     line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === target);
     if (!isGameCat(v)) delete line.guideFlag;
+    if (line.source === 'pc' && line.condition === 'parts' && !isHwCat(v)) line.condition = 'loose';
     commit();
     return;
   }
@@ -796,8 +982,20 @@ function onLineChange(e) {
     else line.override = cents == null || cents === auto ? null : cents;
     e.target.value = plain(line.override ?? auto);
   } else if (field === 'condition') {
+    if (line.source === 'hw' && isPcCondition(v) && !line.matchedPcId) {
+      // No PriceCharting product on this line yet: keep the old condition until staff pick one.
+      e.target.value = line.condition;
+      openPcPicker(line, v);
+      return;
+    }
     line.condition = v;
-    if (line.source === 'hw') { commit(); return; } // Parts hides/shows the deduction menu
+    if (line.source === 'hw') {
+      const rule = settings.rules[line.category] || settings.rules.other;
+      if (isPcCondition(v) && !(pcPriceKey(line, rule) in (line.prices || {}))) loadLinePrices(line);
+      commit(); // Parts hides/shows the deduction menu; CIB/New show PriceCharting prices
+      return;
+    }
+    if (line.source === 'pc') { commit(); return; } // Parts hides/shows the deduction menu
   } else if (field === 'name') {
     line.name = v.trim();
   }
@@ -835,7 +1033,8 @@ function onLineClick(e) {
 
 /* ================================================================== scan / search box */
 
-const search = { q: '', hw: [], pc: null, loading: false, error: null, active: -1, items: [], seq: 0 };
+// attachTo: { lineId, name, category, condition } while picking a PriceCharting product for a hardware line's CIB/New price.
+const search = { q: '', hw: [], pc: null, loading: false, error: null, active: -1, items: [], seq: 0, attachTo: null };
 
 function focusScan() {
   if (currentView === 'trade') $('#scanInput').focus();
@@ -860,7 +1059,27 @@ function matchHardware(q) {
 
 function closeResults() {
   search.seq += 1;
-  Object.assign(search, { q: '', hw: [], pc: null, loading: false, error: null, active: -1 });
+  Object.assign(search, { q: '', hw: [], pc: null, loading: false, error: null, active: -1, attachTo: null });
+  renderResults();
+}
+
+// PriceCharting search for a buying-guide name: "PS4 (PlayStation 4)" -> "PS4 console".
+// Its search is fuzzy, so the (parenthetical) mostly pulls in games; "console" pulls in consoles.
+function pcQuery(hw) {
+  const q = hw.name.replace(/\([^)]*\)/g, ' ').replace(/[–/]/g, ' ').replace(/\s+/g, ' ').trim();
+  return hw.category === 'console' && !/\b(console|system)\b/i.test(q) ? `${q} console` : q;
+}
+
+// A hardware line switched to CIB/New without a PriceCharting product: search PriceCharting
+// in the scan box so staff pick the exact product (model, color, bundle) to price it from.
+function openPcPicker(line, condition) {
+  const input = $('#scanInput');
+  const q = pcQuery(line);
+  input.value = q;
+  input.focus();
+  input.scrollIntoView({ block: 'nearest' });
+  runPcSearch(q);
+  search.attachTo = { lineId: line.id, name: line.name, category: line.category, condition };
   renderResults();
 }
 
@@ -893,23 +1112,35 @@ async function runPcSearch(q) {
   renderResults();
 }
 
-function basisPrice(raw, cond) {
-  const rule = settings.rules[guessCategory(raw['product-name'] || '')] || settings.rules.game;
+function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '')) {
+  if (flatItemMatch(raw['product-name'])) return settings.flatItems.amount; // steering wheels etc.
+  const rule = settings.rules[category] || settings.rules.game;
   const v = raw[PC_FIELDS[rule.basis || 'retail-buy'][cond]];
   return v > 0 ? Number(v) : null;
 }
 
+// Result buttons show the flat price for steering wheels etc., which pay the same in any condition.
+const flatOr = (name, price) => (flatItemMatch(name) ? settings.flatItems.amount : price);
+const condBtn = (cond, label, price) => `<button type="button" class="cond-btn" data-cond="${cond}">${label} <b>${money(price)}</b></button>`;
+const thirdPartyBtn = (hw) => (takesThirdParty(hw) ? condBtn(THIRD_PARTY, '3rd party', flatOr(hw.name, thirdPartyPrice(hw))) : '');
+// CIB/New buttons for hardware, priced from a PriceCharting product.
+const pcCondBtns = (p, category) => Object.entries(HW_PC_CONDITIONS).map(([c, label]) => condBtn(c, label, basisPrice(p, c, category))).join('');
+
 function renderResults() {
   const el = $('#results');
+  const attach = search.attachTo;
   search.items = [];
   let html = '';
 
-  if (search.hw.length) {
+  if (attach) {
+    html += `<div class="results-note picker">Pick the PriceCharting product for <strong>${esc(attach.name)}</strong> to price it
+      ${esc(HW_PC_CONDITIONS[attach.condition])}. Not the right results? Edit the search and press <kbd>Enter</kbd>, or <kbd>Esc</kbd> to cancel.</div>`;
+  } else if (search.hw.length) {
     html += '<div class="results-group">Buying guide <span>cash prices · click a condition to add</span></div>';
     for (const h of search.hw) {
       const i = search.items.push({ kind: 'hw', hw: h }) - 1;
       const conds = Object.entries(hwConditionLabels(h.category)).filter(([f]) => h[f] != null)
-        .map(([f, label]) => `<button type="button" class="cond-btn" data-cond="${f}">${label} <b>${money(h[f])}</b></button>`).join('');
+        .map(([f, label]) => condBtn(f, label, flatOr(h.name, h[f]))).join('') + thirdPartyBtn(h);
       html += `<div class="result" data-i="${i}">
         <div class="r-main"><div class="r-name">${esc(h.name)}</div><div class="sub">${esc(CATEGORIES[h.category])}</div></div>
         <div class="r-conds">${conds || '<span class="badge warn">No price yet</span>'}</div></div>`;
@@ -921,25 +1152,32 @@ function renderResults() {
   } else if (search.error) {
     html += `<div class="results-group">PriceCharting</div><div class="results-note error">${esc(search.error)}</div>`;
   } else if (search.pc) {
-    html += `<div class="results-group">PriceCharting <span>${search.alt ? `including results for “${esc(search.alt)}” · ` : ''}click a condition to add</span></div>`;
-    if (!search.pc.length) html += '<div class="results-note">No matches. Try fewer words, or add it as a custom item.</div>';
+    html += `<div class="results-group">PriceCharting <span>${search.alt ? `including results for “${esc(search.alt)}” · ` : ''}click a condition to ${attach ? 'use' : 'add'}</span></div>`;
+    if (!search.pc.length) html += `<div class="results-note">No matches. Try fewer words${attach ? '' : ', or add it as a custom item'}.</div>`;
     for (const p of search.pc) {
+      const sub = `<div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}`;
+      if (attach) {
+        const i = search.items.push({ kind: 'pc', product: p }) - 1;
+        html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${pcCondBtns(p, attach.category)}</div></div>`;
+        continue;
+      }
       const hw = hardwareMatch(p);
-      if (hw) { // priced from the buying guide, so offer the guide's conditions
-        const i = search.items.push({ kind: 'hw', hw, matchedFrom: p['product-name'] }) - 1;
+      if (hw) { // priced from the buying guide, plus CIB/New from PriceCharting
+        const i = search.items.push({ kind: 'hw', hw, product: p }) - 1;
         const conds = Object.entries(hwConditionLabels(hw.category)).filter(([f]) => hw[f] != null)
-          .map(([f, label]) => `<button type="button" class="cond-btn" data-cond="${f}">${label} <b>${money(hw[f])}</b></button>`).join('');
-        html += `<div class="result" data-i="${i}">
-          <div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])} · buying guide price (${esc(hw.name)})</div></div>
-          <div class="r-conds">${conds || '<span class="badge warn">No price yet</span>'}</div></div>`;
+          .map(([f, label]) => condBtn(f, label, flatOr(hw.name, hw[f]))).join('') + thirdPartyBtn(hw);
+        html += `<div class="result" data-i="${i}">${sub} · buying guide price (${esc(hw.name)})</div></div>
+          <div class="r-conds">${conds}${pcCondBtns(p, hw.category)}</div></div>`;
         continue;
       }
       const i = search.items.push({ kind: 'pc', product: p }) - 1;
-      const conds = Object.entries(GAME_CONDITIONS)
-        .map(([c, label]) => `<button type="button" class="cond-btn" data-cond="${c}">${label} <b>${money(basisPrice(p, c))}</b></button>`).join('');
-      html += `<div class="result" data-i="${i}">
-        <div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}</div></div>
-        <div class="r-conds">${conds}</div></div>`;
+      let conds = Object.entries(GAME_CONDITIONS).map(([c, label]) => condBtn(c, label, basisPrice(p, c))).join('');
+      const category = guessCategory(p['product-name'] || '');
+      if (isHwCat(category)) {
+        const parts = pcPartsPrice({ name: p['product-name'], platform: p['console-name'], category, prices: slimProduct(p).prices });
+        conds += condBtn('parts', 'Parts', flatOr(p['product-name'], parts?.price ?? null));
+      }
+      html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${conds}</div></div>`;
     }
   } else if (search.q.length >= 2 && !/^\d+$/.test(search.q)) {
     html += `<div class="results-hint">Press <kbd>Enter</kbd> to search PriceCharting for “${esc(search.q)}”</div>`;
@@ -952,12 +1190,20 @@ function renderResults() {
 }
 
 function choose(item, condition) {
+  const attach = search.attachTo;
   const input = $('#scanInput');
   input.value = '';
   closeResults();
   input.focus();
-  if (item.kind === 'hw') addHardware(item.hw, condition || defaultHwCondition(item.hw), null, item.matchedFrom || null);
-  else addFromSearch(item.product, condition || settings.defaultCondition);
+  if (attach) {
+    attachPcProduct(attach, item.product, isPcCondition(condition) ? condition : attach.condition);
+  } else if (item.kind === 'hw') {
+    const cond = condition || defaultHwCondition(item.hw);
+    if (isPcCondition(cond)) addHardwareFromSearch(item.hw, item.product, cond);
+    else addHardware(item.hw, cond, null, item.product ? pcInfo(item.product) : null);
+  } else {
+    addFromSearch(item.product, condition || settings.defaultCondition);
+  }
 }
 
 function onScanKeydown(e) {
@@ -1167,7 +1413,7 @@ function rulesFromForm() {
 function renderRuleExamples() {
   const s = { ...settings, rules: rulesFromForm() };
   for (const cat of Object.keys(s.rules)) {
-    const { cash, credit } = priceLine({ source: 'custom', category: cat, override: 1000, qty: 1 }, s);
+    const { cash, credit } = priceLine({ source: 'example', category: cat, override: 1000, qty: 1 }, s);
     $(`#rulesBody [data-example="${cat}"]`).textContent = `${money(cash)} cash · ${money(credit)} credit`;
   }
 }
@@ -1178,7 +1424,7 @@ function basisCell(cat, rule) {
       <option value="retail-buy"${rule.basis === 'retail-buy' ? ' selected' : ''}>PriceCharting retail buy</option>
       <option value="market"${rule.basis === 'market' ? ' selected' : ''}>PriceCharting market</option></select>`;
   }
-  return `<span class="muted">${cat === 'other' ? 'Value you type in' : 'Buying guide price'}</span>`;
+  return '<span class="muted">Buying guide price · CIB/New: PriceCharting retail buy</span>';
 }
 
 function dedRowHtml(d) {
@@ -1210,6 +1456,10 @@ function fillSettingsForm() {
   f.roundStep.value = String(settings.roundStep);
   f.lowValue.value = plain(settings.lowValue);
   f.slowSalesPerYear.value = settings.slowSalesPerYear;
+  f.partsPctOfLoose.value = pctText(settings.partsPctOfLoose);
+  f.thirdPartyPct.value = pctText(settings.thirdPartyPct);
+  f.flatKeywords.value = settings.flatItems.keywords.join('\n');
+  f.flatAmount.value = plain(settings.flatItems.amount);
   f.shopName.value = settings.shopName;
   f.quoteFooter.value = settings.quoteFooter;
   f.guideEnabled.checked = settings.guide.enabled;
@@ -1230,6 +1480,7 @@ async function saveSettings(e) {
   e.preventDefault();
   const f = e.target.elements;
   const lowValue = parseMoney(f.lowValue.value);
+  const flatAmount = parseMoney(f.flatAmount.value);
   const guide = { enabled: f.guideEnabled.checked };
   for (const key of GUIDE_LISTS) guide[key] = lines(f[key].value);
   const next = {
@@ -1239,6 +1490,12 @@ async function saveSettings(e) {
     roundStep: Number(f.roundStep.value),
     lowValue: Number.isNaN(lowValue) || lowValue == null ? 0 : lowValue,
     slowSalesPerYear: Math.max(0, Math.round(Number(f.slowSalesPerYear.value) || 0)),
+    partsPctOfLoose: Math.max(0, Number(f.partsPctOfLoose.value) || 0),
+    thirdPartyPct: Math.max(0, Number(f.thirdPartyPct.value) || 0),
+    flatItems: {
+      amount: Number.isNaN(flatAmount) || flatAmount == null ? settings.flatItems.amount : flatAmount,
+      keywords: lines(f.flatKeywords.value),
+    },
     shopName: f.shopName.value.trim(),
     quoteFooter: f.quoteFooter.value.trim(),
     rules: rulesFromForm(),
@@ -1311,7 +1568,7 @@ function tradeItems() {
     return {
       name: l.name || 'Custom item', platform: l.platform || '', type: CATEGORIES[l.category] || '', condition: conditionLabel(l),
       qty: l.qty, cash: p.cash, credit: p.credit, dontBuy: p.dontBuy || undefined,
-      deductions: lineDeductions(l).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
+      deductions: lineDeductions(l).filter((d) => !(p.scratchWaived && d.resurface)).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
     };
   });
 }
@@ -1331,6 +1588,7 @@ function printSheet({ receipt, time, customer, items, totals, payout, staff }) {
     <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Store credit</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>Total (${totals.count} items)</td><td></td><td class="num">${money(totals.cash)}</td><td class="num">${money(totals.credit)}</td></tr></tfoot></table>
+    ${roundingNote(totals) ? `<p class="print-meta">${esc(roundingNote(totals))}</p>` : ''}
     ${payout ? `<p class="print-payout">${receipt ? 'Paid' : 'Customer is taking'}: <strong>${esc(payoutText(payout))}</strong></p>` : ''}
     ${receipt ? '<p class="print-sign">Customer signature: ______________________________</p>' : ''}
     ${settings.quoteFooter ? `<p class="print-footer">${esc(settings.quoteFooter)}</p>` : ''}`;
@@ -1352,10 +1610,11 @@ function printQuote() {
 
 // Customer takes part in cash; the rest becomes store credit in proportion
 // (credit rates differ by category, so this keeps every item's cash/credit ratio).
+// Both parts round to whole dollars, like the totals.
 function splitPayout(t, cashWanted) {
   if (cashWanted == null || Number.isNaN(cashWanted) || t.cash <= 0) return null;
-  const cash = Math.min(Math.max(0, cashWanted), t.cash);
-  return { cash, credit: roundOffer(t.credit * (1 - cash / t.cash), settings) };
+  const cash = roundTotal(Math.min(Math.max(0, cashWanted), t.cash));
+  return { cash, credit: roundTotal(t.credit * (1 - cash / t.cash)) };
 }
 
 function renderSplit(t) {
@@ -1527,7 +1786,8 @@ function wireEvents() {
   });
   $('#results').addEventListener('click', onResultsClick);
   $('#customBtn').addEventListener('click', addCustom);
-  document.addEventListener('click', (e) => { if (!e.target.closest('.scan') && !$('#results').hidden) closeResults(); });
+  // The condition menu that opens the PriceCharting picker must not close it again.
+  document.addEventListener('click', (e) => { if (!e.target.closest('.scan, [data-field="condition"]') && !$('#results').hidden) closeResults(); });
 
   const body = $('#lineBody');
   body.addEventListener('change', onLineChange);
@@ -1613,6 +1873,7 @@ function wireEvents() {
       trade.split.cash = t.cash;
       toast(`Cash can't be more than the ${money(t.cash)} cash total.`);
     }
+    if (trade.split.cash != null) trade.split.cash = roundTotal(trade.split.cash);
     e.target.value = plain(trade.split.cash);
     saveTrade();
     renderTotals();
@@ -1634,6 +1895,10 @@ function wireEvents() {
   $('#paySplitCash').addEventListener('input', () => {
     $('#completeForm').elements.payout.value = 'split';
     updateDialogSplit();
+  });
+  $('#paySplitCash').addEventListener('change', (e) => { // show the whole-dollar cash that will be paid
+    const s = splitPayout(tradeTotals(), parseMoney(e.target.value));
+    if (s) e.target.value = plain(s.cash);
   });
 
   // Trade log

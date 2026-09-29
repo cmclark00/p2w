@@ -614,16 +614,35 @@ that device is locked out for 15 minutes.
    the same game again adds 1 to its quantity.
 2. For consoles, handhelds, and controllers, type part of the name (for
    example `ps2`, `wavebird`, or `3ds xl`), then click **Complete**,
-   **Console only**, **Working**, or **Parts**.
+   **Console only**, **Working**, or **Parts**. For boxed or sealed
+   hardware, set the line's condition to **CIB** or **New**. Those use
+   PriceCharting prices: a search opens in the big box, and you click the
+   exact model/color that matches what the customer brought in.
+   **Special editions** (a Spider-Man PS4, a Halo controller) come from
+   PriceCharting and can also be set to **Parts**. That pays 15% of the
+   PriceCharting loose price, but never less than the regular model's
+   Parts price. The badge on the line shows which regular model it used.
+   **Third-party controllers:** search the controller it copies (for
+   example `ps4 controller`) and click **3rd party**. That pays 20% of the
+   first-party controller's Working price. Premium brands (8BitDo, Hori,
+   Scuf, Nacon) are worth more, so search their name instead to get the
+   PriceCharting price.
+   **Steering wheels, pedals, and flight sticks** always pay **$5** cash
+   or credit, in any condition. The calculator does this automatically.
+   A manager can add more items (or change the $5) under Settings →
+   Flat-price items.
 3. Set each game's condition (**Loose / CIB / New**). Use a line's
    **+ Deduction** menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on **Parts** has no
-   deductions, and store credit is the same as cash.)
+   deductions, and store credit is the same as cash. Items worth $0.50 or
+   less aren't docked for scratches; the calculator skips it for you.)
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".
-5. The bottom bar shows the **cash** and **store credit** totals. **Print
-   quote** prints a copy for the customer, and **New trade** clears the list.
+5. The bottom bar shows the **cash** and **store credit** totals. Both
+   round to the nearest whole dollar ($8.50 → $9, $8.49 → $8), so the
+   total can differ a little from the items added up. **Print quote**
+   prints a copy for the customer, and **New trade** clears the list.
 6. **Part cash, part credit?** Click **Split payout** and type how much
    they want in cash. The rest is shown as store credit at the same rates.
 7. When the customer agrees, click **Complete trade**:

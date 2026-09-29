@@ -259,7 +259,19 @@
           </label>
         </div>
 
+        <h2>Flat-price items</h2>
+        <p class="muted">Steering wheels and the like: anything whose name contains one of these phrases pays this amount in cash and credit, in any condition, with no deductions. One phrase per line; leave it empty to turn this off.</p>
+        <div class="grid-3 guide-lists">
+          <label>Phrases
+            <textarea name="flatKeywords" rows="8"></textarea>
+          </label>
+          <label>Pays
+            <span class="money-input"><span>$</span><input name="flatAmount" type="text" inputmode="decimal"></span>
+          </label>
+        </div>
+
         <h2>Rounding &amp; flags</h2>
+        <p class="muted">Each item's offer rounds as set here. Trade totals (cash and credit) and split payouts always round to the nearest whole dollar ($0.50 and up rounds up).</p>
         <div class="grid-3">
           <label>Round offers
             <select name="roundMode">
@@ -281,6 +293,12 @@
           </label>
           <label>Flag slow sellers (worth $10+) selling fewer than
             <span class="pct-input"><input name="slowSalesPerYear" type="number" min="0" step="1"><span>a year (0 = off)</span></span>
+          </label>
+          <label>Special-edition hardware on Parts pays
+            <span class="pct-input"><input name="partsPctOfLoose" type="number" min="0" step="any"><span>% of PriceCharting loose (never below the regular model's Parts price)</span></span>
+          </label>
+          <label>Third-party controllers pay
+            <span class="pct-input"><input name="thirdPartyPct" type="number" min="0" step="any"><span>% of the first-party controller's Working price</span></span>
           </label>
         </div>
 

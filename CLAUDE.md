@@ -509,12 +509,25 @@ The site's **only server-side code**. Everything else is static.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
   mixed categories (games +50%, hardware +20%) stay fair.
+- **Totals round to whole dollars** (`roundTotal()`, `TOTAL_ROUND`).
+  `tradeTotals()` returns cash/credit rounded to the nearest $1 (.50 rounds
+  up), plus `itemsCash`/`itemsCredit` (the exact item sums). Rounding
+  happens on the **trade total only**, by owner choice, so individual
+  items keep their cents and cheap items aren't zeroed out. Split payouts
+  round both parts too. The rounded totals are what's shown, printed, and
+  logged. A "Totals are rounded…" note (`roundingNote()`) goes on the
+  printout and in the totals' tooltip. The Settings "Round offers" option
+  still rounds each item's offer separately.
 - **PriceCharting extras** kept on each line:
   - `sales-volume` (units sold per year) drives the "Slow seller" badge
     (`settings.slowSalesPerYear`, default 50, only on items worth $10+).
   - `gamestop-trade-price` / `gamestop-price` (GameStop's cash trade and
     pre-owned sell price) show on the reference line. PriceCharting uses
     `0` when GameStop doesn't carry an item, so those are hidden.
+  - Item names on trade lines link to `pricecharting.com/game/<id>`
+    (PriceCharting redirects that to the product page). Hardware lines
+    with a PriceCharting product keep the id as `matchedPcId` and link the
+    PriceCharting name. Demo items (non-numeric ids) aren't linked.
 - **Pricing rules live in `app.js`** as `DEFAULT_SETTINGS` and
   `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
   Sheet). Once a manager saves, the server copy wins. Code defaults only
@@ -529,6 +542,46 @@ The site's **only server-side code**. Everything else is static.
     tags; console name allowed before/after). Loose → Console only, CIB/New
     → Complete, accessories → Working. This is how managers override
     PriceCharting for specific products (e.g. every Joy-Con color).
+  - **Hardware CIB / New** (`HW_PC_CONDITIONS`): hardware lines offer
+    CIB and New next to the guide conditions, priced from a PriceCharting
+    product attached to the line (`matchedPcId`/`matchedFrom`/`prices`)
+    through the category rule. Consoles use PriceCharting retail buy at
+    100% cash and 120% credit, the same as an unmatched PriceCharting
+    console. Scan-matched lines already carry the product. A guide line
+    without one opens a **picker** instead (`openPcPicker`), which fills
+    the scan box via `pcQuery()` (e.g. "PS4 console") and runs a
+    PriceCharting search. Staff pick the exact product. Nothing is
+    remembered between lines. Scans still default to the guide condition
+    (`hwConditionFor`), so the guide price wins unless staff pick CIB or New.
+  - **Special-edition Parts** (PriceCharting hardware with no guide row):
+    PriceCharting lines typed console/handheld/accessory also offer
+    **Parts**. The price is `settings.partsPctOfLoose` (default 15%,
+    editable in Settings) of PriceCharting's loose price. It never goes
+    below the **regular model's** guide Parts price (`pcPartsPrice()`).
+    `regularModel()` finds that model among same-type guide items by word
+    overlap, with `SYSTEM_ALIASES` mapping "Playstation 4" → "ps4" and so
+    on. Numbers count only from the system name, so "Splatoon 2" can't
+    match "Switch 2". A badge shows the % figure and which model set the
+    minimum. Like guide Parts: no deductions, and credit = cash.
+  - **Third-party controllers** (`THIRD_PARTY` condition): guide
+    accessories that are controllers (`takesThirdParty()`, a name regex that
+    excludes memory cards, adapters, and existing "3rd Party" rows) get a
+    **3rd party** button/condition. It pays `settings.thirdPartyPct`
+    (default 20%, editable in Settings) of that controller's guide
+    **Working** price, then the normal accessory rule (+20% credit).
+    Deductions apply. Premium brands (8BitDo, Hori, Scuf…) are meant to be
+    searched on PriceCharting instead, and a badge on the line says so.
+  - **Flat-price items** (`settings.flatItems`): steering wheels and the
+    like pay a flat **$5** in cash and credit. It applies in any condition
+    and ignores deductions. A name matches if it contains a listed phrase
+    (`flatItemMatch()` → the first check in `guideCheck()`), for both
+    PriceCharting and guide lines. Defaults are Racing/Steering/Speed
+    Wheel, Driving Force, Speed Force, Pedals, Flight Stick, and HOTAS.
+    Plain "wheel" is left out so "Wheel of Fortune" isn't caught. Matches
+    are also typed Accessory by `guessCategory()`. It runs even with the
+    game guide switched off, and an empty phrase list turns it off.
+    Managers edit the phrases and amount under Settings → Flat-price items.
+    A typed price still wins.
   - **New built-in items reach live sites via a button, not automatically.**
     Adding rows to `SEED_HARDWARE` only seeds fresh installs; the Hardware
     tab's "+ N built-in items" button (`missingBuiltIns()`) appends seed
@@ -536,8 +589,16 @@ The site's **only server-side code**. Everything else is static.
   - Hardware: guide cash price, credit +20%. **Parts** is a flat parts
     price: no deductions (`takesDeductions()`) and no credit bump
     (credit = cash, via `isPartsLine()`).
+  - **Custom items** (`+ Custom item`): the typed price **is the cash
+    offer** (not an item value run through the cash %). Credit keeps the
+    category's credit ÷ cash ratio (Other = same as cash, Video Game =
+    +50%, consoles = +20%). Deductions come off the cash scaled by cash %.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
-    ÷5 resurfacing rule, and the $0.25 stack.
+    ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
+    $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line
+    without its resurface deductions first, and if that cash offer is
+    ≤ $0.50 it uses that price (`scratchWaived`, badge, and the waived
+    deduction is left off the receipt).
   - Saved settings carry a `version`. `mergeSettings` migrates older saves
     (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5 unless a manager had
     set a custom number). Bump `version` and add a migration line when a
