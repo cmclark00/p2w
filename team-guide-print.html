@@ -143,6 +143,8 @@ is nothing here you can permanently break.</p>
 <li><a href="#update-a-team-member">Update a team member or add a new one</a></li>
 <li><a href="#update-an-faq-answer">Update an FAQ answer</a></li>
 <li><a href="#add-or-edit-a-calendar-event">Add or edit a calendar event</a></li>
+<li><a href="#post-tournament-pairings">Post tournament pairings for players</a></li>
+<li><a href="#trade-in-calculator">Use the trade-in calculator</a></li>
 <li><a href="#edit-the-careers-page">Edit the careers page</a></li>
 <li><a href="#swap-out-a-featured-google-review">Swap out a featured Google review</a></li>
 <li><a href="#update-the-google-review-link">Update the Google review link</a></li>
@@ -369,46 +371,49 @@ end = parts + (high labor).</p>
 <hr>
 <h3 id="update-tcg-bulk-rates">Update TCG bulk rates</h3>
 <p><strong>When to do this:</strong> Market shifted on a TCG, you want to bump or drop
-what we pay for a category, or a new TCG launched and you want to
-publish a rate for it.</p>
-<p><strong>File to edit:</strong> <code>bulk-rates.html</code> (only).</p>
-<p>The page has <strong>two</strong> <code>&lt;div class="pricing-group"&gt;</code> blocks: <strong>Pokémon</strong>
-(the long one — bulk per-1k rates plus per-card rates for things like
-Vstar/Vmax and EX/GX/V) and <strong>Other TCGs (per 1000)</strong> (one flat per-1k
-rate per game).</p>
+what we pay for a category, a new TCG launched, or slab rates change.</p>
+<p><strong>File to edit:</strong> <code>assets/bulk-rates.json</code> (only).</p>
+<p>That one file feeds <strong>both</strong> the public Bulk Rates page and the <strong>TCG
+Bulk</strong> tab in the staff trade-in calculator, so they always match. Don't
+edit the rates in <code>bulk-rates.html</code>; that page just displays this file.</p>
+<p>The file has three groups: <strong>Pokémon</strong>, <strong>Other TCGs</strong>, and <strong>Graded
+slabs</strong>. Every rate is one line like this:</p>
+<pre><code class="language-json">{ &quot;id&quot;: &quot;lorcana&quot;, &quot;name&quot;: &quot;Lorcana&quot;, &quot;price&quot;: 5, &quot;per&quot;: 1000 },
+</code></pre>
+<ul>
+<li><code>name</code> is what people see.</li>
+<li><code>price</code> is the <strong>dollars</strong> we pay, with no <code>$</code> sign (e.g. <code>5</code>, <code>1.10</code>).</li>
+<li><code>per</code> is how many cards that price is for: <code>1000</code> for per-1k rates
+  (shows as "$5 / 1k"), or <code>1</code> for per-card rates (shows as "$1.10 each").</li>
+<li><code>id</code> is a short unique label the calculator uses. Never change an
+  existing one.</li>
+</ul>
 <h4 id="changing-an-existing-rate">Changing an existing rate</h4>
 <ol>
-<li>Open <code>bulk-rates.html</code> in the GitHub editor.</li>
-<li><strong>Ctrl + F</strong> and search for the game name (e.g., <code>Lorcana</code>) or the
-   current price (e.g., <code>$5</code>).</li>
-<li>Change the number between <code>&lt;dd&gt;</code> and <code>&lt;/dd&gt;</code>. Leave everything else
-   alone.</li>
-<li>Commit.</li>
+<li>Open <code>assets/bulk-rates.json</code> in the GitHub editor.</li>
+<li><strong>Ctrl + F</strong> for the game or item name (e.g., <code>Lorcana</code>).</li>
+<li>Change only the number after <code>"price":</code>.</li>
+<li>Commit. The website and the calculator both pick it up after the
+   deploy.</li>
 </ol>
-<p><strong>Example.</strong> To bump Lorcana from $5 to $7 per 1000:</p>
-<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Lorcana&lt;/dt&gt;&lt;dd&gt;$5&lt;/dd&gt;&lt;/div&gt;
-</code></pre>
-<p>becomes:</p>
-<pre><code class="language-html">&lt;div class=&quot;price-row&quot;&gt;&lt;dt&gt;Lorcana&lt;/dt&gt;&lt;dd&gt;$7&lt;/dd&gt;&lt;/div&gt;
-</code></pre>
-<h4 id="adding-a-new-game-to-the-other-tcgs-card">Adding a new game to the "Other TCGs" card</h4>
+<p><strong>Example.</strong> To bump Lorcana from $5 to $7 per 1000, change
+<code>"price": 5</code> to <code>"price": 7</code> on the Lorcana line.</p>
+<h4 id="adding-a-new-rate">Adding a new rate</h4>
 <ol>
-<li>Find any existing row in the <strong>Other TCGs</strong> group (e.g., the
-   <code>&lt;div class="price-row"&gt;&lt;dt&gt;Digimon&lt;/dt&gt;…</code> line).</li>
-<li><strong>Copy that whole line</strong> and paste it below.</li>
-<li>Change the game name and the price in the new row.</li>
-<li>Keep the list sorted by <strong>price descending</strong> (highest pay rate at
-   the top). If multiple games share a price, group them together.</li>
-<li>Commit with a message like <em>"Bulk rates: add Star Wars Unlimited at $5/1k"</em>.</li>
+<li>Copy an existing line in the right group (e.g., the <strong>Digimon</strong> line
+   for a per-1k TCG, or a slab line for a per-slab rate).</li>
+<li>Paste it below and change the <code>id</code> (anything unique, lowercase with
+   dashes, e.g. <code>star-wars</code>), the <code>name</code>, the <code>price</code>, and <code>per</code>.</li>
+<li><strong>Every line except the last one in a group ends with a comma.</strong> A
+   missing or extra comma breaks the file. If the Bulk Rates page shows
+   "Our rates didn't load" after your commit, check the commas first.</li>
+<li>Keep each group sorted by price, highest first.</li>
+<li>Commit with a message like <em>"Bulk rates: add Star Wars Unlimited at
+   $5/1k"</em>.</li>
 </ol>
-<p><strong>Important — units convention.</strong> The "Other TCGs" header says
-<strong>"(per 1000)"</strong>, so each row only writes the dollar amount (e.g.,
-<code>$5</code>, not <code>$5 / 1k</code>). Pokémon rows are mixed (some are per-1k like
-<code>$15 / 1k</code>, others are per-card like <code>$0.70 each</code>) so each row
-<strong>must</strong> spell out its unit. Match the style of the rows already there.</p>
-<h4 id="removing-a-game">Removing a game</h4>
-<p>Delete the entire <code>&lt;div class="price-row"&gt;…&lt;/div&gt;</code> line for that game.
-Commit.</p>
+<h4 id="removing-a-rate">Removing a rate</h4>
+<p>Delete that item's whole line, and make sure the line above it still
+ends with a comma only if another line follows it. Commit.</p>
 <hr>
 <h3 id="update-a-team-member">Update a team member</h3>
 <p><strong>When to do this:</strong> Someone joined, left, changed roles, or you finally
@@ -642,6 +647,168 @@ After you add/edit/cancel an event in Calendar, it typically
 shows up on the site by next morning. To push it live sooner,
 ask the dev to manually trigger the <strong>"Sync events from Google
 Calendar"</strong> workflow in GitHub Actions — it takes about a minute.</p>
+<hr>
+<h3 id="post-tournament-pairings-for-players">Post tournament pairings for players <a id="post-tournament-pairings"></a></h3>
+<p><strong>When to do this:</strong> You're running a Pokémon (or any TCG) tournament and
+want players to see each round's pairings by scanning the QR code on the
+tables — instead of everyone crowding the counter.</p>
+<p><strong>This is NOT the GitHub editor.</strong> It's a simple web page on the site. You
+don't need a GitHub account for this one.</p>
+<p><strong>One-time setup (ask the dev / manager):</strong>
+- A <strong>passphrase</strong> is set up in the Firebase settings. You type it to post;
+  it stops random people from posting fake pairings. Get it from a manager.
+- A <strong>QR code</strong> pointing at <code>play2wingames.com/pairings.html</code> is printed and
+  placed on the tables. That QR never changes — only what it shows changes.</p>
+<p><strong>Each round, from your phone or the shop tablet:</strong></p>
+<ol>
+<li>In the Pokémon Play app, get the pairings on screen and take a
+   <strong>screenshot</strong> (or a clear photo).</li>
+<li>Go to <strong><code>play2wingames.com/pairings-admin.html</code></strong> (bookmark it — it's not
+   linked anywhere on the site on purpose).</li>
+<li>Type the <strong>passphrase</strong> (it's remembered on that device after the first
+   time), the <strong>event name</strong> (e.g. "Friday Night Pokémon"), and the
+   <strong>round number</strong>.</li>
+<li>Tap <strong>"Pairings screenshot"</strong> and pick the screenshot (or snap a photo).
+   Wait a second for the preview to appear — the page then automatically
+   tries to <strong>read the pairings out of the photo</strong> (takes ~10-20 seconds).</li>
+<li>Check the <strong>"Extracted pairings"</strong> table that appears. This is the
+   important step — the auto-read makes mistakes (misspelled names, a wrong
+   table number, a missed row). <strong>Fix any typos, delete junk rows, and add
+   any pairings it missed</strong> (tap <strong>"+ Add row"</strong>) before publishing. If it
+   couldn't read anything at all, that's OK — just publish the photo as-is
+   and players will see the picture instead of a table.</li>
+<li>Tap <strong>"Publish to players."</strong> You'll see "Published! Players can see
+   Round N now."</li>
+</ol>
+<p>That's it. Players who scan the table QR now see the pairings — as a clean,
+searchable table when the auto-read worked, or as the photo if it didn't —
+and it updates within about 25 seconds (or they can tap Refresh). For the
+next round, just repeat — you never delete anything, the newest post always
+wins.</p>
+<p><strong>Tips &amp; gotchas:</strong>
+- <strong>Keep the screenshot readable.</strong> A tight crop of just the pairings reads
+  better — both for players zooming an image and for the auto-read step.
+- <strong>Always check the extracted table before publishing.</strong> It's a best-effort
+  reader, not perfect — a quick glance to fix a misread name takes seconds
+  and saves confusion at the tables.
+- <strong>"Rejected — check the passphrase"</strong> means the passphrase was wrong, or
+  the image was too big. Re-type the passphrase, or crop the screenshot
+  tighter and try again.
+- When the table view shows, players get a <strong>"Find your name"</strong> search box
+  right on the page — no more pinch-zooming a photo to find their table.</p>
+<hr>
+<h3 id="use-the-trade-in-calculator">Use the trade-in calculator <a id="trade-in-calculator"></a></h3>
+<p><strong>What it is:</strong> a staff-only page at <strong><code>play2wingames.com/trade-in/</code></strong>
+(bookmark it; it isn't linked anywhere and search engines are told to
+ignore it). It works out cash and store credit offers for every item.</p>
+<ul>
+<li><strong>Games:</strong> scan the barcode or type the name. Prices come from
+  PriceCharting and follow the Game Buying Guide rules.</li>
+<li><strong>Consoles, handhelds, and controllers:</strong> type the name. Prices come
+  from the buying guide.</li>
+</ul>
+<p><strong>This is NOT the GitHub editor.</strong> Nothing here needs a GitHub account,
+and prices are changed on the page itself, not in the code.</p>
+<p><strong>Logging in:</strong> there are two passwords (get them from a manager):
+- <strong>Staff password:</strong> run trade-ins.
+- <strong>Manager password:</strong> also change prices (Hardware Prices tab), the
+  cash/credit percentages and buying guide lists (Settings tab), and the
+  PriceCharting token.</p>
+<p>A device stays logged in for 30 days. After 8 wrong passwords in a row,
+that device is locked out for 15 minutes.</p>
+<p><strong>At the counter:</strong></p>
+<ol>
+<li>Scan each game's barcode into the big box. It's selected
+   automatically, and the scanner types into it like a keyboard. Scanning
+   the same game again adds 1 to its quantity.</li>
+<li>For consoles, handhelds, and controllers, type part of the name (for
+   example <code>ps2</code>, <code>wavebird</code>, or <code>3ds xl</code>), then click <strong>Complete</strong>,
+   <strong>Console only</strong>, <strong>Working</strong>, or <strong>Parts</strong>. For boxed or sealed
+   hardware, set the line's condition to <strong>CIB</strong> or <strong>New</strong>. Those use
+   PriceCharting prices: a search opens in the big box, and you click the
+   exact model/color that matches what the customer brought in.
+   Controllers always pay more boxed: CIB is at least the Working price</li>
+<li>10%, and New at least CIB + 10% (or PriceCharting's price, if higher).
+   <strong>Special editions</strong> (a Spider-Man PS4, a Halo controller) come from
+   PriceCharting and can also be set to <strong>Parts</strong>. That pays 15% of the
+   PriceCharting loose price, but never less than the regular model's
+   Parts price. The badge on the line shows which regular model it used.
+   <strong>Third-party controllers:</strong> search the controller it copies (for
+   example <code>ps4 controller</code>) and click <strong>3rd party</strong>. That pays 20% of the
+   first-party controller's Working price. Premium brands (8BitDo, Hori,
+   Scuf, Nacon) are worth more, so search their name instead to get the
+   PriceCharting price.
+   <strong>Steering wheels, pedals, and flight sticks</strong> always pay <strong>$5</strong> cash
+   or credit, in any condition. The calculator does this automatically.
+   A manager can add more items (or change the $5) under Settings →
+   Flat-price items.</li>
+<li>Set each game's condition (<strong>Loose / CIB / New</strong>). Use a line's
+   <strong>+ Deduction</strong> menu for scratches, a broken case, or missing cords and
+   controllers. (Parts is a flat price: hardware on <strong>Parts</strong> has no
+   deductions, and store credit is the same as cash. Items worth $0.50 or
+   less aren't docked for scratches; the calculator skips it for you.)
+   <strong>Management giving extra store credit on something?</strong> Open that line's
+   <strong>+ Deduction</strong> menu, pick <strong>Custom store credit %…</strong>, and type how
+   much more than cash it pays in credit (e.g. 35 for +35%). Click the ×
+   on it to go back to normal.</li>
+<li>Read the badges. They explain guide rules (disc-only, shitbox game,
+   don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
+   Mark".</li>
+<li>The bottom bar shows the <strong>cash</strong> and <strong>store credit</strong> totals. Both
+   round to the nearest whole dollar ($8.50 → $9, $8.49 → $8), so the
+   total can differ a little from the items added up. <strong>Agreed on a
+   different cash amount?</strong> Click the cash total, type the new amount,
+   and press Enter. Store credit adjusts to match. <strong>↺ auto</strong> puts it
+   back, and changing the items clears it. <strong>Print quote</strong>
+   prints a copy for the customer, and <strong>New trade</strong> clears the list.</li>
+<li><strong>Part cash, part credit?</strong> Click <strong>Split payout</strong> and type how much
+   they want in cash. The rest is shown as store credit at the same rates.</li>
+<li>When the customer agrees, click <strong>Complete trade</strong>:</li>
+<li>Pick what they're taking: cash, store credit, or the split.</li>
+<li>Type your name. It's remembered on that device.</li>
+<li>Enter serial numbers for consoles and handhelds, and tick <strong>Photo ID
+     checked</strong>. The trade won't save without it when there's serialized
+     hardware.</li>
+<li><strong>Save trade</strong>, or <strong>Save &amp; print receipt</strong> for a copy with a
+     signature line.
+   The trade is saved to the <strong>Trade Log</strong> and the screen clears for the
+   next customer.</li>
+</ol>
+<p><strong>Trade Log tab:</strong> every completed trade, newest first. Search by customer,
+staff name, item, or serial number, and click a trade to see its items or
+reprint the receipt. Trades can't be edited or deleted, so if one is saved
+wrong, add a note on the next one or tell a manager.</p>
+<p><strong>Extra info on game lines:</strong>
+- <strong>"Slow seller" badge:</strong> fewer than 50 copies sell per year and it's worth
+  $10+. Check eBay sold listings before making an offer.
+- <strong>"GameStop: pays $X cash":</strong> what GameStop would give in cash, which is
+  handy when a customer mentions GameStop.</p>
+<p><strong>Changing prices (managers):</strong>
+- <strong>Your price instead of PriceCharting's:</strong> add an item on the
+  <strong>Hardware Prices</strong> tab named exactly like PriceCharting names it (for
+  example <code>Joy-Con Neon Blue</code>). Scanning or searching that item then uses
+  your price. Tags like <code>[Left]</code> or <code>[V2]</code> can be left off unless that
+  version needs its own price.
+- <strong>"+ N built-in items" button:</strong> when a calculator update adds new
+  buying-guide items (like the standard Joy-Con colors), this button on
+  the <strong>Hardware Prices</strong> tab adds the ones you don't have yet. Click it,
+  then <strong>Save changes</strong>. Nothing you already have is changed.
+- <strong>Buying guide prices:</strong> edit them on the <strong>Hardware Prices</strong> tab and
+  click <strong>Save changes</strong>.
+- <strong>Everything else:</strong> percentages, deductions, and the dead-games and
+  sports lists are on the <strong>Settings</strong> tab.
+- Changes apply to every device right away.</p>
+<p><strong>If staff turnover happens:</strong> a manager can change either password under
+<strong>Settings → Passwords</strong>. Changing a password logs out every other device.</p>
+<p><strong>Tips &amp; gotchas:</strong>
+- <strong>Demo mode (yellow bar)</strong> means no PriceCharting token is saved, so game
+  prices are fake. A manager adds the token under <strong>Settings</strong>.
+- <strong>"Looking up…" rows</strong> when scanning a stack quickly are normal.
+  PriceCharting allows one lookup per second, so they fill in one at a time.
+- <strong>Forgot the manager password, or need a fresh start?</strong> Contact the dev.
+  The saved passwords, token, and prices live in a private folder on the
+  GoDaddy hosting account (<code>p2w-trade-in-data</code>, next to <code>public_html</code>),
+  <strong>not</strong> in GitHub.</p>
 <hr>
 <h3 id="edit-the-careers-page">Edit the careers page</h3>
 <p><strong>When to do this:</strong> You want to change the listed roles, the
@@ -950,6 +1117,11 @@ certainly break the site. <strong>Always contact the dev for these.</strong></p>
 <td><code>.gitignore</code></td>
 <td>Tells Git what to skip</td>
 <td>Editing wrong can leak private info</td>
+</tr>
+<tr>
+<td><code>trade-in/</code></td>
+<td>The staff trade-in calculator's code</td>
+<td>Prices and settings are changed <strong>on the page</strong> by a manager, never in these files</td>
 </tr>
 </tbody>
 </table>

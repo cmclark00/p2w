@@ -286,7 +286,7 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print(f"Site checks passed ({len(published_html())} HTML pages, events.json).")
+    print(f"Site checks passed ({len(published_html())} HTML pages, events.json, bulk-rates.json).")
     return 0
 
 
