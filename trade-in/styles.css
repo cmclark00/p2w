@@ -201,12 +201,18 @@ td.cash small, td.credit small { display: block; font-size: 0.75rem; font-weight
 .chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 4px; }
 .chip button:hover { color: #fff; }
 .credit-chip input { width: 52px; padding: 1px 4px; margin: 0 2px; font: inherit; text-align: right; }
+/* Editable cash offer and the store credit column's custom % control. */
+td.cash .money-input input { width: 84px; font-weight: 600; }
+td.credit .credit-chip { margin-top: 4px; font-weight: 400; }
+td.credit .credit-custom { display: block; margin: 4px 0 0 auto; padding: 0; font-size: 0.75rem; font-weight: 400; color: var(--muted); }
+td.credit .credit-custom:hover, td.credit .credit-custom:focus-visible { color: var(--paper); }
 .adjust-select {
   font-size: 0.78rem; padding: 2px 6px; color: var(--muted);
   background: var(--surface-2); border: 1px dashed var(--line); border-radius: 999px; max-width: 180px;
 }
 .adjust-select:hover { color: var(--paper); border-color: rgba(255, 255, 255, 0.3); }
-tr.dont-buy td.cash, tr.dont-buy td.credit { color: var(--muted); text-decoration: line-through; }
+tr.dont-buy td.cash, tr.dont-buy td.credit { color: var(--muted); }
+tr.dont-buy td.cash input, tr.dont-buy [data-cell="credit"] { color: var(--muted); text-decoration: line-through; }
 
 tr.pending td { color: var(--muted); }
 tr.failed td { background: rgba(217, 31, 56, 0.08); }

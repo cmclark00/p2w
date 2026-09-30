@@ -522,7 +522,7 @@ The site's **only server-side code**. Everything else is static.
     `data\trades` folder, so the offline log is separate from the website's.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
-  mixed categories (games +50%, hardware +20%) stay fair.
+  mixed categories (games +43%, hardware +20%) stay fair.
 - **Editable cash total** (`#totalCash` input, `trade.cashTotal`): staff
   can type a different cash total in the totals bar. It rounds to whole
   dollars. Store credit then scales by the same ratio (items' credit ×
@@ -534,13 +534,27 @@ The site's **only server-side code**. Everything else is static.
   Once the items no longer add up to that (added, removed, repriced),
   `renderTotals()` drops the adjustment with a toast so it can't go
   stale. "↺ auto" resets it, and so does typing the calculated total.
-- **Custom store credit %** (per item, `line.creditBonus`): the line's
-  "+ Deduction…" menu has a **Store credit → Custom store credit %…**
-  option. It adds an editable chip, starting at the line's normal bump
-  (`normalCreditBonus()`: 50 for games, 20 for hardware, 0 for Parts).
-  Credit becomes cash × (100 + %)/100, and cash is unchanged. `priceLine()`
-  applies it on top of `priceBeforeCredit()`, which holds the normal
-  pricing and scratch rule. It's skipped for not-buying items. It shows
+- **Editable line cash** (per item, `line.cashOverride`, cents each):
+  every line's Cash column is an input. A typed amount is the **final**
+  cash offer for that item (deductions and guide flat prices are already
+  behind it). Store credit keeps the line's normal ratio
+  (`normalCreditBonusOf()`: exact from the category rule, 0 for flat
+  guide prices, Parts and TCG bulk), unless a custom store credit % is
+  set. Typing cash on a "don't buy" line buys it at that price, with a
+  "Guide says don't buy" badge kept as a reminder. "↺ auto" (or typing
+  the calculated number) clears it. It shows a "Cash edited" badge and
+  goes in the trade log (`cashEdited`), but not on the customer printout
+  (a typed Value isn't printed either). It is separate from the Value
+  column's `line.override`, which is the item value *before* the
+  percentages and deductions.
+- **Custom store credit %** (per item, `line.creditBonus`): its own
+  **Custom %** button under the line's store credit (not in the
+  "+ Deduction…" menu). It becomes an editable "+N%" chip, starting at
+  the line's normal bump (`normalCreditBonus()`: 43 for games, 20 for
+  hardware, 0 for Parts). Credit becomes cash × (100 + %)/100, and cash is
+  unchanged. `priceLine()` applies it last, after the typed cash and
+  `priceBeforeCredit()` (normal pricing and scratch rule). It's skipped
+  for not-buying items. It shows
   as a badge, on the printout and in the trade log (`creditBonus` on the
   item). Lines with it don't merge on re-add (`isPlain`). Both roles can
   use it; it's meant for when management approves more credit.

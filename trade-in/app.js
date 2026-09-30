@@ -507,19 +507,29 @@ function roundOffer(cents, s) {
   return fn(cents / step + 1e-9) * step;
 }
 
-// Management can give one item a custom store credit: credit = cash + line.creditBonus %.
+// Staff can type a line's cash offer (line.cashOverride, cents each). It is the final cash for the item, and
+// store credit keeps the line's normal credit-to-cash ratio. Management can also give one item a custom
+// store credit: credit = cash + line.creditBonus %.
 function priceLine(line, s = settings) {
-  const p = priceBeforeCredit(line, s);
+  let p = priceBeforeCredit(line, s);
+  if (line.cashOverride != null && !line.pending && !line.failed) {
+    const ratio = 1 + normalCreditBonusOf(line, p, s) / 100;
+    p = { ...p, cash: line.cashOverride, credit: roundOffer(line.cashOverride * ratio, s), dontBuy: false, cashEdited: true, guideDontBuy: p.dontBuy };
+  }
   if (line.creditBonus == null || p.cash == null || p.dontBuy) return p;
   return { ...p, credit: roundOffer((p.cash * (100 + line.creditBonus)) / 100, s), customCredit: true };
 }
 
 // The line's normal credit bump (% more than cash), e.g. 50 for games, 20 for hardware.
 function normalCreditBonus(line, s = settings) {
-  const p = priceBeforeCredit(line, s);
-  if (p.cash > 0 && p.credit != null) return Math.round((p.credit / p.cash - 1) * 100);
+  return Math.round(normalCreditBonusOf(line, priceBeforeCredit(line, s), s));
+}
+
+// Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
+function normalCreditBonusOf(line, p, s) {
+  if (isPartsLine(line) || line.source === 'bulk' || p.flat) return 0;
   const rule = s.rules[line.category] || s.rules.other;
-  return rule.cashPct > 0 ? Math.round((rule.creditPct / rule.cashPct - 1) * 100) : 0;
+  return rule.cashPct > 0 ? (rule.creditPct / rule.cashPct - 1) * 100 : 0;
 }
 
 // A trade-in worth SCRATCH_FREE_MAX or less without its scratch (resurfacing) deductions isn't docked for them.
@@ -601,7 +611,7 @@ function flash(id) {
   tr.classList.add('flash');
 }
 
-const isPlain = (l) => l.override == null && !(l.deductions || []).length && !l.guideFlag && l.creditBonus == null;
+const isPlain = (l) => l.override == null && l.cashOverride == null && !(l.deductions || []).length && !l.guideFlag && l.creditBonus == null;
 
 function placeLine(line, replaceId) {
   const i = replaceId ? trade.lines.findIndex((l) => l.id === replaceId) : -1;
@@ -838,10 +848,6 @@ function adjustHtml(line) {
   if (line.guideFlag) {
     chips.push(`<span class="chip">${line.guideFlag === 'shitbox' ? 'Marked as shitbox game' : 'Priced normally'}<button type="button" data-action="unflag" aria-label="Undo">×</button></span>`);
   }
-  if (line.creditBonus != null) {
-    chips.push(`<span class="chip credit-chip">Store credit +<input type="number" data-field="creditBonus" min="0" step="1" value="${line.creditBonus}"
-      aria-label="Custom store credit, percent more than cash">%<button type="button" data-action="uncredit" aria-label="Back to normal store credit">×</button></span>`);
-  }
   const applied = new Set(line.deductions || []);
   const target = isGameCat(line.category) ? 'game' : 'hardware';
   const dedOpts = settings.deductions.filter((d) => takesDeductions(line) && d.appliesTo === target && !applied.has(d.id))
@@ -852,11 +858,19 @@ function adjustHtml(line) {
       ? '<option value="flag:normal">Not a shitbox game – price normally</option>'
       : '<option value="flag:shitbox">Mark as shitbox game</option>';
   }
-  const creditOpt = line.creditBonus == null ? '<option value="credit:custom">Custom store credit %…</option>' : '';
-  const select = dedOpts || guideOpt || creditOpt
-    ? `<select class="adjust-select" data-field="adjust" aria-label="Add deduction or adjustment"><option value="">+ Deduction…</option>${dedOpts ? `<optgroup label="Deductions">${dedOpts}</optgroup>` : ''}${guideOpt ? `<optgroup label="Buying guide">${guideOpt}</optgroup>` : ''}${creditOpt ? `<optgroup label="Store credit">${creditOpt}</optgroup>` : ''}</select>`
+  const select = dedOpts || guideOpt
+    ? `<select class="adjust-select" data-field="adjust" aria-label="Add deduction or adjustment"><option value="">+ Deduction…</option>${dedOpts ? `<optgroup label="Deductions">${dedOpts}</optgroup>` : ''}${guideOpt ? `<optgroup label="Buying guide">${guideOpt}</optgroup>` : ''}</select>`
     : '';
   return `<div class="adjust">${chips.join('')}${select}</div>`;
+}
+
+// Store credit column: a "Custom %" button, or the custom % field once one is set.
+function creditControlHtml(line) {
+  if (line.creditBonus == null) {
+    return '<button type="button" class="link credit-custom" data-action="credit" title="Management approved more store credit on this item">Custom %</button>';
+  }
+  return `<span class="chip credit-chip">+<input type="number" data-field="creditBonus" min="0" step="1" value="${line.creditBonus}"
+    aria-label="Custom store credit, percent more than cash">%<button type="button" data-action="uncredit" title="Back to normal store credit" aria-label="Back to normal store credit">×</button></span>`;
 }
 
 function rowHtml(line) {
@@ -900,8 +914,8 @@ function rowHtml(line) {
     <td>${conditionSelect(line)}</td>
     <td class="num">${qtyCell}</td>
     <td class="num value-cell"><span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="${line.source === 'custom' ? 'Cash' : 'Price'}"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button></td>
-    <td class="num cash" data-cell="cash"></td>
-    <td class="num credit" data-cell="credit"></td>
+    <td class="num cash value-cell"><span class="money-input"><span>$</span><input type="text" data-field="cash" inputmode="decimal" autocomplete="off" placeholder="Cash" aria-label="Cash offer each"></span><button type="button" class="reset" data-action="resetcash" title="Back to the calculated cash offer" hidden>↺ auto</button><small data-cell="cash-total"></small></td>
+    <td class="num credit"><div data-cell="credit"></div>${creditControlHtml(line)}</td>
     <td>${removeBtn}</td>
   </tr>`;
 }
@@ -920,7 +934,11 @@ function updateRow(tr, line) {
   input.classList.toggle('missing', p.cash == null);
   $('[data-action="reset"]', tr).hidden = line.override == null;
   tr.classList.toggle('dont-buy', p.dontBuy);
-  $('[data-cell="cash"]', tr).innerHTML = offerCell(p.cash, line.qty);
+  const cashInput = $('[data-field="cash"]', tr);
+  if (document.activeElement !== cashInput) cashInput.value = plain(p.cash);
+  cashInput.classList.toggle('overridden', line.cashOverride != null);
+  $('[data-action="resetcash"]', tr).hidden = line.cashOverride == null;
+  $('[data-cell="cash-total"]', tr).textContent = p.cash != null && line.qty > 1 ? `${money(p.cash * line.qty)} for ${line.qty}` : '';
   $('[data-cell="credit"]', tr).innerHTML = offerCell(p.credit, line.qty);
 
   const flags = [];
@@ -950,6 +968,8 @@ function updateRow(tr, line) {
       flags.push(`<span class="badge info">${HW_PC_CONDITIONS[line.condition]} minimum: ${from} +${pctText(settings.boxedStepPct)}%</span>`);
     }
   }
+  if (p.cashEdited) flags.push('<span class="badge edited">Cash edited</span>');
+  if (p.guideDontBuy) flags.push(`<span class="badge warn">Guide says don't buy: ${esc(p.guide.note)}</span>`);
   if (p.customCredit) flags.push(`<span class="badge edited">Custom store credit +${line.creditBonus}%</span>`);
   if (line.override != null) flags.push('<span class="badge edited">Price edited</span>');
   $('[data-cell="flags"]', tr).innerHTML = flags.join('');
@@ -1061,9 +1081,7 @@ function onLineChange(e) {
     const val = v.slice(i + 1);
     if (kind === 'ded') line.deductions = [...(line.deductions || []), val];
     if (kind === 'flag') line.guideFlag = val;
-    if (kind === 'credit') line.creditBonus = normalCreditBonus(line);
     commit();
-    if (kind === 'credit') $(`#lineBody tr[data-id="${line.id}"] [data-field="creditBonus"]`)?.select();
     return;
   }
   if (field === 'creditBonus') {
@@ -1089,6 +1107,13 @@ function onLineChange(e) {
     if (Number.isNaN(cents)) toast('Enter a price like 12.50', 'error');
     else line.override = cents == null || cents === auto ? null : cents;
     e.target.value = plain(line.override ?? auto);
+  } else if (field === 'cash') {
+    // A typed cash offer is final for the line; typing the calculated number (or clearing it) goes back to auto.
+    const auto = priceLine({ ...line, cashOverride: null, creditBonus: null }).cash;
+    const cents = parseMoney(v);
+    if (Number.isNaN(cents)) toast('Enter a cash offer like 12.50', 'error');
+    else line.cashOverride = cents == null || cents === auto ? null : cents;
+    e.target.value = plain(priceLine(line).cash);
   } else if (field === 'condition') {
     if (line.source === 'hw' && isPcCondition(v) && !line.matchedPcId) {
       // No PriceCharting product on this line yet: keep the old condition until staff pick one.
@@ -1136,6 +1161,15 @@ function onLineClick(e) {
   } else if (action === 'unflag') {
     delete line.guideFlag;
     commit();
+  } else if (action === 'resetcash') {
+    line.cashOverride = null;
+    saveTrade();
+    updateRow(tr, line);
+    renderTotals();
+  } else if (action === 'credit') {
+    line.creditBonus = normalCreditBonus(line);
+    commit();
+    $(`#lineBody tr[data-id="${line.id}"] [data-field="creditBonus"]`)?.select();
   } else if (action === 'uncredit') {
     delete line.creditBonus;
     commit();
@@ -1686,6 +1720,7 @@ function tradeItems() {
       qty: l.qty, cash: p.cash, credit: p.credit, dontBuy: p.dontBuy || undefined,
       deductions: lineDeductions(l).filter((d) => !(p.scratchWaived && d.resurface)).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
       creditBonus: p.customCredit ? l.creditBonus : undefined,
+      cashEdited: p.cashEdited || undefined,
       ...(l.source === 'bulk' ? { type: 'TCG bulk', condition: '', detail: bulkBreakdown(l.bulkItems) } : {}),
     };
   });
@@ -1850,7 +1885,7 @@ async function loadLog() {
 
 function logDetailHtml(r, i) {
   const items = (r.items || []).map((it) => {
-    const detail = [it.detail, it.platform, it.type, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : '', it.note].filter(Boolean).join(' · ');
+    const detail = [it.detail, it.platform, it.type, it.condition, ...(it.deductions || []), creditBonusText(it), it.cashEdited ? 'Cash edited' : '', it.serial ? `Serial ${it.serial}` : '', it.note].filter(Boolean).join(' · ');
     const cell = (c) => (it.dontBuy ? 'Not buying' : money(c == null ? null : c * it.qty));
     return `<tr><td>${esc(it.name)}<div class="sub">${esc(detail)}</div></td><td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
   }).join('');

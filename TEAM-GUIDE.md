@@ -640,10 +640,14 @@ that device is locked out for 15 minutes.
    The exception is the buying guide's disc-only and sports-game prices:
    a scratch there divides the price by 5, just like the guide says, so a
    50-cent disc that needs resurfacing pays 10 cents.)
-   **Management giving extra store credit on something?** Open that line's
-   **+ Deduction** menu, pick **Custom store credit %…**, and type how
-   much more than cash it pays in credit (e.g. 35 for +35%). Click the ×
-   on it to go back to normal.
+   **Agreed on a different price for one item?** Click that line's
+   **Cash** amount and type the new cash offer (for one of them, if the
+   qty is more than 1). Store credit adjusts to match. **↺ auto** puts it
+   back. This works on any line, even one marked "don't buy".
+   **Management giving extra store credit on something?** Click
+   **Custom %** under that line's store credit and type how much more
+   than cash it pays in credit (e.g. 35 for +35%). Click the × on it to
+   go back to normal.
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".
