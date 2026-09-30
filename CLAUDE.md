@@ -522,7 +522,7 @@ The site's **only server-side code**. Everything else is static.
     `data\trades` folder, so the offline log is separate from the website's.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
-  mixed categories (games +43%, hardware +20%) stay fair.
+  mixed categories (games +50%, hardware +20%) stay fair.
 - **Editable cash total** (`#totalCash` input, `trade.cashTotal`): staff
   can type a different cash total in the totals bar. It rounds to whole
   dollars. Store credit then scales by the same ratio (items' credit ×
@@ -550,7 +550,7 @@ The site's **only server-side code**. Everything else is static.
 - **Custom store credit %** (per item, `line.creditBonus`): its own
   **Custom %** button under the line's store credit (not in the
   "+ Deduction…" menu). It becomes an editable "+N%" chip, starting at
-  the line's normal bump (`normalCreditBonus()`: 43 for games, 20 for
+  the line's normal bump (`normalCreditBonus()`: 50 for games, 20 for
   hardware, 0 for Parts). Credit becomes cash × (100 + %)/100, and cash is
   unchanged. `priceLine()` applies it last, after the typed cash and
   `priceBeforeCredit()` (normal pricing and scratch rule). It's skipped
@@ -582,10 +582,11 @@ The site's **only server-side code**. Everything else is static.
   Sheet). Once a manager saves, the server copy wins. Code defaults only
   seed a fresh install.
   - Games (from the Game Buying Guide): credit = 105% of PriceCharting
-    retail buy (`GAME_CREDIT_PCT`), cash = 70% of that credit
-    (`GAME_CASH_PCT` = 73.5%). Credit is therefore ~43% more than cash,
-    which is the public "about 43% more" copy. (Before settings v4 it
-    was credit 100%, cash = credit ÷ 1.5.)
+    retail buy (`GAME_CREDIT_PCT`), cash = 70% of PriceCharting
+    (`GAME_CASH_PCT`, owner's choice over the guide's "70% of store
+    credit"). Credit is therefore exactly 50% more than cash, which is
+    the public "50% more" copy. (Settings v3: credit 100%, cash ÷ 1.5;
+    v4: cash 73.5%.)
   - Pokémon games: credit 75% of market, cash 50% (credit ÷ 1.5).
   - **PriceCharting → hardware matching:** `hardwareMatch()` sends a
     scanned/searched PriceCharting item to a Hardware Prices item with the
@@ -664,8 +665,8 @@ The site's **only server-side code**. Everything else is static.
     normally with the $2/$3 deduction, as the guide says ("use price
     charting").
   - Saved settings carry a `version`. `mergeSettings` migrates older saves
-    (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5, and v3 → v4 moved
-    games to the guide's credit 105% / cash 70% of credit, each only when
+    (v2 → v3 moved game cash from 50% to ÷ 1.5, v3 → v4 moved games to
+    credit 105%, v4 → v5 moved game cash from 73.5% to 70%; each only when
     a manager hadn't set custom numbers). Bump `version` and add a migration line when a
     default policy changes, or live saved settings keep the old number.
 
@@ -860,14 +861,14 @@ Three via **Formspree** (endpoints are public client-side by design):
   `.coin-hunt-teaser` and as the floating hero on `bulky-coin-hunt.html`.
   It was cut from a photo with a feathered circular PIL mask, not rembg.)
 - **Trade-in store-credit bumps (tiered).** Store credit pays more than
-  cash on trade-ins, by category: **video games ~43% more** (cash = 70% of credit), **consoles &
+  cash on trade-ins, by category: **video games 50% more**, **consoles &
   handhelds 20% more**, **TCG singles/sealed/graded 10% more**, **TCG
   bulk is flat** (cash = store credit). Visible in: `faq.html` "Cash or
   store credit" entry (visible + JSON-LD), `sell-trade.html` step 3 of
   the How-it-works flow, `bulk-rates.html` centered disclaimer (the
   "flat" half of the rule). All four must stay in sync if the numbers
   ever change. The `trade-in/` calculator uses the same games rule
-  (credit = 105% of PriceCharting retail buy, cash = 70% of credit), so
+  (credit = 105% of PriceCharting retail buy, cash = 70%), so
   update its Settings defaults too.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
