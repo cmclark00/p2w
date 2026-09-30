@@ -650,10 +650,17 @@ The site's **only server-side code**. Everything else is static.
   - Hardware: guide cash price, credit +20%. **Parts** is a flat parts
     price: no deductions (`takesDeductions()`) and no credit bump
     (credit = cash, via `isPartsLine()`).
-  - **Custom items** (`+ Custom item`): the typed price **is the cash
-    offer** (not an item value run through the cash %). Credit keeps the
-    category's credit ÷ cash ratio (Other = same as cash, Video Game =
-    +50%, consoles = +20%). Deductions come off the cash scaled by cash %.
+  - **Custom items** (`+ Custom item`): no Value box. Staff type the cash
+    offer in the **Cash column** (`line.cashOverride`, same as any line's
+    typed cash, but with no "Cash edited" badge or ↺ auto). Credit keeps
+    the category's credit ÷ cash ratio (Other = same as cash, Video Game =
+    +50%, consoles = +20%). No deductions (`takesDeductions()`), since the
+    typed cash is final. `migrateCustomLines()` converts custom lines on a
+    saved trade from the old Value-box format (override minus deductions ×
+    cash %) so their offer doesn't change.
+  - **Hardware matches keep agreed prices:** when `applyHardwareMatches()`
+    turns a PriceCharting line into a guide line, it carries over
+    `cashOverride` and `creditBonus`.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

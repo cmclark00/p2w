@@ -632,6 +632,9 @@ that device is locked out for 15 minutes.
    or credit, in any condition. The calculator does this automatically.
    A manager can add more items (or change the $5) under Settings →
    Flat-price items.
+   **Something the calculator can't find?** Click **+ Custom item**,
+   describe it, pick its type, and type the cash offer in the **Cash**
+   column. Store credit fills in from the type.
 3. Set each game's condition (**Loose / CIB / New**). Use a line's
    **+ Deduction** menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on **Parts** has no

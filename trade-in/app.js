@@ -501,7 +501,8 @@ function autoBase(line, rule, s = settings) {
 // Hardware bought for parts is a flat parts price: missing cables/controllers don't matter,
 // and there's no store credit bump (credit = cash).
 const isPartsLine = (line) => (line.source === 'hw' || line.source === 'pc') && line.condition === 'parts';
-const takesDeductions = (line) => !isPartsLine(line) && line.source !== 'bulk';
+// Custom items: the typed cash is the final offer, so there's nothing for a deduction to come off.
+const takesDeductions = (line) => !isPartsLine(line) && line.source !== 'bulk' && line.source !== 'custom';
 
 function lineDeductions(line, s = settings) {
   if (!takesDeductions(line)) return []; // kept on the line in case it's switched back from Parts
@@ -521,7 +522,8 @@ function priceLine(line, s = settings) {
   let p = priceBeforeCredit(line, s);
   if (line.cashOverride != null && !line.pending && !line.failed) {
     const ratio = 1 + normalCreditBonusOf(line, p, s) / 100;
-    p = { ...p, cash: line.cashOverride, credit: roundOffer(line.cashOverride * ratio, s), dontBuy: false, cashEdited: true, guideDontBuy: p.dontBuy };
+    // Custom items are always priced this way, so they don't get the "Cash edited" flag.
+    p = { ...p, cash: line.cashOverride, credit: roundOffer(line.cashOverride * ratio, s), dontBuy: false, cashEdited: line.source !== 'custom', guideDontBuy: p.dontBuy };
   }
   if (line.creditBonus == null || p.cash == null || p.dontBuy) return p;
   return { ...p, credit: roundOffer((p.cash * (100 + line.creditBonus)) / 100, s), customCredit: true };
@@ -581,13 +583,6 @@ function priceWith(line, s, deds) {
   if (out.base == null) return out;
   if (line.source === 'bulk') { // TCG bulk rates are flat: cash and store credit pay the same
     Object.assign(out, { cash: out.base, credit: out.base });
-    return out;
-  }
-  if (line.source === 'custom') {
-    // Custom items: the typed price is the cash offer. Deductions come off it the way they would
-    // off any other line's cash, and credit keeps the category's credit-to-cash ratio.
-    out.cash = Math.max(0, Math.round(out.base - (dedTotal * rule.cashPct) / 100));
-    out.credit = rule.cashPct > 0 ? roundOffer((out.cash * rule.creditPct) / rule.cashPct, s) : out.cash;
     return out;
   }
   const value = out.base - dedTotal;
@@ -654,9 +649,24 @@ function applyHardwareMatches() {
     return {
       id: l.id, source: 'hw', hwId: hw.id, name: hw.name, category: hw.category, condition: hwConditionFor(hw, l.condition),
       qty: l.qty, override: null, deductions: [], hwPrices: { complete: hw.complete, unit: hw.unit, parts: hw.parts }, matchedFrom: l.name, matchedPcId: l.pcId,
-      prices: l.prices,
+      prices: l.prices, cashOverride: l.cashOverride, creditBonus: l.creditBonus, // an agreed price or credit % stays
     };
   });
+  if (changed) saveTrade();
+}
+
+// Custom items used to take their price in the Value box, with deductions off it. Convert any still on a
+// saved trade to the typed cash they came to, so their offer doesn't change.
+function migrateCustomLines() {
+  let changed = false;
+  for (const l of trade.lines) {
+    if (l.source !== 'custom' || l.override == null) continue;
+    const rule = settings.rules[l.category] || settings.rules.other;
+    const ded = (l.deductions || []).reduce((sum, id) => sum + (settings.deductions.find((d) => d.id === id)?.amount || 0), 0);
+    if (l.cashOverride == null) l.cashOverride = Math.max(0, Math.round(l.override - (ded * rule.cashPct) / 100));
+    Object.assign(l, { override: null, deductions: [] });
+    changed = true;
+  }
   if (changed) saveTrade();
 }
 
@@ -901,7 +911,7 @@ function rowHtml(line) {
     qtyCell = '<span class="muted">—</span>';
   } else if (line.source === 'custom') {
     item = `<input type="text" class="name-input" data-field="name" value="${esc(line.name)}" placeholder="Describe the item">
-      <div class="sub">The price you type is the cash offer</div>`;
+      <div class="sub">Type the cash offer in the Cash column</div>`;
   } else if (line.source === 'hw') {
     const fromPc = isPcCondition(line.condition);
     const pcName = line.matchedFrom ? ` · PriceCharting “${pcLink(line.matchedPcId, line.matchedFrom)}”` : '';
@@ -920,7 +930,7 @@ function rowHtml(line) {
     <td>${typeCell}</td>
     <td>${conditionSelect(line)}</td>
     <td class="num">${qtyCell}</td>
-    <td class="num value-cell"><span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="${line.source === 'custom' ? 'Cash' : 'Price'}"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button></td>
+    <td class="num value-cell">${line.source === 'custom' ? '<span class="muted">—</span>' : '<span class="money-input"><span>$</span><input type="text" data-field="value" inputmode="decimal" autocomplete="off" placeholder="Price"></span><button type="button" class="reset" data-action="reset" title="Back to automatic price" hidden>↺ auto</button>'}</td>
     <td class="num cash value-cell"><span class="money-input"><span>$</span><input type="text" data-field="cash" inputmode="decimal" autocomplete="off" placeholder="Cash" aria-label="Cash offer each"></span><button type="button" class="reset" data-action="resetcash" title="Back to the calculated cash offer" hidden>↺ auto</button><small data-cell="cash-total"></small></td>
     <td class="num credit"><div data-cell="credit"></div>${creditControlHtml(line)}</td>
     <td>${removeBtn}</td>
@@ -935,16 +945,20 @@ function offerCell(each, qty) {
 function updateRow(tr, line) {
   if (line.pending || line.failed) return;
   const p = priceLine(line);
-  const input = $('[data-field="value"]', tr);
-  if (document.activeElement !== input) input.value = plain(p.base);
-  input.classList.toggle('overridden', line.override != null);
-  input.classList.toggle('missing', p.cash == null);
-  $('[data-action="reset"]', tr).hidden = line.override == null;
+  const custom = line.source === 'custom';
+  const input = $('[data-field="value"]', tr); // custom items have no Value box
+  if (input) {
+    if (document.activeElement !== input) input.value = plain(p.base);
+    input.classList.toggle('overridden', line.override != null);
+    input.classList.toggle('missing', p.cash == null);
+    $('[data-action="reset"]', tr).hidden = line.override == null;
+  }
   tr.classList.toggle('dont-buy', p.dontBuy);
   const cashInput = $('[data-field="cash"]', tr);
   if (document.activeElement !== cashInput) cashInput.value = plain(p.cash);
-  cashInput.classList.toggle('overridden', line.cashOverride != null);
-  $('[data-action="resetcash"]', tr).hidden = line.cashOverride == null;
+  cashInput.classList.toggle('overridden', line.cashOverride != null && !custom);
+  cashInput.classList.toggle('missing', p.cash == null && custom);
+  $('[data-action="resetcash"]', tr).hidden = line.cashOverride == null || custom;
   $('[data-cell="cash-total"]', tr).textContent = p.cash != null && line.qty > 1 ? `${money(p.cash * line.qty)} for ${line.qty}` : '';
   $('[data-cell="credit"]', tr).innerHTML = offerCell(p.credit, line.qty);
 
@@ -1556,7 +1570,7 @@ function rulesFromForm() {
   for (const cat of Object.keys(rules)) {
     for (const key of ['cashPct', 'creditPct']) {
       const n = Number($(`#rulesBody [name="${key}-${cat}"]`).value);
-      // The box shows 4 decimals; keep the exact stored value (e.g. 100/1.5) if it wasn't changed.
+      // The box shows 4 decimals; keep the exact stored value (e.g. 66.666…%) if it wasn't changed.
       if (Number.isFinite(n) && n >= 0 && n !== pctText(rules[cat][key])) rules[cat][key] = n;
     }
     const basis = $(`#rulesBody [name="basis-${cat}"]`);
@@ -2321,6 +2335,7 @@ async function startApp(status) {
     if (isManager()) await api('hardware', { method: 'PUT', body: hardware });
   }
   $('#view-auth').hidden = true;
+  migrateCustomLines();
   applyHardwareMatches();
   applyRole();
   renderTokenStatus();
