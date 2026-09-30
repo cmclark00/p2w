@@ -272,7 +272,7 @@ let currentView = 'trade';
 // auth.enabled is true on the website (api.php), false on the shop PC's local server.
 const auth = { enabled: false, role: null, mode: 'login' };
 const isManager = () => auth.role === 'manager';
-const trade = store.get('p2w-trade', null) || { customer: '', lines: [] };
+const trade = store.get('p2w-trade', null) || { customer: '', staff: '', lines: [] };
 trade.lines = trade.lines.filter((l) => !l.pending); // drop lookups interrupted by a reload
 
 /* ================================================================== server + PriceCharting */
@@ -1806,7 +1806,8 @@ function openComplete() {
   f.payout.value = trade.split ? 'split' : 'credit';
   $('#paySplitCash').value = plain(trade.split?.cash ?? null);
   updateDialogSplit();
-  $('#staffName').value = store.get('p2w-staff-name', '');
+  // Staff and customer names belong to this trade only: both start blank on every new trade.
+  $('#staffName').value = trade.staff || '';
   $('#completeCustomer').value = trade.customer || '';
   $('#completeNotes').value = '';
   const serialLines = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
@@ -1816,7 +1817,7 @@ function openComplete() {
   $('#idChecked').checked = false;
   $('#completeError').textContent = '';
   $('#completeDialog').showModal();
-  $(store.get('p2w-staff-name', '') ? '#completeCustomer' : '#staffName').focus();
+  $(!trade.staff ? '#staffName' : !trade.customer ? '#completeCustomer' : '#completeSave').focus();
 }
 
 function updateDialogSplit() {
@@ -1829,7 +1830,9 @@ async function saveCompleted(print) {
   error.textContent = '';
   const t = tradeTotals();
   const staff = $('#staffName').value.trim();
-  if (!staff) { error.textContent = 'Enter your name.'; return; }
+  const customer = $('#completeCustomer').value.trim();
+  if (!staff) { error.textContent = 'Enter your name.'; $('#staffName').focus(); return; }
+  if (!customer) { error.textContent = "Enter the customer's name."; $('#completeCustomer').focus(); return; }
   let payout;
   const type = $('#completeForm').elements.payout.value;
   if (type === 'cash') payout = { type, cash: t.cash, credit: 0 };
@@ -1845,13 +1848,12 @@ async function saveCompleted(print) {
   });
   const needsId = !$('#idCheckRow').hidden;
   if (needsId && !$('#idChecked').checked) { error.textContent = "Check the customer's photo ID before buying consoles or handhelds."; return; }
-  trade.customer = $('#completeCustomer').value.trim();
+  Object.assign(trade, { staff, customer });
   saveTrade();
   const record = {
-    staff, customer: trade.customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom },
+    staff, customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom },
     idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
   };
-  store.set('p2w-staff-name', staff);
   let saved;
   try {
     saved = await api('trades', { method: 'POST', body: record });
@@ -1861,15 +1863,16 @@ async function saveCompleted(print) {
   }
   $('#completeDialog').close();
   if (print) printSheet({ ...record, receipt: true, time: saved.time });
-  trade.lines = [];
-  trade.customer = '';
-  trade.split = null;
-  trade.cashTotal = null;
-  trade.bulk = { counts: {}, lineId: null };
+  resetTrade();
+  toast('Trade saved to the trade log.');
+}
+
+// New trade: empty list, and the staff and customer names start blank again.
+function resetTrade() {
+  Object.assign(trade, { lines: [], customer: '', staff: '', split: null, cashTotal: null, bulk: { counts: {}, lineId: null } });
   $('#customerName').value = '';
   commit();
   focusScan();
-  toast('Trade saved to the trade log.');
 }
 
 let logRecords = [];
@@ -2090,14 +2093,7 @@ function wireEvents() {
   $('#printBtn').addEventListener('click', printQuote);
   $('#clearBtn').addEventListener('click', () => {
     if (trade.lines.length && !confirm('Clear this trade and start a new one?')) return;
-    trade.lines = [];
-    trade.split = null;
-    trade.cashTotal = null;
-    trade.bulk = { counts: {}, lineId: null };
-    trade.customer = '';
-    $('#customerName').value = '';
-    commit();
-    focusScan();
+    resetTrade();
   });
 
   // TCG bulk tab
@@ -2213,6 +2209,13 @@ function wireEvents() {
   $('#completeSave').addEventListener('click', () => saveCompleted(false));
   $('#completePrint').addEventListener('click', () => saveCompleted(true));
   $('#completeDialog [data-close]').addEventListener('click', () => $('#completeDialog').close());
+  // Keep what was typed if the dialog is cancelled and reopened; the customer box mirrors the top bar's.
+  $('#staffName').addEventListener('input', (e) => { trade.staff = e.target.value; saveTrade(); });
+  $('#completeCustomer').addEventListener('input', (e) => {
+    trade.customer = e.target.value;
+    $('#customerName').value = e.target.value;
+    saveTrade();
+  });
   $('#completeDialog').addEventListener('close', focusScan);
   $('#paySplitCash').addEventListener('input', () => {
     $('#completeForm').elements.payout.value = 'split';

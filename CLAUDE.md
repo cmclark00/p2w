@@ -511,7 +511,10 @@ The site's **only server-side code**. Everything else is static.
   - Each file holds one object per line, one file per UTC month.
   - The log is **append-only by design** (no edit or delete route).
   - The server adds `id`, `time` (UTC ISO), and `role`. The client sends
-    staff name, customer, payout (`cash` / `credit` / `split` with cents),
+    staff name and customer (**both required**; stored per trade as
+    `trade.staff`/`trade.customer` and cleared by `resetTrade()` on New
+    trade and after Complete, so they're never carried over from the last
+    trade or remembered per device), payout (`cash` / `credit` / `split` with cents),
     totals, per-item snapshot (incl. serials), `idChecked`, and notes.
   - Search is a case-insensitive substring match on the raw JSON line,
     newest first. It returns at most 100 results from the last 36 months.

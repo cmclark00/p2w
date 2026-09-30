@@ -662,7 +662,10 @@ that device is locked out for 15 minutes.
    they want in cash. The rest is shown as store credit at the same rates.
 7. When the customer agrees, click **Complete trade**:
    - Pick what they're taking: cash, store credit, or the split.
-   - Type your name. It's remembered on that device.
+   - Type **your name** and the **customer's name**. Both are required,
+     and both start blank on every new trade, so whoever is at the
+     counter types their own name each time. (The Customer box at the
+     top of the screen fills in the same name.)
    - Enter serial numbers for consoles and handhelds, and tick **Photo ID
      checked**. The trade won't save without it when there's serialized
      hardware.

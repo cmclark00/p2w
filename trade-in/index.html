@@ -82,7 +82,7 @@
         </div>
         <label class="customer">
           <span class="eyebrow">Customer</span>
-          <input id="customerName" type="text" autocomplete="off" placeholder="Optional">
+          <input id="customerName" type="text" autocomplete="off" placeholder="Required to complete" aria-required="true">
         </label>
       </div>
 
@@ -381,10 +381,10 @@
       </fieldset>
       <div class="grid-2">
         <label>Your name
-          <input id="staffName" type="text" autocomplete="off" placeholder="Who bought this in">
+          <input id="staffName" type="text" autocomplete="off" placeholder="Who bought this in (required)" required>
         </label>
         <label>Customer
-          <input id="completeCustomer" type="text" autocomplete="off" placeholder="Optional">
+          <input id="completeCustomer" type="text" autocomplete="off" placeholder="Required" required>
         </label>
       </div>
       <div id="serialFields"></div>
