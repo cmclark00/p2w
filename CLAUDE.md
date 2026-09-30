@@ -639,7 +639,14 @@ The site's **only server-side code**. Everything else is static.
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line
     without its resurface deductions first, and if that cash offer is
     ≤ $0.50 it uses that price (`scratchWaived`, badge, and the waived
-    deduction is left off the receipt).
+    deduction is left off the receipt). **The guide's "outliers" are exempt
+    from that waiver** (`guideCheck()` tags them `outlier: true`): disc-only
+    sports $0.10, sports in box $0.25, disc-only under $10 $0.50, disc-only
+    $10–$20 $1 always take the guide's ÷5 when resurfacing is ticked
+    ($0.02 / $0.05 / $0.10 / $0.20). Without the exemption the waiver
+    cancelled ÷5 on every tier but $1. Disc-only over $20 is priced
+    normally with the $2/$3 deduction, as the guide says ("use price
+    charting").
   - Saved settings carry a `version`. `mergeSettings` migrates older saves
     (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5 unless a manager had
     set a custom number). Bump `version` and add a migration line when a

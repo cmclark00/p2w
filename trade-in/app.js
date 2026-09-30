@@ -397,16 +397,17 @@ function guideCheck(line, s) {
   const condMarket = line.prices?.[PC_FIELDS.market[line.condition]];
   const discOnly = line.condition === 'loose' && DISC_PLATFORM_RE.test(norm(line.platform));
 
+  // The guide's "outliers" (outlier: true) are divided by 5 when the disc needs resurfacing.
   if (discOnly) {
     if (loose > 2000) return reason ? { info: true, note: `${reason}, but over $20 – priced normally` } : null;
-    if (reason) return { flat: 10, note: `Disc-only ${reason} → $0.10` };
-    if (loose > 0 && loose < 1000) return { flat: 50, note: 'Disc-only under $10 → $0.50' };
-    if (loose >= 1000) return { flat: 100, note: 'Disc-only $10–$20 → $1.00' };
+    if (reason) return { flat: 10, outlier: true, note: `Disc-only ${reason} → $0.10` };
+    if (loose > 0 && loose < 1000) return { flat: 50, outlier: true, note: 'Disc-only under $10 → $0.50' };
+    if (loose >= 1000) return { flat: 100, outlier: true, note: 'Disc-only $10–$20 → $1.00' };
     return null;
   }
   if (reason && line.condition !== 'loose') {
     if (condMarket > 2000) return { info: true, note: `${reason}, but over $20 – priced normally` };
-    return { flat: 25, note: `${reason} in box → $0.25` };
+    return { flat: 25, outlier: true, note: `${reason} in box → $0.25` };
   }
   return null;
 }
@@ -514,12 +515,16 @@ function normalCreditBonus(line, s = settings) {
 }
 
 // A trade-in worth SCRATCH_FREE_MAX or less without its scratch (resurfacing) deductions isn't docked for them.
+// The guide's outlier prices ($0.10 / $0.25 / $0.50 / $1) always take their ÷5 instead: that is the guide's
+// resurfacing rule for them, and the waiver would otherwise cancel it on every tier but $1.
 function priceBeforeCredit(line, s = settings) {
   const deds = lineDeductions(line, s);
   const out = priceWith(line, s, deds);
   if (!deds.some((d) => d.resurface)) return out;
   const clean = priceWith(line, s, deds.filter((d) => !d.resurface));
-  if (!clean.dontBuy && clean.cash != null && clean.cash <= SCRATCH_FREE_MAX) return { ...clean, scratchWaived: true };
+  if (!clean.dontBuy && !clean.guide?.outlier && clean.cash != null && clean.cash <= SCRATCH_FREE_MAX) {
+    return { ...clean, scratchWaived: true };
+  }
   return out;
 }
 
@@ -541,7 +546,7 @@ function priceWith(line, s, deds) {
   if (out.guide?.flat != null) {
     // Guide: outliers that need resurfacing are divided by 5.
     let flat = out.guide.flat;
-    if (deds.some((d) => d.resurface)) {
+    if (out.guide.outlier && deds.some((d) => d.resurface)) {
       flat = Math.floor(flat / 5);
       out.guide = { ...out.guide, note: `${out.guide.note}, ÷5 for resurfacing = ${money(flat)}` };
     }

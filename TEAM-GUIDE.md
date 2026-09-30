@@ -636,7 +636,10 @@ that device is locked out for 15 minutes.
    **+ Deduction** menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on **Parts** has no
    deductions, and store credit is the same as cash. Items worth $0.50 or
-   less aren't docked for scratches; the calculator skips it for you.)
+   less aren't docked for scratches; the calculator skips it for you.
+   The exception is the buying guide's disc-only and sports-game prices:
+   a scratch there divides the price by 5, just like the guide says, so a
+   50-cent disc that needs resurfacing pays 10 cents.)
    **Management giving extra store credit on something?** Open that line's
    **+ Deduction** menu, pick **Custom store credit %…**, and type how
    much more than cash it pays in credit (e.g. 35 for +35%). Click the ×
