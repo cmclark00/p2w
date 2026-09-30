@@ -567,10 +567,12 @@ The site's **only server-side code**. Everything else is static.
   `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
   Sheet). Once a manager saves, the server copy wins. Code defaults only
   seed a fresh install.
-  - Games: credit = 100% of PriceCharting retail buy, cash = that ÷ 1.5
-    (`GAME_CASH_PCT = 100 / 1.5`, kept exact rather than 66.67). This
-    matches the public "games: credit 50% more than cash" copy.
-  - Pokémon games: credit 75% of market, cash 50% (also credit ÷ 1.5).
+  - Games (from the Game Buying Guide): credit = 105% of PriceCharting
+    retail buy (`GAME_CREDIT_PCT`), cash = 70% of that credit
+    (`GAME_CASH_PCT` = 73.5%). Credit is therefore ~43% more than cash,
+    which is the public "about 43% more" copy. (Before settings v4 it
+    was credit 100%, cash = credit ÷ 1.5.)
+  - Pokémon games: credit 75% of market, cash 50% (credit ÷ 1.5).
   - **PriceCharting → hardware matching:** `hardwareMatch()` sends a
     scanned/searched PriceCharting item to a Hardware Prices item with the
     same name (normalized; exact first, then ignoring [bracket]/(paren)
@@ -648,8 +650,9 @@ The site's **only server-side code**. Everything else is static.
     normally with the $2/$3 deduction, as the guide says ("use price
     charting").
   - Saved settings carry a `version`. `mergeSettings` migrates older saves
-    (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5 unless a manager had
-    set a custom number). Bump `version` and add a migration line when a
+    (e.g. v2 → v3 moved game cash from 50% to ÷ 1.5, and v3 → v4 moved
+    games to the guide's credit 105% / cash 70% of credit, each only when
+    a manager hadn't set custom numbers). Bump `version` and add a migration line when a
     default policy changes, or live saved settings keep the old number.
 
 ## Konami easter egg (BULKY-TRIS)
@@ -843,15 +846,15 @@ Three via **Formspree** (endpoints are public client-side by design):
   `.coin-hunt-teaser` and as the floating hero on `bulky-coin-hunt.html`.
   It was cut from a photo with a feathered circular PIL mask, not rembg.)
 - **Trade-in store-credit bumps (tiered).** Store credit pays more than
-  cash on trade-ins, by category: **video games 50% more**, **consoles &
+  cash on trade-ins, by category: **video games ~43% more** (cash = 70% of credit), **consoles &
   handhelds 20% more**, **TCG singles/sealed/graded 10% more**, **TCG
   bulk is flat** (cash = store credit). Visible in: `faq.html` "Cash or
   store credit" entry (visible + JSON-LD), `sell-trade.html` step 3 of
   the How-it-works flow, `bulk-rates.html` centered disclaimer (the
   "flat" half of the rule). All four must stay in sync if the numbers
   ever change. The `trade-in/` calculator uses the same games rule
-  (credit = PriceCharting retail buy, cash = credit ÷ 1.5), so update its
-  Settings defaults too.
+  (credit = 105% of PriceCharting retail buy, cash = 70% of credit), so
+  update its Settings defaults too.
 - **Board games are sell-only.** The shop carries a board game selection
   but does **not** buy or take them in trade. Board games appears in
   sell-framed copy (home "What we carry" 5th card, home split-section

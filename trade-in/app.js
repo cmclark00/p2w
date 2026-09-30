@@ -43,8 +43,11 @@ const PRICE_KEYS = [...Object.values(PC_FIELDS['retail-buy']), ...Object.values(
 // PriceCharting console names for disc-based systems (the guide's "disc only" rules apply to these).
 const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
 
-// Game cash = PriceCharting price ÷ 1.5 (store credit is 50% more than cash). Kept exact, not 66.67.
-const GAME_CASH_PCT = 100 / 1.5;
+// Game Buying Guide: store credit = 105% of PriceCharting, cash = 70% of the store credit (73.5%).
+const GAME_CREDIT_PCT = 105;
+const GAME_CASH_PCT = GAME_CREDIT_PCT * 0.7;
+// The version 3 game rule (credit 100%, cash = credit ÷ 1.5), for migrating saves that still use it.
+const V3_GAME_CASH_PCT = 100 / 1.5;
 // Slow-seller flags only matter on items worth this much (cents); cheap items get the guide's flat prices.
 const SLOW_SELLER_MIN_VALUE = 1000;
 // Trade-ins worth this much or less (cents) get no scratch/resurfacing deduction.
@@ -52,10 +55,10 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 3,
+  version: 4,
   defaultCondition: 'loose',
   rules: {
-    game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: 100 },
+    game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
     pokemon:   { basis: 'market', cashPct: 50, creditPct: 75 },
     console:   { cashPct: 100, creditPct: 120 },
     handheld:  { cashPct: 100, creditPct: 120 },
@@ -234,7 +237,12 @@ function mergeSettings(saved) {
     Object.assign(s.guide, saved.guide || {});
   }
   // Version 3: game cash changed from half of the PriceCharting price to the price ÷ 1.5.
-  if (saved.version < 3 && s.rules.game.cashPct === 50) s.rules.game.cashPct = GAME_CASH_PCT;
+  const game = s.rules.game;
+  if (saved.version < 3 && game.cashPct === 50) game.cashPct = V3_GAME_CASH_PCT;
+  // Version 4: games follow the buying guide (credit 105%, cash 70% of credit) unless a manager set custom numbers.
+  if (saved.version < 4 && game.creditPct === 100 && Math.abs(game.cashPct - V3_GAME_CASH_PCT) < 0.001) {
+    Object.assign(game, { cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT });
+  }
   return s;
 }
 
