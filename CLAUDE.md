@@ -453,7 +453,8 @@ The site's **only server-side code**. Everything else is static.
   syntax so it works on 7.4+.
 - **Private data lives OUTSIDE the docroot** in
   `<home>/p2w-trade-in-data/`, next to `public_html`. It holds
-  `config.json` (bcrypt password hashes, cookie-signing secret, token),
+  `config.json` (bcrypt password hashes, cookie-signing secret, token,
+  Amazon SP-API keys),
   `settings.json`, `hardware.json` (each with a `.bak`), and `cache/`.
   Two reasons, both load-bearing:
   1. The repo is public.
@@ -502,10 +503,12 @@ The site's **only server-side code**. Everything else is static.
     so Amazon is links only).
   - **Tiers** (`FLOOR_TIERS`, by PriceCharting console name; PAL/JP
     prefixes ignored): every guide system prices from the sales; modern
-    systems (PS4/PS5/Xbox One/Series/Switch/Switch 2, `gamestop: true`)
-    take the **higher of GameStop's pre-owned price** (`gamestop-price`
-    from the API; loaded with `PC.byId` if search results lack it)
-    **and the sale** (owner's choice). Systems not in the guide
+    systems (PS4/PS5/Xbox One/Series/Switch/Switch 2, `gamestop: true`,
+    `amazon: true`) take the **highest of GameStop's pre-owned price**
+    (`gamestop-price` from the API; loaded with `PC.byId` if search
+    results lack it), **Amazon's lowest offer** (see **Amazon** below),
+    **and the sale** (owner's choice). "Add to list" waits while Amazon
+    is still loading so the price can't be added low. Systems not in the guide
     (`FLOOR_OTHER`) price from the sales too, with a "double-check" rule.
   - **Which sale: the 90th percentile** of the condition's normal sales
     (`FLOOR_PCT`, `floorAutoSale()`), not the single highest. Backtested
@@ -540,7 +543,34 @@ The site's **only server-side code**. Everything else is static.
     file, flock'd; the oldest drop off past `MAX_FLOOR_SESSIONS` = 300).
     The open list is also kept in `localStorage` (`p2w-floor`) so a
     refresh doesn't lose it. Copy list (TSV) and Print list.
-  - **Shop PC offline copy:** `server.ps1` doesn't have the `pc/sales` or
+  - **Amazon (SP-API).** The shop has a Professional seller account,
+    so it uses its own **private SP-API app** (registered in Amazon's
+    Solution Provider Portal with only the Pricing + Product Listing
+    roles). Keys: LWA **client id, client secret, refresh token**
+    (self-authorized), saved by a manager in **Settings → Amazon** via
+    `PUT api.php?route=amazon` into `config.json` → `amazon` (blank
+    fields keep the saved value; `{clear:true}` removes them; never sent
+    back to the browser). No AWS/SigV4 needed (Amazon dropped it in
+    2023). `amazon_access_token()` trades them for an hour-long access
+    token cached in `amazon-token.json`; `amazon_get()` calls
+    `sellingpartnerapi-na.amazon.com` (or the sandbox host when the
+    "sandbox keys" box is ticked; sandbox only returns Amazon's canned
+    sample data) one call at a time, ≥2.1 s apart (`getItemOffers` is
+    0.5 req/s). `GET api.php?route=amazon/offers&upc=…&cond=used|new`:
+    Catalog Items `2022-04-01` UPC search → ASIN, then Product Pricing
+    `getItemOffers` for that condition → offers (price **including
+    shipping**, sub-condition, Prime/FBA), sorted low→high, plus the
+    total offer count; cached 6 h as `cache/amz-<upc>-<cond>.json`.
+    **Amazon only returns its ~20 lowest offers per condition** (no API
+    lists more); the tab shows them all and "N lowest of M". Renewed
+    copies are separate ASINs, so they never appear. Loose/CIB compare
+    with **Used**, New with **New**. Modern systems load it
+    automatically; other systems get a "Check Amazon" link. The game
+    needs a UPC on PriceCharting to match. `GET amazon/test` checks the
+    keys (token exchange only). For local testing, `P2W_AMAZON_LWA` /
+    `P2W_AMAZON_HOST` env vars point the server at a fake Amazon.
+  - **Shop PC offline copy:** `server.ps1` doesn't have the `pc/sales`,
+    `amazon/*`, or
     `floor-sessions` routes, so offline the tab shows the PriceCharting
     link instead of sales and can't save sessions. Add the routes there
     if the shop wants them offline.

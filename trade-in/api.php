@@ -25,6 +25,8 @@
  *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
  *   PUT  floor-sessions          save (create or update) a named session
  *   DELETE floor-sessions (id)   delete a saved session
+ *   GET  amazon/offers (upc, cond) Amazon's lowest offers for a game, via the shop's SP-API app
+ *   PUT  amazon / GET amazon/test  manager: save / check the Amazon SP-API keys
  */
 
 declare(strict_types=1);
@@ -42,6 +44,9 @@ const PC_MIN_GAP_SECONDS = 1.1;     // PriceCharting allows 1 call/second
 const PC_CACHE_SECONDS = 1800;      // re-scanning a game within 30 min costs no API call
 const SALES_CACHE_SECONDS = 21600;  // a game's recent-sales list is re-read at most every 6 hours
 const MAX_FLOOR_SESSIONS = 300;     // oldest saved floor-pricing sessions drop off past this
+const AMZ_MARKETPLACE = 'ATVPDKIKX0DER'; // amazon.com
+const AMZ_MIN_GAP_SECONDS = 2.1;    // getItemOffers allows 0.5 requests/second
+const AMZ_CACHE_SECONDS = 21600;    // a game's Amazon offers are re-read at most every 6 hours
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -259,6 +264,38 @@ function http_get(string $url, bool $follow = false): array {
   return [$status, $body === false ? '' : (string)$body, $body === false ? 'request failed' : ''];
 }
 
+// Any HTTP request with headers (Amazon's token exchange is a form POST). Returns [status, body, error].
+function http_send(string $method, string $url, array $headers = [], ?string $body = null): array {
+  if (function_exists('curl_init')) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_TIMEOUT => 20,
+      CURLOPT_CONNECTTIMEOUT => 10,
+      CURLOPT_CUSTOMREQUEST => $method,
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_USERAGENT => 'P2W-TradeIn/1.0 (Language=PHP)',
+    ]);
+    if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    $out = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    return [$status, $out === false ? '' : (string)$out, $error];
+  }
+  $ctx = stream_context_create(['http' => [
+    'method' => $method, 'timeout' => 20, 'ignore_errors' => true,
+    'header' => implode("\r\n", array_merge($headers, ['User-Agent: P2W-TradeIn/1.0 (Language=PHP)'])),
+    'content' => $body ?? '',
+  ]]);
+  $out = @file_get_contents($url, false, $ctx);
+  $status = 0;
+  foreach ($http_response_header ?? [] as $h) {
+    if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $status = (int)$m[1];
+  }
+  return [$status, $out === false ? '' : (string)$out, $out === false ? 'request failed' : ''];
+}
+
 function pricecharting(string $endpoint, string $param, string $value): void {
   $token = (string)(config()['token'] ?? '');
   if ($token === '') fail(400, 'No PriceCharting API token is set. A manager can add it on the Settings tab.');
@@ -372,6 +409,103 @@ function floor_sessions(callable $update) {
   return $result;
 }
 
+/* ------------------------------------------------------------------ Amazon (Selling Partner API) */
+
+// The shop's own private SP-API app: Login-with-Amazon client id/secret + the refresh token from
+// self-authorizing it. Kept in config.json with the other secrets; never sent to a browser.
+function amazon_keys(): ?array {
+  $a = config()['amazon'] ?? null;
+  return is_array($a) && ($a['clientId'] ?? '') !== '' && ($a['clientSecret'] ?? '') !== '' && ($a['refreshToken'] ?? '') !== '' ? $a : null;
+}
+
+function amazon_error(int $status, string $body): string {
+  $d = json_decode($body, true);
+  $msg = $d['errors'][0]['message'] ?? $d['error_description'] ?? $d['error'] ?? '';
+  return "Amazon returned HTTP $status" . ($msg !== '' ? ': ' . rtrim($msg, '.') . '.' : '.');
+}
+
+// A Login-with-Amazon access token (good for an hour), cached until 2 minutes before it expires.
+function amazon_access_token(array $keys): string {
+  $cache = read_json('amazon-token.json');
+  if (is_array($cache) && ($cache['expires'] ?? 0) > time() + 120 && ($cache['for'] ?? '') === sha1($keys['refreshToken'])) return $cache['token'];
+  // P2W_AMAZON_LWA / P2W_AMAZON_HOST point at a fake Amazon for local testing (like P2W_TRADEIN_DATA).
+  $lwa = getenv('P2W_AMAZON_LWA') ?: 'https://api.amazon.com/auth/o2/token';
+  [$status, $body, $error] = http_send('POST', $lwa, ['Content-Type: application/x-www-form-urlencoded'], http_build_query([
+    'grant_type' => 'refresh_token', 'refresh_token' => $keys['refreshToken'],
+    'client_id' => $keys['clientId'], 'client_secret' => $keys['clientSecret'],
+  ]));
+  if ($status === 0) fail(502, 'Could not reach Amazon: ' . $error);
+  $d = json_decode($body, true);
+  if ($status !== 200 || empty($d['access_token'])) fail(502, amazon_error($status, $body) . ' Check the Amazon keys in Settings.');
+  write_atomic('amazon-token.json', (string)json_encode([
+    'token' => $d['access_token'], 'expires' => time() + (int)($d['expires_in'] ?? 3600), 'for' => sha1($keys['refreshToken']),
+  ]));
+  return $d['access_token'];
+}
+
+// GET from the SP-API (production or sandbox), one call at a time across every device.
+function amazon_get(array $keys, string $path, array $query): array {
+  $token = amazon_access_token($keys);
+  $host = getenv('P2W_AMAZON_HOST') ?: (!empty($keys['sandbox']) ? 'https://sandbox.sellingpartnerapi-na.amazon.com' : 'https://sellingpartnerapi-na.amazon.com');
+  $lock = fopen(data_path('amazon-throttle.lock'), 'c+');
+  flock($lock, LOCK_EX);
+  $wait = AMZ_MIN_GAP_SECONDS - (microtime(true) - (float)stream_get_contents($lock));
+  if ($wait > 0) usleep((int)($wait * 1e6));
+  [$status, $body, $error] = http_send('GET', $host . $path . '?' . http_build_query($query), ['x-amz-access-token: ' . $token, 'Accept: application/json']);
+  ftruncate($lock, 0);
+  rewind($lock);
+  fwrite($lock, (string)microtime(true));
+  flock($lock, LOCK_UN);
+  fclose($lock);
+  if ($status === 0) fail(502, 'Could not reach Amazon: ' . $error);
+  return [$status, $body];
+}
+
+// A game's lowest Amazon offers by UPC: catalog lookup (UPC -> ASIN), then getItemOffers for the condition.
+// Renewed copies are separate Amazon products, so they never show up here.
+function amazon_offers(string $upc, string $cond): void {
+  $keys = amazon_keys();
+  if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
+  if (!preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a UPC.');
+  $condition = $cond === 'new' ? 'New' : 'Used';
+  $cacheDir = data_path('cache');
+  if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700);
+  $cacheFile = $cacheDir . '/amz-' . $upc . '-' . strtolower($condition) . '.json';
+  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
+
+  [$status, $body] = amazon_get($keys, '/catalog/2022-04-01/items', [
+    'identifiers' => $upc, 'identifiersType' => 'UPC', 'marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries',
+  ]);
+  if ($status !== 200) fail(502, amazon_error($status, $body));
+  $item = json_decode($body, true)['items'][0] ?? null;
+  $out = ['status' => 'success', 'found' => false, 'condition' => $condition];
+  if ($item && !empty($item['asin'])) {
+    $asin = (string)$item['asin'];
+    [$status, $body] = amazon_get($keys, '/products/pricing/v0/items/' . rawurlencode($asin) . '/offers', [
+      'MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $condition, 'CustomerType' => 'Consumer',
+    ]);
+    if ($status !== 200) fail(502, amazon_error($status, $body));
+    $payload = json_decode($body, true)['payload'] ?? [];
+    $offers = [];
+    foreach ((array)($payload['Offers'] ?? []) as $o) {
+      $price = (float)($o['ListingPrice']['Amount'] ?? 0) + (float)($o['Shipping']['Amount'] ?? 0);
+      if ($price <= 0) continue;
+      $offers[] = ['price' => (int)round($price * 100), 'sub' => (string)($o['SubCondition'] ?? ''), 'fba' => !empty($o['IsFulfilledByAmazon'])];
+    }
+    usort($offers, function ($a, $b) { return $a['price'] <=> $b['price']; });
+    $out = [
+      'status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $asin,
+      'title' => cut_text((string)($item['summaries'][0]['itemName'] ?? ''), 160),
+      'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin),
+      'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)),
+      'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers, // Amazon returns up to its 20 lowest
+    ];
+  }
+  $json = (string)json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  @file_put_contents($cacheFile, $json, LOCK_EX);
+  respond_raw(200, $json);
+}
+
 function clear_cache(): void {
   foreach ((array)glob(data_path('cache') . '/*.json') as $f) @unlink($f);
 }
@@ -395,6 +529,8 @@ switch ("$method $route") {
       'setupNeeded' => config() === null,
       'role' => $role,
       'tokenSet' => $role !== null && (string)(config()['token'] ?? '') !== '',
+      'amazonSet' => $role !== null && amazon_keys() !== null,
+      'amazonSandbox' => $role !== null && !empty(config()['amazon']['sandbox']),
     ]);
 
   case 'POST setup':
@@ -583,6 +719,40 @@ switch ("$method $route") {
     $id = (string)($_GET['id'] ?? '');
     floor_sessions(function ($all) use ($id) { unset($all[$id]); return [$all, null, true]; });
     respond(200, ['ok' => true]);
+
+  case 'GET amazon/offers':
+    require_role('staff');
+    amazon_offers((string)($_GET['upc'] ?? ''), (string)($_GET['cond'] ?? 'used'));
+
+  // Save the Amazon keys. Blank fields keep what's saved; {"clear": true} removes them all.
+  case 'PUT amazon':
+    require_role('manager');
+    $in = json_body();
+    $cfg = config();
+    $amz = !empty($in['clear']) ? [] : (array)($cfg['amazon'] ?? []);
+    if (empty($in['clear'])) {
+      foreach (['clientId', 'clientSecret', 'refreshToken'] as $k) {
+        $v = trim((string)($in[$k] ?? ''));
+        if ($v === '') continue;
+        if (strlen($v) > 2000 || preg_match('/\s/', $v)) fail(400, "That $k doesn't look right. Copy it again from Amazon.");
+        $amz[$k] = $v;
+      }
+      if (array_key_exists('sandbox', $in)) $amz['sandbox'] = !empty($in['sandbox']);
+    }
+    $cfg['amazon'] = $amz;
+    save_config($cfg);
+    @unlink(data_path('amazon-token.json'));
+    foreach ((array)glob(data_path('cache') . '/amz-*.json') as $f) @unlink($f);
+    respond(200, ['amazonSet' => amazon_keys() !== null, 'amazonSandbox' => !empty($amz['sandbox'])]);
+
+  // Checks the keys by trading them for an access token (works for sandbox and production apps).
+  case 'GET amazon/test':
+    require_role('manager');
+    $keys = amazon_keys();
+    if (!$keys) fail(400, 'Save all three Amazon keys first.');
+    @unlink(data_path('amazon-token.json'));
+    amazon_access_token($keys);
+    respond(200, ['ok' => true, 'sandbox' => !empty($keys['sandbox'])]);
 
   default:
     fail(404, "No route for $method $route");

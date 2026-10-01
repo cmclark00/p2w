@@ -802,8 +802,11 @@ Guide (the Google Sheet tab).</p>
 <li><strong>Most systems:</strong> it goes by the <strong>high end of normal sales</strong> (the
      90th percentile, about the 4th-highest of 30), so one lucky sale
      doesn't set the price. That sale is highlighted in the list.</li>
-<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> whichever is
-     higher, <strong>GameStop's pre-owned price</strong> or that sale.</li>
+<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> the highest of
+     <strong>GameStop's pre-owned price</strong>, <strong>Amazon's lowest offer</strong> (used, or
+     new for New), and that sale. Amazon's offers are listed under the
+     sales, prices including shipping. On other systems, click <strong>Check
+     Amazon</strong> to see them.</li>
 <li>Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.</li>
 <li>Only look closer when it says <strong>Double-check</strong> (very few sales, or no
@@ -819,6 +822,12 @@ Guide (the Google Sheet tab).</p>
    <strong>Saved sessions</strong>. <strong>Copy list</strong> copies it for a spreadsheet, and
    <strong>Print list</strong> prints it.</li>
 </ol>
+<p><strong>Amazon keys (managers):</strong> Amazon prices come from the shop's own
+Amazon seller API app. Its three keys (Client ID, Client secret, Refresh
+token) go in <strong>Settings → Amazon (Selling Partner API)</strong>; click <strong>Save
+Amazon keys</strong>, then <strong>Test connection</strong>. Never email or text them. If
+Amazon ever says the keys stopped working, make a new refresh token in
+Amazon's Solution Provider Portal (Authorize app) and paste it there.</p>
 <p>The recent sales are read from PriceCharting's website. If PriceCharting
 changes their site and the sales stop showing, the tool asks you to type
 a price; use the <strong>PriceCharting ↗</strong> link to see the sales.</p>

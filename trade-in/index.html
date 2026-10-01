@@ -284,6 +284,29 @@
         <p id="tokenStatus" class="status"></p>
       </div>
 
+      <div class="panel">
+        <h2>Amazon (Selling Partner API)</h2>
+        <p class="muted">The keys from the shop's private SP-API app in Amazon's Solution Provider Portal. Floor Pricing uses them to read Amazon's offers for PS4/PS5/Xbox/Switch games. They stay on the server; the browser never sees them. Leave a box blank to keep what's saved.</p>
+        <div class="grid-3 amazon-keys">
+          <label>Client ID
+            <input id="amzClientId" type="password" autocomplete="off" spellcheck="false" placeholder="amzn1.application-oa2-client…">
+          </label>
+          <label>Client secret
+            <input id="amzClientSecret" type="password" autocomplete="off" spellcheck="false" placeholder="amzn1.oa2-cs.v1…">
+          </label>
+          <label>Refresh token
+            <input id="amzRefresh" type="password" autocomplete="off" spellcheck="false" placeholder="Atzr|…">
+          </label>
+        </div>
+        <label class="check"><input id="amzSandbox" type="checkbox"> These are sandbox keys (Amazon's test app: sample data only, not real prices)</label>
+        <div class="token-row">
+          <button id="amzSave" type="button" class="btn primary">Save Amazon keys</button>
+          <button id="amzTest" type="button" class="btn">Test connection</button>
+          <button id="amzClear" type="button" class="btn danger">Remove keys</button>
+        </div>
+        <p id="amzStatus" class="status"></p>
+      </div>
+
       <div id="passwordPanel" class="panel" hidden>
         <h2>Passwords</h2>
         <p class="muted">Change either password (leave a box blank to keep it). Changing a password logs out every other device, so staff will need the new one.</p>

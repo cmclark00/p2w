@@ -693,8 +693,11 @@ Guide (the Google Sheet tab).
    - **Most systems:** it goes by the **high end of normal sales** (the
      90th percentile, about the 4th-highest of 30), so one lucky sale
      doesn't set the price. That sale is highlighted in the list.
-   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** whichever is
-     higher, **GameStop's pre-owned price** or that sale.
+   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the highest of
+     **GameStop's pre-owned price**, **Amazon's lowest offer** (used, or
+     new for New), and that sale. Amazon's offers are listed under the
+     sales, prices including shipping. On other systems, click **Check
+     Amazon** to see them.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
 4. Only look closer when it says **Double-check** (very few sales, or no
@@ -709,6 +712,13 @@ Guide (the Google Sheet tab).
    list on the website under its name, so anyone can open it later from
    **Saved sessions**. **Copy list** copies it for a spreadsheet, and
    **Print list** prints it.
+
+**Amazon keys (managers):** Amazon prices come from the shop's own
+Amazon seller API app. Its three keys (Client ID, Client secret, Refresh
+token) go in **Settings → Amazon (Selling Partner API)**; click **Save
+Amazon keys**, then **Test connection**. Never email or text them. If
+Amazon ever says the keys stopped working, make a new refresh token in
+Amazon's Solution Provider Portal (Authorize app) and paste it there.
 
 The recent sales are read from PriceCharting's website. If PriceCharting
 changes their site and the sales stop showing, the tool asks you to type

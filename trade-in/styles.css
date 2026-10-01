@@ -435,3 +435,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 @media (max-width: 800px) {
   .floor-body { grid-template-columns: 1fr; }
 }
+.floor-amz-head { margin-top: 18px; }
+.floor-amz-head a { color: var(--paper); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.floor-amz-check { display: inline-block; margin-top: 14px; padding: 0; }
+.amazon-keys { margin-bottom: 12px; }

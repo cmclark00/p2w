@@ -267,6 +267,9 @@ function toast(msg, kind = 'info') {
 let settings = clone(DEFAULT_SETTINGS);
 let hardware = [];
 let tokenSet = false;
+// The shop's Amazon SP-API keys are saved on the server (Settings), and whether they're the sandbox app's.
+let amazonSet = false;
+let amazonSandbox = false;
 let hwDirty = false;
 let currentView = 'trade';
 // auth.enabled is true on the website (api.php), false on the shop PC's local server.
@@ -1644,6 +1647,7 @@ function fillSettingsForm() {
   $('#dedBody').innerHTML = settings.deductions.map(dedRowHtml).join('');
   renderRuleExamples();
   renderTokenStatus();
+  renderAmazonStatus();
 }
 
 async function saveSettings(e) {
@@ -1718,6 +1722,60 @@ async function testToken() {
     renderTokenStatus(`Connected ✓ PriceCharting returned ${results.length} results for “super mario”.`);
   } catch (err) {
     renderTokenStatus(`Connection failed: ${err.message}`);
+  }
+}
+
+function renderAmazonStatus(extra = '') {
+  $('#amzSandbox').checked = amazonSandbox;
+  $('#amzStatus').textContent = extra || (amazonSet
+    ? `Amazon keys are saved${amazonSandbox ? ' (sandbox app: sample data only)' : ''}. Paste new ones to replace them.`
+    : 'No Amazon keys saved. Floor Pricing leaves Amazon out until they are.');
+}
+
+async function saveAmazonKeys() {
+  const body = {
+    clientId: $('#amzClientId').value.trim(), clientSecret: $('#amzClientSecret').value.trim(),
+    refreshToken: $('#amzRefresh').value.trim(), sandbox: $('#amzSandbox').checked,
+  };
+  if (!amazonSet && !(body.clientId && body.clientSecret && body.refreshToken)) {
+    renderAmazonStatus('Fill in all three boxes the first time.');
+    return;
+  }
+  try {
+    const r = await api('amazon', { method: 'PUT', body });
+    amazonSet = !!r.amazonSet;
+    amazonSandbox = !!r.amazonSandbox;
+    ['#amzClientId', '#amzClientSecret', '#amzRefresh'].forEach((sel) => { $(sel).value = ''; });
+    floorAmazonCache.clear();
+    renderAmazonStatus(amazonSet ? 'Amazon keys saved ✓ Click “Test connection” to check them.' : 'Saved, but a key is still missing.');
+  } catch (err) {
+    toast(`Couldn't save the Amazon keys: ${err.message}`, 'error');
+  }
+}
+
+async function testAmazonKeys() {
+  if (!amazonSet) { renderAmazonStatus('Save the Amazon keys first.'); return; }
+  renderAmazonStatus('Testing…');
+  try {
+    const r = await api('amazon/test');
+    renderAmazonStatus(r.sandbox
+      ? 'Connected ✓ These are sandbox keys, so Amazon only answers with sample data. Swap in the production app’s keys for real prices.'
+      : 'Connected ✓ Amazon accepted the keys.');
+  } catch (err) {
+    renderAmazonStatus(`Connection failed: ${err.message}`);
+  }
+}
+
+async function clearAmazonKeys() {
+  if (!amazonSet || !confirm('Remove the Amazon keys? Floor Pricing will stop checking Amazon.')) return;
+  try {
+    await api('amazon', { method: 'PUT', body: { clear: true } });
+    amazonSet = false;
+    amazonSandbox = false;
+    floorAmazonCache.clear();
+    renderAmazonStatus('Amazon keys removed.');
+  } catch (err) {
+    toast(err.message, 'error');
   }
 }
 
@@ -2066,8 +2124,8 @@ function showBulk() {
 /* ================================================================== floor pricing */
 
 // Game Pricing Guide (the Google Sheet tab), made hands-free: the sales PriceCharting lists are eBay
-// sold listings, so they stand in for "eBay highest sold" at any price. Modern systems take the higher
-// of GameStop's pre-owned price and that sale (owner's choice).
+// sold listings, so they stand in for "eBay highest sold" at any price. Modern systems take the highest
+// of GameStop's pre-owned price, Amazon's lowest offer, and that sale (owner's choice).
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
@@ -2077,7 +2135,8 @@ const FLOOR_TIERS = [
       'playstation 3', 'xbox 360'],
   },
   {
-    id: 'modern', gamestop: true, rule: "Higher of GameStop's pre-owned price and the top recent eBay sales",
+    id: 'modern', gamestop: true, amazon: true,
+    rule: "Highest of GameStop's pre-owned price, Amazon's lowest offer, and the top recent eBay sales",
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
@@ -2144,6 +2203,10 @@ const saveFloorLocal = () => store.set('p2w-floor', floor);
 let floorCur = null;
 const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0 };
 const floorSalesCache = new Map(); // product id -> { loose, cib, new }
+const floorAmazonCache = new Map(); // "upc|used" or "upc|new" -> amazon/offers response
+// Amazon has no Loose/CIB split: Loose and CIB games compare with its Used offers.
+const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
+const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
 function showFloor() {
   $('#floorName').value = floor.name;
@@ -2213,13 +2276,41 @@ function pickFloorGame(product) {
   floorCur = { product, condition: 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
   renderFloorPricer();
   loadFloorSales(product);
-  if (floorTier(product['console-name']).gamestop && !('gamestop-price' in product) && tokenSet) {
+  const tier = floorTier(product['console-name']);
+  const needsFull = (tier.gamestop && !('gamestop-price' in product)) || (tier.amazon && amazonSet && !product.upc);
+  if (needsFull && tokenSet) {
     PC.byId(product.id).then((full) => {
       if (floorCur?.product !== product || !full) return;
       product['gamestop-price'] = full['gamestop-price'];
+      product.upc = product.upc || full.upc || '';
       renderFloorPricer();
+      loadFloorAmazon();
     }).catch(() => {});
+  } else {
+    loadFloorAmazon();
   }
+}
+
+// Amazon's offers for the game being priced (modern systems, or when staff click "Check Amazon").
+async function loadFloorAmazon(force = false) {
+  const cur = floorCur;
+  if (!cur || !amazonSet) return;
+  if (!force && !floorTier(cur.product['console-name']).amazon) return;
+  const upc = String(cur.product.upc || '').split(/[,\s]+/)[0];
+  const cond = amazonCond(cur.condition);
+  if (!/^\d{8,14}$/.test(upc)) { cur.amazon = { error: 'No barcode for this game on PriceCharting, so Amazon can’t be matched.' }; renderFloorPricer(); return; }
+  const key = `${upc}|${cond}`;
+  if (floorAmazonCache.has(key)) { cur.amazon = floorAmazonCache.get(key); renderFloorPricer(); return; }
+  cur.amazon = { loading: true };
+  renderFloorPricer();
+  try {
+    const d = await api('amazon/offers', { params: { upc, cond } });
+    floorAmazonCache.set(key, d);
+    if (floorCur === cur && amazonCond(cur.condition) === cond) cur.amazon = d;
+  } catch (err) {
+    if (floorCur === cur) cur.amazon = { error: err.message };
+  }
+  if (floorCur === cur) renderFloorPricer();
 }
 
 async function loadFloorSales(product) {
@@ -2275,8 +2366,13 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
-  if (gs != null && (!sale || gs >= sale.price)) return { basis: gs, from: 'gamestop', sale, checks };
-  if (sale) return { basis: sale.price, from: 'sale', sale, checks };
+  const amz = tier.amazon && cur.amazon?.found && cur.amazon.lowest > 0 ? cur.amazon.lowest : null;
+  const waiting = tier.amazon && cur.amazon?.loading; // don't let staff add it before Amazon answers
+  const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [amz, 'amazon']].filter(([v]) => v > 0);
+  if (options.length) {
+    const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
+    return { basis, from, sale, checks, waiting };
+  }
   if (!cur.sales && !cur.salesError) return { basis: null, sale, checks: [] }; // still loading
   return { basis: null, sale, checks: [], need: 'No sales to go by. Check the links and type a price.' };
 }
@@ -2328,7 +2424,7 @@ function renderFloorPricer() {
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
         ${tier.id !== 'retro' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
-        <a href="${esc(links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>` : ''}
+        <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>` : ''}
         ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
       </span>
     </div>
@@ -2336,6 +2432,7 @@ function renderFloorPricer() {
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         ${salesHtml}
+        ${floorAmazonHtml(cur, tier, b)}
       </div>
       <div class="floor-result">
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
@@ -2346,9 +2443,29 @@ function renderFloorPricer() {
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
-        <button type="button" class="btn primary" data-floor-act="add"${result ? '' : ' disabled'}>Add to list</button>
+        ${b.waiting ? '<p class="muted small-print"><span class="spinner"></span>Checking Amazon…</p>' : ''}
+        <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
       </div>
     </div>`;
+}
+
+// Amazon's offers for the game: shown for modern systems automatically, elsewhere on request.
+function floorAmazonHtml(cur, tier, b) {
+  if (!amazonSet) return '';
+  const a = cur.amazon;
+  const label = `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
+  if (!a) return tier.amazon ? '' : `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
+  if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
+  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
+  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">This game isn't on Amazon (no match for its barcode).</p>`;
+  const offers = a.offers || [];
+  const used = b.from === 'amazon';
+  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>`;
+  if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
+  const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
+  return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${used && i === 0 ? 'picked' : ''}">
+      <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === 0 ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="muted small-print">Prices include shipping.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {
@@ -2382,8 +2499,10 @@ function onFloorPricerClick(e) {
   if (!floorCur) return;
   const cond = e.target.closest('[data-floor-cond]')?.dataset.floorCond;
   if (cond) {
+    const amazonChanged = amazonCond(cond) !== amazonCond(floorCur.condition);
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
     if (cond !== 'cib') floorCur.manualMissing = false;
+    if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(true); }
     renderFloorPricer();
     return;
   }
@@ -2392,6 +2511,7 @@ function onFloorPricerClick(e) {
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; renderFloorPricer(); return; }
+  if (act === 'amazon') { loadFloorAmazon(true); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();
@@ -2420,7 +2540,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', amazon: 'Amazon', ebay: 'eBay', typed: 'Typed' };
 
 function renderFloorList() {
   const items = floor.items;
@@ -2733,6 +2853,9 @@ function wireEvents() {
   });
   $('#dedBody').addEventListener('click', (e) => { e.target.closest('[data-action="del-ded"]')?.closest('tr').remove(); });
   $('#tokenSave').addEventListener('click', saveToken);
+  $('#amzSave').addEventListener('click', saveAmazonKeys);
+  $('#amzTest').addEventListener('click', testAmazonKeys);
+  $('#amzClear').addEventListener('click', clearAmazonKeys);
   $('#tokenTest').addEventListener('click', testToken);
   $('#passwordSave').addEventListener('click', changePasswords);
   $('#authForm').addEventListener('submit', submitAuth);
@@ -2877,6 +3000,8 @@ function applyRole() {
 async function startApp(status) {
   auth.role = status.role;
   tokenSet = !!status.tokenSet;
+  amazonSet = !!status.amazonSet;
+  amazonSandbox = !!status.amazonSandbox;
   const [saved, hw] = await Promise.all([api('settings'), api('hardware')]);
   settings = mergeSettings(saved);
   // First run (or a list saved before per-condition prices existed): load the Game Buying Guide prices.
