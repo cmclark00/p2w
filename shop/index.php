@@ -114,7 +114,7 @@ function shop_product(array $idx, array $p): void {
   }));
   usort($more, function ($a, $b) { return $b['from'] <=> $a['from']; });
   $img = $p['img'] !== ''
-    ? '<img src="' . h($p['img']) . '" alt="' . h($p['name']) . '" width="480" height="670">'
+    ? '<img src="' . h(shop_img($p['img'], 'large')) . '" srcset="' . h(shop_img($p['img'], 'large')) . ' 1x, ' . h($p['img']) . ' 2x" alt="' . h($p['name']) . '" width="460" height="640">'
     : shop_placeholder($p);
   $meta = array_filter([$p['set'], $p['type']]);
   $body = '<section class="shop-section shop-product">
@@ -167,8 +167,9 @@ function shop_search_form(string $value, string $type = ''): string {
 
 function shop_card(array $p): string {
   $url = '/shop/product/' . $p['id'] . '-' . $p['slug'];
-  $img = $p['thumb'] !== '' || $p['img'] !== ''
-    ? '<img src="' . h($p['thumb'] ?: $p['img']) . '" alt="" loading="lazy" width="240" height="335">'
+  // Medium photo, large on high-density screens (CrystalCommerce's own thumb is only 46px wide).
+  $img = $p['img'] !== ''
+    ? '<img src="' . h(shop_img($p['img'], 'medium')) . '" srcset="' . h(shop_img($p['img'], 'medium')) . ' 1x, ' . h(shop_img($p['img'], 'large')) . ' 2x" alt="" loading="lazy" decoding="async" width="173" height="240">'
     : shop_placeholder($p);
   $stock = $p['qty'] === 1 ? 'Last one' : $p['qty'] . ' in stock';
   // "Standard" just means the listing has no condition set; it's left off the card.

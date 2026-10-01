@@ -223,6 +223,12 @@ function shop_condition_order(string $a, string $b): int {
   return [$rank($a), $a] <=> [$rank($b), $b];
 }
 
+// CrystalCommerce keeps each photo in several sizes beside the original:
+// thumb 46x64 (too small to use), medium 173x240, large 460x640, original ~736x1024.
+function shop_img(string $url, string $size): string {
+  return $size === '' ? $url : preg_replace('#(/photos/\d+/)(?:(?:thumb|medium|large)/)?([^/]+)$#', '${1}' . $size . '/${2}', $url);
+}
+
 function shop_money(?int $cents): string {
   return $cents === null ? '—' : '$' . number_format($cents / 100, 2);
 }
