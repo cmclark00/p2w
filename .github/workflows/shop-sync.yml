@@ -1,0 +1,34 @@
+name: Shop inventory sync
+
+# Keeps /shop current: asks the live site to re-read Play2Win's CrystalCommerce inventory.
+# The work happens in shop/sync.php on the server (data stays outside the website folder);
+# this job only calls it. Each call fills in up to ~40 seconds of product details, so a run
+# repeats the call until nothing is missing (the first-ever run takes a few minutes).
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may start scheduled runs a few minutes late)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: shop-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run the shop sync until product details are complete
+        run: |
+          for i in $(seq 1 25); do
+            out=$(curl -sS --max-time 120 https://play2wingames.com/shop/sync.php || echo '{"status":"error","error":"request failed"}')
+            echo "$out"
+            status=$(echo "$out" | jq -r '.status // "error"')
+            missing=$(echo "$out" | jq -r '.missing // 1')
+            if [ "$status" = "ok" ] && [ "$missing" = "0" ]; then exit 0; fi
+            if [ "$status" = "error" ] && [ "$i" -ge 3 ]; then exit 1; fi
+            sleep 5
+          done

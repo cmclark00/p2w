@@ -63,6 +63,7 @@ jobs:
             --exclude='scripts' \
             --exclude='_site' \
             --exclude='.gitignore' \
+            --exclude='.env*' \
             --exclude='*.md' \
             --exclude='team-guide-print.html' \
             --exclude='WEBSITE-AGREEMENT.md' \

@@ -9,3 +9,8 @@ website-agreement-print.html
 # Python bytecode cache (from running .github/scripts/*.py locally)
 __pycache__/
 *.pyc
+
+# Secrets: real .env files never go in the repo (.env.example is placeholders only)
+.env
+.env.*
+!.env.example

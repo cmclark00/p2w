@@ -201,6 +201,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
 | `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + required Masters/Open screenshot + optional Junior/Senior screenshots (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
 | `trade-in/` | **Hidden staff trade-in calculator** (`index.html` + `app.js` + `styles.css` + PHP back end `api.php`). Scan/search games (PriceCharting API) and consoles/controllers (Game Buying Guide prices) → cash + store credit per line, plus a **Floor Pricing** tab for shelf prices. Staff/manager logins. `noindex` (meta + `X-Robots-Tag` in `trade-in/.htaccess`), not in nav, not in sitemap. See **Trade-in calculator** below. |
+| `shop/` | **Native storefront (PREVIEW)** for the CrystalCommerce inventory: `/shop`, `/shop/search`, `/shop/category/<type>`, `/shop/product/<id>-<slug>`, routed by the root `.htaccess` to `shop/index.php`. `noindex` and out of the nav until the owners approve (`SHOP_PREVIEW` in `index.php`). See **Shop (CrystalCommerce)** below. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -761,6 +762,65 @@ The site's **only server-side code**. Everything else is static.
     credit 105%, v4 → v5 moved game cash from 73.5% to 70%; each only when
     a manager hadn't set custom numbers). Bump `version` and add a migration line when a
     default policy changes, or live saved settings keep the old number.
+
+## Shop (CrystalCommerce) — `shop/`, PREVIEW
+
+Native browsing on play2wingames.com for the CrystalCommerce inventory;
+**CrystalCommerce stays the source of truth and handles cart/checkout.**
+
+- **Data source today: CrystalCommerce's Core2 API**
+  (`https://core2-api.crystalcommerce.com`). Play2Win is marketplace
+  **#1584 "Playtowingames", organization #2020**. `GET
+  /api/listings?organization_id=2020&per_page=500&page=N` (listings come
+  grouped by store location) and `GET /api/v2/products/{id}` answer
+  **without a login**, although the published docs mark Core2 as JWT —
+  **verified Oct 2026 against the live storefront** (Jellicent ex: Core2
+  `ally_agreement_price` 313 / quantity 9 = storefront $3.13 / 9). If
+  CrystalCommerce locks that down, switch the sync to the documented
+  classic **Admin API** (`https://playtowingames-admin.crystalcommerce.com/api/v1`,
+  headers `X-API-PROXY-SECRET` / `X-API-USERNAME` / `X-API-SCOPES:
+  admin:read-inventory`; categories → variants/products per category,
+  `activity_logs` for changes). Docs: crystal-service.readme.io
+  (`/llms.txt` lists every page). **Neither API has search by name**, so
+  the shop searches its own index.
+- **`shop/sync.php`** (public URL; only reads public data, one run at a
+  time via `sync.lock`, listings re-read at most every 10 min) writes the
+  private index to `<home>/p2w-shop-data/` (outside the docroot, like the
+  trade-in data; override with `P2W_SHOP_DATA`): `listings.json` (in-stock
+  only: quantity − reserved > 0, priced, org 2020), `products.json`
+  (photo, set, product-type slug per product — Core2 has **no batch
+  product endpoint**, so details are fetched 6 at a time on a time budget
+  and cached forever), `index.json` (what pages read), `state.json`.
+  `.github/workflows/shop-sync.yml` calls it every 15 min and repeats
+  until `missing` is 0. Can also run from cPanel cron: `php
+  public_html/shop/sync.php`.
+- **`shop/index.php`** renders every page server-side (Google can read
+  it; works without JS) with the site's header/footer copied in and
+  **`<base href="/">`** so the shared relative links (`assets/…`,
+  `about.html`, konami.js) work on `/shop/...` paths — so shop links must
+  be root-relative (`/shop/...`) and the skip link uses the full path.
+  Search, filters (game & type, set, condition, price), sorting and
+  pagination are `shop_query()` in `shop/lib.php`. Game/type comes from
+  Core2's product type ("Pokemon Singles" → game Pokemon, kind Singles).
+- **Buying:** each product's **Buy on our online store** opens the
+  CrystalCommerce storefront search for that exact product name
+  (`shop_buy_url()`), where it's listed with its add-to-cart button.
+  Core2 ids don't match the storefront's own product/variant ids (Core2
+  product 8044547 = storefront product 627069 / variant 7931543), so a
+  cart on our site with one-click handoff needs the **classic Admin API**
+  (variant ids) **plus a custom CrystalCommerce storefront page** that
+  adds items via the storefront's own `/api/v1/cart/line_items` (it needs
+  the CC session + CSRF token, so only a page on the CC domain can call
+  it). Core2's own carts/checkout need CrystalCommerce-issued app
+  credentials and an online payment gateway on the Core2 org (it has
+  none: `has_online_payment_gateway: false`).
+- **Secrets:** none needed today. `.env.example` lists the settings;
+  real values go in `<home>/p2w-shop-data/.env` (never in the repo —
+  `.env*` is git-ignored and excluded from the deploy).
+- **Go-live checklist:** set `SHOP_PREVIEW = false`; point the nav's
+  "TCG Inventory" button (`nav-cta`, every page) and the other
+  CrystalCommerce links at `/shop`; add `/shop` to `sitemap.xml`; update
+  TEAM-GUIDE.md.
 
 ## Konami easter egg (BULKY-TRIS)
 

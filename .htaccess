@@ -17,6 +17,11 @@ RewriteRule ^(.*)$ https://play2wingames.com/$1 [R=301,L]
 RewriteRule ^mods\.html$ /upgrades.html [R=301,L]
 RewriteRule ^showcase\.html$ /sell-trade.html#showcase [NE,R=301,L]
 
+# Shop: /shop, /shop/search, /shop/category/<type>, /shop/product/<id>-<slug> all go to the
+# shop's PHP router. Real files (shop/shop.css, shop/sync.php, ...) are served as they are.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^shop(?:/.*)?$ /shop/index.php [L,QSA]
+
 # Serve the branded error page for unknown URLs.
 ErrorDocument 404 /404.html
 
@@ -40,7 +45,7 @@ ErrorDocument 404 /404.html
   # Fonts (404 only), and on-demand Tesseract workers. Report-only protects the
   # rollout from breaking those integrations while exposing unexpected loads
   # in browser developer tools.
-  Header always set Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https://formspree.io; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://formspree.io https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; frame-src https://maps.google.com https://www.google.com; worker-src 'self' blob: https://cdn.jsdelivr.net; child-src blob:; manifest-src 'self'"
+  Header always set Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https://formspree.io; img-src 'self' data: blob: https://crystalcommerce-assets.cdn.crystalcommerce.com; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://formspree.io https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; frame-src https://maps.google.com https://www.google.com; worker-src 'self' blob: https://cdn.jsdelivr.net; child-src blob:; manifest-src 'self'"
 
   <FilesMatch "\.(?:html|css|js|json)$">
     Header set Cache-Control "no-cache"
