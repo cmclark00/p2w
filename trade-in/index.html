@@ -18,6 +18,7 @@
     <nav class="tabs" aria-label="Sections" hidden>
       <button type="button" data-view="trade" class="active">Trade-In</button>
       <button type="button" data-view="bulk">TCG Bulk</button>
+      <button type="button" data-view="floor">Floor Pricing</button>
       <button type="button" data-view="log">Trade Log</button>
       <button type="button" data-view="hardware">Hardware Prices</button>
       <button type="button" data-view="settings">Settings</button>
@@ -129,6 +130,73 @@
           <span id="bulkCount" class="muted"></span>
         </div>
         <button id="bulkAdd" type="button" class="btn primary" disabled>Add to trade</button>
+      </div>
+    </section>
+
+    <!-- ============================================================ FLOOR PRICING -->
+    <!-- Shelf prices for games, by the Game Pricing Guide. Sessions are saved on the server (website only). -->
+    <section id="view-floor" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <h1>Floor pricing</h1>
+          <p class="muted">Price games for the shelf with the Game Pricing Guide. Scan or search a game, check the suggested price, and add it to the list. Save the list as a named session to come back to it.</p>
+        </div>
+      </div>
+
+      <div class="panel floor-session">
+        <div class="floor-session-fields">
+          <label>Session name
+            <input id="floorName" type="text" autocomplete="off" placeholder="e.g. PS2 wall, Oct 1">
+          </label>
+          <label>Your name
+            <input id="floorStaff" type="text" autocomplete="off" placeholder="Optional">
+          </label>
+          <label>Saved sessions
+            <select id="floorOpen"><option value="">Open a saved session…</option></select>
+          </label>
+        </div>
+        <div class="toolbar">
+          <button id="floorSave" type="button" class="btn primary">Save session</button>
+          <button id="floorNew" type="button" class="btn">New session</button>
+          <button id="floorDelete" type="button" class="btn danger" hidden>Delete session</button>
+          <span id="floorStatus" class="status"></span>
+        </div>
+      </div>
+
+      <div class="scan floor-scan">
+        <label for="floorScan" class="eyebrow">Scan a barcode or search</label>
+        <div class="scan-row">
+          <input id="floorScan" type="text" autocomplete="off" spellcheck="false" placeholder="Scan a UPC, or type a game name and press Enter">
+          <button id="floorSearchBtn" type="button" class="btn primary">Search</button>
+        </div>
+        <div id="floorResults" class="results" hidden></div>
+      </div>
+
+      <div id="floorPricer" class="panel floor-pricer" hidden></div>
+
+      <div class="table-wrap">
+        <table class="lines floor-list">
+          <thead>
+            <tr>
+              <th>Game</th>
+              <th>System</th>
+              <th>Condition</th>
+              <th>Based on</th>
+              <th class="num">Shelf price</th>
+              <th><span class="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody id="floorBody"></tbody>
+        </table>
+        <div id="floorEmpty" class="empty">
+          <p><strong>No games priced yet.</strong></p>
+          <p>Scan or search a game above to price it.</p>
+        </div>
+      </div>
+      <div class="row-end floor-foot">
+        <span id="floorCount" class="muted"></span>
+        <button id="floorCopy" type="button" class="btn">Copy list</button>
+        <button id="floorPrint" type="button" class="btn">Print list</button>
       </div>
     </section>
 

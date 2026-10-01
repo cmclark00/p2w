@@ -2063,7 +2063,534 @@ function showBulk() {
   else renderBulk();
 }
 
-const VIEWS = ['trade', 'bulk', 'log', 'hardware', 'settings'];
+/* ================================================================== floor pricing */
+
+// Game Pricing Guide (the Google Sheet tab): where a game's shelf price comes from, by system.
+// cutoff (cents): PriceCharting's highest recent sale sets the price below it, eBay's highest sold
+// at or above it. 0 = always eBay; null = no PriceCharting rule (staff pick the number).
+// Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
+const FLOOR_TIERS = [
+  {
+    id: 'retro', cutoff: 3000, rule: 'PriceCharting highest sale under $30 · eBay highest sold & completed over $30',
+    systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
+      'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast'],
+  },
+  { id: 'gamecube', cutoff: 1500, rule: 'PriceCharting highest sale under $15 · eBay highest sold & completed over $15', systems: ['gamecube'] },
+  {
+    id: 'ps3-360', cutoff: 0, rule: 'PS3 / 360 are weird right now: check every real game on eBay (highest sold & completed)',
+    systems: ['playstation 3', 'xbox 360'],
+  },
+  {
+    id: 'modern', cutoff: null,
+    rule: 'PriceCharting matters little. Check GameStop (if in stock) and Amazon (ignore renewed), then pick a happy high-ish number',
+    systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
+  },
+];
+const FLOOR_OTHER = { id: 'other', cutoff: null, rule: "Not in the Game Pricing Guide: use the sales and links below and pick a price" };
+const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
+const FLOOR_MIN_SHITBOX = 500;
+const FLOOR_STEP = 500; // suggested prices round up to the next $5
+// Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
+const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|disc only|cart only|game only|choose|pick)\b/i;
+const SEALED_RE = /\b(sealed|brand new|new in box|nib)\b/i;
+
+function floorTier(platform) {
+  const p = norm(platform).replace(/^(pal|jp) /, '');
+  return FLOOR_TIERS.find((t) => t.systems.includes(p)) || FLOOR_OTHER;
+}
+
+// Missing manual on a CIB game: by its normal CIB shelf price.
+function manualDeduction(price) {
+  if (price <= 2000) return 0;
+  if (price <= 5000) return 500;
+  if (price <= 10000) return 1000;
+  if (price <= 20000) return 2000;
+  return Math.round((price * 0.1) / 500) * 500; // $205+: 10%, to the nearest $5
+}
+
+// Basis (cents) -> shelf price: round up to the next $5, the $10 floor ($5 for shitbox games),
+// then the missing-manual deduction.
+function floorPrice(basis, { shitbox, manualMissing }) {
+  if (basis == null) return null;
+  const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
+  const full = Math.max(min, Math.ceil(basis / FLOOR_STEP) * FLOOR_STEP);
+  const ded = manualMissing ? manualDeduction(full) : 0;
+  return { full, ded, price: full - ded, min };
+}
+
+const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
+
+// Search links for the cases the guide sends to eBay, GameStop, or Amazon.
+function floorLinks(p, condition) {
+  const name = baseTitle(p['product-name']) || p['product-name'];
+  const sys = p['console-name'] || '';
+  const extra = { cib: ' complete', new: ' sealed', loose: '' }[condition];
+  const q = (s) => encodeURIComponent(s.replace(/\s+/g, ' ').trim());
+  return {
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${extra}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`,
+    gamestop: `https://www.gamestop.com/search/?q=${q(name)}`,
+    amazon: `https://www.amazon.com/s?k=${q(`${name} ${sys}`)}`,
+    pc: /^\d+$/.test(String(p.id)) ? pcUrl(p.id) : '',
+  };
+}
+
+// The list being priced. Kept in this browser so a refresh doesn't lose it; saved to the server by name.
+const floor = Object.assign({ id: null, name: '', staff: '', items: [], dirty: false, savedAt: null }, store.get('p2w-floor', {}));
+const saveFloorLocal = () => store.set('p2w-floor', floor);
+// The game being priced right now: { product, condition, manualMissing, sales, salesError, pick, typed }.
+let floorCur = null;
+const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0 };
+const floorSalesCache = new Map(); // product id -> { loose, cib, new }
+
+function showFloor() {
+  $('#floorName').value = floor.name;
+  $('#floorStaff').value = floor.staff;
+  renderFloorList();
+  renderFloorPricer();
+  loadFloorSessions();
+  $('#floorScan').focus();
+}
+
+/* ---------------------------------------------------------------- search */
+
+function closeFloorResults() {
+  floorSearch.seq += 1;
+  Object.assign(floorSearch, { results: null, loading: false, error: null });
+  renderFloorResults();
+}
+
+async function runFloorSearch(q) {
+  const seq = ++floorSearch.seq;
+  Object.assign(floorSearch, { q, results: null, loading: true, error: null });
+  renderFloorResults();
+  try {
+    const results = await PC.search(q);
+    if (seq !== floorSearch.seq) return;
+    floorSearch.results = results;
+  } catch (err) {
+    if (seq !== floorSearch.seq) return;
+    floorSearch.error = err.message;
+  }
+  floorSearch.loading = false;
+  renderFloorResults();
+}
+
+async function floorScanUpc(upc) {
+  closeFloorResults();
+  try {
+    pickFloorGame(await PC.byUpc(upc));
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function renderFloorResults() {
+  const el = $('#floorResults');
+  let html = '';
+  if (floorSearch.loading) html = '<div class="results-note"><span class="spinner"></span>Searching PriceCharting…</div>';
+  else if (floorSearch.error) html = `<div class="results-note error">${esc(floorSearch.error)}</div>`;
+  else if (floorSearch.results) {
+    html = '<div class="results-group">PriceCharting <span>click a game to price it</span></div>';
+    if (!floorSearch.results.length) html += '<div class="results-note">No matches. Try fewer words.</div>';
+    floorSearch.results.forEach((p, i) => {
+      html += `<div class="result" data-i="${i}"><div class="r-main"><div class="r-name">${esc(p['product-name'])}</div>
+        <div class="sub">${esc(p['console-name'])}</div></div>
+        <div class="r-offer muted">CIB ${money(Number(p['cib-price']) || null)}</div></div>`;
+    });
+  }
+  el.innerHTML = html;
+  el.hidden = !html;
+}
+
+/* ---------------------------------------------------------------- pricing one game */
+
+function pickFloorGame(product) {
+  $('#floorScan').value = '';
+  closeFloorResults();
+  floorCur = { product, condition: 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
+  renderFloorPricer();
+  loadFloorSales(product);
+}
+
+async function loadFloorSales(product) {
+  const id = String(product.id);
+  if (!/^\d+$/.test(id)) { // demo products have no PriceCharting page
+    floorCur.salesError = 'Demo mode: no recent sales until a PriceCharting token is added.';
+    renderFloorPricer();
+    return;
+  }
+  if (floorSalesCache.has(id)) {
+    floorCur.sales = floorSalesCache.get(id);
+    renderFloorPricer();
+    return;
+  }
+  try {
+    const d = await api('pc/sales', { params: { id } });
+    const sales = d?.sales || {};
+    if (!['loose', 'cib', 'new'].some((c) => sales[c]?.length)) throw new Error('PriceCharting shows no recent sales for this game.');
+    floorSalesCache.set(id, sales);
+    if (floorCur?.product === product) floorCur.sales = sales;
+  } catch (err) {
+    if (floorCur?.product === product) floorCur.salesError = err.message;
+  }
+  if (floorCur?.product === product) renderFloorPricer();
+}
+
+// The condition's sales, highest first, each with its index into that list.
+function floorSales(cur = floorCur) {
+  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition) }))
+    .sort((a, b) => b.price - a.price);
+}
+
+// What sets the price: { basis (cents) | null, from: 'sale'|'ebay'|'typed', sale, need, ask }.
+// need = what staff have to do when the tool can't suggest a number; ask = the label for the number they type.
+function floorBasis(cur = floorCur) {
+  const tier = floorTier(cur.product['console-name']);
+  const sales = floorSales(cur);
+  const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : sales.find((s) => !s.odd);
+  const ebay = 'eBay highest sold';
+  let r;
+  if (tier.cutoff == null) r = { basis: null, sale, need: 'Type the price you picked.', ask: 'Your price' };
+  else if (!sale) r = { basis: null, sale, need: 'No PriceCharting sale to go by. Check eBay and type its highest sold price.', ask: ebay };
+  else if (tier.cutoff === 0 || sale.price >= tier.cutoff) {
+    const over = tier.cutoff ? `Highest PriceCharting sale is ${money(sale.price)}, ${money(tier.cutoff)} or more. ` : '';
+    r = { basis: null, sale, need: `${over}Check eBay and type its highest sold price.`, ask: ebay };
+  } else r = { basis: sale.price, from: 'sale', sale };
+  if (cur.typed == null) return r;
+  return { ...r, basis: cur.typed, from: r.ask === ebay ? 'ebay' : 'typed', need: null, ask: r.ask || 'Your price' };
+}
+
+function renderFloorPricer() {
+  const el = $('#floorPricer');
+  el.hidden = !floorCur;
+  if (!floorCur) { el.innerHTML = ''; return; }
+  const cur = floorCur;
+  const p = cur.product;
+  const tier = floorTier(p['console-name']);
+  const shitbox = autoShitboxReason({ name: p['product-name'], genre: p.genre });
+  const links = floorLinks(p, cur.condition);
+  const b = floorBasis(cur);
+  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing });
+  const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
+  const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop ${money(Number(p['gamestop-price']))}` : '';
+
+  const condBtns = Object.entries(GAME_CONDITIONS).map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
+  const sales = floorSales(cur);
+  let salesHtml;
+  if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
+  else if (cur.salesError) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
+  else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
+  else {
+    const shown = cur.showAll ? sales : sales.slice(0, 8);
+    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
+        <td class="num">${money(s.price)}</td>
+        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">check listing</span>' : ''}</td>
+        <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
+      ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
+      <p class="muted small-print">Click a sale to use it instead (skip lots, sealed copies, and other odd listings).</p>`;
+  }
+
+  const showTyped = !!b.ask;
+  el.innerHTML = `
+    <div class="floor-head">
+      <div>
+        <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
+        <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
+        <div class="floor-rule">${esc(tier.rule)}</div>
+        ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
+      </div>
+      <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="floor-controls">
+      <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
+      ${cur.condition === 'cib' ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
+      <span class="floor-links">
+        <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
+        ${tier.id === 'modern' || tier.id === 'other' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
+        <a href="${esc(links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>` : ''}
+        ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
+      </span>
+    </div>
+    <div class="floor-body">
+      <div class="floor-sales-wrap">
+        <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting</div>
+        ${salesHtml}
+      </div>
+      <div class="floor-result">
+        ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
+        <label${showTyped ? '' : ' hidden'}>${esc(b.ask || 'Your price')}
+          <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
+        </label>
+        ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : ''}
+        ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
+        <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
+        <button type="button" class="btn primary" data-floor-act="add"${result ? '' : ' disabled'}>Add to list</button>
+      </div>
+    </div>`;
+}
+
+function floorMath(b, r) {
+  const from = { sale: 'PriceCharting sale', ebay: 'eBay', typed: 'Typed' }[b.from];
+  const parts = [`${from} ${money(b.basis)}`];
+  if (r.full !== b.basis) parts.push(r.full === r.min && b.basis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
+  if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
+  return parts.join(' → ');
+}
+
+function addFloorItem() {
+  const cur = floorCur;
+  const p = cur.product;
+  const b = floorBasis(cur);
+  const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing });
+  if (!r) return;
+  floor.items.unshift({
+    id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
+    manualMissing: cur.condition === 'cib' && cur.manualMissing, basis: b.basis, from: b.from,
+    saleDate: b.from === 'sale' ? b.sale?.date || '' : '', price: r.price, edited: false,
+  });
+  floor.dirty = true;
+  saveFloorLocal();
+  floorCur = null;
+  renderFloorPricer();
+  renderFloorList();
+  $('#floorScan').focus();
+}
+
+function onFloorPricerClick(e) {
+  if (!floorCur) return;
+  const cond = e.target.closest('[data-floor-cond]')?.dataset.floorCond;
+  if (cond) {
+    Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
+    if (cond !== 'cib') floorCur.manualMissing = false;
+    renderFloorPricer();
+    return;
+  }
+  const act = e.target.closest('[data-floor-act]')?.dataset.floorAct;
+  if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
+  if (act === 'add') { addFloorItem(); return; }
+  if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
+  if (act === 'type') {
+    floorCur.typed = floorBasis().basis;
+    renderFloorPricer();
+    $('#floorPricer [data-floor-field="typed"]')?.select();
+    return;
+  }
+  const row = e.target.closest('tr[data-sale]');
+  if (row && !e.target.closest('a')) {
+    floorCur.pick = Number(row.dataset.sale);
+    floorCur.typed = null;
+    renderFloorPricer();
+  }
+}
+
+function onFloorPricerChange(e) {
+  if (!floorCur) return;
+  const field = e.target.dataset.floorField;
+  if (field === 'manual') floorCur.manualMissing = e.target.checked;
+  if (field === 'typed') {
+    const cents = parseMoney(e.target.value);
+    if (Number.isNaN(cents)) { toast('Enter a price like 24.99', 'error'); return; }
+    floorCur.typed = cents;
+  }
+  renderFloorPricer();
+}
+
+/* ---------------------------------------------------------------- the list */
+
+const FROM_LABELS = { sale: 'PriceCharting sale', ebay: 'eBay', typed: 'Typed' };
+
+function renderFloorList() {
+  const items = floor.items;
+  $('#floorBody').innerHTML = items.map((it) => `<tr data-id="${esc(it.id)}">
+      <td class="item"><div class="item-name">${pcLink(it.pcId, it.name)}</div></td>
+      <td>${esc(it.platform)}</td>
+      <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td>
+      <td class="muted">${it.basis != null ? `${esc(FROM_LABELS[it.from] || '')} ${money(it.basis)}` : '—'}${it.saleDate ? `<div class="sub">${esc(it.saleDate)}</div>` : ''}</td>
+      <td class="num"><span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-price value="${esc(plain(it.price))}"${it.edited ? ' class="overridden" title="Edited by hand"' : ''} aria-label="Shelf price"></span></td>
+      <td><button type="button" class="icon-btn" data-floor-remove title="Remove" aria-label="Remove">×</button></td>
+    </tr>`).join('');
+  $('#floorEmpty').hidden = items.length > 0;
+  const total = items.reduce((sum, it) => sum + (it.price || 0), 0);
+  $('#floorCount').textContent = items.length ? `${items.length} game${items.length === 1 ? '' : 's'} · ${money(total)} on the shelf` : '';
+  renderFloorStatus();
+}
+
+function renderFloorStatus(msg) {
+  const el = $('#floorStatus');
+  if (msg) { el.textContent = msg; return; }
+  if (floor.dirty) el.textContent = floor.id ? 'Unsaved changes' : (floor.items.length ? 'Not saved yet' : '');
+  else el.textContent = floor.savedAt ? `Saved ${fmtTime(floor.savedAt)}` : '';
+  $('#floorDelete').hidden = !floor.id;
+}
+
+function onFloorListChange(e) {
+  const tr = e.target.closest('tr[data-id]');
+  const it = tr && floor.items.find((x) => x.id === tr.dataset.id);
+  if (!it || !e.target.matches('[data-floor-price]')) return;
+  const cents = parseMoney(e.target.value);
+  if (Number.isNaN(cents) || cents == null) { toast('Enter a price like 20', 'error'); e.target.value = plain(it.price); return; }
+  if (cents !== it.price) Object.assign(it, { price: cents, edited: true });
+  floor.dirty = true;
+  saveFloorLocal();
+  renderFloorList();
+}
+
+function onFloorListClick(e) {
+  if (!e.target.closest('[data-floor-remove]')) return;
+  const id = e.target.closest('tr[data-id]').dataset.id;
+  floor.items = floor.items.filter((x) => x.id !== id);
+  floor.dirty = true;
+  saveFloorLocal();
+  renderFloorList();
+}
+
+function floorListText() {
+  const rows = floor.items.map((it) => [it.name, it.platform, `${GAME_CONDITIONS[it.condition] || it.condition}${it.manualMissing ? ' (no manual)' : ''}`, plain(it.price)]);
+  return [['Game', 'System', 'Condition', 'Price'], ...rows].map((r) => r.join('\t')).join('\n');
+}
+
+async function copyFloorList() {
+  if (!floor.items.length) { toast('Nothing to copy yet.'); return; }
+  try {
+    await navigator.clipboard.writeText(floorListText());
+    toast('Copied. Paste it into a spreadsheet.');
+  } catch {
+    toast("Couldn't copy here. Use Print list instead.", 'error');
+  }
+}
+
+function printFloorList() {
+  if (!floor.items.length) { toast('Nothing to print yet.'); return; }
+  const rows = floor.items.map((it) => `<tr><td>${esc(it.name)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td><td>${esc(it.platform)}</td>
+    <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}</td><td class="num">${money(it.price)}</td></tr>`).join('');
+  const meta = ['Floor pricing', floor.name, floor.staff, fmtTime(new Date().toISOString())].filter(Boolean);
+  $('#printArea').innerHTML = `<h1>${esc(settings.shopName)}</h1><p class="print-meta">${meta.map(esc).join(' · ')}</p>
+    <table><thead><tr><th>Game</th><th>System</th><th>Condition</th><th class="num">Price</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3">${floor.items.length} games</td><td class="num">${money(floor.items.reduce((s, it) => s + it.price, 0))}</td></tr></tfoot></table>`;
+  window.print();
+}
+
+/* ---------------------------------------------------------------- saved sessions */
+
+async function loadFloorSessions() {
+  const sel = $('#floorOpen');
+  try {
+    const list = (await api('floor-sessions')) || [];
+    sel.innerHTML = `<option value="">${list.length ? 'Open a saved session…' : 'No saved sessions yet'}</option>${list.map((s) => `<option value="${esc(s.id)}"${s.id === floor.id ? ' selected' : ''}>${esc(s.name)} · ${s.count} game${s.count === 1 ? '' : 's'} · ${esc(fmtTime(s.updated))}${s.staff ? ` · ${esc(s.staff)}` : ''}</option>`).join('')}`;
+    sel.disabled = false;
+  } catch (err) {
+    sel.innerHTML = '<option value="">Saved sessions unavailable</option>';
+    sel.disabled = true;
+    sel.title = err.message;
+  }
+}
+
+async function saveFloorSession() {
+  floor.name = $('#floorName').value.trim();
+  floor.staff = $('#floorStaff').value.trim();
+  if (!floor.name) { toast('Name the session first.', 'error'); $('#floorName').focus(); return; }
+  if (!floor.items.length) { toast('Price some games first.'); return; }
+  renderFloorStatus('Saving…');
+  try {
+    const r = await api('floor-sessions', { method: 'PUT', body: { id: floor.id, name: floor.name, staff: floor.staff, items: floor.items } });
+    Object.assign(floor, { id: r.id, savedAt: r.updated, dirty: false });
+    saveFloorLocal();
+    renderFloorStatus();
+    toast('Session saved.');
+    loadFloorSessions();
+  } catch (err) {
+    renderFloorStatus();
+    toast(`Couldn't save: ${err.message}`, 'error');
+  }
+}
+
+const floorUnsavedOk = () => !floor.dirty || !floor.items.length || confirm('This list has unsaved changes. Continue without saving them?');
+
+async function openFloorSession(id) {
+  if (!id) return;
+  if (!floorUnsavedOk()) { $('#floorOpen').value = floor.id || ''; return; }
+  try {
+    const s = await api('floor-sessions', { params: { id } });
+    Object.assign(floor, { id: s.id, name: s.name, staff: s.staff || '', items: s.items || [], dirty: false, savedAt: s.updated });
+    saveFloorLocal();
+    floorCur = null;
+    showFloor();
+  } catch (err) {
+    toast(err.message, 'error');
+    loadFloorSessions();
+  }
+}
+
+function newFloorSession() {
+  if (!floorUnsavedOk()) return;
+  Object.assign(floor, { id: null, name: '', staff: '', items: [], dirty: false, savedAt: null });
+  saveFloorLocal();
+  floorCur = null;
+  showFloor();
+  $('#floorName').focus();
+}
+
+async function deleteFloorSession() {
+  if (!floor.id || !confirm(`Delete the saved session "${floor.name}"? This can't be undone.`)) return;
+  try {
+    await api('floor-sessions', { method: 'DELETE', body: {}, params: { id: floor.id } });
+    Object.assign(floor, { id: null, dirty: floor.items.length > 0, savedAt: null });
+    saveFloorLocal();
+    toast('Session deleted. The list is still here until you start a new one.');
+    renderFloorStatus();
+    loadFloorSessions();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function wireFloor() {
+  const scan = $('#floorScan');
+  const go = () => {
+    const q = scan.value.trim();
+    if (!q) return;
+    if (/^\d{8,14}$/.test(q)) { scan.value = ''; floorScanUpc(q); return; }
+    // Enter again on the same search picks the top result (handy right after a search).
+    if (floorSearch.results?.length && floorSearch.q === q) { pickFloorGame(floorSearch.results[0]); return; }
+    runFloorSearch(q);
+  };
+  scan.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); go(); }
+    if (e.key === 'Escape') { scan.value = ''; closeFloorResults(); }
+  });
+  scan.addEventListener('input', () => { if (floorSearch.results || floorSearch.error) closeFloorResults(); });
+  $('#floorSearchBtn').addEventListener('click', () => { go(); scan.focus(); });
+  $('#floorResults').addEventListener('click', (e) => {
+    const r = e.target.closest('.result');
+    if (r) pickFloorGame(floorSearch.results[Number(r.dataset.i)]);
+  });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.floor-scan') && !$('#floorResults').hidden) closeFloorResults(); });
+
+  const pricer = $('#floorPricer');
+  pricer.addEventListener('click', onFloorPricerClick);
+  pricer.addEventListener('change', onFloorPricerChange);
+  pricer.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('[data-floor-field="typed"]')) {
+      e.preventDefault();
+      e.target.dispatchEvent(new Event('change', { bubbles: true }));
+      if (floorBasis().basis != null) addFloorItem();
+    }
+  });
+
+  $('#floorBody').addEventListener('change', onFloorListChange);
+  $('#floorBody').addEventListener('click', onFloorListClick);
+  $('#floorBody').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
+  $('#floorName').addEventListener('input', (e) => { floor.name = e.target.value; floor.dirty = true; saveFloorLocal(); renderFloorStatus(); });
+  $('#floorStaff').addEventListener('input', (e) => { floor.staff = e.target.value; saveFloorLocal(); });
+  $('#floorSave').addEventListener('click', saveFloorSession);
+  $('#floorNew').addEventListener('click', newFloorSession);
+  $('#floorDelete').addEventListener('click', deleteFloorSession);
+  $('#floorOpen').addEventListener('change', (e) => openFloorSession(e.target.value));
+  $('#floorCopy').addEventListener('click', copyFloorList);
+  $('#floorPrint').addEventListener('click', printFloorList);
+}
+
+const VIEWS = ['trade', 'bulk', 'floor', 'log', 'hardware', 'settings'];
 
 function showView(name) {
   currentView = name;
@@ -2074,10 +2601,12 @@ function showView(name) {
   if (name === 'hardware') renderHardware();
   if (name === 'settings') fillSettingsForm();
   if (name === 'bulk') showBulk();
+  if (name === 'floor') showFloor();
   if (name === 'trade') { renderLines(); focusScan(); }
 }
 
 function wireEvents() {
+  wireFloor();
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
   $$('[data-goto]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.goto)));
 

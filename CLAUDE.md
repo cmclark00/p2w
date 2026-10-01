@@ -200,7 +200,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `showcase.html` | Redirect → `sell-trade.html#showcase` (kept for old links). |
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
 | `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + required Masters/Open screenshot + optional Junior/Senior screenshots (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
-| `trade-in/` | **Hidden staff trade-in calculator** (`index.html` + `app.js` + `styles.css` + PHP back end `api.php`). Scan/search games (PriceCharting API) and consoles/controllers (Game Buying Guide prices) → cash + store credit per line. Staff/manager logins. `noindex` (meta + `X-Robots-Tag` in `trade-in/.htaccess`), not in nav, not in sitemap. See **Trade-in calculator** below. |
+| `trade-in/` | **Hidden staff trade-in calculator** (`index.html` + `app.js` + `styles.css` + PHP back end `api.php`). Scan/search games (PriceCharting API) and consoles/controllers (Game Buying Guide prices) → cash + store credit per line, plus a **Floor Pricing** tab for shelf prices. Staff/manager logins. `noindex` (meta + `X-Robots-Tag` in `trade-in/.htaccess`), not in nav, not in sitemap. See **Trade-in calculator** below. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -492,6 +492,44 @@ The site's **only server-side code**. Everything else is static.
   - `index.html`, `app.js`, and `styles.css` are byte-identical in both
     places. **Keep them in sync** when editing; this repo is the source of
     truth.
+- **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
+  games, per the sheet's **Game Pricing Guide** tab.
+  - **Tiers** (`FLOOR_TIERS`, by PriceCharting console name; PAL/JP
+    prefixes ignored): retro systems use PriceCharting's highest recent
+    sale under $30 and eBay's highest sold at $30+; GameCube the same at
+    $15; PS3/360 always eBay ("weird right now" per the sheet);
+    PS4/PS5/Xbox One/Series/Switch/Switch 2 have no PriceCharting rule
+    (staff check the GameStop/Amazon links and type a price). Systems
+    not in the guide (`FLOOR_OTHER`) also need a typed price.
+  - **"PriceCharting highest" = the highest individual recent sale**
+    (owner's definition), not the API's price fields. The API has no
+    sales data ("historic sales are not supported"), so **`GET
+    api.php?route=pc/sales&id=…` reads the sold-listings tables off the
+    public page `pricecharting.com/game/<id>`** (`pc_sales()`: parses
+    `div.completed-auctions-{used,cib,new}` → date/price/title/eBay url,
+    about 30 per condition, cached 6 h in `cache/sales-<id>.json`, shares
+    the PriceCharting throttle lock). **Fragile by nature:** if
+    PriceCharting changes that markup, the route returns empty lists and
+    the tab shows a "see the PriceCharting page" link; fix the regexes in
+    `pc_sales()`. Sales whose title matches `ODD_SALE_RE` (lot, bundle,
+    graded, repro, box/manual only…) or looks sealed on a non-New
+    condition are shown dimmed and never auto-picked; staff can click any
+    sale to use it.
+  - **Price math** (`floorPrice()`): basis → round **up** to the next $5
+    (`FLOOR_STEP`, owner's choice) → at least $10 (`FLOOR_MIN`), or $5
+    for shitbox games (`autoShitboxReason()`) → minus the guide's
+    missing-manual amount (`manualDeduction()`: CIB $10–$20 $0, $25–$50
+    $5, $55–$100 $10, $105–$200 $20, $205+ 10% to the nearest $5).
+    Prices in the list are editable (`edited` flag).
+  - **Saved sessions** (`GET/PUT/DELETE api.php?route=floor-sessions`):
+    named lists stored in `p2w-trade-in-data/floor-sessions.json` (one
+    file, flock'd; the oldest drop off past `MAX_FLOOR_SESSIONS` = 300).
+    The open list is also kept in `localStorage` (`p2w-floor`) so a
+    refresh doesn't lose it. Copy list (TSV) and Print list.
+  - **Shop PC offline copy:** `server.ps1` doesn't have the `pc/sales` or
+    `floor-sessions` routes, so offline the tab shows the PriceCharting
+    link instead of sales and can't save sessions. Add the routes there
+    if the shop wants them offline.
 - **TCG Bulk tab** (`#view-bulk`, both roles): loads
   `../assets/bulk-rates.json` (same file as the public Bulk Rates page).
   Staff type card counts per rate item. Each row pays count × price ÷

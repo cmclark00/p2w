@@ -21,6 +21,10 @@
  *   PUT  token | passwords       manager
  *   GET  pc/product (id|upc|q), pc/products (q)   any logged-in user
  *   POST trades / GET trades (q) completed-trade log, any logged-in user
+ *   GET  pc/sales (id)           recent sold listings from a game's PriceCharting page (floor pricing)
+ *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
+ *   PUT  floor-sessions          save (create or update) a named session
+ *   DELETE floor-sessions (id)   delete a saved session
  */
 
 declare(strict_types=1);
@@ -36,6 +40,8 @@ const MAX_LOGIN_FAILS = 8;          // per IP ...
 const LOGIN_WINDOW_SECONDS = 900;   // ... per 15 minutes
 const PC_MIN_GAP_SECONDS = 1.1;     // PriceCharting allows 1 call/second
 const PC_CACHE_SECONDS = 1800;      // re-scanning a game within 30 min costs no API call
+const SALES_CACHE_SECONDS = 21600;  // a game's recent-sales list is re-read at most every 6 hours
+const MAX_FLOOR_SESSIONS = 300;     // oldest saved floor-pricing sessions drop off past this
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -130,6 +136,11 @@ function is_https(): bool {
     || strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '')) === 'on';
 }
 
+// First $n characters of UTF-8 text (no mbstring needed).
+function cut_text(string $s, int $n): string {
+  return preg_match('/^.{0,' . $n . '}/us', $s, $m) ? $m[0] : '';
+}
+
 function b64url(string $s): string {
   return rtrim(strtr(base64_encode($s), '+/', '-_'), '=');
 }
@@ -222,7 +233,7 @@ function record_login(bool $ok): void {
 
 /* ------------------------------------------------------------------ PriceCharting */
 
-function http_get(string $url): array {
+function http_get(string $url, bool $follow = false): array {
   if (function_exists('curl_init')) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -230,6 +241,8 @@ function http_get(string $url): array {
       CURLOPT_TIMEOUT => 20,
       CURLOPT_CONNECTTIMEOUT => 10,
       CURLOPT_USERAGENT => 'P2W-TradeIn/1.0',
+      CURLOPT_FOLLOWLOCATION => $follow,
+      CURLOPT_MAXREDIRS => 3,
     ]);
     $body = curl_exec($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -237,7 +250,7 @@ function http_get(string $url): array {
     curl_close($ch);
     return [$status, $body === false ? '' : (string)$body, $error];
   }
-  $ctx = stream_context_create(['http' => ['timeout' => 20, 'ignore_errors' => true, 'header' => "User-Agent: P2W-TradeIn/1.0\r\n"]]);
+  $ctx = stream_context_create(['http' => ['timeout' => 20, 'ignore_errors' => true, 'follow_location' => $follow ? 1 : 0, 'header' => "User-Agent: P2W-TradeIn/1.0\r\n"]]);
   $body = @file_get_contents($url, false, $ctx);
   $status = 0;
   foreach ($http_response_header ?? [] as $h) {
@@ -284,6 +297,79 @@ function pricecharting(string $endpoint, string $param, string $value): void {
   if ($trimmed === '' || $trimmed[0] !== '{') fail(502, "PriceCharting returned HTTP $status.");
   if ($status === 200 && preg_match('/"status"\s*:\s*"success"/', $body)) @file_put_contents($cacheFile, $body, LOCK_EX);
   respond_raw($status ?: 502, $body);
+}
+
+// Floor pricing: the recent sold listings on a game's public PriceCharting page (the API has no
+// sales data). One page read covers Loose, CIB, and New; it's cached for SALES_CACHE_SECONDS.
+// If PriceCharting changes their page, this returns no sales and staff use the page link instead.
+function pc_sales(string $id): void {
+  if (!preg_match('/^\d{1,10}$/', $id)) fail(400, 'Pass a PriceCharting product id.');
+  $cacheDir = data_path('cache');
+  if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700);
+  $cacheFile = $cacheDir . '/sales-' . $id . '.json';
+  if (is_file($cacheFile) && time() - filemtime($cacheFile) < SALES_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
+
+  // Same one-at-a-time gap as the API calls, so a busy pricing session can't hammer their site.
+  $lock = fopen(data_path('pc-throttle.lock'), 'c+');
+  flock($lock, LOCK_EX);
+  $wait = PC_MIN_GAP_SECONDS - (microtime(true) - (float)stream_get_contents($lock));
+  if ($wait > 0) usleep((int)($wait * 1e6));
+  [$status, $html, $error] = http_get('https://www.pricecharting.com/game/' . $id, true);
+  ftruncate($lock, 0);
+  rewind($lock);
+  fwrite($lock, (string)microtime(true));
+  flock($lock, LOCK_UN);
+  fclose($lock);
+  if ($status === 0) fail(502, 'Could not reach PriceCharting: ' . $error);
+  if ($status !== 200) fail(502, "PriceCharting returned HTTP $status.");
+
+  $out = ['status' => 'success', 'sales' => []];
+  foreach (['loose' => 'used', 'cib' => 'cib', 'new' => 'new'] as $cond => $cls) {
+    $list = [];
+    if (preg_match('#<div class="completed-auctions-' . $cls . '"[^>]*>(.*?)</table>#s', $html, $m)) {
+      preg_match_all('#<tr id="[^"]*">(.*?)</tr>#s', $m[1], $rows);
+      foreach ($rows[1] as $row) {
+        if (!preg_match('#class="js-price"\s*>\s*\$([\d,]+\.\d{2})#', $row, $pm)) continue;
+        $date = preg_match('#class="date">\s*([\d-]{10})#', $row, $dm) ? $dm[1] : '';
+        $title = '';
+        $url = '';
+        if (preg_match('#<td class="title">\s*<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>#s', $row, $am)) {
+          $url = html_entity_decode($am[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+          $title = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($am[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        }
+        $list[] = [
+          'date' => $date,
+          'price' => (int)round((float)str_replace(',', '', $pm[1]) * 100),
+          'title' => cut_text($title, 160),
+          'url' => preg_match('#^https://#', $url) ? $url : '',
+        ];
+      }
+    }
+    $out['sales'][$cond] = $list;
+  }
+  $json = json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  if ($out['sales']['loose'] || $out['sales']['cib'] || $out['sales']['new']) @file_put_contents($cacheFile, $json, LOCK_EX);
+  respond_raw(200, $json);
+}
+
+// Saved floor-pricing sessions, all in one file: { id: { id, name, staff, created, updated, items: [...] } }.
+// $update gets the whole set and returns [new set, result, changed?].
+function floor_sessions(callable $update) {
+  $fh = fopen(data_path('floor-sessions.json'), 'c+');
+  if (!$fh) fail(500, 'Could not open the saved sessions on the server.');
+  flock($fh, LOCK_EX);
+  $all = json_decode((string)stream_get_contents($fh), true);
+  if (!is_array($all)) $all = [];
+  [$all, $result, $changed] = $update($all);
+  if ($changed) {
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, (string)json_encode((object)$all, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    fflush($fh);
+  }
+  flock($fh, LOCK_UN);
+  fclose($fh);
+  return $result;
 }
 
 function clear_cache(): void {
@@ -448,6 +534,55 @@ switch ("$method $route") {
       if (count($found) >= 100) break;
     }
     respond_raw(200, '[' . implode(',', $found) . ']');
+
+  case 'GET pc/sales':
+    require_role('staff');
+    pc_sales((string)($_GET['id'] ?? ''));
+
+  case 'GET floor-sessions':
+    require_role('staff');
+    $id = (string)($_GET['id'] ?? '');
+    $result = floor_sessions(function ($all) use ($id) {
+      if ($id !== '') return [$all, $all[$id] ?? null, false];
+      $list = [];
+      foreach ($all as $s) {
+        $list[] = ['id' => $s['id'], 'name' => $s['name'], 'staff' => $s['staff'] ?? '', 'updated' => $s['updated'], 'count' => count($s['items'] ?? [])];
+      }
+      usort($list, function ($a, $b) { return strcmp($b['updated'], $a['updated']); });
+      return [$all, $list, false];
+    });
+    if ($id !== '' && $result === null) fail(404, 'That session was deleted.');
+    respond(200, $result);
+
+  case 'PUT floor-sessions':
+    require_role('staff');
+    $raw = (string)file_get_contents('php://input');
+    if (strlen($raw) > 524288) fail(413, 'That session is too large to save. Split it into two.');
+    $in = json_decode($raw, true);
+    $name = trim((string)($in['name'] ?? ''));
+    if (!is_array($in) || $name === '' || !is_array($in['items'] ?? null)) fail(400, 'A session needs a name and a list of games.');
+    $id = (string)($in['id'] ?? '');
+    if ($id !== '' && !preg_match('/^[a-f0-9]{12}$/', $id)) fail(400, 'That session id is not valid.');
+    $saved = floor_sessions(function ($all) use ($in, $id, $name) {
+      $now = gmdate('c');
+      if ($id === '' || !isset($all[$id])) $id = bin2hex(random_bytes(6));
+      $all[$id] = [
+        'id' => $id, 'name' => cut_text($name, 80), 'staff' => cut_text(trim((string)($in['staff'] ?? '')), 60),
+        'created' => $all[$id]['created'] ?? $now, 'updated' => $now, 'items' => array_values($in['items']),
+      ];
+      if (count($all) > MAX_FLOOR_SESSIONS) { // drop the oldest
+        uasort($all, function ($a, $b) { return strcmp($b['updated'], $a['updated']); });
+        $all = array_slice($all, 0, MAX_FLOOR_SESSIONS, true);
+      }
+      return [$all, ['id' => $id, 'updated' => $now], true];
+    });
+    respond(200, ['ok' => true] + $saved);
+
+  case 'DELETE floor-sessions':
+    require_role('staff');
+    $id = (string)($_GET['id'] ?? '');
+    floor_sessions(function ($all) use ($id) { unset($all[$id]); return [$all, null, true]; });
+    respond(200, ['ok' => true]);
 
   default:
     fail(404, "No route for $method $route");

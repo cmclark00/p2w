@@ -393,3 +393,45 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   #printArea .print-payout { margin-top: 12px; font-size: 10pt; }
   #printArea .print-sign { margin-top: 28px; }
 }
+
+/* ---------------------------------------------------------------- floor pricing */
+.floor-session-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.floor-session-fields label + label, .floor-result label + label { margin-top: 0; }
+.floor-session .toolbar { align-items: center; }
+.floor-session .status { margin: 0 0 0 4px; color: var(--muted); }
+.floor-scan { margin-bottom: 16px; }
+#floorScan { flex: 1 1 260px; font-size: 1.1rem; padding: 12px 14px; }
+.floor-pricer { border-left: 4px solid var(--gold); }
+.floor-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.floor-head .item-name { font-size: 1.15rem; }
+.floor-head .item-name a { color: inherit; }
+.floor-rule { margin: 6px 0; font-size: 0.88rem; color: var(--paper); opacity: 0.85; }
+.floor-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 14px 0; }
+.floor-controls .check { flex-direction: row; align-items: center; gap: 8px; color: var(--paper); }
+.segs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg { font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--muted); background: var(--surface-2); border: 0; padding: 8px 16px; cursor: pointer; }
+.seg + .seg { border-left: 1px solid var(--line); }
+.seg.on { background: var(--red); color: #fff; }
+.floor-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; }
+.floor-links a { color: var(--paper); }
+.floor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.floor-sales { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.floor-sales td { padding: 6px 8px; border-top: 1px solid var(--line); }
+.floor-sales tr { cursor: pointer; }
+.floor-sales tr:hover td { background: rgba(49, 94, 203, 0.14); }
+.floor-sales tr.picked td { background: rgba(241, 200, 75, 0.14); }
+.floor-sales tr.picked td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.floor-sales tr.odd td { opacity: 0.6; }
+.floor-sales td.num { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.floor-sales a { color: var(--paper); text-decoration-color: var(--line); }
+.nowrap { white-space: nowrap; }
+.floor-result { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--surface-2); border-radius: var(--radius); }
+.floor-need { margin: 0; color: var(--gold); font-size: 0.9rem; }
+.floor-math { font-size: 0.82rem; }
+.floor-price strong { display: block; font: 700 2.2rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
+.floor-result .link { align-self: flex-start; padding: 0; font-size: 0.82rem; color: var(--muted); }
+.floor-list .money-input input { width: 80px; font-weight: 600; }
+.floor-foot { margin-bottom: 24px; }
+@media (max-width: 800px) {
+  .floor-body { grid-template-columns: 1fr; }
+}
