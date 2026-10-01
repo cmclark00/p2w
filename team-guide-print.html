@@ -797,19 +797,20 @@ Guide (the Google Sheet tab).</p>
 <li>Type a <strong>session name</strong> (like "PS2 wall, Oct 1") and your name.</li>
 <li>Scan or search a game and click it. Pick <strong>Loose / CIB / New</strong>, and
    tick <strong>Manual missing</strong> for a CIB game without its manual.</li>
-<li>The tool shows that game's recent PriceCharting sales, highest first,
-   and follows the guide for its system:</li>
-<li><strong>PS1, PS2, OG Xbox, NES, SNES, N64, Wii, Wii U, Game Boys, DS,
-     3DS, Genesis, Dreamcast:</strong> the highest sale sets the price when it's
-     under $30. At $30 or more, it asks for eBay's highest sold price
-     (click <strong>eBay sold ↗</strong>, it opens sorted highest first).</li>
-<li><strong>GameCube:</strong> the same, with $15 instead of $30.</li>
-<li><strong>PS3 / 360:</strong> always eBay for now.</li>
-<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> check the
-     <strong>GameStop ↗</strong> and <strong>Amazon ↗</strong> links and type the price you pick.</li>
-<li>If the highest sale is a lot, a sealed copy, or another odd listing,
-   click a different sale to use it instead. Listings that look odd are
-   marked "check listing" and are never picked automatically.</li>
+<li>The price fills in by itself from the game's recent eBay sales (the
+   ones PriceCharting lists for that condition), highest first:</li>
+<li><strong>Most systems:</strong> it goes by the <strong>high end of normal sales</strong> (the
+     90th percentile, about the 4th-highest of 30), so one lucky sale
+     doesn't set the price. That sale is highlighted in the list.</li>
+<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> whichever is
+     higher, <strong>GameStop's pre-owned price</strong> or that sale.</li>
+<li>Lots, sealed copies, and other odd listings are marked "odd
+     listing" and never count.</li>
+<li>Only look closer when it says <strong>Double-check</strong> (very few sales, or no
+   sale in the last 6 months). To use a different number, click any sale
+   in the list, or <strong>Type a different price</strong>. <strong>Back to the automatic
+   price</strong> undoes that. The <strong>eBay sold ↗</strong>, <strong>GameStop ↗</strong>, <strong>Amazon ↗</strong>,
+   and <strong>PriceCharting ↗</strong> links are there if you want to check.</li>
 <li>The shelf price rounds <strong>up to the next $5</strong>, never goes under
    <strong>$10</strong> ($5 only for shitbox games), and takes the guide's
    missing-manual amount off. Click <strong>Add to list</strong>.</li>
@@ -819,8 +820,8 @@ Guide (the Google Sheet tab).</p>
    <strong>Print list</strong> prints it.</li>
 </ol>
 <p>The recent sales are read from PriceCharting's website. If PriceCharting
-changes their site and the sales stop showing, use the <strong>PriceCharting ↗</strong>
-link to see them and type the price.</p>
+changes their site and the sales stop showing, the tool asks you to type
+a price; use the <strong>PriceCharting ↗</strong> link to see the sales.</p>
 <p><strong>Extra info on game lines:</strong>
 - <strong>"Slow seller" badge:</strong> fewer than 50 copies sell per year and it's worth
   $10+. Check eBay sold listings before making an offer.

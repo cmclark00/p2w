@@ -688,19 +688,20 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
-3. The tool shows that game's recent PriceCharting sales, highest first,
-   and follows the guide for its system:
-   - **PS1, PS2, OG Xbox, NES, SNES, N64, Wii, Wii U, Game Boys, DS,
-     3DS, Genesis, Dreamcast:** the highest sale sets the price when it's
-     under $30. At $30 or more, it asks for eBay's highest sold price
-     (click **eBay sold ↗**, it opens sorted highest first).
-   - **GameCube:** the same, with $15 instead of $30.
-   - **PS3 / 360:** always eBay for now.
-   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** check the
-     **GameStop ↗** and **Amazon ↗** links and type the price you pick.
-4. If the highest sale is a lot, a sealed copy, or another odd listing,
-   click a different sale to use it instead. Listings that look odd are
-   marked "check listing" and are never picked automatically.
+3. The price fills in by itself from the game's recent eBay sales (the
+   ones PriceCharting lists for that condition), highest first:
+   - **Most systems:** it goes by the **high end of normal sales** (the
+     90th percentile, about the 4th-highest of 30), so one lucky sale
+     doesn't set the price. That sale is highlighted in the list.
+   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** whichever is
+     higher, **GameStop's pre-owned price** or that sale.
+   - Lots, sealed copies, and other odd listings are marked "odd
+     listing" and never count.
+4. Only look closer when it says **Double-check** (very few sales, or no
+   sale in the last 6 months). To use a different number, click any sale
+   in the list, or **Type a different price**. **Back to the automatic
+   price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
+   and **PriceCharting ↗** links are there if you want to check.
 5. The shelf price rounds **up to the next $5**, never goes under
    **$10** ($5 only for shitbox games), and takes the guide's
    missing-manual amount off. Click **Add to list**.
@@ -710,8 +711,8 @@ Guide (the Google Sheet tab).
    **Print list** prints it.
 
 The recent sales are read from PriceCharting's website. If PriceCharting
-changes their site and the sales stop showing, use the **PriceCharting ↗**
-link to see them and type the price.
+changes their site and the sales stop showing, the tool asks you to type
+a price; use the **PriceCharting ↗** link to see the sales.
 
 **Extra info on game lines:**
 - **"Slow seller" badge:** fewer than 50 copies sell per year and it's worth

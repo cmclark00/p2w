@@ -2065,28 +2065,31 @@ function showBulk() {
 
 /* ================================================================== floor pricing */
 
-// Game Pricing Guide (the Google Sheet tab): where a game's shelf price comes from, by system.
-// cutoff (cents): PriceCharting's highest recent sale sets the price below it, eBay's highest sold
-// at or above it. 0 = always eBay; null = no PriceCharting rule (staff pick the number).
+// Game Pricing Guide (the Google Sheet tab), made hands-free: the sales PriceCharting lists are eBay
+// sold listings, so they stand in for "eBay highest sold" at any price. Modern systems take the higher
+// of GameStop's pre-owned price and that sale (owner's choice).
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
-    id: 'retro', cutoff: 3000, rule: 'PriceCharting highest sale under $30 · eBay highest sold & completed over $30',
+    id: 'retro', rule: 'Top recent eBay sales (from PriceCharting)',
     systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
-      'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast'],
-  },
-  { id: 'gamecube', cutoff: 1500, rule: 'PriceCharting highest sale under $15 · eBay highest sold & completed over $15', systems: ['gamecube'] },
-  {
-    id: 'ps3-360', cutoff: 0, rule: 'PS3 / 360 are weird right now: check every real game on eBay (highest sold & completed)',
-    systems: ['playstation 3', 'xbox 360'],
+      'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast', 'gamecube',
+      'playstation 3', 'xbox 360'],
   },
   {
-    id: 'modern', cutoff: null,
-    rule: 'PriceCharting matters little. Check GameStop (if in stock) and Amazon (ignore renewed), then pick a happy high-ish number',
+    id: 'modern', gamestop: true, rule: "Higher of GameStop's pre-owned price and the top recent eBay sales",
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
-const FLOOR_OTHER = { id: 'other', cutoff: null, rule: "Not in the Game Pricing Guide: use the sales and links below and pick a price" };
+const FLOOR_OTHER = { id: 'other', rule: 'Not in the Game Pricing Guide: top recent eBay sales (from PriceCharting). Double-check it' };
+// The sale the price comes from: the 90th percentile of the condition's normal recent sales (about the
+// 4th highest of 30). Checked against a month of the shop's own shelf prices (140 PS2/GameCube games,
+// Sept 2026): the single highest sale ran ~$12 high on average and was within $5 only 40% of the time;
+// the 90th percentile was within $5 65% of the time with no overall bias. Splitting by price or
+// skipping one-off highs did worse.
+const FLOOR_PCT = 0.9;
+const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
+const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500; // suggested prices round up to the next $5
@@ -2120,7 +2123,7 @@ function floorPrice(basis, { shitbox, manualMissing }) {
 
 const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
 
-// Search links for the cases the guide sends to eBay, GameStop, or Amazon.
+// Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
   const name = baseTitle(p['product-name']) || p['product-name'];
   const sys = p['console-name'] || '';
@@ -2210,6 +2213,13 @@ function pickFloorGame(product) {
   floorCur = { product, condition: 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
   renderFloorPricer();
   loadFloorSales(product);
+  if (floorTier(product['console-name']).gamestop && !('gamestop-price' in product) && tokenSet) {
+    PC.byId(product.id).then((full) => {
+      if (floorCur?.product !== product || !full) return;
+      product['gamestop-price'] = full['gamestop-price'];
+      renderFloorPricer();
+    }).catch(() => {});
+  }
 }
 
 async function loadFloorSales(product) {
@@ -2242,22 +2252,33 @@ function floorSales(cur = floorCur) {
     .sort((a, b) => b.price - a.price);
 }
 
-// What sets the price: { basis (cents) | null, from: 'sale'|'ebay'|'typed', sale, need, ask }.
-// need = what staff have to do when the tool can't suggest a number; ask = the label for the number they type.
+// The sale the tool goes by (see FLOOR_PCT). sales are highest first; odd listings never count.
+function floorAutoSale(sales) {
+  const asc = sales.filter((s) => !s.odd).reverse();
+  if (!asc.length) return { sale: null, count: 0 };
+  return { sale: asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))], count: asc.length };
+}
+
+// What sets the price: { basis (cents) | null, from: 'sale'|'gamestop'|'typed', sale, checks, need }.
+// checks = reasons staff should glance at it; need = what to do when there's nothing to go by.
 function floorBasis(cur = floorCur) {
   const tier = floorTier(cur.product['console-name']);
   const sales = floorSales(cur);
-  const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : sales.find((s) => !s.odd);
-  const ebay = 'eBay highest sold';
-  let r;
-  if (tier.cutoff == null) r = { basis: null, sale, need: 'Type the price you picked.', ask: 'Your price' };
-  else if (!sale) r = { basis: null, sale, need: 'No PriceCharting sale to go by. Check eBay and type its highest sold price.', ask: ebay };
-  else if (tier.cutoff === 0 || sale.price >= tier.cutoff) {
-    const over = tier.cutoff ? `Highest PriceCharting sale is ${money(sale.price)}, ${money(tier.cutoff)} or more. ` : '';
-    r = { basis: null, sale, need: `${over}Check eBay and type its highest sold price.`, ask: ebay };
-  } else r = { basis: sale.price, from: 'sale', sale };
-  if (cur.typed == null) return r;
-  return { ...r, basis: cur.typed, from: r.ask === ebay ? 'ebay' : 'typed', need: null, ask: r.ask || 'Your price' };
+  const auto = floorAutoSale(sales);
+  const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : auto.sale;
+  const gs = tier.gamestop && Number(cur.product['gamestop-price']) > 0 ? Number(cur.product['gamestop-price']) : null;
+  const checks = [];
+  if (cur.pick == null) {
+    if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
+    const newest = sales.reduce((d, s) => (s.date > d ? s.date : d), '');
+    const cutoff = new Date(Date.now() - FLOOR_STALE_DAYS * 864e5).toISOString().slice(0, 10);
+    if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
+  }
+  if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
+  if (gs != null && (!sale || gs >= sale.price)) return { basis: gs, from: 'gamestop', sale, checks };
+  if (sale) return { basis: sale.price, from: 'sale', sale, checks };
+  if (!cur.sales && !cur.salesError) return { basis: null, sale, checks: [] }; // still loading
+  return { basis: null, sale, checks: [], need: 'No sales to go by. Check the links and type a price.' };
 }
 
 function renderFloorPricer() {
@@ -2272,7 +2293,7 @@ function renderFloorPricer() {
   const b = floorBasis(cur);
   const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing });
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
-  const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop ${money(Number(p['gamestop-price']))}` : '';
+  const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
 
   const condBtns = Object.entries(GAME_CONDITIONS).map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
@@ -2282,15 +2303,15 @@ function renderFloorPricer() {
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
   else {
     const shown = cur.showAll ? sales : sales.slice(0, 8);
-    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
+    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
-        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">check listing</span>' : ''}</td>
+        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">Click a sale to use it instead (skip lots, sealed copies, and other odd listings).</p>`;
+      <p class="muted small-print">The price goes by the highlighted sale: the high end of normal sales (90th percentile), so one lucky sale doesn't set it. Click any sale to use it instead. Lots, sealed copies, and other odd listings never count.</p>`;
   }
 
-  const showTyped = !!b.ask;
+  const showTyped = !!b.need || cur.typed != null;
   el.innerHTML = `
     <div class="floor-head">
       <div>
@@ -2306,22 +2327,23 @@ function renderFloorPricer() {
       ${cur.condition === 'cib' ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
-        ${tier.id === 'modern' || tier.id === 'other' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
+        ${tier.id !== 'retro' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
         <a href="${esc(links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>` : ''}
         ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
       </span>
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
-        <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting</div>
+        <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         ${salesHtml}
       </div>
       <div class="floor-result">
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
-        <label${showTyped ? '' : ' hidden'}>${esc(b.ask || 'Your price')}
+        ${b.checks.map((c) => `<p class="floor-need">Double-check: ${esc(c)}</p>`).join('')}
+        <label${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
-        ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : ''}
+        ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
         <button type="button" class="btn primary" data-floor-act="add"${result ? '' : ' disabled'}>Add to list</button>
@@ -2330,7 +2352,7 @@ function renderFloorPricer() {
 }
 
 function floorMath(b, r) {
-  const from = { sale: 'PriceCharting sale', ebay: 'eBay', typed: 'Typed' }[b.from];
+  const from = FROM_LABELS[b.from] || '';
   const parts = [`${from} ${money(b.basis)}`];
   if (r.full !== b.basis) parts.push(r.full === r.min && b.basis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
@@ -2369,6 +2391,7 @@ function onFloorPricerClick(e) {
   if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
+  if (act === 'auto') { floorCur.typed = null; renderFloorPricer(); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();
@@ -2397,7 +2420,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'PriceCharting sale', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', ebay: 'eBay', typed: 'Typed' };
 
 function renderFloorList() {
   const items = floor.items;

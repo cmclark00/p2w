@@ -494,15 +494,29 @@ The site's **only server-side code**. Everything else is static.
     truth.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
+  - **Hands-free by design** (owner request). PriceCharting's listed
+    sales *are* eBay sold listings, so they stand in for the sheet's
+    "eBay highest sold" at every price; there's no eBay step (eBay's
+    sold-data API is closed to new users and its sold pages need a
+    login as of Aug 2026; Amazon's API needs 10 affiliate sales/30 days,
+    so Amazon is links only).
   - **Tiers** (`FLOOR_TIERS`, by PriceCharting console name; PAL/JP
-    prefixes ignored): retro systems use PriceCharting's highest recent
-    sale under $30 and eBay's highest sold at $30+; GameCube the same at
-    $15; PS3/360 always eBay ("weird right now" per the sheet);
-    PS4/PS5/Xbox One/Series/Switch/Switch 2 have no PriceCharting rule
-    (staff check the GameStop/Amazon links and type a price). Systems
-    not in the guide (`FLOOR_OTHER`) also need a typed price.
-  - **"PriceCharting highest" = the highest individual recent sale**
-    (owner's definition), not the API's price fields. The API has no
+    prefixes ignored): every guide system prices from the sales; modern
+    systems (PS4/PS5/Xbox One/Series/Switch/Switch 2, `gamestop: true`)
+    take the **higher of GameStop's pre-owned price** (`gamestop-price`
+    from the API; loaded with `PC.byId` if search results lack it)
+    **and the sale** (owner's choice). Systems not in the guide
+    (`FLOOR_OTHER`) price from the sales too, with a "double-check" rule.
+  - **Which sale: the 90th percentile** of the condition's normal sales
+    (`FLOOR_PCT`, `floorAutoSale()`), not the single highest. Backtested
+    on the shop's own Sept 2026 sold list (140 PS2/GameCube games): max
+    sale was ~$12 high on average and within $5 only 40% of the time;
+    p90 was within $5 65% (within 10% 68%) with no bias. Price-split
+    and outlier-skipping variants did worse. **Re-run that comparison
+    before changing `FLOOR_PCT`.** `floorBasis()` adds "Double-check"
+    notes for under `FLOOR_FEW_SALES` sales or a newest sale older than
+    `FLOOR_STALE_DAYS`. Staff can click any sale or type a price.
+  - **Sales source.** The API has no
     sales data ("historic sales are not supported"), so **`GET
     api.php?route=pc/sales&id=…` reads the sold-listings tables off the
     public page `pricecharting.com/game/<id>`** (`pc_sales()`: parses
@@ -510,7 +524,7 @@ The site's **only server-side code**. Everything else is static.
     about 30 per condition, cached 6 h in `cache/sales-<id>.json`, shares
     the PriceCharting throttle lock). **Fragile by nature:** if
     PriceCharting changes that markup, the route returns empty lists and
-    the tab shows a "see the PriceCharting page" link; fix the regexes in
+    the tab asks for a typed price; fix the regexes in
     `pc_sales()`. Sales whose title matches `ODD_SALE_RE` (lot, bundle,
     graded, repro, box/manual only…) or looks sealed on a non-New
     condition are shown dimmed and never auto-picked; staff can click any
