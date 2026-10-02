@@ -710,7 +710,9 @@ Guide (the Google Sheet tab).
    and **PriceCharting ↗** links are there if you want to check.
 5. The shelf price rounds **up to the next $5**, never goes under
    **$10** ($5 only for shitbox games), and takes the guide's
-   missing-manual amount off. Click **Add to list**.
+   missing-manual amount off. It's **never below GameStop's pre-owned
+   price** (on any system), even after the manual deduction. If you type
+   a price below GameStop's, you'll see a warning. Click **Add to list**.
 6. Prices in the list can be changed by hand. **Save session** keeps the
    list on the website under its name, so anyone can open it later from
    **Saved sessions**. **Copy list** copies it for a spreadsheet, and

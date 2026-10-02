@@ -539,6 +539,13 @@ The site's **only server-side code**. Everything else is static.
     graded, repro, box/manual only…) or looks sealed on a non-New
     condition are shown dimmed and never auto-picked; staff can click any
     sale to use it.
+  - **Never below GameStop** (owner's rule, every system): GameStop's
+    pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
+    carried) is one of the basis options for every tier, and
+    `floorPrice()` also holds the final price at GameStop rounded up to
+    $5 *after* the missing-manual deduction ("raised to GameStop's $X").
+    Typed prices aren't forced up, but show a "Below GameStop's
+    pre-owned price" warning.
   - **Price math** (`floorPrice()`): basis → round **up** to the next $5
     (`FLOOR_STEP`, owner's choice) → at least $10 (`FLOOR_MIN`), or $5
     for shitbox games (`autoShitboxReason()`) → minus the guide's

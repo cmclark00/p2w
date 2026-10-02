@@ -2129,7 +2129,7 @@ function showBulk() {
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
-    id: 'retro', rule: 'Top recent eBay sales (from PriceCharting)',
+    id: 'retro', rule: "Top recent eBay sales (from PriceCharting), never below GameStop's pre-owned price",
     systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
       'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast', 'gamecube',
       'playstation 3', 'xbox 360'],
@@ -2175,13 +2175,20 @@ function manualDeduction(price) {
 
 // Basis (cents) -> shelf price: round up to the next $5, the $10 floor ($5 for shitbox games),
 // then the missing-manual deduction.
-function floorPrice(basis, { shitbox, manualMissing }) {
+// Never below GameStop's pre-owned price (gs, owner's rule), even after the missing-manual deduction;
+// rounded up to the next $5 like everything else. Typed prices pass gs = null (staff get a warning instead).
+function floorPrice(basis, { shitbox, manualMissing, gs = null }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const full = Math.max(min, Math.ceil(basis / FLOOR_STEP) * FLOOR_STEP);
   const ded = manualMissing ? manualDeduction(full) : 0;
-  return { full, ded, price: full - ded, min };
+  const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
+  const price = Math.max(full - ded, gsFloor);
+  return { full, ded, price, min, gsRaised: price > full - ded ? gsFloor : 0 };
 }
+
+// GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
+const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
 const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
 
@@ -2280,7 +2287,7 @@ function pickFloorGame(product) {
   renderFloorPricer();
   loadFloorSales(product);
   const tier = floorTier(product['console-name']);
-  const needsFull = (tier.gamestop && !('gamestop-price' in product)) || (amazonSet && !product.upc);
+  const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc);
   if (needsFull && tokenSet) {
     PC.byId(product.id).then((full) => {
       if (floorCur?.product !== product || !full) return;
@@ -2364,7 +2371,7 @@ function floorBasis(cur = floorCur) {
   const sales = floorSales(cur);
   const auto = floorAutoSale(sales);
   const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : auto.sale;
-  const gs = tier.gamestop && Number(cur.product['gamestop-price']) > 0 ? Number(cur.product['gamestop-price']) : null;
+  const gs = floorGs(cur.product); // a minimum on every system; GameStop is never cheaper
   const checks = [];
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
@@ -2394,7 +2401,8 @@ function renderFloorPricer() {
   const shitbox = autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const links = floorLinks(p, cur.condition);
   const b = floorBasis(cur);
-  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing });
+  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing, gs: b.from === 'typed' ? null : floorGs(p) });
+  const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
   const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
 
@@ -2444,6 +2452,7 @@ function renderFloorPricer() {
       <div class="floor-result">
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         ${b.checks.map((c) => `<p class="floor-need">Double-check: ${esc(c)}</p>`).join('')}
+        ${belowGs ? `<p class="floor-need">Below GameStop's pre-owned price (${money(floorGs(p))}). Our price shouldn't be under GameStop's.</p>` : ''}
         <label${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
@@ -2480,6 +2489,7 @@ function floorMath(b, r) {
   const parts = [`${from} ${money(b.basis)}`];
   if (r.full !== b.basis) parts.push(r.full === r.min && b.basis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
+  if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   return parts.join(' → ');
 }
 
@@ -2487,7 +2497,8 @@ function addFloorItem() {
   const cur = floorCur;
   const p = cur.product;
   const b = floorBasis(cur);
-  const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing });
+  const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing,
+    gs: b.from === 'typed' ? null : floorGs(p) });
   if (!r) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
