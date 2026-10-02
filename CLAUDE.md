@@ -515,9 +515,15 @@ The site's **only server-side code**. Everything else is static.
     (`FLOOR_PCT`, `floorAutoSale()`), not the single highest. Backtested
     on the shop's own Sept 2026 sold list (140 PS2/GameCube games): max
     sale was ~$12 high on average and within $5 only 40% of the time;
-    p90 was within $5 65% (within 10% 68%) with no bias. Price-split
-    and outlier-skipping variants did worse. **Re-run that comparison
-    before changing `FLOOR_PCT`.** `floorBasis()` adds "Double-check"
+    p90 was within $5 65% (within 10% 68%) with no bias. Outlier-skipping
+    did worse. **Expensive games use the second-highest normal sale**
+    once the p90 sale reaches `FLOOR_HIGH` ($80): the shop prices them
+    nearer the top (games priced $60+: 46% → 71% within 10%; all games
+    68% → 72%, avg miss $8.05 → $7.76). **Re-run that comparison
+    before changing `FLOOR_PCT`/`FLOOR_HIGH`.** Sold data can't explain
+    prices above every recent sale (e.g. Conker loose $275 vs NTSC sales
+    ≤ $190): those come from current eBay asking prices, which need the
+    eBay Browse API (active listings). `floorBasis()` adds "Double-check"
     notes for under `FLOOR_FEW_SALES` sales or a newest sale older than
     `FLOOR_STALE_DAYS`. Staff can click any sale or type a price.
   - **Sales source.** The API has no

@@ -692,7 +692,9 @@ Guide (the Google Sheet tab).
    ones PriceCharting lists for that condition), highest first:
    - **Most systems:** it goes by the **high end of normal sales** (the
      90th percentile, about the 4th-highest of 30), so one lucky sale
-     doesn't set the price. That sale is highlighted in the list.
+     doesn't set the price. For games selling around **$80 and up** it
+     uses the **second-highest** sale instead, since pricier games go on
+     the shelf nearer the top. That sale is highlighted in the list.
    - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the highest of
      **GameStop's pre-owned price**, **Amazon's lowest offer** (used, or
      new for New), and that sale.

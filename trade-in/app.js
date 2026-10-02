@@ -2144,9 +2144,12 @@ const FLOOR_OTHER = { id: 'other', rule: 'Not in the Game Pricing Guide: top rec
 // The sale the price comes from: the 90th percentile of the condition's normal recent sales (about the
 // 4th highest of 30). Checked against a month of the shop's own shelf prices (140 PS2/GameCube games,
 // Sept 2026): the single highest sale ran ~$12 high on average and was within $5 only 40% of the time;
-// the 90th percentile was within $5 65% of the time with no overall bias. Splitting by price or
-// skipping one-off highs did worse.
+// the 90th percentile was within $5 65% of the time with no overall bias. Skipping one-off highs did worse.
+// Expensive games are priced nearer the top, though: once the 90th-percentile sale reaches FLOOR_HIGH, the
+// second-highest normal sale is used instead. Same backtest: games the shop priced at $60+ went from 46% to
+// 71% within 10%, and all games from 68% to 72% within 10% (avg miss $8.05 -> $7.76).
 const FLOOR_PCT = 0.9;
+const FLOOR_HIGH = 8000;
 const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
 const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
@@ -2344,11 +2347,14 @@ function floorSales(cur = floorCur) {
     .sort((a, b) => b.price - a.price);
 }
 
-// The sale the tool goes by (see FLOOR_PCT). sales are highest first; odd listings never count.
+// The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH). sales are highest first; odd listings never count.
 function floorAutoSale(sales) {
-  const asc = sales.filter((s) => !s.odd).reverse();
-  if (!asc.length) return { sale: null, count: 0 };
-  return { sale: asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))], count: asc.length };
+  const normal = sales.filter((s) => !s.odd);
+  if (!normal.length) return { sale: null, count: 0 };
+  const asc = [...normal].reverse();
+  const p90 = asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))];
+  const sale = p90.price >= FLOOR_HIGH && normal.length > 1 ? normal[1] : p90;
+  return { sale, count: normal.length, high: sale !== p90 };
 }
 
 // What sets the price: { basis (cents) | null, from: 'sale'|'gamestop'|'typed', sale, checks, need }.
@@ -2405,7 +2411,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The price goes by the highlighted sale: the high end of normal sales (90th percentile), so one lucky sale doesn't set it. Click any sale to use it instead. Lots, sealed copies, and other odd listings never count.</p>`;
+      <p class="muted small-print">The price goes by the highlighted sale: the high end of normal sales (90th percentile; the second-highest sale for games selling around $80 and up), so one lucky sale doesn't set it. Click any sale to use it instead. Lots, sealed copies, and other odd listings never count.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
