@@ -695,9 +695,10 @@ Guide (the Google Sheet tab).
      doesn't set the price. That sale is highlighted in the list.
    - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the highest of
      **GameStop's pre-owned price**, **Amazon's lowest offer** (used, or
-     new for New), and that sale. Amazon's offers are listed under the
-     sales, prices including shipping. On other systems, click **Check
-     Amazon** to see them.
+     new for New), and that sale.
+   - **Amazon's offers show on every game**, listed under the sales
+     (prices include shipping). On older systems they're for reference
+     only: the price still comes from the eBay sales.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
 4. Only look closer when it says **Double-check** (very few sales, or no

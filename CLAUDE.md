@@ -565,8 +565,11 @@ The site's **only server-side code**. Everything else is static.
     **Amazon only returns its ~20 lowest offers per condition** (no API
     lists more); the tab shows them all and "N lowest of M". Renewed
     copies are separate ASINs, so they never appear. Loose/CIB compare
-    with **Used**, New with **New**. Modern systems load it
-    automatically; other systems get a "Check Amazon" link. The game
+    with **Used**, New with **New**. **Loaded automatically for every
+    game**, but **only modern systems use it in the price**; older
+    systems show it "for reference only" and price from eBay sales
+    (owner's choice — retro Amazon listings are third-party asking
+    prices, often far above actual sales). The game
     needs a UPC on PriceCharting to match. `GET amazon/test` checks the
     keys (token exchange only). For local testing, `P2W_AMAZON_LWA` /
     `P2W_AMAZON_HOST` env vars point the server at a fake Amazon.

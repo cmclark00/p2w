@@ -2277,7 +2277,7 @@ function pickFloorGame(product) {
   renderFloorPricer();
   loadFloorSales(product);
   const tier = floorTier(product['console-name']);
-  const needsFull = (tier.gamestop && !('gamestop-price' in product)) || (tier.amazon && amazonSet && !product.upc);
+  const needsFull = (tier.gamestop && !('gamestop-price' in product)) || (amazonSet && !product.upc);
   if (needsFull && tokenSet) {
     PC.byId(product.id).then((full) => {
       if (floorCur?.product !== product || !full) return;
@@ -2291,11 +2291,12 @@ function pickFloorGame(product) {
   }
 }
 
-// Amazon's offers for the game being priced (modern systems, or when staff click "Check Amazon").
-async function loadFloorAmazon(force = false) {
+// Amazon's offers for the game being priced, loaded for every game. Only modern systems (tier.amazon)
+// use them in the price; older systems show them for reference (owner's choice: retro Amazon listings
+// are third-party asking prices, often well above what copies actually sell for).
+async function loadFloorAmazon() {
   const cur = floorCur;
   if (!cur || !amazonSet) return;
-  if (!force && !floorTier(cur.product['console-name']).amazon) return;
   const upc = String(cur.product.upc || '').split(/[,\s]+/)[0];
   const cond = amazonCond(cur.condition);
   if (!/^\d{8,14}$/.test(upc)) { cur.amazon = { error: 'No barcode for this game on PriceCharting, so Amazon can’t be matched.' }; renderFloorPricer(); return; }
@@ -2454,7 +2455,7 @@ function floorAmazonHtml(cur, tier, b) {
   if (!amazonSet) return '';
   const a = cur.amazon;
   const label = `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
-  if (!a) return tier.amazon ? '' : `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
+  if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">This game isn't on Amazon (no match for its barcode).</p>`;
@@ -2465,7 +2466,7 @@ function floorAmazonHtml(cur, tier, b) {
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${used && i === 0 ? 'picked' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === 0 ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Prices include shipping.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+    <p class="muted small-print">Prices include shipping.${tier.amazon ? '' : ' For reference only: older games are priced from eBay sales.'}${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {
@@ -2502,7 +2503,7 @@ function onFloorPricerClick(e) {
     const amazonChanged = amazonCond(cond) !== amazonCond(floorCur.condition);
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
     if (cond !== 'cib') floorCur.manualMissing = false;
-    if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(true); }
+    if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
     renderFloorPricer();
     return;
   }
@@ -2511,7 +2512,7 @@ function onFloorPricerClick(e) {
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; renderFloorPricer(); return; }
-  if (act === 'amazon') { loadFloorAmazon(true); return; }
+  if (act === 'amazon') { loadFloorAmazon(); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();
