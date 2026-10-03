@@ -945,8 +945,14 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     the old map). A new pass starts once the listings are newer than the
     last finished map. (The first version read every page at once and
     made `sync.php` return HTTP 500 on the live server, likely memory, so
-    don't go back to that.) The status page's "matched N of M" is the
-    health check.
+    don't go back to that.) A new pass starts at most hourly
+    (`VARIANT_MIN_MINUTES`; a full pass is ~256 slow pages / ~47k
+    variants, including out-of-stock ones), and `shop-sync.yml` keeps
+    calling until `variants.pending` is gone. The status page's "matched
+    N of M" is the health check, with `unmatchedExamples` (condition +
+    descriptor spellings on each side) listed under it. First live pass
+    (Oct 3 2026): 3,957 of 4,346 matched (322 via the only-variant
+    fallback), 389 unmatched → "Ask at the register".
 - **Secrets:** `.env.example` lists the settings; real values go in
   `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
   git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,

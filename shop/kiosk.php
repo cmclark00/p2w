@@ -486,8 +486,15 @@ function kiosk_status_page(): void {
     . $row('Kiosk customer', h($cfg['customer']))
     . $row('Item ids from CrystalCommerce', $mins === null ? 'Not built yet (the inventory sync builds them)'
       : number_format((int)$v['matched']) . ' of ' . number_format((int)$v['listings']) . ' listings matched, ' . $mins . ' min ago');
+  // Why some listings have no CrystalCommerce variant: how each side describes the item (no customer data).
+  $examples = '';
+  foreach ($v['unmatchedExamples'] ?? [] as $ex) {
+    $desc = function ($pair) { return h(trim($pair[0] . ($pair[1] !== '' ? ' · ' . $pair[1] : ''))); };
+    $examples .= '<li>Listing: <strong>' . $desc($ex['listing']) . '</strong> → variants: ' . ($ex['variants'] ? implode(', ', array_map($desc, $ex['variants'])) : 'none for this product') . '</li>';
+  }
   $body = '<section class="shop-section kiosk-status"><p class="eyebrow">Kiosk</p><h1>Kiosk status</h1>
       <table class="kiosk-status-table"><tbody>' . $rows . '</tbody></table>
+      ' . ($examples !== '' ? '<details class="kiosk-howto"><summary>Examples of unmatched listings (' . number_format((int)($v['unmatched'] ?? 0)) . ')</summary><ul>' . $examples . '</ul></details>' : '') . '
       <p class="kiosk-actions"><a class="button primary" href="/shop">Go to the shop</a>' . (kiosk_staff() ? '<a class="button secondary" href="/shop/kiosk/orders">Kiosk orders</a>' : '')
       . (kiosk_active() ? '<a class="button secondary" href="/shop/kiosk/exit">Turn kiosk mode off</a>' : '') . '</p></section>';
   shop_page('Kiosk status', 'Kiosk status', $body, ['crumbs' => [], 'idle' => 0]);

@@ -24,6 +24,7 @@ require __DIR__ . '/lib.php';
 const SYNC_MIN_MINUTES = 10;
 const SYNC_PER_PAGE = 500;
 const VARIANT_PER_PAGE = 200;
+const VARIANT_MIN_MINUTES = 60;   // a full variants pass is ~250 slow Admin API pages, so at most hourly
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -170,14 +171,15 @@ if (shop_env('CC_API_PROXY_SECRET') !== '') {
  * The store has many variants pages and the Admin API is slow, so one pass is spread over several runs:
  * pages are read 6 at a time, slimmed down right away, and the progress is saved in variants-progress.json
  * until the queue is empty. Then the listings are matched and variants.json is replaced. A new pass starts
- * once the listings are newer than the last finished map.
+ * once the listings are newer than the last finished map and it's at least VARIANT_MIN_MINUTES old.
  */
 function sync_variants(array $listings, int $listingsAt, float $deadline): ?array {
   $progressFile = 'variants-progress.json';
   $prog = shop_read_json($progressFile);
   if (!is_array($prog) || !isset($prog['queue'])) {
     $old = shop_read_json('variants.json');
-    if (is_array($old) && (int)($old['at'] ?? 0) >= $listingsAt) return null; // up to date
+    // Up to date, or refreshed recently enough (checkout re-checks stock and price live anyway).
+    if (is_array($old) && ((int)($old['at'] ?? 0) >= $listingsAt || time() - (int)($old['at'] ?? 0) < VARIANT_MIN_MINUTES * 60)) return null;
     [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
     $queue = [];
     foreach ((is_array($cats) ? $cats['category']['children'] ?? [] : []) as $c) {
@@ -231,6 +233,7 @@ function sync_variants(array $listings, int $listingsAt, float $deadline): ?arra
   if ($prog['queue']) return ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count']];
 
   $map = [];
+  $examples = [];
   $loose = $missing = 0;
   foreach ($listings as $l) {
     $cands = $prog['byPid'][(string)$l['pid']] ?? [];
@@ -246,10 +249,12 @@ function sync_variants(array $listings, int $listingsAt, float $deadline): ?arra
     // A product with a single variant can only be that one, even if its descriptors are spelled differently.
     if (count($cands) === 1) { $map[$l['id']] = $cands[0][0]; $loose++; continue; }
     $missing++;
+    // A few examples for the status check: how the listing and its candidate variants are described.
+    if (count($examples) < 12) $examples[] = ['listing' => [$l['c'], $want], 'variants' => array_map(function ($c) { return [$c[1], $c[2]]; }, array_slice($cands, 0, 6)), 'variantCount' => count($cands)];
   }
   $stats = ['at' => time(), 'variants' => $prog['count'], 'pages' => $prog['pages'], 'listings' => count($listings),
     'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing, 'passMinutes' => (int)round((time() - $prog['started']) / 60)];
-  shop_write_json('variants.json', $stats + ['map' => $map]);
+  shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'map' => $map]);
   @unlink(shop_data_dir() . '/' . $progressFile);
   return $stats;
 }
