@@ -16,7 +16,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$done = shop_data_dir() . '/test-order2e.json';
+$done = shop_data_dir() . '/test-order2f.json';
 $lock = fopen(shop_data_dir() . '/test-order2.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -125,10 +125,10 @@ $order = [
 // 2. Order status "Awaiting Payment" (seen on live orders; run 1 showed a payment record is required).
 // Payment statuses: whatever the live Awaiting Payment orders use first, then likely names. Stops at the first accepted.
 $desc = 'Pay at register - nothing collected yet (TEST)';
+// Runs 1-5: CrystalCommerce only accepts a NEW API order as Payment Received (every unpaid status was
+// refused, with every payment record tried). So create it the proven way, then switch it with PUT /orders/{id}.
 $combos = [
-  ['Awaiting Payment', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
-  ['Awaiting Payment', ['status' => 'Received', 'amount' => '0.00', 'description' => $desc]],
-  ['Awaiting Payment', ['status' => 'Received', 'amount' => $amount, 'description' => $desc]],
+  ['Payment Received', ['status' => 'Received', 'amount' => $amount, 'description' => 'TEST - pay at register, nothing collected']],
 ];
 $out['attempts'] = [];
 $created = null;
@@ -147,6 +147,15 @@ if ($created) {
     'payment' => $scrub($o['payment'] ?? $o['payments'] ?? []),
     'items' => array_map(function ($li) { return $li['line_item']['name'] ?? null; }, $o['line_items'] ?? [])];
   if ($id) {
+    $out['statusUpdates'] = [];
+    foreach (['Awaiting Payment', 'Processing'] as $want) {
+      [$s, $j, $raw] = cc('PUT', "$base/orders/$id", 'admin:read-orders', $secret, $user, ['order' => ['status' => $want]]);
+      $o2 = is_array($j) ? ($j['order'] ?? $j) : [];
+      $out['statusUpdates'][] = ['to' => $want, 'http' => $s, 'statusAfter' => $o2['status'] ?? null, 'error' => $s < 300 ? null : err_text($j, $raw)];
+      if ($s >= 200 && $s < 300) break;
+    }
+    [$s, $j] = cc('GET', "$base/orders/$id", 'admin:read-orders', $secret, $user);
+    $out['readBack'] = ['http' => $s, 'status' => is_array($j) ? (($j['order'] ?? $j)['status'] ?? null) : null];
     [$s, $j, $raw] = cc('GET', "$base/orders/$id/available_shipping", 'admin:read-orders', $secret, $user);
     $out['availableShipping'] = ['http' => $s, 'body' => $s === 200 ? $j : err_text($j, $raw)];
   }
