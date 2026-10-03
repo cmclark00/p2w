@@ -857,8 +857,29 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     and `billing_address_attributes` are both required and **`address2`
     can't be blank**; `line_items_attributes` must be a JSON **object**
     keyed "0", "1", … (not a list); `status: "Payment Received"` +
-    `payment_attributes`. `GET /orders/{id}/available_shipping` returned
-    503 at the time (retry). The one-time test script was removed after.
+    `payment_attributes`. The one-time test script was removed after.
+  - **No unpaid orders via the API** (test #2, Oct 3 2026, order
+    **#277128**, Beedrill $0.23, TEST, to be cancelled). A create without
+    `payment_attributes` is refused ("Payment Attributes is required").
+    Any status other than `Payment Received` gets a detail-less 422
+    `invalid_resource`: Awaiting Payment, Processing and In Checkout,
+    with payment status Pending/pending/Failed/Received, $0 or the full
+    amount, or no status. `PUT /orders/{id}` with `{status: "Awaiting
+    Payment"}` returns 200 but **silently leaves the status unchanged**.
+    So kiosk (pay-at-register) orders must be created as `Payment
+    Received` and marked unpaid some other way (comments, employee name,
+    our own open-orders list).
+  - Live orders use these statuses: Shipped, In Checkout, Payment
+    Received, Abandoned, Void, Awaiting Payment.
+  - `GET /orders/{id}/available_shipping` **works** (it was 503 once).
+    It returns live prices for In Store (`method_id` 1, $0) and the USPS
+    `service_id`s (142, 143, 144, 133, 121, 114, 119, 128, 132), so
+    checkout can quote CC's real rates.
+  - **Kiosks:** two in-store kiosks (headless Linux, locked Chrome kiosk
+    mode) on the shop's public IP **162.81.197.116**. Kiosk orders are
+    pickup + pay at the register only. Staff ring them up in **Fulcrum**
+    as "TCG singles". Fulcrum doesn't track TCG stock; that lives only
+    in CrystalCommerce, so the CC order is what holds the cards.
   - Payment: the CC store takes online payments through **PayPal**, so a
     native checkout would use PayPal (REST app keys
     `PAYPAL_{SANDBOX,LIVE}_{CLIENT_ID,SECRET}` in the same `.env`), then
