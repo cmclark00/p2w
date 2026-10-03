@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$cache = shop_data_dir() . '/admin-check-v4.json';
+$cache = shop_data_dir() . '/admin-check-v5.json';
 if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
@@ -121,6 +121,33 @@ try {
   $out['checks']['prefsStore'] = ['status' => $s, 'fields' => is_array($first) ? array_keys($first) : (is_array($j) ? array_keys($j) : []), 'raw' => $s === 200 ? null : $raw];
 } catch (Throwable $t) {
   $out['checks']['prefsStore'] = ['error' => get_class($t) . ': ' . $t->getMessage()];
+}
+
+// 3c. One recent web order in full detail, structure only: which nested records an order points at
+//     (customer, addresses, ship rate, payment), with ids but no names, emails, addresses, or phones.
+try {
+  $detail = null;
+  [$s, $j] = cc_get($base, '/orders?per_page=25&page=1', 'admin:read-orders', $secret, $user);
+  $list = is_array($j) ? ($j['paginated_collection']['entries'] ?? (isset($j[0]) ? $j : [])) : [];
+  foreach ($list as $e) {
+    $o = is_array($e) ? ($e['order'] ?? $e) : null;
+    if (!is_array($o) || !empty($o['is_pos']) || empty($o['id'])) continue;
+    [$s2, $d] = cc_get($base, '/orders/' . (int)$o['id'], 'admin:read-orders', $secret, $user);
+    $d = is_array($d) ? ($d['order'] ?? $d) : null;
+    if (!is_array($d)) continue;
+    $safe = function ($v, $k = '') use (&$safe) {
+      if (is_array($v)) { $r = []; foreach ($v as $kk => $vv) $r[$kk] = $safe($vv, (string)$kk); return $r; }
+      // Keep ids, flags, and short codes; blank out everything that could be personal.
+      if (preg_match('/(^|_)id$|^(status|carrier|service|country|state|currency|origin|is_.*|in_store_pickup|method.*)$/', $k)) return $v;
+      return is_numeric($v) || is_bool($v) || $v === null ? $v : '…';
+    };
+    unset($d['line_items']);
+    $detail = ['httpStatus' => $s2, 'order' => $safe($d)];
+    break;
+  }
+  $out['checks']['webOrderDetail'] = $detail;
+} catch (Throwable $t) {
+  $out['checks']['webOrderDetail'] = ['error' => get_class($t) . ': ' . $t->getMessage()];
 }
 
 // 4. Customers (customers scope): same, no customer data.
