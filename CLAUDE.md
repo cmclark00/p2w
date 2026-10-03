@@ -877,6 +877,12 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     stock** (that variant's `available_qty` went 2 → 1). The owner then
     moved it Preorder → Payment Received → Shipped by hand without
     trouble, so **kiosk orders are created as `Preorder`**.
+  - **Not `Processing`** (test #4, Oct 3 2026, order **#277146**, 15¢
+    Yu-Gi-Oh card, TEST): creating as Processing is refused (422); a
+    Preorder changed to Processing with `PUT /orders/{id}` does stick (so
+    forward status changes via the API work), **but the card's
+    `available_qty` read 2 before and 2 after, so Processing doesn't hold
+    the stock** the way Preorder did (2 → 1).
   - **Emails:** CC sends **nothing when an order is created through the
     API**. It **does** email the order's customer when staff change the
     status in CC's admin: the owner's manual status change on #277128
