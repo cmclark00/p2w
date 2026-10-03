@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$cache = shop_data_dir() . '/admin-check-v3.json';
+$cache = shop_data_dir() . '/admin-check-v4.json';
 if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
@@ -87,27 +87,41 @@ if ($catId) {
 $out['checks']['orders'] = ['status' => $s, 'total' => $j['paginated_collection']['total_entries'] ?? (is_array($j) ? count($j) : null), 'fields' => shape($j), 'raw' => $s === 200 ? null : $raw];
 
 // 3b. Shipping methods on recent website orders (carrier/service/method fields only, no customer data),
-//     to learn the store's ship-method ids for website orders.
-$ship = [];
-for ($page = 1; $page <= 3; $page++) {
-  [$s, $j] = cc_get($base, "/orders?per_page=50&page=$page", 'admin:read-orders', $secret, $user);
-  $list = $j['paginated_collection']['entries'] ?? (is_array($j) && isset($j[0]) ? $j : []);
-  foreach ($list as $e) {
-    $o = $e['order'] ?? $e;
-    if (!empty($o['is_pos'])) continue;
-    foreach ($o['shipping_lines'] ?? [] as $sl) {
-      $l = $sl['shipping_line'] ?? $sl;
-      unset($l['address'], $l['shipping_address']);
-      $key = json_encode([$l['carrier'] ?? null, $l['service'] ?? null]);
-      $ship[$key] = ['carrier' => $l['carrier'] ?? null, 'service' => $l['service'] ?? null, 'amount_cents' => $l['amount']['money']['cents'] ?? null,
-        'fields' => array_keys($l), 'ids' => array_intersect_key($l, array_flip(['id', 'method_id', 'ship_method_id', 'ship_rate_id', 'shipping_method_id']))];
+//     to learn the store's ship-method ids for website orders. Defensive: CrystalCommerce's shapes vary.
+try {
+  $ship = [];
+  $examples = [];
+  for ($page = 1; $page <= 2; $page++) {
+    [$s, $j] = cc_get($base, "/orders?per_page=50&page=$page", 'admin:read-orders', $secret, $user);
+    $list = is_array($j) ? ($j['paginated_collection']['entries'] ?? (isset($j[0]) ? $j : [])) : [];
+    foreach ($list as $e) {
+      $o = is_array($e) ? ($e['order'] ?? $e) : null;
+      if (!is_array($o) || !empty($o['is_pos'])) continue;
+      foreach ((array)($o['shipping_lines'] ?? []) as $sl) {
+        $l = is_array($sl) ? ($sl['shipping_line'] ?? $sl) : null;
+        if (!is_array($l)) continue;
+        $amt = $l['amount'] ?? null;
+        $cents = is_array($amt) ? ($amt['money']['cents'] ?? null) : $amt;
+        $key = json_encode([$l['carrier'] ?? null, $l['service'] ?? null]);
+        $ids = [];
+        foreach (['id', 'method_id', 'ship_method_id', 'ship_rate_id', 'shipping_method_id', 'code'] as $k) if (isset($l[$k]) && !is_array($l[$k])) $ids[$k] = $l[$k];
+        $ship[$key] = ['carrier' => $l['carrier'] ?? null, 'service' => $l['service'] ?? null, 'amount_cents' => $cents, 'fields' => array_keys($l), 'ids' => $ids];
+      }
+      if (count($examples) < 1) $examples[] = array_values(array_diff(array_keys($o), ['line_items']));
     }
-    if (isset($o['ship_rate'])) $out['checks']['orderShipRateExample'] = array_keys((array)$o['ship_rate']);
   }
+  $out['checks']['shippingSeen'] = array_values($ship);
+  $out['checks']['webOrderFields'] = $examples[0] ?? [];
+} catch (Throwable $t) {
+  $out['checks']['shippingSeen'] = ['error' => get_class($t) . ': ' . $t->getMessage() . ' line ' . $t->getLine()];
 }
-$out['checks']['shippingSeen'] = array_values($ship);
-[$s, $j, $raw] = cc_get($base, '/prefs/store', 'admin:read-prefs', $secret, $user);
-$out['checks']['prefsStore'] = ['status' => $s, 'fields' => is_array($j) ? array_keys(reset($j) ?: []) : [], 'raw' => $s === 200 ? null : $raw];
+try {
+  [$s, $j, $raw] = cc_get($base, '/prefs/store', 'admin:read-prefs', $secret, $user);
+  $first = is_array($j) ? reset($j) : null;
+  $out['checks']['prefsStore'] = ['status' => $s, 'fields' => is_array($first) ? array_keys($first) : (is_array($j) ? array_keys($j) : []), 'raw' => $s === 200 ? null : $raw];
+} catch (Throwable $t) {
+  $out['checks']['prefsStore'] = ['error' => get_class($t) . ': ' . $t->getMessage()];
+}
 
 // 4. Customers (customers scope): same, no customer data.
 [$s, $j, $raw] = cc_get($base, '/customers?per_page=1&page=1', 'admin:read-customers', $secret, $user);
