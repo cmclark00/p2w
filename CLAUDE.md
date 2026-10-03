@@ -883,6 +883,12 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     forward status changes via the API work), **but the card's
     `available_qty` read 2 before and 2 after, so Processing doesn't hold
     the stock** the way Preorder did (2 → 1).
+  - **Not "on hold"** (test #5, Oct 3 2026, order **#277148**, 15¢
+    Yu-Gi-Oh card, TEST): Preorder + `on_hold: true` was accepted (200),
+    but the order read back `is_on_hold: false` with a **blank status**,
+    `PUT {on_hold: true}` / `{is_on_hold: true}` answered 200 and changed
+    nothing, and the card's `available_qty` stayed 10 → 10 (not held).
+    Don't send `on_hold` on kiosk orders.
   - **Emails:** CC sends **nothing when an order is created through the
     API**. It **does** email the order's customer when staff change the
     status in CC's admin: the owner's manual status change on #277128
