@@ -16,7 +16,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$done = shop_data_dir() . '/test-order2c.json';
+$done = shop_data_dir() . '/test-order2d.json';
 $lock = fopen(shop_data_dir() . '/test-order2.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -124,18 +124,19 @@ $order = [
 
 // 2. Order status "Awaiting Payment" (seen on live orders; run 1 showed a payment record is required).
 // Payment statuses: whatever the live Awaiting Payment orders use first, then likely names. Stops at the first accepted.
-$payOptions = [
-  ['amount' => '0.00', 'description' => 'Pay at register - nothing collected yet (TEST)'],
-  ['status' => 'Received', 'amount' => '0.00', 'description' => 'Pay at register - nothing collected yet (TEST)'],
-  ['status' => 'pending', 'amount' => $amount, 'description' => 'Pay at register - nothing collected yet (TEST)'],
-  ['status' => 'Failed', 'amount' => $amount, 'description' => 'Pay at register - nothing collected yet (TEST)'],
+$desc = 'Pay at register - nothing collected yet (TEST)';
+$combos = [
+  ['Processing', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
+  ['In Checkout', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
+  ['Processing', ['status' => 'Received', 'amount' => '0.00', 'description' => $desc]],
+  ['Awaiting Payment', ['status' => 'Received', 'amount' => $amount, 'description' => $desc]],
 ];
 $out['attempts'] = [];
 $created = null;
-foreach ($payOptions as $payment) {
+foreach ($combos as [$ost, $payment]) {
   [$s, $j, $raw] = cc('POST', "$base/orders", 'admin:read-orders', $secret, $user,
-    ['order' => ['status' => 'Awaiting Payment', 'payment_attributes' => $payment] + $order]);
-  $out['attempts'][] = ['payment' => $payment, 'http' => $s, 'error' => $s < 300 ? null : err_text($j, $raw)];
+    ['order' => ['status' => $ost, 'payment_attributes' => $payment] + $order]);
+  $out['attempts'][] = ['orderStatus' => $ost, 'payment' => $payment, 'http' => $s, 'error' => $s < 300 ? null : err_text($j, $raw)];
   if ($s >= 200 && $s < 300) { $created = is_array($j) ? $j : ['unparsed' => substr($raw, 0, 300)]; break; }
 }
 
