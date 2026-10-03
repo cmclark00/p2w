@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$cache = shop_data_dir() . '/admin-check-v5.json';
+$cache = shop_data_dir() . '/admin-check-v6.json';
 if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
@@ -148,6 +148,28 @@ try {
   $out['checks']['webOrderDetail'] = $detail;
 } catch (Throwable $t) {
   $out['checks']['webOrderDetail'] = ['error' => get_class($t) . ': ' . $t->getMessage()];
+}
+
+// 3d. Which "origin" values orders use (the API only accepts some): counts per origin from the first page
+//     and the newest pages. Labels only.
+try {
+  $origins = [];
+  [$s, $j] = cc_get($base, '/orders?per_page=50&page=1', 'admin:read-orders', $secret, $user);
+  $pc = is_array($j) ? ($j['paginated_collection'] ?? []) : [];
+  $last = (int)($pc['total_pages'] ?? 1);
+  $pages = array_unique([1, max(1, $last - 3), max(1, $last - 2), max(1, $last - 1), $last]);
+  foreach ($pages as $pg) {
+    [$s, $j] = cc_get($base, "/orders?per_page=50&page=$pg", 'admin:read-orders', $secret, $user);
+    foreach ((is_array($j) ? ($j['paginated_collection']['entries'] ?? []) : []) as $e) {
+      $o = $e['order'] ?? $e;
+      $key = ($o['origin'] ?? '(none)') . (!empty($o['is_pos']) ? ' [POS]' : '');
+      $origins[$key] = ($origins[$key] ?? 0) + 1;
+    }
+  }
+  arsort($origins);
+  $out['checks']['orderOrigins'] = ['pagesRead' => array_values($pages), 'counts' => $origins];
+} catch (Throwable $t) {
+  $out['checks']['orderOrigins'] = ['error' => get_class($t) . ': ' . $t->getMessage()];
 }
 
 // 4. Customers (customers scope): same, no customer data.
