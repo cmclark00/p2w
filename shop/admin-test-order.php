@@ -23,7 +23,7 @@ header('X-Robots-Tag: noindex');
 // v4: v1-v3 created nothing. v3's 422 was most likely ship method 1, which doesn't exist in this store
 // (its enabled methods are USPS static ones: 133 Ground Advantage, 114 Priority Flat Rate Envelope, ...;
 // no custom methods, so in-store pickup is an order flag, not a ship method).
-$done = shop_data_dir() . '/test-order-v6.json'; // v5: existing customer still 422 "invalid_resource" -> show the full error body
+$done = shop_data_dir() . '/test-order-v7.json'; // v6: "Origin is not included in the list" -> use Direct
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -74,7 +74,9 @@ $amount = number_format($pick['price'] / 100, 2, '.', '');
 
 $note = 'TEST ORDER from play2wingames.com - please cancel. Not a real sale or payment.';
 $order = [
-  'origin' => 'play2wingames.com', 'employee_name' => 'Website (TEST)', 'status' => 'Payment Received',
+  // origin must be one of CrystalCommerce's own values; this store's orders use TcgPlayer, Direct, and Ebay.
+  // Direct = the store's own online sales. The employee name and comments say it came from the website.
+  'origin' => 'Direct', 'employee_name' => 'Website (TEST)', 'status' => 'Payment Received',
   'customer_comments' => $note, 'vendor_comments' => $note, 'in_store_pickup' => true,
   'ship_price' => '0', 'tax' => '0',
   'payment_attributes' => ['status' => 'Received', 'amount' => $amount, 'description' => 'TEST - no money was taken'],
