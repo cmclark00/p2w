@@ -20,7 +20,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 // v2: the first run (test-order.json) created nothing; CrystalCommerce listed the required fields.
-$done = shop_data_dir() . '/test-order-v2.json';
+$done = shop_data_dir() . '/test-order-v3.json'; // v2 also created nothing (Address2 can't be blank)
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -84,7 +84,7 @@ $order = [
 ];
 // In-store pickup test: the store's own address for both.
 $address = [
-  'firstname' => 'TEST ORDER', 'lastname' => 'Play2Win Website', 'address1' => '3903 Western Avenue', 'address2' => '',
+  'firstname' => 'TEST ORDER', 'lastname' => 'Play2Win Website', 'address1' => '3903 Western Avenue', 'address2' => 'In-store pickup', // CrystalCommerce rejects a blank address2
   'city' => 'Knoxville', 'state' => 'TN', 'postal_code' => '37921', 'country' => 'US', 'phone' => '8659108357',
 ];
 $order['shipping_address_attributes'] = $address;
