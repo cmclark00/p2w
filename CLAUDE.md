@@ -935,10 +935,18 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     mode, the IP seen, whether this kiosk can order, and the variant-map
     match count.
   - **Variant ids:** `sync.php` maps every listing to CC's variant id
-    (`variants.json`, re-read with the listings) by product
-    (`product_catalog_id` = Core2 product id) + normalized condition +
-    other descriptors, falling back to the only variant of a product. The
-    status page's "matched N of M" is the health check.
+    (`variants.json`) by product (`product_catalog_id` = Core2 product
+    id) + normalized condition + other descriptors, falling back to the
+    only variant of a product. It's the **last** sync step (after
+    `index.json` is saved) and wrapped in try/catch, and one pass is
+    **spread over several runs**: variants pages are read 6 at a time,
+    slimmed immediately, and saved in `variants-progress.json` until the
+    queue is empty (a page that fails 3 times abandons the pass and keeps
+    the old map). A new pass starts once the listings are newer than the
+    last finished map. (The first version read every page at once and
+    made `sync.php` return HTTP 500 on the live server, likely memory, so
+    don't go back to that.) The status page's "matched N of M" is the
+    health check.
 - **Secrets:** `.env.example` lists the settings; real values go in
   `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
   git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,
