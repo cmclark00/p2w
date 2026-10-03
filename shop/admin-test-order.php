@@ -19,7 +19,8 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$done = shop_data_dir() . '/test-order.json';
+// v2: the first run (test-order.json) created nothing; CrystalCommerce listed the required fields.
+$done = shop_data_dir() . '/test-order-v2.json';
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -77,17 +78,24 @@ $order = [
   'customer_comments' => $note, 'vendor_comments' => $note, 'in_store_pickup' => true,
   'ship_price' => '0', 'tax' => '0',
   'payment_attributes' => ['status' => 'Received', 'amount' => $amount, 'description' => 'TEST - no money was taken'],
-  'line_items_attributes' => ['0' => ['qty' => 1, 'variant_id' => (string)$pick['id'], 'price' => $amount]],
+  // An object keyed "0" (CrystalCommerce wants a hash, and PHP would encode a plain [0 => ...] array as a list).
+  'line_items_attributes' => (object)['0' => ['qty' => 1, 'variant_id' => (string)$pick['id'], 'price' => $amount]],
+  'customer_attributes' => ['email' => 'inquiries@play2wingames.com', 'fullname' => 'TEST ORDER Play2Win Website'],
 ];
+// In-store pickup test: the store's own address for both.
+$address = [
+  'firstname' => 'TEST ORDER', 'lastname' => 'Play2Win Website', 'address1' => '3903 Western Avenue', 'address2' => '',
+  'city' => 'Knoxville', 'state' => 'TN', 'postal_code' => '37921', 'country' => 'US', 'phone' => '8659108357',
+];
+$order['shipping_address_attributes'] = $address;
+$order['billing_address_attributes'] = $address;
 $extras = [
-  'minimal' => [],
-  '+customer' => ['customer_attributes' => ['email' => 'inquiries@play2wingames.com', 'fullname' => 'TEST ORDER Play2Win Website']],
-  '+customer+ship_rate' => ['customer_attributes' => ['email' => 'inquiries@play2wingames.com', 'fullname' => 'TEST ORDER Play2Win Website'], 'ship_rate_attributes' => ['method_id' => 1]],
+  'ship_rate 1' => ['ship_rate_attributes' => ['method_id' => 1]],
 ];
 
 $created = null;
 foreach ($extras as $label => $extra) {
-  foreach (['admin:write-orders', 'admin:read-orders'] as $scope) {
+  foreach (['admin:read-orders'] as $scope) { // the documented scope; admin:write-orders is refused (insufficient_scope)
     [$s, $j, $raw] = cc('POST', "$base/orders", $scope, $secret, $user, ['order' => $order + $extra]);
     $out['attempts'][] = ['try' => $label, 'scope' => $scope, 'status' => $s, 'error' => $s < 300 ? null : err_text($j, $raw)];
     if ($s >= 200 && $s < 300) { $created = is_array($j) ? $j : ['unparsed' => substr($raw, 0, 300)]; break 2; }
