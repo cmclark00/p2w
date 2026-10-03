@@ -20,7 +20,10 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 // v2: the first run (test-order.json) created nothing; CrystalCommerce listed the required fields.
-$done = shop_data_dir() . '/test-order-v3.json'; // v2 also created nothing (Address2 can't be blank)
+// v4: v1-v3 created nothing. v3's 422 was most likely ship method 1, which doesn't exist in this store
+// (its enabled methods are USPS static ones: 133 Ground Advantage, 114 Priority Flat Rate Envelope, ...;
+// no custom methods, so in-store pickup is an order flag, not a ship method).
+$done = shop_data_dir() . '/test-order-v4.json';
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -90,13 +93,16 @@ $address = [
 $order['shipping_address_attributes'] = $address;
 $order['billing_address_attributes'] = $address;
 $extras = [
-  'ship_rate 1' => ['ship_rate_attributes' => ['method_id' => 1]],
+  'method 133 (Ground Advantage) + pickup' => ['ship_rate_attributes' => ['method_id' => 133]],
+  'method 114 (Priority Flat Rate Env) + pickup' => ['ship_rate_attributes' => ['method_id' => 114]],
+  'method 133, no pickup flag' => ['ship_rate_attributes' => ['method_id' => 133], 'in_store_pickup' => null],
 ];
 
 $created = null;
 foreach ($extras as $label => $extra) {
   foreach (['admin:read-orders'] as $scope) { // the documented scope; admin:write-orders is refused (insufficient_scope)
-    [$s, $j, $raw] = cc('POST', "$base/orders", $scope, $secret, $user, ['order' => $order + $extra]);
+    $payload = array_filter($extra + $order, function ($v) { return $v !== null; });
+    [$s, $j, $raw] = cc('POST', "$base/orders", $scope, $secret, $user, ['order' => $payload]);
     $out['attempts'][] = ['try' => $label, 'scope' => $scope, 'status' => $s, 'error' => $s < 300 ? null : err_text($j, $raw)];
     if ($s >= 200 && $s < 300) { $created = is_array($j) ? $j : ['unparsed' => substr($raw, 0, 300)]; break 2; }
     if ($s !== 401 && $s !== 403) break; // scope accepted; the payload is what failed, so try the next payload
