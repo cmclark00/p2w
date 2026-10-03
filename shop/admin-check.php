@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$cache = shop_data_dir() . '/admin-check-v2.json';
+$cache = shop_data_dir() . '/admin-check-v3.json';
 if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
@@ -85,6 +85,29 @@ if ($catId) {
 // 3. Orders (orders scope): only whether it works, how many, and the field names. No order contents.
 [$s, $j, $raw] = cc_get($base, '/orders?per_page=1&page=1', 'admin:read-orders', $secret, $user);
 $out['checks']['orders'] = ['status' => $s, 'total' => $j['paginated_collection']['total_entries'] ?? (is_array($j) ? count($j) : null), 'fields' => shape($j), 'raw' => $s === 200 ? null : $raw];
+
+// 3b. Shipping methods on recent website orders (carrier/service/method fields only, no customer data),
+//     to learn the store's ship-method ids for website orders.
+$ship = [];
+for ($page = 1; $page <= 3; $page++) {
+  [$s, $j] = cc_get($base, "/orders?per_page=50&page=$page", 'admin:read-orders', $secret, $user);
+  $list = $j['paginated_collection']['entries'] ?? (is_array($j) && isset($j[0]) ? $j : []);
+  foreach ($list as $e) {
+    $o = $e['order'] ?? $e;
+    if (!empty($o['is_pos'])) continue;
+    foreach ($o['shipping_lines'] ?? [] as $sl) {
+      $l = $sl['shipping_line'] ?? $sl;
+      unset($l['address'], $l['shipping_address']);
+      $key = json_encode([$l['carrier'] ?? null, $l['service'] ?? null]);
+      $ship[$key] = ['carrier' => $l['carrier'] ?? null, 'service' => $l['service'] ?? null, 'amount_cents' => $l['amount']['money']['cents'] ?? null,
+        'fields' => array_keys($l), 'ids' => array_intersect_key($l, array_flip(['id', 'method_id', 'ship_method_id', 'ship_rate_id', 'shipping_method_id']))];
+    }
+    if (isset($o['ship_rate'])) $out['checks']['orderShipRateExample'] = array_keys((array)$o['ship_rate']);
+  }
+}
+$out['checks']['shippingSeen'] = array_values($ship);
+[$s, $j, $raw] = cc_get($base, '/prefs/store', 'admin:read-prefs', $secret, $user);
+$out['checks']['prefsStore'] = ['status' => $s, 'fields' => is_array($j) ? array_keys(reset($j) ?: []) : [], 'raw' => $s === 200 ? null : $raw];
 
 // 4. Customers (customers scope): same, no customer data.
 [$s, $j, $raw] = cc_get($base, '/customers?per_page=1&page=1', 'admin:read-customers', $secret, $user);
