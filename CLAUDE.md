@@ -201,7 +201,7 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | `pairings.html` | **Player-facing tournament pairings view** — the fixed URL the table QR code points to. Full standard site chrome (header + CFP pill + nav + footer, `nav.js`/`konami.js`) since customers see it. Reads the newest `pairings` Firestore doc: extracted pairings render as a searchable gold-badged match-card list, else the screenshot big + tap-to-zoom; event name / Round N / "updated X min ago"; auto-refreshes every 25s. ⚠ Its inline Firebase uses a **named app** (`initializeApp(cfg, 'pairings')`) because `konami.js` on the same page lazily initializes the default app — a second default init throws `app/duplicate-app`. Still `noindex`, not in nav, not in sitemap. See **Tournament pairings** below. |
 | `pairings-admin.html` | **Hidden staff page** to post pairings. Passphrase + event + round + required Masters/Open screenshot + optional Junior/Senior screenshots (compressed client-side), publishes one new `pairings` Firestore doc. `noindex`, not in nav, not in sitemap. Link kept to staff only. |
 | `trade-in/` | **Hidden staff trade-in calculator** (`index.html` + `app.js` + `styles.css` + PHP back end `api.php`). Scan/search games (PriceCharting API) and consoles/controllers (Game Buying Guide prices) → cash + store credit per line, plus a **Floor Pricing** tab for shelf prices. Staff/manager logins. `noindex` (meta + `X-Robots-Tag` in `trade-in/.htaccess`), not in nav, not in sitemap. See **Trade-in calculator** below. |
-| `shop/` | **Native storefront (PREVIEW)** for the CrystalCommerce inventory: `/shop`, `/shop/search`, `/shop/category/<type>`, `/shop/product/<id>-<slug>`, routed by the root `.htaccess` to `shop/index.php`. `noindex` and out of the nav until the owners approve (`SHOP_PREVIEW` in `index.php`). See **Shop (CrystalCommerce)** below. |
+| `shop/` | **Native storefront (PREVIEW)** for the CrystalCommerce inventory: `/shop`, `/shop/search`, `/shop/category/<type>`, `/shop/product/<id>-<slug>`, routed by the root `.htaccess` to `shop/index.php`. `noindex` and out of the nav until the owners approve (`SHOP_PREVIEW` in `index.php`). Also runs the **in-store kiosks** (`shop/kiosk.php`, `/shop/kiosk/...`). See **Shop (CrystalCommerce)** below. |
 | `404.html` | Custom retro NES/Zelda easter-egg page. **Do not modify** (owner request). Uses Google's "Press Start 2P" font (the only remaining Google Fonts call). |
 
 ## Events (Google Calendar → events.json)
@@ -865,33 +865,89 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     `invalid_resource`: Awaiting Payment, Processing and In Checkout,
     with payment status Pending/pending/Failed/Received, $0 or the full
     amount, or no status. `PUT /orders/{id}` with `{status: "Awaiting
-    Payment"}` returns 200 but **silently leaves the status unchanged**.
+    Payment"}` returns 200 but **silently leaves the status unchanged**,
+    and the owner couldn't move it back by hand in CC's admin either, so
+    CC doesn't allow going from Payment Received back to Awaiting Payment.
     So kiosk (pay-at-register) orders must be created as `Payment
     Received` and marked unpaid some other way (comments, employee name,
     our own open-orders list).
+  - **Emails:** CC sends **nothing when an order is created through the
+    API**. It **does** email the order's customer when staff change the
+    status in CC's admin: the owner's manual status change on #277128
+    sent a "payment received" email right away. So online checkout must
+    send its own confirmation at order time, and CC's emails will follow
+    staff status changes (e.g. shipped). Kiosk orders should sit under a
+    shop-owned CC customer, so those status emails go to the shop.
   - Live orders use these statuses: Shipped, In Checkout, Payment
     Received, Abandoned, Void, Awaiting Payment.
   - `GET /orders/{id}/available_shipping` **works** (it was 503 once).
     It returns live prices for In Store (`method_id` 1, $0) and the USPS
     `service_id`s (142, 143, 144, 133, 121, 114, 119, 128, 132), so
     checkout can quote CC's real rates.
-  - **Kiosks:** two in-store kiosks (headless Linux, locked Chrome kiosk
-    mode) on the shop's public IP **162.81.197.116**. Kiosk orders are
-    pickup + pay at the register only. Staff ring them up in **Fulcrum**
-    as "TCG singles". Fulcrum doesn't track TCG stock; that lives only
-    in CrystalCommerce, so the CC order is what holds the cards.
   - Payment: the CC store takes online payments through **PayPal**, so a
     native checkout would use PayPal (REST app keys
     `PAYPAL_{SANDBOX,LIVE}_{CLIENT_ID,SECRET}` in the same `.env`), then
     create the CC order as `Payment Received`. Tax: 9.25% on pickup/TN,
     0% out of state (owner's choice). Shipping: copy CC's options.
-- **Secrets:** none needed today. `.env.example` lists the settings;
-  real values go in `<home>/p2w-shop-data/.env` (never in the repo —
-  `.env*` is git-ignored and excluded from the deploy).
+- **In-store kiosks — `shop/kiosk.php`, routes `/shop/kiosk/...`
+  (built Oct 2026, in TEST mode until the owner switches it).** Two
+  kiosks (headless Linux, locked-down Chrome kiosk mode) on the store's
+  public IP **162.81.197.116** browse the normal shop pages with a cart;
+  every order is **in-store pickup, paid at the register**. Staff ring
+  kiosk orders up in **Fulcrum** as "TCG singles" (Fulcrum doesn't track
+  TCG stock; that lives only in CrystalCommerce, so the CC order is what
+  holds the cards), then complete the order in CC.
+  - **Off until `KIOSK_KEY` is set.** A browser becomes a kiosk by
+    opening `/shop/kiosk/start?key=KIOSK_KEY` (HMAC-signed `p2w_kiosk`
+    cookie, path `/shop`, 400 days; also empties the cart, so it's the
+    kiosk's Chrome start page). Without the cookie every kiosk URL is a
+    404 and the shop looks as usual. `/shop/kiosk/exit` turns it off.
+  - **Kiosk pages:** own header (logo → `/shop`, "Pick up & pay at the
+    register" pill, cart button), no site nav/footer links/konami, so
+    there's no way off the shop. Product pages get **Add to cart** per
+    condition (`kiosk_add_form()` in `index.php`; "Ask at the register"
+    when the listing has no CC variant id). Cart = a signed cookie
+    (`p2w_kcart`: listing id, qty, confirmed price), 40 lines, 10 per item.
+  - **Checkout** (`kiosk_place_order()`): name only. Re-checks every line
+    live with `GET /variants/{id}` (stock + price, in parallel); sold-out,
+    short, or re-priced lines update the cart and ask the customer to
+    review before resubmitting. A one-time form token makes a double tap
+    show the same order. **`KIOSK_MODE=test` (default)** stops there and
+    records the order on our side only (numbers `T1`, `T2`…; works from any
+    IP). **`KIOSK_MODE=live`** only from `KIOSK_IPS`, then `POST /orders`
+    with the proven shape: origin Direct, status Payment Received,
+    employee name **"KIOSK - NOT PAID"**, NOT PAID comments and payment
+    description, In Store method 1, customer **`KIOSK_CUSTOMER_ID`
+    (222309, shop-owned)**, store address with the customer's name, tax 0
+    (Fulcrum charges tax at the register). The order number shown is CC's.
+  - **Order placed screen** (`/shop/kiosk/done/<num>`, 30 min): huge order
+    number, items, auto-return after 60 s. **Idle reset** (`shop.js`):
+    120 s without a touch → "Still shopping?" with a 20 s countdown (only
+    when the cart has items) → `/shop/kiosk/reset` empties the cart.
+  - **Staff list** `/shop/kiosk/orders` (opened once per device with
+    `/shop/kiosk/staff?key=KIOSK_STAFF_KEY`, 30-day cookie): open orders
+    oldest first, flagged red after 2 h, "Open in CrystalCommerce" link
+    (`<admin host>/orders/<id>`, unverified URL pattern), **Paid & picked
+    up** / **Cancelled** buttons (our list only: staff still complete or
+    cancel in CC). Refreshes every 30 s. Stored in
+    `p2w-shop-data/kiosk-orders.json` (flock'd; open orders always kept,
+    last 300 closed). `/shop/kiosk/status` (kiosk or staff) shows the
+    mode, the IP seen, whether this kiosk can order, and the variant-map
+    match count.
+  - **Variant ids:** `sync.php` maps every listing to CC's variant id
+    (`variants.json`, re-read with the listings) by product
+    (`product_catalog_id` = Core2 product id) + normalized condition +
+    other descriptors, falling back to the only variant of a product. The
+    status page's "matched N of M" is the health check.
+- **Secrets:** `.env.example` lists the settings; real values go in
+  `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
+  git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,
+  `KIOSK_KEY`, `KIOSK_STAFF_KEY`, `KIOSK_MODE`.
 - **Go-live checklist:** set `SHOP_PREVIEW = false`; point the nav's
   "TCG Inventory" button (`nav-cta`, every page) and the other
   CrystalCommerce links at `/shop`; add `/shop` to `sitemap.xml`; update
-  TEAM-GUIDE.md.
+  TEAM-GUIDE.md (incl. a kiosk section: the staff key link, the register
+  steps, and cancelling unclaimed orders in CC).
 
 ## Konami easter egg (BULKY-TRIS)
 

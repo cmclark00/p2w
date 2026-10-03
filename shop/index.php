@@ -3,11 +3,13 @@
  * Play2Win shop storefront. The root .htaccess sends /shop, /shop/search, /shop/category/<type>,
  * and /shop/product/<id>-<slug> here. Pages are rendered on the server from the private index that
  * sync.php builds, using the site's own header, footer, and styles. Buying hands off to the
- * CrystalCommerce storefront (see shop_buy_url in lib.php).
+ * CrystalCommerce storefront (see shop_buy_url in lib.php), except on the store's kiosks, which
+ * have a cart and place pay-at-the-register pickup orders (/shop/kiosk/..., see kiosk.php).
  */
 
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/kiosk.php';
 
 // While the owners review it: kept out of search engines and the site nav.
 const SHOP_PREVIEW = true;
@@ -20,7 +22,9 @@ header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
 if (SHOP_PREVIEW) header('X-Robots-Tag: noindex, nofollow');
 
-if (!$idx) {
+if (($parts[0] ?? '') === 'kiosk') {
+  kiosk_route(array_slice($parts, 1));
+} elseif (!$idx) {
   shop_page('Shop', 'Play2Win Games inventory.', shop_unavailable(), ['crumbs' => []]);
 } elseif (!$parts) {
   shop_home($idx);
@@ -32,13 +36,17 @@ if (!$idx) {
   shop_product($idx, $idx['products'][$m[1]]);
 } else {
   http_response_code(404);
+  shop_not_found();
+}
+
+/* ================================================================== pages */
+
+function shop_not_found(): void {
   shop_page('Not found', 'That page is not in the shop.', '<section class="shop-section shop-state">
     <p class="eyebrow">Not found</p><h1>That item isn’t in the shop right now.</h1>
     <p class="lead">It may have just sold. Try a search, or browse everything we have in stock.</p>
     <p><a class="button primary" href="/shop">Browse the shop</a></p></section>', ['crumbs' => [['Shop', '/shop']]]);
 }
-
-/* ================================================================== pages */
 
 function shop_home(array $idx): void {
   $games = [];
@@ -58,9 +66,11 @@ function shop_home(array $idx): void {
   $newest = $idx['products'];
   usort($newest, function ($a, $b) { return [$b['rel'] ?? 0, $a['n']] <=> [$a['rel'] ?? 0, $b['n']]; });
   $body = '<section class="page-hero shop-hero">
-      <p class="eyebrow">Shop online</p>
+      <p class="eyebrow">' . (kiosk_active() ? 'Shop in store' : 'Shop online') . '</p>
       <h1>Shop Play2Win’s in-stock inventory.</h1>
-      <p class="lead">Singles, sealed product, and more, straight from our shelves. Checkout happens on our secure online store, with shipping or in-store pickup.</p>
+      <p class="lead">' . (kiosk_active()
+        ? 'Find your cards, add them to your cart, and place your order. Then pay at the register and we’ll hand them over.'
+        : 'Singles, sealed product, and more, straight from our shelves. Checkout happens on our secure online store, with shipping or in-store pickup.') . '</p>
       ' . shop_search_form('') . '
     </section>
     <section class="shop-section">
@@ -103,11 +113,12 @@ function shop_results(array $idx, array $q, string $basePath): void {
 }
 
 function shop_product(array $idx, array $p): void {
+  $kiosk = kiosk_active();
   $rows = '';
   foreach ($p['l'] as $l) {
     $stock = $l['q'] === 1 ? 'Last one' : $l['q'] . ' in stock';
     $rows .= '<tr><td><strong>' . h($l['c']) . '</strong>' . ($l['v'] !== '' ? '<div class="muted">' . h($l['v']) . '</div>' : '') . '</td>
-      <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td></tr>';
+      <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td>' . ($kiosk ? '<td>' . kiosk_add_form($l) . '</td>' : '') . '</tr>';
   }
   $more = array_values(array_filter($idx['products'], function ($o) use ($p) {
     return $o['id'] !== $p['id'] && $p['setSlug'] !== '' && $o['setSlug'] === $p['setSlug'];
@@ -124,11 +135,13 @@ function shop_product(array $idx, array $p): void {
         <h1>' . h($p['name']) . '</h1>
         ' . ($meta ? '<p class="shop-product-meta">' . h(implode(' · ', $meta)) . '</p>' : '') . '
         <table class="shop-variants">
-          <thead><tr><th>Condition</th><th>Available</th><th>Price</th></tr></thead>
+          <thead><tr><th>Condition</th><th>Available</th><th>Price</th>' . ($kiosk ? '<th><span class="sr-only">Add to cart</span></th>' : '') . '</tr></thead>
           <tbody>' . $rows . '</tbody>
         </table>
-        <p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
-        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>
+        ' . ($kiosk
+          ? '<p class="shop-note muted">Add it to your cart, place your order, and pay at the register to pick it up.</p>'
+          : '<p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
+        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>') . '
         ' . ($p['desc'] !== '' ? '<div class="shop-desc">' . nl2br(h(strip_tags($p['desc']))) . '</div>' : '') . '
       </div>
     </section>' . ($more ? '<section class="shop-section">
@@ -149,12 +162,29 @@ function shop_product(array $idx, array $p): void {
 function shop_unavailable(): string {
   return '<section class="shop-section shop-state">
       <p class="eyebrow">Shop</p><h1>Our online inventory is loading.</h1>
-      <p class="lead">Check back in a few minutes. In the meantime you can browse everything on our CrystalCommerce store.</p>
-      <p><a class="button primary" href="' . h(shop_env('CC_STOREFRONT_URL')) . '">Open our online store</a></p>
+      ' . (kiosk_active() ? '<p class="lead">Check back in a few minutes, or ask at the register.</p>' : '<p class="lead">Check back in a few minutes. In the meantime you can browse everything on our CrystalCommerce store.</p>
+      <p><a class="button primary" href="' . h(shop_env('CC_STOREFRONT_URL')) . '">Open our online store</a></p>') . '
     </section>';
 }
 
 /* ================================================================== pieces */
+
+// Kiosk: "Add to cart" for one condition of a product.
+function kiosk_add_form(array $l): string {
+  $inCart = kiosk_cart()[(int)$l['id']]['q'] ?? 0;
+  $left = min((int)$l['q'], KIOSK_MAX_QTY) - $inCart;
+  if (kiosk_variants() && !kiosk_variant_id((int)$l['id'])) return '<span class="muted kiosk-ask">Ask at the register</span>';
+  if ($left <= 0) return '<a class="kiosk-incart" href="/shop/kiosk/cart">In your cart (' . $inCart . ')</a>';
+  $qty = '';
+  if ($left > 1) {
+    $opts = '';
+    for ($i = 1; $i <= $left; $i++) $opts .= '<option value="' . $i . '">' . $i . '</option>';
+    $qty = '<label><span class="sr-only">Quantity</span><select name="qty">' . $opts . '</select></label>';
+  }
+  return '<form class="kiosk-add" action="/shop/kiosk/cart" method="post" data-once><input type="hidden" name="do" value="add"><input type="hidden" name="listing" value="' . (int)$l['id'] . '">'
+    . $qty . '<button class="button primary" type="submit">Add to cart</button></form>'
+    . ($inCart ? '<a class="kiosk-incart" href="/shop/kiosk/cart">' . $inCart . ' in your cart</a>' : '');
+}
 
 function shop_search_form(string $value, string $type = ''): string {
   return '<form class="shop-search" action="/shop/search" method="get" role="search">
@@ -266,13 +296,19 @@ function shop_page(string $title, string $description, string $body, array $opt)
   $self = (string)parse_url($_SERVER['REQUEST_URI'] ?? '/shop', PHP_URL_PATH);
   $canonical = 'https://play2wingames.com' . ($opt['canonical'] ?? $self);
   $crumbs = $opt['crumbs'] ?? [];
+  $kiosk = kiosk_active();
   $crumbHtml = '';
   if ($crumbs) {
-    $bits = ['<a href="/">Home</a>'];
+    $bits = $kiosk ? [] : ['<a href="/">Home</a>'];
     foreach ($crumbs as [$label, $href]) $bits[] = $href ? '<a href="' . h($href) . '">' . h($label) . '</a>' : '<span aria-current="page">' . h($label) . '</span>';
     $crumbHtml = '<nav class="shop-crumbs" aria-label="Breadcrumb">' . implode(' <span aria-hidden="true">›</span> ', $bits) . '</nav>';
   }
   $ld = isset($opt['ld']) ? '<script type="application/ld+json">' . json_encode($opt['ld'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' : '';
+  // Kiosks go back to the start after a quiet spell (seconds; 0 = never), asking "Still shopping?" first.
+  // Nothing to reset on the shop's front page with an empty cart; without a cart there's nothing to ask about.
+  $cartCount = $kiosk ? kiosk_cart_count() : 0;
+  $idle = $kiosk && !($self === '/shop' && $cartCount === 0 && empty($_GET)) ? (int)($opt['idle'] ?? 120) : 0;
+  $idlePrompt = $cartCount > 0 && ($opt['idlePrompt'] ?? true);
   $css = filemtime(__DIR__ . '/shop.css');
   $js = filemtime(__DIR__ . '/shop.js');
   ?><!doctype html>
@@ -282,7 +318,8 @@ function shop_page(string $title, string $description, string $body, array $opt)
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <base href="/">
     <meta name="theme-color" content="#111217">
-    <?php if (SHOP_PREVIEW): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+    <?php if (SHOP_PREVIEW || $kiosk || !empty($opt['refresh'])): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+    <?php if (!empty($opt['refresh'])): ?><meta http-equiv="refresh" content="<?= (int)$opt['refresh'] ?>"><?php endif; ?>
     <meta name="description" content="<?= h($description) ?>">
     <title><?= h($title) ?> | Play2Win Games</title>
     <link rel="stylesheet" href="styles.css">
@@ -300,8 +337,21 @@ function shop_page(string $title, string $description, string $body, array $opt)
     <link rel="canonical" href="<?= h($canonical) ?>">
     <?= $ld ?>
   </head>
-  <body class="shop-body">
+  <body class="shop-body<?= $kiosk ? ' kiosk' : '' ?>"<?= $idle ? ' data-kiosk-idle="' . $idle . '" data-kiosk-prompt="' . ($idlePrompt ? '1' : '0') . '"' : '' ?>>
     <a class="skip-link" href="<?= h($self) ?>#main">Skip to content</a>
+    <?php if ($kiosk): ?>
+    <header class="site-header kiosk-header">
+      <a class="brand" href="/shop" aria-label="Shop home">
+        <img src="assets/play-to-win-logo.png" alt="Play2Win Games">
+      </a>
+      <span class="kiosk-pill">Pick up &amp; pay at the register</span>
+      <a class="kiosk-cart-btn" href="/shop/kiosk/cart">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span>Cart</span><span class="kiosk-cart-count"><?= $cartCount ?></span>
+      </a>
+    </header>
+    <?php if (!kiosk_cfg()['live']): ?><p class="kiosk-test-banner">TEST MODE: kiosk orders stay on our website and are not sent to CrystalCommerce.</p><?php endif; ?>
+    <?php else: ?>
     <header class="site-header">
       <a class="brand" href="index.html" aria-label="Play2Win Games home">
         <img src="assets/play-to-win-logo.png" alt="Play2Win Games">
@@ -329,10 +379,14 @@ function shop_page(string $title, string $description, string $body, array $opt)
         <a class="nav-cta" href="shop" aria-current="page">Shop</a>
       </nav>
     </header>
+    <?php endif; ?>
     <main id="main" tabindex="-1">
       <?= $crumbHtml ?>
       <?= $body ?>
     </main>
+    <?php if ($kiosk): ?>
+    <footer class="site-footer kiosk-footer"><p>Questions? Ask anyone at the counter. Whenever you play, Play 2 Win!</p></footer>
+    <?php else: ?>
     <footer class="site-footer">
       <div class="footer-brand">
         <img class="footer-mascot" src="assets/bulky-mascot.webp" alt="" width="44" height="49" loading="lazy" aria-hidden="true">
@@ -356,6 +410,7 @@ function shop_page(string $title, string $description, string $body, array $opt)
     </footer>
     <script src="nav.js" defer></script>
     <script src="konami.js" defer></script>
+    <?php endif; ?>
     <script src="shop/shop.js?v=<?= $js ?>" defer></script>
   </body>
 </html>

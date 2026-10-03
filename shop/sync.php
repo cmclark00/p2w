@@ -8,6 +8,9 @@
  *   2. Product details (photo, set, game): Core2 /api/v2/products/{id}, one product per request (no
  *      batch endpoint), fetched in parallel within a time budget and cached in products.json for good.
  *      New products get filled in on the next runs; the shop works meanwhile.
+ *   3. Variant ids (kiosk orders): when CC_API_PROXY_SECRET is set, the Admin API's variants for each
+ *      top-level category, matched to the listings by product (variant product_catalog_id = Core2
+ *      product id) and condition, into variants.json. Re-read with the listings.
  *
  * Run it from cron (php sync.php) or over HTTP (GitHub Actions calls /shop/sync.php on a schedule).
  * Anyone may call it: it only reads public data, refuses to re-read listings more often than
@@ -19,6 +22,7 @@ require __DIR__ . '/lib.php';
 
 const SYNC_MIN_MINUTES = 10;
 const SYNC_PER_PAGE = 500;
+const VARIANT_PER_PAGE = 200;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -77,6 +81,82 @@ if (!$fresh) {
   shop_write_json('listings.json', $listings);
   $state['listingsAt'] = time();
   $state['listingsCount'] = count($listings);
+}
+
+/* ---------------------------------------------------------------- variant ids (for kiosk orders) */
+
+// The Admin API knows CrystalCommerce's own variant ids, which orders need; Core2 doesn't. Variants
+// carry product_catalog_id (= the Core2 product id) and descriptors (Condition, ...), so each listing
+// is matched to the variant of the same product with the same condition and other descriptors.
+$variantStats = null;
+$vfile = shop_read_json('variants.json');
+if (shop_env('CC_API_PROXY_SECRET') !== '' && (!$fresh || !is_array($vfile) || (int)($vfile['at'] ?? 0) < (int)($state['listingsAt'] ?? 0))) {
+  $variantStats = sync_variants($listings);
+}
+
+function sync_variants(array $listings): array {
+  $headers = shop_cc_headers('admin:read-inventory');
+  $base = shop_cc_base();
+  [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
+  $catIds = [];
+  foreach ($cats['category']['children'] ?? [] as $c) if (!empty($c['category']['id'])) $catIds[] = (int)$c['category']['id'];
+  if (!$catIds) return ['error' => "Could not read CrystalCommerce categories (HTTP $s)"];
+
+  $url = function ($cat, $page) use ($base) { return "$base/variants?category_id=$cat&per_page=" . VARIANT_PER_PAGE . "&page=$page"; };
+  $pages = [];
+  $first = shop_fetch_json(array_map(function ($c) use ($url) { return $url($c, 1); }, $catIds), 6, 30, $headers);
+  $more = [];
+  foreach ($catIds as $c) {
+    $r = $first[$url($c, 1)] ?? null;
+    if (!is_array($r)) return ['error' => "A variants page failed (category $c); the old map was kept"];
+    $pages[] = $r;
+    for ($p = 2; $p <= (int)($r['paginated_collection']['total_pages'] ?? 1); $p++) $more[] = $url($c, $p);
+  }
+  foreach (shop_fetch_json($more, 6, 30, $headers) as $u => $r) {
+    if (!is_array($r)) return ['error' => 'A variants page failed; the old map was kept'];
+    $pages[] = $r;
+  }
+
+  $byPid = [];
+  $count = 0;
+  foreach ($pages as $r) {
+    foreach ($r['paginated_collection']['entries'] ?? [] as $e) {
+      $v = $e['variant'] ?? $e;
+      if (empty($v['id']) || empty($v['product_catalog_id'])) continue;
+      $cond = '';
+      $other = [];
+      foreach ($v['descriptors'] ?? [] as $d) {
+        $d = $d['variant_descriptor'] ?? $d;
+        if (strcasecmp((string)($d['name'] ?? ''), 'condition') === 0) $cond = shop_condition_label((string)($d['value'] ?? ''));
+        elseif (($d['value'] ?? '') !== '') $other[] = shop_norm((string)$d['value']);
+      }
+      sort($other);
+      $byPid[(int)$v['product_catalog_id']][] = ['id' => (int)$v['id'], 'c' => $cond !== '' ? $cond : 'Standard', 'v' => implode(' ', $other),
+        'p' => (int)($v['sell_price']['money']['cents'] ?? 0)];
+      $count++;
+    }
+  }
+
+  $map = [];
+  $loose = $missing = 0;
+  foreach ($listings as $l) {
+    $cands = $byPid[$l['pid']] ?? [];
+    $v = explode(' · ', $l['v']);
+    $v = array_map('shop_norm', array_filter($v, 'strlen'));
+    sort($v);
+    $same = array_values(array_filter($cands, function ($c) use ($l, $v) { return $c['c'] === $l['c'] && $c['v'] === implode(' ', $v); }));
+    if (count($same) > 1) {
+      $samePrice = array_values(array_filter($same, function ($c) use ($l) { return $c['p'] === $l['p']; }));
+      if ($samePrice) $same = $samePrice;
+    }
+    if ($same) { $map[$l['id']] = $same[0]['id']; continue; }
+    // A product with a single variant can only be that one, even if its descriptors are spelled differently.
+    if (count($cands) === 1) { $map[$l['id']] = $cands[0]['id']; $loose++; continue; }
+    $missing++;
+  }
+  $stats = ['at' => time(), 'variants' => $count, 'listings' => count($listings), 'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing];
+  shop_write_json('variants.json', $stats + ['map' => $map]);
+  return $stats;
 }
 
 /* ---------------------------------------------------------------- 2. product details */
@@ -146,5 +226,5 @@ shop_write_json('state.json', $state);
 
 done([
   'status' => 'ok', 'listings' => count($listings), 'products' => count($products), 'listingsRefreshed' => !$fresh,
-  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'seconds' => round(microtime(true) - $t0, 1),
+  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'variants' => $variantStats, 'seconds' => round(microtime(true) - $t0, 1),
 ]);

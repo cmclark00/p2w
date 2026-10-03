@@ -20,6 +20,8 @@ const SHOP_DEFAULTS = [
   'CC_CORE2_BASE' => 'https://core2-api.crystalcommerce.com',
   'CC_CORE2_ORG_ID' => '2020',
   'CC_STOREFRONT_URL' => 'https://playtowingames.crystalcommerce.com',
+  'CC_ADMIN_BASE_URL' => 'https://playtowingames-admin.crystalcommerce.com/api/v1',
+  'CC_API_USERNAME' => 'playtowingames',
 ];
 
 /* ------------------------------------------------------------------ settings + storage */
@@ -66,16 +68,16 @@ function shop_write_json(string $name, $data): void {
 /* ------------------------------------------------------------------ HTTP */
 
 // GET several URLs at once (up to $parallel at a time). Returns [url => decoded JSON or null].
-function shop_fetch_json(array $urls, int $parallel = 6, int $timeout = 25): array {
+function shop_fetch_json(array $urls, int $parallel = 6, int $timeout = 25, array $headers = []): array {
   $out = [];
   $queue = array_values($urls);
   $mh = curl_multi_init();
   $active = [];
-  $start = function (string $url) use ($mh, &$active, $timeout) {
+  $start = function (string $url) use ($mh, &$active, $timeout, $headers) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
       CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 10,
-      CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'Play2WinGames-Shop/1.0 (+https://play2wingames.com)',
+      CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $headers), CURLOPT_USERAGENT => 'Play2WinGames-Shop/1.0 (+https://play2wingames.com)',
     ]);
     curl_multi_add_handle($mh, $ch);
     $active[(int)$ch] = [$ch, $url];
@@ -98,6 +100,35 @@ function shop_fetch_json(array $urls, int $parallel = 6, int $timeout = 25): arr
   } while ($active);
   curl_multi_close($mh);
   return $out;
+}
+
+/* ------------------------------------------------------------------ CrystalCommerce Admin API */
+
+// The classic Admin API (store-specific; needs CC_API_PROXY_SECRET). Used for the kiosk: variant ids,
+// live stock/price checks, and creating orders. Order creation uses the admin:read-orders scope
+// (admin:write-orders is refused), as verified with test orders in Oct 2026.
+function shop_cc_base(): string {
+  return rtrim(shop_env('CC_ADMIN_BASE_URL'), '/');
+}
+
+function shop_cc_headers(string $scope): array {
+  return ['X-API-PROXY-SECRET: ' . shop_env('CC_API_PROXY_SECRET'), 'X-API-USERNAME: ' . shop_env('CC_API_USERNAME'), 'X-API-SCOPES: ' . $scope];
+}
+
+// One request. Returns [HTTP status, decoded JSON or null, raw body].
+function shop_cc(string $method, string $path, string $scope, $body = null): array {
+  $ch = curl_init(shop_cc_base() . $path);
+  $headers = array_merge(['Accept: application/json'], shop_cc_headers($scope));
+  if ($body !== null) $headers[] = 'Content-Type: application/json';
+  curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 45, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_CUSTOMREQUEST => $method,
+    CURLOPT_HTTPHEADER => $headers, CURLOPT_USERAGENT => 'Play2WinGames-Shop/1.0 (+https://play2wingames.com)',
+  ]);
+  if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+  $raw = (string)curl_exec($ch);
+  $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  curl_close($ch);
+  return [$status, json_decode($raw, true), $raw];
 }
 
 /* ------------------------------------------------------------------ the index */
