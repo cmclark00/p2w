@@ -278,7 +278,7 @@ function kiosk_route(array $parts): void {
 
   switch ($action) {
     case 'start':   // the kiosk's start page: turns this browser into a kiosk and empties its cart
-      if (strlen($cfg['key']) < 16 || !hash_equals($cfg['key'], (string)($_GET['key'] ?? ''))) kiosk_404();
+      kiosk_check_key('KIOSK_KEY', $cfg['key']);
       kiosk_set_cookie(KIOSK_COOKIE, kiosk_sign('kiosk1', $cfg['key']), 400 * 86400);
       kiosk_cart_save([]);
       kiosk_redirect('/shop');
@@ -287,7 +287,7 @@ function kiosk_route(array $parts): void {
       kiosk_cart_save([]);
       kiosk_redirect('/shop');
     case 'staff':
-      if (strlen($cfg['staffKey']) < 16 || !hash_equals($cfg['staffKey'], (string)($_GET['key'] ?? ''))) kiosk_404();
+      kiosk_check_key('KIOSK_STAFF_KEY', $cfg['staffKey']);
       kiosk_set_cookie(KIOSK_STAFF_COOKIE, kiosk_sign('staff1', $cfg['staffKey']), 30 * 86400);
       kiosk_redirect('/shop/kiosk/orders');
     case 'orders':
@@ -315,6 +315,26 @@ function kiosk_route(array $parts): void {
       kiosk_done_page($o);
   }
   kiosk_404();
+}
+
+// The ?key= on a start/staff link must match the setting. Says what's wrong (never the key itself), since a
+// plain 404 left the owner guessing. A "+" in a key arrives as a space when the link isn't encoded.
+function kiosk_check_key(string $setting, string $key): void {
+  $given = trim((string)($_GET['key'] ?? ''));
+  if (strlen($key) >= 16 && $given !== '' && (hash_equals($key, $given) || hash_equals($key, str_replace(' ', '+', $given)))) return;
+  if ($key === '') {
+    $why = "$setting isn’t set. Add a line <code>$setting=…</code> to the private <code>p2w-shop-data/.env</code> file (next to public_html, not inside it).";
+  } elseif (strlen($key) < 16) {
+    $why = "$setting is set but shorter than 16 characters, so it’s refused. Use a longer key.";
+  } elseif ($given === '') {
+    $why = 'This link has no key. Add <code>?key=</code> and the key to the end of it.';
+  } else {
+    $why = "The key in this link doesn’t match $setting (" . strlen($given) . ' characters in the link, ' . strlen($key) . ' in the setting). '
+      . 'Use only letters and numbers in keys: symbols like + &amp; # % = ? change meaning in a web address and get cut off or altered.';
+  }
+  http_response_code(403);
+  shop_page('Kiosk setup', 'Kiosk setup', '<section class="shop-section shop-state"><p class="eyebrow">Kiosk setup</p><h1>That link didn’t work.</h1>
+    <p class="lead">' . $why . '</p><p><a class="button primary" href="/shop">Go to the shop</a></p></section>', ['crumbs' => []]);
 }
 
 function kiosk_redirect(string $to): void {
