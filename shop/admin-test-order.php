@@ -23,7 +23,7 @@ header('X-Robots-Tag: noindex');
 // v4: v1-v3 created nothing. v3's 422 was most likely ship method 1, which doesn't exist in this store
 // (its enabled methods are USPS static ones: 133 Ground Advantage, 114 Priority Flat Rate Envelope, ...;
 // no custom methods, so in-store pickup is an order flag, not a ship method).
-$done = shop_data_dir() . '/test-order-v4.json';
+$done = shop_data_dir() . '/test-order-v5.json'; // v4: real USPS methods still 422 -> try an existing customer
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -83,7 +83,8 @@ $order = [
   'payment_attributes' => ['status' => 'Received', 'amount' => $amount, 'description' => 'TEST - no money was taken'],
   // An object keyed "0" (CrystalCommerce wants a hash, and PHP would encode a plain [0 => ...] array as a list).
   'line_items_attributes' => (object)['0' => ['qty' => 1, 'variant_id' => (string)$pick['id'], 'price' => $amount]],
-  'customer_attributes' => ['email' => 'inquiries@play2wingames.com', 'fullname' => 'TEST ORDER Play2Win Website'],
+  // An existing customer (the owner's own account, approved for this test): the guide's example uses an id.
+  'customer_attributes' => ['id' => '202607'],
 ];
 // In-store pickup test: the store's own address for both.
 $address = [
@@ -93,9 +94,9 @@ $address = [
 $order['shipping_address_attributes'] = $address;
 $order['billing_address_attributes'] = $address;
 $extras = [
-  'method 133 (Ground Advantage) + pickup' => ['ship_rate_attributes' => ['method_id' => 133]],
-  'method 114 (Priority Flat Rate Env) + pickup' => ['ship_rate_attributes' => ['method_id' => 114]],
-  'method 133, no pickup flag' => ['ship_rate_attributes' => ['method_id' => 133], 'in_store_pickup' => null],
+  'In Store (custom method 1) + pickup, customer 202607' => ['ship_rate_attributes' => ['method_id' => 1]],
+  'In Store (method 1), no pickup flag' => ['ship_rate_attributes' => ['method_id' => 1], 'in_store_pickup' => null],
+  'USPS Ground Advantage (133), customer 202607' => ['ship_rate_attributes' => ['method_id' => 133]],
 ];
 
 $created = null;
