@@ -16,7 +16,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$done = shop_data_dir() . '/test-order2d.json';
+$done = shop_data_dir() . '/test-order2e.json';
 $lock = fopen(shop_data_dir() . '/test-order2.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -101,7 +101,7 @@ for ($page = 1; $page <= 5 && $cat; $page++) {
     $x = $e['variant'];
     $price = $x['sell_price']['money']['cents'] ?? 0;
     $avail = $x['available_qty'] ?? $x['qty'] ?? 0;
-    if ($avail > 0 && $price > 0 && (!$pick || $price < $pick['price'])) $pick = ['id' => $x['id'], 'name' => $x['product_name'], 'price' => $price, 'qty' => $avail];
+    if ($avail >= 2 && $price > 0 && $x['id'] != 7936197 && (!$pick || $price < $pick['price'])) $pick = ['id' => $x['id'], 'name' => $x['product_name'], 'price' => $price, 'qty' => $avail];
   }
 }
 if (!$pick) { $out['error'] = 'No in-stock variant found to test with'; file_put_contents($done, json_encode($out)); echo json_encode($out, JSON_PRETTY_PRINT); exit; }
@@ -126,9 +126,8 @@ $order = [
 // Payment statuses: whatever the live Awaiting Payment orders use first, then likely names. Stops at the first accepted.
 $desc = 'Pay at register - nothing collected yet (TEST)';
 $combos = [
-  ['Processing', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
-  ['In Checkout', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
-  ['Processing', ['status' => 'Received', 'amount' => '0.00', 'description' => $desc]],
+  ['Awaiting Payment', ['status' => 'Pending', 'amount' => $amount, 'description' => $desc]],
+  ['Awaiting Payment', ['status' => 'Received', 'amount' => '0.00', 'description' => $desc]],
   ['Awaiting Payment', ['status' => 'Received', 'amount' => $amount, 'description' => $desc]],
 ];
 $out['attempts'] = [];
