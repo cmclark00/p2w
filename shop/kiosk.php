@@ -8,9 +8,10 @@
  *  - KIOSK_MODE=test (the default) runs the whole flow from any computer, including CrystalCommerce's
  *    live stock and price checks, but keeps the order on our side only (numbers start with "T").
  *    KIOSK_MODE=live sends each order to CrystalCommerce, and only from the store's IP (KIOSK_IPS).
- *  - CrystalCommerce's API can only create an order as "Payment Received" (verified Oct 2026: every
- *    unpaid status is refused, and it can't be changed back afterwards, even by hand). So a live kiosk
- *    order says "KIOSK - NOT PAID" in its employee name, comments, and payment line, and the staff list
+ *  - CrystalCommerce's API refuses every unpaid status (Awaiting Payment, Processing, In Checkout), but it
+ *    accepts "Preorder", which still holds the cards in stock and which staff can move on to Payment
+ *    Received and Shipped by hand (verified Oct 2026, test order #277145). So a live kiosk order is a
+ *    Preorder that says "KIOSK - NOT PAID" in its employee name, comments, and payment line, and the staff list
  *    (/shop/kiosk/orders, opened once with /shop/kiosk/staff?key=KIOSK_STAFF_KEY) tracks which kiosk
  *    orders are still unpaid. Staff ring them up in Fulcrum as TCG singles, then complete the order in
  *    CrystalCommerce, which holds the stock.
@@ -247,11 +248,12 @@ function kiosk_cc_order(array $items, string $name, int $total): array {
   $money = function (int $cents) { return number_format($cents / 100, 2, '.', ''); };
   $lineItems = [];
   foreach (array_values($items) as $i => $it) $lineItems[(string)$i] = ['qty' => $it['qty'], 'variant_id' => (string)$it['variant'], 'price' => $money($it['cents'])];
-  $note = "KIOSK ORDER - NOT PAID. Customer: $name. Pay at the register: ring up in Fulcrum (TCG singles), then mark this order complete. If nobody picks it up, cancel it so the cards go back in stock.";
+  $note = "KIOSK ORDER - NOT PAID. Customer: $name. Pay at the register: ring up in Fulcrum (TCG singles), then move this order to Payment Received, then Shipped. If nobody picks it up, cancel it so the cards go back in stock.";
   $address = ['firstname' => $name, 'lastname' => 'Kiosk order', 'address2' => 'In-store pickup'] + KIOSK_STORE_ADDRESS;
   $order = [
-    // CrystalCommerce only accepts new API orders as Payment Received; everything else says NOT PAID.
-    'origin' => 'Direct', 'status' => 'Payment Received', 'employee_name' => 'KIOSK - NOT PAID',
+    // Preorder: the one unpaid-looking status CrystalCommerce accepts on create, and it holds the stock.
+    // It still needs a payment record; everything else says NOT PAID.
+    'origin' => 'Direct', 'status' => 'Preorder', 'employee_name' => 'KIOSK - NOT PAID',
     'customer_comments' => $note, 'vendor_comments' => $note, 'in_store_pickup' => true, 'ship_price' => '0', 'tax' => '0',
     'ship_rate_attributes' => ['method_id' => 1],
     'customer_attributes' => ['id' => kiosk_cfg()['customer']],
@@ -543,9 +545,9 @@ function kiosk_orders_page(): void {
   };
   $body = '<section class="shop-section kiosk-orders">
       <p class="eyebrow">Staff</p><h1>Kiosk orders</h1>
-      <div class="kiosk-howto"><p><strong>At the register:</strong> ring the cards up in Fulcrum as TCG singles and take payment. Then open the order in CrystalCommerce and mark it complete, and tap <em>Paid &amp; picked up</em> here.</p>
+      <div class="kiosk-howto"><p><strong>At the register:</strong> ring the cards up in Fulcrum as TCG singles and take payment. Then open the order in CrystalCommerce, change it from Preorder to Payment Received and then Shipped, and tap <em>Paid &amp; picked up</em> here.</p>
       <p><strong>Never picked up?</strong> Cancel the order in CrystalCommerce so the cards go back in stock, then tap <em>Cancelled</em> here.</p>
-      <p class="muted">CrystalCommerce lists kiosk orders as “Payment Received” (it can’t record unpaid orders). Its employee name says KIOSK - NOT PAID. This page is the real list of what’s unpaid.</p></div>
+      <p class="muted">In CrystalCommerce, kiosk orders show as “Preorder” with the employee name KIOSK - NOT PAID until staff move them on. This page is the list of what’s still unpaid.</p></div>
       <h2>Waiting at the register (' . count($open) . ')</h2>
       ' . ($open ? '<div class="kiosk-ord-list">' . implode('', array_map(function ($o) use ($card) { return $card($o, true); }, $open)) . '</div>' : '<p class="muted">No open kiosk orders.</p>') . '
       <h2>Recently closed</h2>

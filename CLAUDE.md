@@ -871,6 +871,12 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     So kiosk (pay-at-register) orders must be created as `Payment
     Received` and marked unpaid some other way (comments, employee name,
     our own open-orders list).
+  - **`Preorder` IS accepted on create** (test #3, Oct 3 2026, order
+    **#277145**, 15¢ Yu-Gi-Oh common, TEST, to be cancelled) with the
+    same `payment_attributes {status: Received}`, and it **holds the
+    stock** (that variant's `available_qty` went 2 → 1). The owner then
+    moved it Preorder → Payment Received → Shipped by hand without
+    trouble, so **kiosk orders are created as `Preorder`**.
   - **Emails:** CC sends **nothing when an order is created through the
     API**. It **does** email the order's customer when staff change the
     status in CC's admin: the owner's manual status change on #277128
@@ -896,7 +902,8 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   every order is **in-store pickup, paid at the register**. Staff ring
   kiosk orders up in **Fulcrum** as "TCG singles" (Fulcrum doesn't track
   TCG stock; that lives only in CrystalCommerce, so the CC order is what
-  holds the cards), then complete the order in CC.
+  holds the cards), then move the CC order Preorder → Payment Received
+  → Shipped.
   - **Off until `KIOSK_KEY` is set.** A browser becomes a kiosk by
     opening `/shop/kiosk/start?key=KIOSK_KEY` (HMAC-signed `p2w_kiosk`
     cookie, path `/shop`, 400 days; also empties the cart, so it's the
@@ -915,7 +922,8 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     show the same order. **`KIOSK_MODE=test` (default)** stops there and
     records the order on our side only (numbers `T1`, `T2`…; works from any
     IP). **`KIOSK_MODE=live`** only from `KIOSK_IPS`, then `POST /orders`
-    with the proven shape: origin Direct, status Payment Received,
+    with the proven shape: origin Direct, status **Preorder** (holds the
+    stock; staff move it to Payment Received → Shipped at the register),
     employee name **"KIOSK - NOT PAID"**, NOT PAID comments and payment
     description, In Store method 1, customer **`KIOSK_CUSTOMER_ID`
     (222309, shop-owned)**, store address with the customer's name, tax 0
