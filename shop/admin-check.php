@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$cache = shop_data_dir() . '/admin-check.json';
+$cache = shop_data_dir() . '/admin-check-v2.json';
 if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
@@ -54,8 +54,17 @@ $out = ['ok' => true, 'checkedAt' => gmdate('c'), 'base' => $base, 'username' =>
 $top = $j['category']['children'] ?? [];
 $out['checks']['categories'] = ['status' => $s, 'topLevel' => array_map(function ($c) { return ['id' => $c['category']['id'] ?? null, 'name' => $c['category']['name'] ?? null]; }, array_slice($top, 0, 12)), 'raw' => $raw];
 
-// 2. Variants and products in the first top-level category: ids and the link to the storefront/catalog.
-$catId = $top[0]['category']['id'] ?? null;
+// 2. Variants and products in the first top-level category that has stock (Pokemon Singles first, the
+//    shop's biggest): ids and the link to the storefront/catalog, to match against Core2's product ids.
+$order = $top;
+usort($order, function ($a, $b) { return (int)(stripos($b['category']['name'] ?? '', 'pokemon') !== false) - (int)(stripos($a['category']['name'] ?? '', 'pokemon') !== false); });
+$catId = null;
+foreach (array_slice($order, 0, 8) as $c) {
+  $id = $c['category']['id'] ?? null;
+  if (!$id) continue;
+  [$s, $j] = cc_get($base, "/variants?category_id=$id&per_page=1&page=1", 'admin:read-inventory', $secret, $user);
+  if (($j['paginated_collection']['total_entries'] ?? 0) > 0) { $catId = $id; $out['checks']['sampleCategory'] = $c['category']['name'] ?? $id; break; }
+}
 if ($catId) {
   [$s, $j, $raw] = cc_get($base, "/variants?category_id=$catId&per_page=3&page=1", 'admin:read-inventory', $secret, $user);
   $v = array_map(function ($e) {
