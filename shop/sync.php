@@ -25,6 +25,10 @@ const SYNC_MIN_MINUTES = 10;
 const SYNC_PER_PAGE = 500;
 const VARIANT_PER_PAGE = 200;
 const VARIANT_MIN_MINUTES = 60;   // a full variants pass is ~250 slow Admin API pages, so at most hourly
+// Paused Oct 3 2026: CrystalCommerce stopped accepting connections from the store's IP after heavy API
+// use (local sync tests + back-to-back variants passes). The last finished variants.json stays in use.
+// Re-enable only with a gentler pace agreed with the owner.
+const VARIANT_SYNC_PAUSED = true;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -174,6 +178,7 @@ if (shop_env('CC_API_PROXY_SECRET') !== '') {
  * once the listings are newer than the last finished map and it's at least VARIANT_MIN_MINUTES old.
  */
 function sync_variants(array $listings, int $listingsAt, float $deadline): ?array {
+  if (VARIANT_SYNC_PAUSED) return ['paused' => true];
   $progressFile = 'variants-progress.json';
   $prog = shop_read_json($progressFile);
   if (!is_array($prog) || !isset($prog['queue'])) {
