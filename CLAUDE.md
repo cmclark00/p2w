@@ -830,6 +830,40 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   it). Core2's own carts/checkout need CrystalCommerce-issued app
   credentials and an online payment gateway on the Core2 org (it has
   none: `has_online_payment_gateway: false`).
+- **Admin API (classic) — verified Oct 2026 with the shop's proxy
+  secret** (`CC_API_PROXY_SECRET` in `<home>/p2w-shop-data/.env`;
+  base `https://playtowingames-admin.crystalcommerce.com/api/v1`,
+  `X-API-USERNAME: playtowingames`). `shop/admin-check.php` is a
+  read-only diagnostic (statuses, counts, field names; no customer data;
+  cached 10 min). Findings:
+  - Variants give the **storefront variant id** (the cart's id) and
+    `product_catalog_id`, which **equals the Core2 product id** — so
+    Core2 products map to sellable storefront variants. Products carry
+    `catalog_links.en.href` (the storefront product page).
+  - Orders/customers readable (`admin:read-orders` /
+    `admin:read-customers`); `admin:read-prefs` is refused; the
+    `activity_logs` endpoint returned HTTP 500.
+  - **Creating an order works** (`POST /orders`, scope
+    `admin:read-orders` — `admin:write-orders` is refused). Test order
+    **#277127** (Oct 3 2026, Grookey $0.15, owner's customer 202607,
+    labelled TEST, to be cancelled) was accepted after learning the
+    required shape: `origin` must be one of CC's values — this store's
+    orders use **`Direct`** (own online sales), `TcgPlayer`, `Ebay`;
+    `customer_attributes: {id}` of an **existing** customer (the API
+    can't create customers); `ship_rate_attributes: {method_id}` — the
+    store's ship methods are USPS static ids (133 Ground Advantage, 121
+    Priority, 114 Priority Flat Rate Envelope, 144 Media Mail, …) and
+    **custom method 1 = "In Store" pickup**; `shipping_address_attributes`
+    and `billing_address_attributes` are both required and **`address2`
+    can't be blank**; `line_items_attributes` must be a JSON **object**
+    keyed "0", "1", … (not a list); `status: "Payment Received"` +
+    `payment_attributes`. `GET /orders/{id}/available_shipping` returned
+    503 at the time (retry). The one-time test script was removed after.
+  - Payment: the CC store takes online payments through **PayPal**, so a
+    native checkout would use PayPal (REST app keys
+    `PAYPAL_{SANDBOX,LIVE}_{CLIENT_ID,SECRET}` in the same `.env`), then
+    create the CC order as `Payment Received`. Tax: 9.25% on pickup/TN,
+    0% out of state (owner's choice). Shipping: copy CC's options.
 - **Secrets:** none needed today. `.env.example` lists the settings;
   real values go in `<home>/p2w-shop-data/.env` (never in the repo —
   `.env*` is git-ignored and excluded from the deploy).
