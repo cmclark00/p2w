@@ -23,7 +23,7 @@ header('X-Robots-Tag: noindex');
 // v4: v1-v3 created nothing. v3's 422 was most likely ship method 1, which doesn't exist in this store
 // (its enabled methods are USPS static ones: 133 Ground Advantage, 114 Priority Flat Rate Envelope, ...;
 // no custom methods, so in-store pickup is an order flag, not a ship method).
-$done = shop_data_dir() . '/test-order-v5.json'; // v4: real USPS methods still 422 -> try an existing customer
+$done = shop_data_dir() . '/test-order-v6.json'; // v5: existing customer still 422 "invalid_resource" -> show the full error body
 $lock = fopen(shop_data_dir() . '/test-order.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -48,10 +48,7 @@ function cc(string $method, string $url, string $scope, string $secret, string $
 
 // Error text only (CrystalCommerce errors name fields, not customers); HTML error pages are shortened.
 function err_text($json, string $raw): string {
-  if (is_array($json)) {
-    $e = $json['errors'] ?? $json['error'] ?? $json['message'] ?? $json;
-    return substr(json_encode($e, JSON_UNESCAPED_SLASHES), 0, 1200);
-  }
+  if (is_array($json)) return substr(json_encode($json, JSON_UNESCAPED_SLASHES), 0, 2000); // whole error body: names fields, not customers
   return substr(trim(preg_replace('/\s+/', ' ', strip_tags($raw))), 0, 300);
 }
 
@@ -95,8 +92,6 @@ $order['shipping_address_attributes'] = $address;
 $order['billing_address_attributes'] = $address;
 $extras = [
   'In Store (custom method 1) + pickup, customer 202607' => ['ship_rate_attributes' => ['method_id' => 1]],
-  'In Store (method 1), no pickup flag' => ['ship_rate_attributes' => ['method_id' => 1], 'in_store_pickup' => null],
-  'USPS Ground Advantage (133), customer 202607' => ['ship_rate_attributes' => ['method_id' => 133]],
 ];
 
 $created = null;
