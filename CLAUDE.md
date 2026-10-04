@@ -971,21 +971,34 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     (`variants.json`) by product (`product_catalog_id` = Core2 product
     id) + normalized condition + other descriptors, falling back to the
     only variant of a product. It's the **last** sync step (after
-    `index.json` is saved) and wrapped in try/catch, and one pass is
-    **spread over several runs**: variants pages are read 6 at a time,
-    slimmed immediately, and saved in `variants-progress.json` until the
-    queue is empty (a page that fails 3 times abandons the pass and keeps
-    the old map). A new pass starts once the listings are newer than the
-    last finished map. (The first version read every page at once and
-    made `sync.php` return HTTP 500 on the live server, likely memory, so
-    don't go back to that.) A new pass starts at most hourly
-    (`VARIANT_MIN_MINUTES`; a full pass is ~256 slow pages / ~47k
-    variants, including out-of-stock ones), and `shop-sync.yml` keeps
-    calling until `variants.pending` is gone. The status page's "matched
-    N of M" is the health check, with `unmatchedExamples` (condition +
-    descriptor spellings on each side) listed under it. First live pass
-    (Oct 3 2026): 3,957 of 4,346 matched (322 via the only-variant
-    fallback), 389 unmatched → "Ask at the register".
+    `index.json` is saved), wrapped in try/catch, in two parts:
+    - **Full pass, gently paced** (owner-approved Oct 2026): every
+      variants page (~256 slow pages / ~47k variants, out-of-stock ones
+      included) at most every `VARIANT_PASS_HOURS` (6), only
+      `VARIANT_PAGES_PER_RUN` (20) pages per sync run, `VARIANT_PARALLEL`
+      (2) at a time with `VARIANT_PAUSE_MS` (1 s) between batches.
+      Progress (slimmed rows) lives in `variants-progress.json`; a page
+      that fails 3 times drops the pass and keeps the old catalog. The
+      result is **`variants-catalog.json`** (byPid → [variant id,
+      condition, descriptors, price]).
+    - **Matching** (`sync_variant_map()`) runs against the saved catalog
+      with **no API calls** whenever the listings refresh or a pass
+      finishes, so a restocked card of a known product is orderable at
+      once; only brand-new products wait for the next pass.
+    - `shop-sync.yml` keeps calling while `variants.pending`, but waits
+      **60 s** between those calls.
+    - History: the first version read every page at once and made
+      `sync.php` return HTTP 500 (likely memory); a later fast version
+      (6 at a time, back-to-back passes) ran just before CC's admin and
+      Core2 API went down for every network on Oct 3 2026 (a CC-side
+      outage, but the step was paused until this slower pace). Don't go
+      back to fast passes, and never test against the real CC from the
+      shop PC (it shares the store's IP).
+    - The status page's "matched N of M" is the health check, with
+      `unmatchedExamples` (condition + descriptor spellings on each side)
+      under it. First live pass (Oct 3 2026): 3,957 of 4,346 matched
+      (322 via the only-variant fallback), 389 unmatched → "Ask at the
+      register".
 - **Secrets:** `.env.example` lists the settings; real values go in
   `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
   git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,

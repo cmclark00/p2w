@@ -11,7 +11,7 @@
  *   3. The index (index.json) the shop pages read.
  *   4. Variant ids (kiosk orders), last: when CC_API_PROXY_SECRET is set, the Admin API's variants for
  *      each top-level category, matched to the listings by product (variant product_catalog_id = Core2
- *      product id) and condition, into variants.json. Spread over several runs (see sync_variants).
+ *      product id) and condition, into variants.json. Read slowly over several runs (see sync_variants).
  *
  * Run it from cron (php sync.php) or over HTTP (GitHub Actions calls /shop/sync.php on a schedule).
  * Anyone may call it: it only reads public data, refuses to re-read listings more often than
@@ -24,11 +24,11 @@ require __DIR__ . '/lib.php';
 const SYNC_MIN_MINUTES = 10;
 const SYNC_PER_PAGE = 500;
 const VARIANT_PER_PAGE = 200;
-const VARIANT_MIN_MINUTES = 60;   // a full variants pass is ~250 slow Admin API pages, so at most hourly
-// Paused Oct 3 2026: CrystalCommerce stopped accepting connections from the store's IP after heavy API
-// use (local sync tests + back-to-back variants passes). The last finished variants.json stays in use.
-// Re-enable only with a gentler pace agreed with the owner.
-const VARIANT_SYNC_PAUSED = true;
+// Gentle pace for CrystalCommerce's Admin API (owner-approved Oct 2026; see sync_variants).
+const VARIANT_PASS_HOURS = 6;        // a full variants pass (~256 pages) at most this often
+const VARIANT_PAGES_PER_RUN = 20;    // pages per sync run
+const VARIANT_PARALLEL = 2;          // pages at a time
+const VARIANT_PAUSE_MS = 1000;       // pause between batches
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -160,7 +160,7 @@ shop_write_json('state.json', $state);
 $variantStats = null;
 if (shop_env('CC_API_PROXY_SECRET') !== '') {
   try {
-    $variantStats = sync_variants($listings, (int)($state['listingsAt'] ?? 0), $t0 + ($cli ? 900 : 80));
+    $variantStats = sync_variants($listings, !$fresh, $t0 + ($cli ? 900 : 80));
   } catch (Throwable $e) {
     @unlink(shop_data_dir() . '/variants-progress.json');
     $variantStats = ['error' => get_class($e) . ': ' . $e->getMessage()];
@@ -172,76 +172,109 @@ if (shop_env('CC_API_PROXY_SECRET') !== '') {
  * product_catalog_id (= the Core2 product id) and descriptors (Condition, ...), so each listing is matched
  * to the variant of the same product with the same condition and other descriptors.
  *
- * The store has many variants pages and the Admin API is slow, so one pass is spread over several runs:
- * pages are read 6 at a time, slimmed down right away, and the progress is saved in variants-progress.json
- * until the queue is empty. Then the listings are matched and variants.json is replaced. A new pass starts
- * once the listings are newer than the last finished map and it's at least VARIANT_MIN_MINUTES old.
+ * Two parts, so CrystalCommerce is asked as little as possible:
+ *  - A full pass over every variants page (~256 slow pages, out-of-stock variants included) rebuilds
+ *    variants-catalog.json at most every VARIANT_PASS_HOURS. It's paced gently: VARIANT_PAGES_PER_RUN pages
+ *    per sync run, VARIANT_PARALLEL at a time with a pause between, progress saved in variants-progress.json.
+ *    (Oct 3 2026: back-to-back fast passes coincided with CrystalCommerce dropping connections; keep it slow.)
+ *  - The listings are matched against the saved catalog whenever the listings change or a pass finishes,
+ *    with no API calls, so a restocked card of a known product can be ordered right away.
  */
-function sync_variants(array $listings, int $listingsAt, float $deadline): ?array {
-  if (VARIANT_SYNC_PAUSED) return ['paused' => true];
+function sync_variants(array $listings, bool $listingsChanged, float $deadline): array {
   $progressFile = 'variants-progress.json';
   $prog = shop_read_json($progressFile);
+  $catalog = shop_read_json('variants-catalog.json');
+  $passAge = time() - (int)($catalog['at'] ?? 0);
+  $out = [];
+
   if (!is_array($prog) || !isset($prog['queue'])) {
-    $old = shop_read_json('variants.json');
-    // Up to date, or refreshed recently enough (checkout re-checks stock and price live anyway).
-    if (is_array($old) && ((int)($old['at'] ?? 0) >= $listingsAt || time() - (int)($old['at'] ?? 0) < VARIANT_MIN_MINUTES * 60)) return null;
-    [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
-    $queue = [];
-    foreach ((is_array($cats) ? $cats['category']['children'] ?? [] : []) as $c) {
-      if (!empty($c['category']['id'])) $queue[] = sync_variant_url((int)$c['category']['id'], 1);
+    $prog = null;
+    if (!is_array($catalog) || $passAge >= VARIANT_PASS_HOURS * 3600) {
+      [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
+      $queue = [];
+      foreach ((is_array($cats) ? $cats['category']['children'] ?? [] : []) as $c) {
+        if (!empty($c['category']['id'])) $queue[] = sync_variant_url((int)$c['category']['id'], 1);
+      }
+      if (!$queue) return ['error' => "Could not read CrystalCommerce categories (HTTP $s)"];
+      $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'count' => 0, 'pages' => 0];
     }
-    if (!$queue) return ['error' => "Could not read CrystalCommerce categories (HTTP $s)"];
-    $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'count' => 0, 'pages' => 0];
   }
 
-  $headers = shop_cc_headers('admin:read-inventory');
-  // A batch can take up to the 30 s request timeout, so only start one with time to spare.
-  while ($prog['queue'] && microtime(true) < $deadline - 32) {
-    $batch = array_splice($prog['queue'], 0, 6);
-    $res = shop_fetch_json($batch, 6, 30, $headers);
-    foreach ($batch as $u) {
-      $r = $res[$u] ?? null;
-      unset($res[$u]);
-      if (!is_array($r) || !isset($r['paginated_collection'])) {
-        $prog['tries'][$u] = ($prog['tries'][$u] ?? 0) + 1;
-        if ($prog['tries'][$u] >= 3) {
-          @unlink(shop_data_dir() . '/' . $progressFile);
-          return ['error' => 'A variants page kept failing; the old map was kept'];
+  $passDone = false;
+  if ($prog) {
+    $headers = shop_cc_headers('admin:read-inventory');
+    $read = 0;
+    // A batch can take up to the 30 s request timeout, so only start one with time to spare.
+    while ($prog['queue'] && $read < VARIANT_PAGES_PER_RUN && microtime(true) < $deadline - 32) {
+      if ($read > 0) usleep(VARIANT_PAUSE_MS * 1000);
+      $batch = array_splice($prog['queue'], 0, VARIANT_PARALLEL);
+      $res = shop_fetch_json($batch, VARIANT_PARALLEL, 30, $headers);
+      foreach ($batch as $u) {
+        $read++;
+        $r = $res[$u] ?? null;
+        unset($res[$u]);
+        if (!is_array($r) || !isset($r['paginated_collection'])) {
+          $prog['tries'][$u] = ($prog['tries'][$u] ?? 0) + 1;
+          if ($prog['tries'][$u] >= 3) {
+            @unlink(shop_data_dir() . '/' . $progressFile);
+            return ['error' => 'A variants page kept failing; the pass was dropped and the old catalog kept'];
+          }
+          $prog['queue'][] = $u;
+          continue;
         }
-        $prog['queue'][] = $u;
-        continue;
-      }
-      $pc = $r['paginated_collection'];
-      if (preg_match('/[?&]category_id=(\d+).*[?&]page=1$/', $u, $m)) {
-        for ($p = 2; $p <= (int)($pc['total_pages'] ?? 1); $p++) $prog['queue'][] = sync_variant_url((int)$m[1], $p);
-      }
-      foreach ($pc['entries'] ?? [] as $e) {
-        $v = $e['variant'] ?? $e;
-        if (empty($v['id']) || empty($v['product_catalog_id'])) continue;
-        $cond = '';
-        $other = [];
-        foreach ($v['descriptors'] ?? [] as $d) {
-          $d = is_array($d) ? ($d['variant_descriptor'] ?? $d) : [];
-          $value = is_scalar($d['value'] ?? null) ? (string)$d['value'] : '';
-          if (strcasecmp((string)($d['name'] ?? ''), 'condition') === 0) $cond = shop_condition_label($value);
-          elseif ($value !== '') $other[] = shop_norm($value);
+        $pc = $r['paginated_collection'];
+        if (preg_match('/[?&]category_id=(\d+).*[?&]page=1$/', $u, $m)) {
+          for ($p = 2; $p <= (int)($pc['total_pages'] ?? 1); $p++) $prog['queue'][] = sync_variant_url((int)$m[1], $p);
         }
-        sort($other);
-        $prog['byPid'][(string)(int)$v['product_catalog_id']][] = [(int)$v['id'], $cond !== '' ? $cond : 'Standard', implode(' ', $other),
-          (int)($v['sell_price']['money']['cents'] ?? 0)];
-        $prog['count']++;
+        foreach ($pc['entries'] ?? [] as $e) {
+          $v = $e['variant'] ?? $e;
+          if (empty($v['id']) || empty($v['product_catalog_id'])) continue;
+          $cond = '';
+          $other = [];
+          foreach ($v['descriptors'] ?? [] as $d) {
+            $d = is_array($d) ? ($d['variant_descriptor'] ?? $d) : [];
+            $value = is_scalar($d['value'] ?? null) ? (string)$d['value'] : '';
+            if (strcasecmp((string)($d['name'] ?? ''), 'condition') === 0) $cond = shop_condition_label($value);
+            elseif ($value !== '') $other[] = shop_norm($value);
+          }
+          sort($other);
+          $prog['byPid'][(string)(int)$v['product_catalog_id']][] = [(int)$v['id'], $cond !== '' ? $cond : 'Standard', implode(' ', $other),
+            (int)($v['sell_price']['money']['cents'] ?? 0)];
+          $prog['count']++;
+        }
+        $prog['pages']++;
       }
-      $prog['pages']++;
+      shop_write_json($progressFile, $prog);
     }
-    shop_write_json($progressFile, $prog);
+    if ($prog['queue']) {
+      $out = ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count']];
+    } else {
+      $catalog = ['at' => time(), 'variants' => $prog['count'], 'pages' => $prog['pages'],
+        'passMinutes' => (int)round((time() - $prog['started']) / 60), 'byPid' => $prog['byPid']];
+      shop_write_json('variants-catalog.json', $catalog);
+      @unlink(shop_data_dir() . '/' . $progressFile);
+      $passDone = true;
+    }
+    unset($prog);
   }
-  if ($prog['queue']) return ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count']];
 
+  // Match the listings against the saved catalog (no API calls).
+  $old = shop_read_json('variants.json');
+  if (is_array($catalog) && isset($catalog['byPid']) && ($passDone || $listingsChanged || !is_array($old) || (int)($old['catalogAt'] ?? 0) !== (int)$catalog['at'])) {
+    $out = sync_variant_map($listings, $catalog) + $out;
+  } elseif (!$out) {
+    $out = ['upToDate' => true, 'nextPassInMinutes' => max(0, (int)ceil((VARIANT_PASS_HOURS * 3600 - $passAge) / 60))];
+  }
+  return $out;
+}
+
+// Matches each listing to a catalog variant and saves variants.json (what the kiosk reads).
+function sync_variant_map(array $listings, array $catalog): array {
   $map = [];
   $examples = [];
   $loose = $missing = 0;
   foreach ($listings as $l) {
-    $cands = $prog['byPid'][(string)$l['pid']] ?? [];
+    $cands = $catalog['byPid'][(string)$l['pid']] ?? [];
     $want = array_map('shop_norm', array_filter(explode(' · ', $l['v']), 'strlen'));
     sort($want);
     $want = implode(' ', $want);
@@ -257,10 +290,9 @@ function sync_variants(array $listings, int $listingsAt, float $deadline): ?arra
     // A few examples for the status check: how the listing and its candidate variants are described.
     if (count($examples) < 12) $examples[] = ['listing' => [$l['c'], $want], 'variants' => array_map(function ($c) { return [$c[1], $c[2]]; }, array_slice($cands, 0, 6)), 'variantCount' => count($cands)];
   }
-  $stats = ['at' => time(), 'variants' => $prog['count'], 'pages' => $prog['pages'], 'listings' => count($listings),
-    'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing, 'passMinutes' => (int)round((time() - $prog['started']) / 60)];
+  $stats = ['at' => time(), 'catalogAt' => (int)$catalog['at'], 'variants' => (int)($catalog['variants'] ?? 0), 'listings' => count($listings),
+    'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing];
   shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'map' => $map]);
-  @unlink(shop_data_dir() . '/' . $progressFile);
   return $stats;
 }
 

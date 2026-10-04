@@ -2,9 +2,10 @@ name: Shop inventory sync
 
 # Keeps /shop current: asks the live site to re-read Play2Win's CrystalCommerce inventory.
 # The work happens in shop/sync.php on the server (data stays outside the website folder);
-# this job only calls it. Each call fills in up to ~40 seconds of product details and reads a
-# batch of CrystalCommerce variant ids for the kiosks, so a run repeats the call until nothing is
-# missing and no variants pass is pending (the first-ever run takes a few minutes).
+# this job only calls it. Each call fills in up to ~40 seconds of product details and, every few
+# hours, reads a small batch of CrystalCommerce variant ids for the kiosks, so a run repeats the
+# call until nothing is missing and no variants pass is pending. While a variants pass is pending it
+# waits a minute between calls, to stay gentle on CrystalCommerce's API.
 
 on:
   schedule:
@@ -20,11 +21,11 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Run the shop sync until product details and variant ids are complete
         run: |
-          for i in $(seq 1 20); do
+          for i in $(seq 1 25); do
             out=$(curl -sS --max-time 120 https://play2wingames.com/shop/sync.php || echo '{"status":"error","error":"request failed"}')
             echo "$out"
             status=$(echo "$out" | jq -r '.status // "error"')
@@ -32,5 +33,5 @@ jobs:
             pending=$(echo "$out" | jq -r '.variants.pending // 0')
             if [ "$status" = "ok" ] && [ "$missing" = "0" ] && [ "$pending" = "0" ]; then exit 0; fi
             if [ "$status" = "error" ] && [ "$i" -ge 3 ]; then exit 1; fi
-            sleep 5
+            if [ "$pending" != "0" ]; then sleep 60; else sleep 5; fi
           done
