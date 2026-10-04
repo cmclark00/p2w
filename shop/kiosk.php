@@ -30,6 +30,7 @@ const KIOSK_MAX_LINES = 40;
 const KIOSK_MAX_QTY = 10;
 const KIOSK_STALE_HOURS = 2;      // the staff list flags open orders older than this
 const KIOSK_KEEP_CLOSED = 300;    // closed orders kept in kiosk-orders.json (open ones are always kept)
+const KIOSK_CC_STATUS = 'Preorder';   // the only unpaid-looking status that holds the stock (see kiosk_cc_order)
 const KIOSK_STORE_ADDRESS = ['address1' => '3903 Western Avenue', 'city' => 'Knoxville', 'state' => 'TN', 'postal_code' => '37921', 'country' => 'US', 'phone' => '8659108357'];
 
 /* ================================================================== settings + access */
@@ -252,8 +253,9 @@ function kiosk_cc_order(array $items, string $name, int $total): array {
   $address = ['firstname' => $name, 'lastname' => 'Kiosk order', 'address2' => 'In-store pickup'] + KIOSK_STORE_ADDRESS;
   $order = [
     // Preorder: the one unpaid-looking status CrystalCommerce accepts on create, and it holds the stock.
-    // It still needs a payment record; everything else says NOT PAID.
-    'origin' => 'Direct', 'status' => 'Preorder', 'employee_name' => 'KIOSK - NOT PAID',
+    // Processing and On Hold are refused on create, and changing a Preorder to either releases the stock
+    // (tests #4 and #6). It still needs a payment record; everything else says NOT PAID.
+    'origin' => 'Direct', 'status' => KIOSK_CC_STATUS, 'employee_name' => 'KIOSK - NOT PAID',
     'customer_comments' => $note, 'vendor_comments' => $note, 'in_store_pickup' => true, 'ship_price' => '0', 'tax' => '0',
     'ship_rate_attributes' => ['method_id' => 1],
     'customer_attributes' => ['id' => kiosk_cfg()['customer']],
@@ -263,7 +265,15 @@ function kiosk_cc_order(array $items, string $name, int $total): array {
   ];
   [$s, $j, $raw] = shop_cc('POST', '/orders', 'admin:read-orders', ['order' => $order]);
   $o = is_array($j) ? ($j['order'] ?? $j) : [];
-  if ($s >= 200 && $s < 300 && !empty($o['id'])) return [(int)$o['id'], null];
+  if ($s >= 200 && $s < 300 && !empty($o['id'])) {
+    // Read it back: CrystalCommerce once answered "success" with an order number for an order it never saved
+    // (test #5). Only a saved Preorder holds the cards, so anything else is a failure the customer must hear about.
+    $id = (int)$o['id'];
+    [$s2, $j2] = shop_cc('GET', "/orders/$id", 'admin:read-orders');
+    $r = is_array($j2) ? ($j2['order'] ?? $j2) : [];
+    if ($s2 === 200 && (int)($r['id'] ?? 0) === $id && ($r['status'] ?? '') === KIOSK_CC_STATUS) return [$id, null];
+    return [null, "order $id could not be confirmed (HTTP $s2, status " . (($r['status'] ?? '') !== '' ? $r['status'] : 'missing') . ')'];
+  }
   $err = is_array($j) ? json_encode($j, JSON_UNESCAPED_SLASHES) : trim(preg_replace('/\s+/', ' ', strip_tags($raw)));
   return [null, "HTTP $s " . substr($err, 0, 200)];
 }

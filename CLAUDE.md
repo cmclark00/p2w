@@ -888,7 +888,15 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     but the order read back `is_on_hold: false` with a **blank status**,
     `PUT {on_hold: true}` / `{is_on_hold: true}` answered 200 and changed
     nothing, and the card's `available_qty` stayed 10 → 10 (not held).
-    Don't send `on_hold` on kiosk orders.
+    Don't send `on_hold` on kiosk orders. (The owner found no order
+    #277148 in the admin: CC answered 200 with an id for an order it
+    never saved.)
+  - **Not `On Hold` either** (test #6, Oct 4 2026, order **#277149**,
+    15¢ Yu-Gi-Oh card, TEST): "On Hold" is a status in the admin's list,
+    but it's refused on create (422). A Preorder changed to On Hold via
+    `PUT` sticks, but the card's `available_qty` went 2 → 1 as Preorder
+    and **back to 2 as On Hold**, so like Processing it releases the
+    stock. **Only `Preorder` holds the cards.**
   - **Emails:** CC sends **nothing when an order is created through the
     API**. It **does** email the order's customer when staff change the
     status in CC's admin: the owner's manual status change on #277128
@@ -939,7 +947,12 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     employee name **"KIOSK - NOT PAID"**, NOT PAID comments and payment
     description, In Store method 1, customer **`KIOSK_CUSTOMER_ID`
     (222309, shop-owned)**, store address with the customer's name, tax 0
-    (Fulcrum charges tax at the register). The order number shown is CC's.
+    (Fulcrum charges tax at the register). `kiosk_cc_order()` then
+    **reads the order back** (`GET /orders/{id}`) and only accepts it if
+    it exists as `KIOSK_CC_STATUS` (Preorder), because CC once answered
+    "success" for an order it never saved. Otherwise the customer gets
+    "ask a staff member" with the order number in the message, and
+    nothing goes on our list. The order number shown is CC's.
   - **Order placed screen** (`/shop/kiosk/done/<num>`, 30 min): huge order
     number, items, auto-return after 60 s. **Idle reset** (`shop.js`):
     120 s without a touch → "Still shopping?" with a 20 s countdown (only
