@@ -556,9 +556,16 @@ The site's **only server-side code**. Everything else is static.
     handheld: a charger/AC adapter, "with console", hardware joined by
     "+", or a handheld model first then "with"/"w/"; deliberately narrow so
     compatibility lists like "DS Lite DSi XL 3DS" and "Entertainment
-    System" stay normal; checked on 266 real titles), or looks sealed on
-    a non-New condition are shown dimmed and never auto-picked; staff can
-    click any sale to use it.
+    System" stay normal; checked on 266 real titles; also "console …
+    controllers/cables/cords"), or looks sealed on a non-New condition
+    are shown dimmed and never auto-picked; staff can click any sale to
+    use it. `ODD_SALE_RE` also catches signed/autographed copies and "N
+    more games" lots. **"Disc/cart/cartridge/game only" is only odd for
+    CIB and New** (`NOT_COMPLETE_RE`): it's what a loose game is (it used
+    to be odd everywhere, which threw out 26 of Pokemon Colosseum's 30
+    loose sales). **Loose only:** sales with the accessory the game
+    shipped with (`LOOSE_EXTRAS_RE`: VRU/mic, Pokewalker, N64 paks) are
+    odd, since a loose shelf copy doesn't have it (Hey You Pikachu).
   - **Never below GameStop** (owner's rule, every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and

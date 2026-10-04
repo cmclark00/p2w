@@ -2167,7 +2167,13 @@ const FLOOR_STEP = 500; // suggested prices round up to the next $5
 const FLOOR_AMAZON_PULL = 0.25;
 const FLOOR_SCARCE_MARKUP = 0.10;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
-const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|disc only|cart only|game only|choose|pick)\b/i;
+const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph|\d+ (more )?games)\b/i;
+// "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
+// odd everywhere, which threw out 26 of Pokemon Colosseum's 30 loose sales).
+const NOT_COMPLETE_RE = /\b(disc only|disk only|cart only|cartridge only|game only)\b/i;
+// A loose game sold with the accessory it shipped with (Hey You Pikachu's VRU/mic, HeartGold's Pokewalker,
+// Stadium's Transfer Pak): odd for loose, since a loose copy on the shelf doesn't have it.
+const LOOSE_EXTRAS_RE = /\b(vru|microphone|mic|pokewalker|poke ?walker|transfer pak|rumble pak|expansion pak)\b/i;
 const SEALED_RE = /\b(sealed|brand new|new in box|nib)\b/i;
 // The game sold together with a console or handheld ("DS Lite Onyx Black + Pokemon Diamond + Charger"): odd too.
 // Kept narrow on purpose: compatibility lists ("Nintendo DS Lite DSi XL 3DS 2DS Game") and "Entertainment
@@ -2176,7 +2182,9 @@ const BUNDLE_HW = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?
 // A specific handheld model first, then "with"/"w/" ("Nintendo DS Lite w/ Pokemon Diamond"); not plain platform
 // names, which normal listings start with ("Nintendo Game Boy Advance Pokemon Emerald CIB w/ poster").
 const BUNDLE_MODEL = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?: xl)?|(?:game ?boy advance|gba) sp|psp|ps ?vita)`;
-const BUNDLE_RE = new RegExp(String.raw`\b(charger|charging cable|power (cord|supply)|ac adapter)\b|\b(with|w\/) ?(the |a )?(console|system|handheld)\b|^${BUNDLE_HW}\b[^+]*\+|\+ ?${BUNDLE_HW}\b|^${BUNDLE_MODEL}\b.*?(\bwith\b|\bw\/)`, 'i');
+const BUNDLE_RE = new RegExp(String.raw`\b(charger|charging cable|power (cord|supply)|ac adapter)\b|\b(with|w\/) ?(the |a )?(console|system|handheld)\b|^${BUNDLE_HW}\b[^+]*\+|\+ ?${BUNDLE_HW}\b|^${BUNDLE_MODEL}\b.*?(\bwith\b|\bw\/)`
+  // "GameCube Console Tested With Controller And Cords", "Console With Cables", "+ controller"
+  + String.raw`|\bconsole\b.*\b(controllers?|cables?|cords?)\b|\b(with|w\/|\+) ?(a |the )?(controllers?|cables|cords)\b`, 'i');
 
 function floorTier(platform) {
   const p = norm(platform).replace(/^(pal|jp) /, '');
@@ -2209,7 +2217,9 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null }) {
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
 const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
-const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || BUNDLE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
+const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || BUNDLE_RE.test(sale.title)
+  || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(sale.title) : NOT_COMPLETE_RE.test(sale.title))
+  || (condition !== 'new' && SEALED_RE.test(sale.title));
 
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
