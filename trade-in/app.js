@@ -2129,7 +2129,7 @@ function showBulk() {
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
-    id: 'retro', rule: "Top recent eBay sales (from PriceCharting), never below GameStop's pre-owned price",
+    id: 'retro', rule: "Top recent eBay sales (from PriceCharting), never below GameStop's pre-owned price, nudged toward Amazon when it's higher",
     systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
       'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast', 'gamecube',
       'playstation 3', 'xbox 360'],
@@ -2140,7 +2140,7 @@ const FLOOR_TIERS = [
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
-const FLOOR_OTHER = { id: 'other', rule: 'Not in the Game Pricing Guide: top recent eBay sales (from PriceCharting). Double-check it' };
+const FLOOR_OTHER = { id: 'other', rule: 'Not in the Game Pricing Guide: top recent eBay sales (from PriceCharting), nudged toward Amazon. Double-check it' };
 // The sale the price comes from: the 90th percentile of the condition's normal recent sales (about the
 // 4th highest of 30). Checked against a month of the shop's own shelf prices (140 PS2/GameCube games,
 // Sept 2026): the single highest sale ran ~$12 high on average and was within $5 only 40% of the time;
@@ -2155,6 +2155,15 @@ const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to 
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500; // suggested prices round up to the next $5
+// Older systems and Amazon (owner's rules, Oct 2026), for systems that don't take Amazon's price outright:
+//  - When Amazon's lowest offer (shipping included) is above the eBay/GameStop price, go halfway toward it,
+//    but at most FLOOR_AMAZON_PULL above. Diddy Kong Racing (N64, loose): GameStop $39.99, Amazon higher,
+//    shelf $45. The cap keeps an inflated third-party asking price from setting the shelf price.
+//  - When Amazon lists the game but has no offers in that condition, copies are scarce: price from the
+//    highest normal sale plus FLOOR_SCARCE_MARKUP. Pokemon Emerald (GBA, loose): $275 (second-highest)
+//    -> highest sale $314.95 + 10% -> $350, the shop's price.
+const FLOOR_AMAZON_PULL = 0.25;
+const FLOOR_SCARCE_MARKUP = 0.10;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|disc only|cart only|game only|choose|pick)\b/i;
 const SEALED_RE = /\b(sealed|brand new|new in box|nib)\b/i;
@@ -2301,9 +2310,10 @@ function pickFloorGame(product) {
   }
 }
 
-// Amazon's offers for the game being priced, loaded for every game. Only modern systems (tier.amazon)
-// use them in the price; older systems show them for reference (owner's choice: retro Amazon listings
-// are third-party asking prices, often well above what copies actually sell for).
+// Amazon's offers for the game being priced, loaded for every game. Modern systems (tier.amazon) take
+// Amazon's lowest offer outright; older systems go partway toward it, and treat "no offers" as scarcity
+// (see FLOOR_AMAZON_PULL). Retro Amazon listings are third-party asking prices, often well above what
+// copies actually sell for, hence only partway.
 async function loadFloorAmazon() {
   const cur = floorCur;
   if (!cur || !amazonSet) return;
@@ -2354,22 +2364,28 @@ function floorSales(cur = floorCur) {
     .sort((a, b) => b.price - a.price);
 }
 
-// The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH). sales are highest first; odd listings never count.
-function floorAutoSale(sales) {
+// The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH; the highest when copies are scarce). sales are
+// highest first; odd listings never count.
+function floorAutoSale(sales, scarce = false) {
   const normal = sales.filter((s) => !s.odd);
   if (!normal.length) return { sale: null, count: 0 };
+  if (scarce) return { sale: normal[0], count: normal.length, high: true };
   const asc = [...normal].reverse();
   const p90 = asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))];
   const sale = p90.price >= FLOOR_HIGH && normal.length > 1 ? normal[1] : p90;
   return { sale, count: normal.length, high: sale !== p90 };
 }
 
-// What sets the price: { basis (cents) | null, from: 'sale'|'gamestop'|'typed', sale, checks, need }.
-// checks = reasons staff should glance at it; need = what to do when there's nothing to go by.
+// What sets the price: { basis (cents) | null, from: 'sale'|'gamestop'|'amazon'|'amazonMid'|'typed', sale, checks,
+// need, pull, scarce }. checks = reasons staff should glance at it; need = what to do when there's nothing to go by.
+// pull = { base, baseFrom, amazon, capped } when an older system's price was nudged toward Amazon.
 function floorBasis(cur = floorCur) {
   const tier = floorTier(cur.product['console-name']);
   const sales = floorSales(cur);
-  const auto = floorAutoSale(sales);
+  const amzInfo = cur.amazon?.found ? cur.amazon : null;
+  // Amazon matched the game but has no offers in this condition: scarce (older systems, automatic price only).
+  const scarce = !tier.amazon && cur.pick == null && !!amzInfo && !(amzInfo.offers || []).length;
+  const auto = floorAutoSale(sales, scarce);
   const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : auto.sale;
   const gs = floorGs(cur.product); // a minimum on every system; GameStop is never cheaper
   const checks = [];
@@ -2380,11 +2396,20 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
-  const amz = tier.amazon && cur.amazon?.found && cur.amazon.lowest > 0 ? cur.amazon.lowest : null;
-  const waiting = tier.amazon && cur.amazon?.loading; // don't let staff add it before Amazon answers
-  const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [amz, 'amazon']].filter(([v]) => v > 0);
+  const amz = amzInfo && amzInfo.lowest > 0 ? amzInfo.lowest : null;
+  const waiting = amazonSet && cur.amazon?.loading; // don't let staff add it before Amazon answers
+  const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [tier.amazon ? amz : null, 'amazon']].filter(([v]) => v > 0);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
+    // Older systems: halfway toward a higher Amazon price, at most FLOOR_AMAZON_PULL above (automatic price only).
+    if (!tier.amazon && cur.pick == null && amz > basis) {
+      const half = Math.round((basis + amz) / 2);
+      const cap = Math.round(basis * (1 + FLOOR_AMAZON_PULL));
+      const pull = { base: basis, baseFrom: from, amazon: amz, capped: cap < half };
+      return { basis: Math.min(half, cap), from: 'amazonMid', sale, checks, waiting, pull };
+    }
+    // Scarce copies: the highest sale plus FLOOR_SCARCE_MARKUP.
+    if (scarce && from === 'sale') return { basis: Math.round(basis * (1 + FLOOR_SCARCE_MARKUP)), from, sale, checks, waiting, scarce: { base: basis } };
     return { basis, from, sale, checks, waiting };
   }
   if (!cur.sales && !cur.salesError) return { basis: null, sale, checks: [] }; // still loading
@@ -2414,7 +2439,7 @@ function renderFloorPricer() {
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
   else {
     const shown = cur.showAll ? sales : sales.slice(0, 8);
-    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
+    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${(b.from === 'sale' || b.pull?.baseFrom === 'sale') && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
@@ -2452,6 +2477,7 @@ function renderFloorPricer() {
       <div class="floor-result">
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         ${b.checks.map((c) => `<p class="floor-need">Double-check: ${esc(c)}</p>`).join('')}
+        ${b.scarce ? `<p class="muted small-print">No ${amazonCond(cur.condition)} copies on Amazon right now, so this goes by the highest normal sale plus ${Math.round(FLOOR_SCARCE_MARKUP * 100)}%.</p>` : ''}
         ${belowGs ? `<p class="floor-need">Below GameStop's pre-owned price (${money(floorGs(p))}). Our price shouldn't be under GameStop's.</p>` : ''}
         <label${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -2475,18 +2501,22 @@ function floorAmazonHtml(cur, tier, b) {
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">This game isn't on Amazon (no match for its barcode).</p>`;
   const offers = a.offers || [];
-  const used = b.from === 'amazon';
+  const used = b.from === 'amazon' || b.from === 'amazonMid';
   const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>`;
   if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${used && i === 0 ? 'picked' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === 0 ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Prices include shipping.${tier.amazon ? '' : ' For reference only: older games are priced from eBay sales.'}${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+    <p class="muted small-print">Prices include shipping.${tier.amazon ? '' : ` Older games go halfway toward Amazon's lowest offer when it's higher (at most ${Math.round(FLOOR_AMAZON_PULL * 100)}% more).`}${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {
-  const from = FROM_LABELS[b.from] || '';
-  const parts = [`${from} ${money(b.basis)}`];
+  const parts = b.pull
+    ? [`${FROM_LABELS[b.pull.baseFrom] || ''} ${money(b.pull.base)}`,
+      `${b.pull.capped ? `toward Amazon's ${money(b.pull.amazon)}, capped at +${Math.round(FLOOR_AMAZON_PULL * 100)}%` : `halfway to Amazon's ${money(b.pull.amazon)}`}: ${money(b.basis)}`]
+    : b.scarce
+      ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
+      : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.full !== b.basis) parts.push(r.full === r.min && b.basis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
@@ -2502,8 +2532,8 @@ function addFloorItem() {
   if (!r) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
-    manualMissing: cur.condition === 'cib' && cur.manualMissing, basis: b.basis, from: b.from,
-    saleDate: b.from === 'sale' ? b.sale?.date || '' : '', price: r.price, edited: false,
+    manualMissing: cur.condition === 'cib' && cur.manualMissing, basis: b.scarce ? b.scarce.base : b.basis, from: b.from,
+    saleDate: b.from === 'sale' || b.pull?.baseFrom === 'sale' ? b.sale?.date || '' : '', price: r.price, edited: false,
   });
   floor.dirty = true;
   saveFloorLocal();
@@ -2558,7 +2588,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', amazon: 'Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 function renderFloorList() {
   const items = floor.items;

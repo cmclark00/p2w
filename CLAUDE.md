@@ -511,6 +511,18 @@ The site's **only server-side code**. Everything else is static.
     **and the sale** (owner's choice). "Add to list" waits while Amazon
     is still loading so the price can't be added low. Systems not in the guide
     (`FLOOR_OTHER`) price from the sales too, with a "double-check" rule.
+  - **Older systems and Amazon** (retro + other tiers, owner's rules Oct
+    2026; automatic price only, not a clicked sale or a typed price):
+    when Amazon's lowest offer is above the eBay/GameStop basis, go
+    **halfway toward it, capped at +`FLOOR_AMAZON_PULL` (25%)** (from
+    `amazonMid`, "Toward Amazon"; Diddy Kong Racing loose: GameStop $39.99
+    + Amazon $49.99 → $45, matching the shop). When Amazon matched the
+    game but has **no offers in that condition**, copies are scarce: use
+    the **highest** normal sale instead of p90/second-highest, **plus
+    `FLOOR_SCARCE_MARKUP` (10%)** (Pokemon Emerald loose: $275 → highest
+    sale $314.95 + 10% → $350, the shop's price; owner's choice). "Add to list"
+    waits for Amazon on every tier now. The cap is there because retro
+    Amazon listings are often inflated third-party asking prices.
   - **Which sale: the 90th percentile** of the condition's normal sales
     (`FLOOR_PCT`, `floorAutoSale()`), not the single highest. Backtested
     on the shop's own Sept 2026 sold list (140 PS2/GameCube games): max
