@@ -513,10 +513,14 @@ The site's **only server-side code**. Everything else is static.
     (`FLOOR_OTHER`) price from the sales too, with a "double-check" rule.
   - **Older systems and Amazon** (retro + other tiers, owner's rules Oct
     2026; automatic price only, not a clicked sale or a typed price):
-    when Amazon's lowest offer is above the eBay/GameStop basis, go
-    **halfway toward it, capped at +`FLOOR_AMAZON_PULL` (25%)** (from
-    `amazonMid`, "Toward Amazon"; Diddy Kong Racing loose: GameStop $39.99
-    + Amazon $49.99 → $45, matching the shop). When Amazon matched the
+    when Amazon's **typical** offer (the lower middle of the up-to-20
+    offers Amazon returns, not the lowest) is above the eBay/GameStop
+    basis, go **halfway toward it, capped at +`FLOOR_AMAZON_PULL` (25%)**
+    (from `amazonMid`, "Toward Amazon"). Typical because a lone cheap
+    "Acceptable" copy is common: Pokemon Diamond loose had lowest $54.01
+    but typical $84.80; GameStop $64.99 → $75, the shop's price (with the
+    lowest offer it stayed at $65). Diddy Kong Racing loose: GameStop
+    $39.99 → shop $45. When Amazon matched the
     game but has **no offers in that condition**, copies are scarce: use
     the **highest** normal sale instead of p90/second-highest, **plus
     `FLOOR_SCARCE_MARKUP` (10%)** (Pokemon Emerald loose: $275 → highest
@@ -548,9 +552,13 @@ The site's **only server-side code**. Everything else is static.
     PriceCharting changes that markup, the route returns empty lists and
     the tab asks for a typed price; fix the regexes in
     `pc_sales()`. Sales whose title matches `ODD_SALE_RE` (lot, bundle,
-    graded, repro, box/manual only…) or looks sealed on a non-New
-    condition are shown dimmed and never auto-picked; staff can click any
-    sale to use it.
+    graded, repro, box/manual only…), `BUNDLE_RE` (sold with a console or
+    handheld: a charger/AC adapter, "with console", hardware joined by
+    "+", or a handheld model first then "with"/"w/"; deliberately narrow so
+    compatibility lists like "DS Lite DSi XL 3DS" and "Entertainment
+    System" stay normal; checked on 266 real titles), or looks sealed on
+    a non-New condition are shown dimmed and never auto-picked; staff can
+    click any sale to use it.
   - **Never below GameStop** (owner's rule, every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and

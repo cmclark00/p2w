@@ -2156,9 +2156,11 @@ const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500; // suggested prices round up to the next $5
 // Older systems and Amazon (owner's rules, Oct 2026), for systems that don't take Amazon's price outright:
-//  - When Amazon's lowest offer (shipping included) is above the eBay/GameStop price, go halfway toward it,
-//    but at most FLOOR_AMAZON_PULL above. Diddy Kong Racing (N64, loose): GameStop $39.99, Amazon higher,
-//    shelf $45. The cap keeps an inflated third-party asking price from setting the shelf price.
+//  - When Amazon's typical offer (the middle of the offers Amazon returns, shipping included) is above the
+//    eBay/GameStop price, go halfway toward it, but at most FLOOR_AMAZON_PULL above. Typical, not lowest: one
+//    cheap "Acceptable" copy shouldn't sink it (Pokemon Diamond, DS, loose: lowest $54.01, typical $84.80,
+//    GameStop $64.99 -> $75, the shop's price; Diddy Kong Racing, N64, loose: GameStop $39.99 -> shop $45).
+//    The cap keeps inflated third-party asking prices from setting the shelf price.
 //  - When Amazon lists the game but has no offers in that condition, copies are scarce: price from the
 //    highest normal sale plus FLOOR_SCARCE_MARKUP. Pokemon Emerald (GBA, loose): $275 (second-highest)
 //    -> highest sale $314.95 + 10% -> $350, the shop's price.
@@ -2167,6 +2169,14 @@ const FLOOR_SCARCE_MARKUP = 0.10;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|disc only|cart only|game only|choose|pick)\b/i;
 const SEALED_RE = /\b(sealed|brand new|new in box|nib)\b/i;
+// The game sold together with a console or handheld ("DS Lite Onyx Black + Pokemon Diamond + Charger"): odd too.
+// Kept narrow on purpose: compatibility lists ("Nintendo DS Lite DSi XL 3DS 2DS Game") and "Entertainment
+// System" are normal game listings, so hardware only counts next to a "+", and "console/system" only after "with".
+const BUNDLE_HW = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?: xl)?|game ?boy(?: advance| color| pocket| sp)?|gba(?: sp)?|psp|ps ?vita|console|system|handheld)`;
+// A specific handheld model first, then "with"/"w/" ("Nintendo DS Lite w/ Pokemon Diamond"); not plain platform
+// names, which normal listings start with ("Nintendo Game Boy Advance Pokemon Emerald CIB w/ poster").
+const BUNDLE_MODEL = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?: xl)?|(?:game ?boy advance|gba) sp|psp|ps ?vita)`;
+const BUNDLE_RE = new RegExp(String.raw`\b(charger|charging cable|power (cord|supply)|ac adapter)\b|\b(with|w\/) ?(the |a )?(console|system|handheld)\b|^${BUNDLE_HW}\b[^+]*\+|\+ ?${BUNDLE_HW}\b|^${BUNDLE_MODEL}\b.*?(\bwith\b|\bw\/)`, 'i');
 
 function floorTier(platform) {
   const p = norm(platform).replace(/^(pal|jp) /, '');
@@ -2199,7 +2209,7 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null }) {
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
 const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
-const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
+const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || BUNDLE_RE.test(sale.title) || (condition !== 'new' && SEALED_RE.test(sale.title));
 
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
@@ -2397,15 +2407,19 @@ function floorBasis(cur = floorCur) {
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
   const amz = amzInfo && amzInfo.lowest > 0 ? amzInfo.lowest : null;
+  // Older systems compare with Amazon's typical offer: the (lower) middle of the offers, which come lowest first.
+  const amzOffers = (amzInfo?.offers || []).filter((o) => o.price > 0);
+  const amzMidIndex = amzOffers.length ? Math.floor((amzOffers.length - 1) / 2) : -1;
+  const amzTypical = amzMidIndex >= 0 ? amzOffers[amzMidIndex].price : null;
   const waiting = amazonSet && cur.amazon?.loading; // don't let staff add it before Amazon answers
   const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [tier.amazon ? amz : null, 'amazon']].filter(([v]) => v > 0);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
     // Older systems: halfway toward a higher Amazon price, at most FLOOR_AMAZON_PULL above (automatic price only).
-    if (!tier.amazon && cur.pick == null && amz > basis) {
-      const half = Math.round((basis + amz) / 2);
+    if (!tier.amazon && cur.pick == null && amzTypical > basis) {
+      const half = Math.round((basis + amzTypical) / 2);
       const cap = Math.round(basis * (1 + FLOOR_AMAZON_PULL));
-      const pull = { base: basis, baseFrom: from, amazon: amz, capped: cap < half };
+      const pull = { base: basis, baseFrom: from, amazon: amzTypical, index: amzMidIndex, capped: cap < half };
       return { basis: Math.min(half, cap), from: 'amazonMid', sale, checks, waiting, pull };
     }
     // Scarce copies: the highest sale plus FLOOR_SCARCE_MARKUP.
@@ -2501,19 +2515,19 @@ function floorAmazonHtml(cur, tier, b) {
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">This game isn't on Amazon (no match for its barcode).</p>`;
   const offers = a.offers || [];
-  const used = b.from === 'amazon' || b.from === 'amazonMid';
+  const usedAt = b.from === 'amazon' ? 0 : b.from === 'amazonMid' ? b.pull.index : -1; // the offer the price went by
   const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>`;
   if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
-  return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${used && i === 0 ? 'picked' : ''}">
-      <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === 0 ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Prices include shipping.${tier.amazon ? '' : ` Older games go halfway toward Amazon's lowest offer when it's higher (at most ${Math.round(FLOOR_AMAZON_PULL * 100)}% more).`}${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+  return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">
+      <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === 0 ? 'lowest' : !tier.amazon && i === Math.floor((offers.length - 1) / 2) ? 'typical' : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="muted small-print">Prices include shipping.${tier.amazon ? '' : ` Older games go halfway toward Amazon's typical offer (the middle of this list) when it's higher, at most ${Math.round(FLOOR_AMAZON_PULL * 100)}% more.`}${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {
   const parts = b.pull
     ? [`${FROM_LABELS[b.pull.baseFrom] || ''} ${money(b.pull.base)}`,
-      `${b.pull.capped ? `toward Amazon's ${money(b.pull.amazon)}, capped at +${Math.round(FLOOR_AMAZON_PULL * 100)}%` : `halfway to Amazon's ${money(b.pull.amazon)}`}: ${money(b.basis)}`]
+      `${b.pull.capped ? `toward Amazon's typical ${money(b.pull.amazon)}, capped at +${Math.round(FLOOR_AMAZON_PULL * 100)}%` : `halfway to Amazon's typical ${money(b.pull.amazon)}`}: ${money(b.basis)}`]
     : b.scarce
       ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
       : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
