@@ -4,7 +4,10 @@
  * the admin's order status list), and does it hold the card? Creates at most ONE clearly-labelled TEST order for
  * the cheapest card with 2+ in stock, with the payment record that works for Preorder, then reads the order back
  * (test #5 got "success" for an order that was never saved) and the card's stock before and after.
- * Runs once (result kept in <home>/p2w-shop-data/test-order6.json). Delete this file after the test.
+ * Run 1 showed "On Hold" is refused on create (422, nothing created). Run 2 (this one): create as Preorder
+ * (proven), then PUT {status: "On Hold"}, read it back, and check whether the card stays held (a Preorder
+ * changed to Processing released the hold in test #4).
+ * Runs once (result kept in <home>/p2w-shop-data/test-order6b.json). Delete this file after the test.
  */
 
 declare(strict_types=1);
@@ -14,7 +17,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
-$done = shop_data_dir() . '/test-order6.json';
+$done = shop_data_dir() . '/test-order6b.json';
 $lock = fopen(shop_data_dir() . '/test-order6.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo json_encode(['status' => 'busy']); exit; }
 if (is_file($done)) { readfile($done); exit; }
@@ -56,7 +59,7 @@ $note = 'TEST ORDER #6 (kiosk On Hold test) from play2wingames.com - please void
 $address = ['firstname' => 'TEST ORDER', 'lastname' => 'Kiosk On Hold test', 'address1' => '3903 Western Avenue', 'address2' => 'In-store pickup',
   'city' => 'Knoxville', 'state' => 'TN', 'postal_code' => '37921', 'country' => 'US', 'phone' => '8659108357'];
 $order = [
-  'origin' => 'Direct', 'status' => 'On Hold', 'employee_name' => 'KIOSK TEST - NOT PAID',
+  'origin' => 'Direct', 'status' => 'Preorder', 'employee_name' => 'KIOSK TEST - NOT PAID',
   'customer_comments' => $note, 'vendor_comments' => $note, 'in_store_pickup' => true, 'ship_price' => '0', 'tax' => '0',
   'ship_rate_attributes' => ['method_id' => 1], 'customer_attributes' => ['id' => shop_env('KIOSK_CUSTOMER_ID') ?: '222309'],
   'shipping_address_attributes' => $address, 'billing_address_attributes' => $address,
@@ -70,6 +73,13 @@ $out['create'] = ['http' => $s, 'id' => $o['id'] ?? null, 'statusReturned' => $o
   'error' => $s < 300 ? null : (is_array($j) ? json_encode($j, JSON_UNESCAPED_SLASHES) : substr(trim(strip_tags($raw)), 0, 300))];
 $id = $s >= 200 && $s < 300 ? (int)($o['id'] ?? 0) : 0;
 if (!$id) finish($out + ['result' => 'Refused; nothing created']);
+
+[$s, $j] = shop_cc('GET', "/orders/$id", 'admin:read-orders');
+$out['afterCreate'] = ['http' => $s, 'status' => is_array($j) ? (($j['order'] ?? $j)['status'] ?? null) : null];
+$out['stockAfterCreate'] = stock($pick['variant']);
+[$s, $j, $raw] = shop_cc('PUT', "/orders/$id", 'admin:read-orders', ['order' => ['status' => 'On Hold']]);
+$out['changeToOnHold'] = ['http' => $s, 'statusReturned' => is_array($j) ? (($j['order'] ?? $j)['status'] ?? null) : null,
+  'error' => $s < 300 ? null : (is_array($j) ? json_encode($j, JSON_UNESCAPED_SLASHES) : substr(trim(strip_tags($raw)), 0, 300))];
 
 [$s, $j] = shop_cc('GET', "/orders/$id", 'admin:read-orders');
 $r = is_array($j) ? ($j['order'] ?? $j) : [];
