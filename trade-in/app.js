@@ -81,6 +81,11 @@ const DEFAULT_SETTINGS = {
     keywords: ['Racing Wheel', 'Steering Wheel', 'Speed Wheel', 'Driving Force', 'Speed Force', 'Pedals', 'Flight Stick', 'HOTAS'],
   },
   partsPctOfLoose: 15, // PriceCharting hardware (special editions) on Parts: % of loose price, min = regular model's Parts price
+  // Floor Pricing: the shop's premium on certain games (owner, Oct 2026: "real eBay sold listings, as well as
+  // premiums on certain games, like Pokemon"). A % on top of the automatic shelf price for names containing the
+  // phrase; the most specific (longest) matching phrase wins, so "pokemon x" at 0 exempts one game. +10% fit
+  // best across 19 of the shop's loose Pokemon prices (6 -> 11 within 10%).
+  floorPremiums: [{ phrase: 'Pokemon', pct: 10 }],
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
     { id: 'scratch-heavy', label: 'Heavy scratching (resurface)', amount: 300, appliesTo: 'game', resurface: true },
@@ -234,6 +239,7 @@ function mergeSettings(saved) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
   if (saved.flatItems && typeof saved.flatItems === 'object') Object.assign(s.flatItems, saved.flatItems);
+  if (Array.isArray(saved.floorPremiums)) s.floorPremiums = saved.floorPremiums;
   if (saved.version >= 2) { // version 1 saves used a different percentage format - keep the new defaults
     for (const cat of Object.keys(s.rules)) Object.assign(s.rules[cat], saved.rules?.[cat] || {});
     if (Array.isArray(saved.deductions)) s.deductions = saved.deductions;
@@ -391,6 +397,23 @@ function shitboxReason(line, g) {
   if (line.guideFlag === 'normal') return null;
   if (line.guideFlag === 'shitbox') return 'shitbox game';
   return autoShitboxReason(line, g);
+}
+
+// The shop's premium for a game on the shelf ({ phrase, pct }), or null: the longest matching phrase wins.
+function floorPremium(name, s = settings) {
+  const text = norm(name);
+  let best = null;
+  for (const pr of s.floorPremiums || []) {
+    if (hasPhrase(text, pr.phrase) && (!best || norm(pr.phrase).length > norm(best.phrase).length)) best = pr;
+  }
+  return best && best.pct > 0 ? best : null;
+}
+
+// Settings text <-> premiums: one "phrase = 10" per line.
+const premiumsText = (list) => (list || []).map((p) => `${p.phrase} = ${pctText(p.pct)}`).join('\n');
+function premiumsFromText(text) {
+  return lines(text).map((l) => l.match(/^(.*?)\s*[=:]\s*(\d+(?:\.\d+)?)\s*%?$/)).filter((m) => m && m[1].trim())
+    .map((m) => ({ phrase: m[1].trim(), pct: Number(m[2]) }));
 }
 
 // The flat-price phrase (steering wheels etc.) an item's name contains, or undefined.
@@ -1633,6 +1656,7 @@ function fillSettingsForm() {
   f.boxedStepPct.value = pctText(settings.boxedStepPct);
   f.flatKeywords.value = settings.flatItems.keywords.join('\n');
   f.flatAmount.value = plain(settings.flatItems.amount);
+  f.floorPremiums.value = premiumsText(settings.floorPremiums);
   f.shopName.value = settings.shopName;
   f.quoteFooter.value = settings.quoteFooter;
   f.guideEnabled.checked = settings.guide.enabled;
@@ -1671,6 +1695,7 @@ async function saveSettings(e) {
       amount: Number.isNaN(flatAmount) || flatAmount == null ? settings.flatItems.amount : flatAmount,
       keywords: lines(f.flatKeywords.value),
     },
+    floorPremiums: premiumsFromText(f.floorPremiums.value),
     shopName: f.shopName.value.trim(),
     quoteFooter: f.quoteFooter.value.trim(),
     rules: rulesFromForm(),
@@ -2204,14 +2229,16 @@ function manualDeduction(price) {
 // then the missing-manual deduction.
 // Never below GameStop's pre-owned price (gs, owner's rule), even after the missing-manual deduction;
 // rounded up to the next $5 like everything else. Typed prices pass gs = null (staff get a warning instead).
-function floorPrice(basis, { shitbox, manualMissing, gs = null }) {
+// premium ({ phrase, pct } from floorPremium) goes on the basis before rounding; typed prices pass none.
+function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
-  const full = Math.max(min, Math.ceil(basis / FLOOR_STEP) * FLOOR_STEP);
+  const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
+  const full = Math.max(min, Math.ceil(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
   const price = Math.max(full - ded, gsFloor);
-  return { full, ded, price, min, gsRaised: price > full - ded ? gsFloor : 0 };
+  return { full, ded, price, min, gsRaised: price > full - ded ? gsFloor : 0, premium, premiumBasis };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -2450,7 +2477,8 @@ function renderFloorPricer() {
   const shitbox = autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const links = floorLinks(p, cur.condition);
   const b = floorBasis(cur);
-  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing, gs: b.from === 'typed' ? null : floorGs(p) });
+  const premium = b.from === 'typed' ? null : floorPremium(p['product-name']);
+  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing, gs: b.from === 'typed' ? null : floorGs(p), premium });
   const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
   const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
@@ -2479,6 +2507,7 @@ function renderFloorPricer() {
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
         <div class="floor-rule">${esc(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
+        ${premium ? `<span class="badge guide">${esc(premium.phrase)} premium +${pctText(premium.pct)}%</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
@@ -2541,7 +2570,8 @@ function floorMath(b, r) {
     : b.scarce
       ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
       : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
-  if (r.full !== b.basis) parts.push(r.full === r.min && b.basis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
+  if (r.premium) parts.push(`${r.premium.phrase} premium +${pctText(r.premium.pct)}%: ${money(r.premiumBasis)}`);
+  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   return parts.join(' → ');
@@ -2552,7 +2582,7 @@ function addFloorItem() {
   const p = cur.product;
   const b = floorBasis(cur);
   const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing,
-    gs: b.from === 'typed' ? null : floorGs(p) });
+    gs: b.from === 'typed' ? null : floorGs(p), premium: b.from === 'typed' ? null : floorPremium(p['product-name']) });
   if (!r) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,

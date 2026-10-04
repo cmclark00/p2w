@@ -573,6 +573,18 @@ The site's **only server-side code**. Everything else is static.
     $5 *after* the missing-manual deduction ("raised to GameStop's $X").
     Typed prices aren't forced up, but show a "Below GameStop's
     pre-owned price" warning.
+  - **Premiums on certain games** (`settings.floorPremiums`, managers edit
+    them under **Settings → Floor price premiums** as `phrase = percent`
+    lines; owner, Oct 2026: "real eBay sold listings, as well as premiums
+    on certain games, like Pokemon"). `floorPremium()` finds the
+    **longest** phrase in the game's name (accents folded), so
+    `Pokemon Yellow = 50` beats `Pokemon = 10` and `Pokemon X = 0`
+    exempts one game. `floorPrice()` adds it to the basis **before**
+    rounding, after the eBay/GameStop/Amazon steps; typed prices get none.
+    Shown as a badge and a breakdown step. Default `Pokemon = 10`: across
+    19 of the shop's loose Pokemon prices, +10% stacked on the tool's
+    price was the best single number (6 → 11 within 10%); the rest vary
+    game to game, hence the per-game lines.
   - **Price math** (`floorPrice()`): basis → round **up** to the next $5
     (`FLOOR_STEP`, owner's choice) → at least $10 (`FLOOR_MIN`), or $5
     for shitbox games (`autoShitboxReason()`) → minus the guide's
