@@ -1950,10 +1950,20 @@ function restoreHistory(of, i) {
 
 const fmtTime = (iso) => new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
+// What the customer actually took, going by the amounts: a corrected trade could have its type say one
+// thing and its amounts another (store credit, $0 credit, $40 cash), and the amounts are what was paid.
+function payoutKind(p) {
+  if (!p) return '';
+  const cash = p.cash > 0;
+  const credit = p.credit > 0;
+  return cash && credit ? 'split' : cash ? 'cash' : credit ? 'credit' : p.type || '';
+}
+
 function payoutText(p) {
   if (!p) return '';
-  if (p.type === 'cash') return `${money(p.cash)} cash`;
-  if (p.type === 'credit') return `${money(p.credit)} store credit`;
+  const kind = payoutKind(p);
+  if (kind === 'cash') return `${money(p.cash)} cash`;
+  if (kind === 'credit') return `${money(p.credit)} store credit`;
   return `${money(p.cash)} cash + ${money(p.credit)} store credit`;
 }
 
@@ -2253,7 +2263,7 @@ function exportLog() {
   const dollars = (c) => (c == null ? '' : (c / 100).toFixed(2));
   const rows = logRecords.map((r) => [
     fmtTime(r.time), r.id || '', r.customer || '', r.staff || '', r.totals?.count ?? (r.items || []).length,
-    r.payout?.type || '', dollars(r.payout?.cash || 0), dollars(r.payout?.credit || 0),
+    payoutKind(r.payout), dollars(r.payout?.cash || 0), dollars(r.payout?.credit || 0),
     dollars(r.totals?.cash), dollars(r.totals?.credit), r.idChecked ? 'yes' : '',
     (r.items || []).map((it) => `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name}${it.platform ? ` (${it.platform})` : ''}${it.serial ? ` [serial ${it.serial}]` : ''}`).join('; '),
     r.notes || '',
@@ -2425,6 +2435,7 @@ async function saveLogEdit(box) {
     const totals = { cash: logEditMoney(box, 'totalCash'), credit: logEditMoney(box, 'totalCredit'), count: items.filter((it) => !it.dontBuy).reduce((n, it) => n + it.qty, 0) };
     if (totals.cash !== r.totals?.cash || totals.credit !== r.totals?.credit || totals.count !== r.totals?.count) changes.totals = totals;
     const payout = { type: val('payoutType'), cash: logEditMoney(box, 'payoutCash'), credit: logEditMoney(box, 'payoutCredit') };
+    payout.type = payoutKind(payout); // the amounts decide, so the type can't contradict them
     if (payout.type !== r.payout?.type || payout.cash !== r.payout?.cash || payout.credit !== r.payout?.credit) changes.payout = payout;
   } catch (err) {
     error.textContent = err.message;
@@ -3675,6 +3686,14 @@ function wireEvents() {
   $('#logBody').addEventListener('click', onLogClick);
   $('#logBody').addEventListener('change', (e) => {
     if (e.target.matches('[data-f="payoutType"]')) logEditPayoutFill(e.target.closest('.log-edit'));
+  });
+  // Typing the payout amounts sets "Customer took" to match them (cash, store credit, or split).
+  $('#logBody').addEventListener('input', (e) => {
+    if (!e.target.matches('[data-k="payoutCash"], [data-k="payoutCredit"]')) return;
+    const box = e.target.closest('.log-edit');
+    const cents = (k) => parseMoney($(`[data-k="${k}"]`, box).value) || 0;
+    const kind = payoutKind({ cash: cents('payoutCash'), credit: cents('payoutCredit') });
+    if (kind) $('[data-f="payoutType"]', box).value = kind;
   });
 
   window.addEventListener('beforeunload', (e) => { if (hwDirty || settingsDirty) { e.preventDefault(); e.returnValue = ''; } });

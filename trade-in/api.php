@@ -580,7 +580,13 @@ function clean_trade_changes(array $c): array {
     if (!is_array($p) || !in_array($p['type'] ?? '', ['cash', 'credit', 'split'], true) || !$money($p['cash'] ?? null) || !$money($p['credit'] ?? null)) {
       fail(400, 'Check the payout amounts.');
     }
-    $out['payout'] = ['type' => $p['type'], 'cash' => $p['cash'], 'credit' => $p['credit']];
+    // The amounts are what was paid, so they decide the type (a type left on "credit" with $0 credit and
+    // $40 cash is a cash payout).
+    $type = $p['type'];
+    if ($p['cash'] > 0 && $p['credit'] > 0) $type = 'split';
+    elseif ($p['cash'] > 0) $type = 'cash';
+    elseif ($p['credit'] > 0) $type = 'credit';
+    $out['payout'] = ['type' => $type, 'cash' => $p['cash'], 'credit' => $p['credit']];
   }
   if (array_key_exists('totals', $c)) {
     $t = $c['totals'];
