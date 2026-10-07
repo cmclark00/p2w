@@ -541,7 +541,9 @@ The site's **only server-side code**. Everything else is static.
     ≤ $190): those come from current eBay asking prices, which need the
     eBay Browse API (active listings). `floorBasis()` adds "Double-check"
     notes for under `FLOOR_FEW_SALES` sales or a newest sale older than
-    `FLOOR_STALE_DAYS`. Staff can click any sale or type a price.
+    `FLOOR_STALE_DAYS`, and the pricer shows one for any shelf price of
+    `FLOOR_REVIEW` ($100) or more, typed prices included (owner request).
+    Staff can click any sale or type a price.
   - **Sales source.** The API has no
     sales data ("historic sales are not supported"), so **`GET
     api.php?route=pc/sales&id=…` reads the sold-listings tables off the
