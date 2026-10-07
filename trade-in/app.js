@@ -58,7 +58,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 6,
+  version: 7,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -83,9 +83,20 @@ const DEFAULT_SETTINGS = {
   partsPctOfLoose: 15, // PriceCharting hardware (special editions) on Parts: % of loose price, min = regular model's Parts price
   // Floor Pricing: the shop's premium on certain games (owner, Oct 2026: "real eBay sold listings, as well as
   // premiums on certain games, like Pokemon"). A % on top of the automatic shelf price for names containing the
-  // phrase; the most specific (longest) matching phrase wins, so "pokemon x" at 0 exempts one game. +10% fit
-  // best across 19 of the shop's loose Pokemon prices (6 -> 11 within 10%).
-  floorPremiums: [{ phrase: 'Pokemon', pct: 10 }],
+  // phrase; the most specific (longest) matching phrase wins, so "pokemon x" at 0 exempts one game. A line can
+  // name a system ("Pokemon @ Nintendo DS = 0"), and beats the same phrase without one. Fit Oct 7 2026 on the
+  // live tool (Amazon included) against the shop's loose prices for 19 Pokemon games + Conker: older-system
+  // Pokemon +25%, DS/3DS Pokemon none (the shop prices those at the sales / GameStop), Conker +15% took it
+  // from 5 to 13 of 20 within $10 (avg miss $24 -> $14). Other systems keep the earlier +10% (no data).
+  floorPremiums: [
+    { phrase: 'Pokemon', pct: 10 },
+    { phrase: 'Pokemon', system: 'GameBoy', pct: 25 }, // also matches GameBoy Color / Advance
+    { phrase: 'Pokemon', system: 'Nintendo 64', pct: 25 },
+    { phrase: 'Pokemon', system: 'Gamecube', pct: 25 },
+    { phrase: 'Pokemon', system: 'Nintendo DS', pct: 0 },
+    { phrase: 'Pokemon', system: 'Nintendo 3DS', pct: 0 },
+    { phrase: "Conker's Bad Fur Day", pct: 15 },
+  ],
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
     { id: 'scratch-heavy', label: 'Heavy scratching (resurface)', amount: 300, appliesTo: 'game', resurface: true },
@@ -261,6 +272,11 @@ function mergeSettings(saved) {
   if (saved.version < 6 && !s.deductions.some((d) => d.id === 'modded')) {
     s.deductions.push(clone(DEFAULT_SETTINGS.deductions.find((d) => d.id === 'modded')));
   }
+  // Version 7: per-system Pokemon premiums + Conker replace the untouched old default (Pokemon = 10).
+  const premiumKey = (list) => JSON.stringify(list.map((p) => [p.phrase, p.system || '', Number(p.pct)]));
+  if (saved.version < 7 && premiumKey(s.floorPremiums) === premiumKey([{ phrase: 'Pokemon', pct: 10 }])) {
+    s.floorPremiums = clone(DEFAULT_SETTINGS.floorPremiums);
+  }
   return s;
 }
 
@@ -406,21 +422,30 @@ function shitboxReason(line, g) {
   return autoShitboxReason(line, g);
 }
 
-// The shop's premium for a game on the shelf ({ phrase, pct }), or null: the longest matching phrase wins.
-function floorPremium(name, s = settings) {
+// The shop's premium for a game on the shelf ({ phrase, system?, pct }), or null. The longest matching phrase
+// wins; for the same phrase, a line naming the game's system beats one without (system = PriceCharting console).
+function floorPremium(name, system = '', s = settings) {
   const text = norm(name);
+  const sys = norm(system);
+  const rank = (pr) => norm(pr.phrase).length * 2 + (pr.system ? 1 : 0);
   let best = null;
   for (const pr of s.floorPremiums || []) {
-    if (hasPhrase(text, pr.phrase) && (!best || norm(pr.phrase).length > norm(best.phrase).length)) best = pr;
+    if (!hasPhrase(text, pr.phrase) || (pr.system && !hasPhrase(sys, pr.system))) continue;
+    if (!best || rank(pr) > rank(best)) best = pr;
   }
   return best && best.pct > 0 ? best : null;
 }
+const premiumLabel = (pr) => (pr.system ? `${pr.phrase} on ${pr.system}` : pr.phrase);
 
-// Settings text <-> premiums: one "phrase = 10" per line.
-const premiumsText = (list) => (list || []).map((p) => `${p.phrase} = ${pctText(p.pct)}`).join('\n');
+// Settings text <-> premiums: one "phrase = 10" or "phrase @ system = 10" per line.
+const premiumsText = (list) => (list || []).map((p) => `${p.phrase}${p.system ? ` @ ${p.system}` : ''} = ${pctText(p.pct)}`).join('\n');
 function premiumsFromText(text) {
   return lines(text).map((l) => l.match(/^(.*?)\s*[=:]\s*(\d+(?:\.\d+)?)\s*%?$/)).filter((m) => m && m[1].trim())
-    .map((m) => ({ phrase: m[1].trim(), pct: Number(m[2]) }));
+    .map((m) => {
+      const [phrase, system] = m[1].split('@').map((x) => x.trim());
+      return system ? { phrase, system, pct: Number(m[2]) } : { phrase, pct: Number(m[2]) };
+    })
+    .filter((p) => p.phrase);
 }
 
 // The flat-price phrase (steering wheels etc.) an item's name contains, or undefined.
@@ -2503,7 +2528,7 @@ function renderFloorPricer() {
   const shitbox = autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const links = floorLinks(p, cur.condition);
   const b = floorBasis(cur);
-  const premium = b.from === 'typed' ? null : floorPremium(p['product-name']);
+  const premium = b.from === 'typed' ? null : floorPremium(p['product-name'], p['console-name']);
   const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing, gs: b.from === 'typed' ? null : floorGs(p), premium });
   const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
@@ -2533,7 +2558,7 @@ function renderFloorPricer() {
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
         <div class="floor-rule">${esc(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
-        ${premium ? `<span class="badge guide">${esc(premium.phrase)} premium +${pctText(premium.pct)}%</span>` : ''}
+        ${premium ? `<span class="badge guide">${esc(premiumLabel(premium))} premium +${pctText(premium.pct)}%</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
@@ -2597,7 +2622,7 @@ function floorMath(b, r) {
     : b.scarce
       ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
       : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
-  if (r.premium) parts.push(`${r.premium.phrase} premium +${pctText(r.premium.pct)}%: ${money(r.premiumBasis)}`);
+  if (r.premium) parts.push(`${premiumLabel(r.premium)} premium +${pctText(r.premium.pct)}%: ${money(r.premiumBasis)}`);
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
@@ -2609,7 +2634,7 @@ function addFloorItem() {
   const p = cur.product;
   const b = floorBasis(cur);
   const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing,
-    gs: b.from === 'typed' ? null : floorGs(p), premium: b.from === 'typed' ? null : floorPremium(p['product-name']) });
+    gs: b.from === 'typed' ? null : floorGs(p), premium: b.from === 'typed' ? null : floorPremium(p['product-name'], p['console-name']) });
   if (!r) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
