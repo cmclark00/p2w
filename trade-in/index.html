@@ -195,8 +195,11 @@
       </div>
       <div class="row-end floor-foot">
         <span id="floorCount" class="muted"></span>
+        <button id="floorRecheck" type="button" class="btn" title="Price every game on the list again with today's sales, GameStop and Amazon">Re-check prices</button>
+        <button id="floorUseAll" type="button" class="btn primary" hidden></button>
         <button id="floorCopy" type="button" class="btn">Copy list</button>
         <button id="floorPrint" type="button" class="btn">Print list</button>
+        <button id="floorLabels" type="button" class="btn" title="Price labels on Avery 5160-size sheets (30 per page)">Print labels</button>
       </div>
     </section>
 
@@ -241,6 +244,13 @@
           <tbody id="hwBody"></tbody>
         </table>
       </div>
+
+      <div class="panel history-panel">
+        <h2>Change history</h2>
+        <p class="muted">The last 50 saves of these prices, newest first, with what changed. Load an older version into the list above, check it, then <em>Save changes</em> to put it back.</p>
+        <button type="button" class="btn" data-history="hardware">Show change history</button>
+        <div id="hardwareHistory" class="history-list" hidden></div>
+      </div>
     </section>
 
     <!-- ============================================================ TRADE LOG -->
@@ -248,13 +258,18 @@
       <div class="section-head">
         <div>
           <h1>Trade log</h1>
-          <p class="muted">Every completed trade, newest first. Search by customer, staff name, item, or serial number. Click a trade for details.</p>
+          <p class="muted">Every completed trade, newest first. Search by customer, staff name, item, serial number, or trade #. Pick dates for a day's totals or to export. Click a trade for details.</p>
         </div>
         <div class="toolbar">
           <input id="logSearch" type="search" placeholder="Search trades…" autocomplete="off">
-          <button id="logSearchBtn" type="button" class="btn">Search</button>
+          <label class="inline-label">From <input id="logFrom" type="date"></label>
+          <label class="inline-label">To <input id="logTo" type="date"></label>
+          <button id="logToday" type="button" class="btn">Today</button>
+          <button id="logSearchBtn" type="button" class="btn primary">Search</button>
+          <button id="logExport" type="button" class="btn">Export CSV</button>
         </div>
       </div>
+      <p id="logSummary" class="log-summary" hidden></p>
       <div class="table-wrap">
         <table class="log">
           <thead><tr><th>Date</th><th>Customer</th><th>Staff</th><th class="num">Items</th><th>Payout</th></tr></thead>
@@ -269,7 +284,7 @@
       <div class="section-head">
         <div>
           <h1>Settings</h1>
-          <p class="muted">Saved on this computer's calculator server, so every browser tab uses the same numbers.</p>
+          <p class="muted">Saved on the calculator's server, so every computer and browser tab uses the same numbers.</p>
         </div>
       </div>
 
@@ -286,7 +301,7 @@
 
       <div class="panel">
         <h2>Amazon (Selling Partner API)</h2>
-        <p class="muted">The keys from the shop's private SP-API app in Amazon's Solution Provider Portal. Floor Pricing uses them to read Amazon's offers for PS4/PS5/Xbox/Switch games. They stay on the server; the browser never sees them. Leave a box blank to keep what's saved.</p>
+        <p class="muted">The keys from the shop's private SP-API app in Amazon's Solution Provider Portal. Floor Pricing uses them to read Amazon's offers for every game it prices. They stay on the server; the browser never sees them. Leave a box blank to keep what's saved.</p>
         <div class="grid-3 amazon-keys">
           <label>Client ID
             <input id="amzClientId" type="password" autocomplete="off" spellcheck="false" placeholder="amzn1.application-oa2-client…">
@@ -438,9 +453,17 @@
 
         <div class="row-end">
           <span id="settingsStatus" class="status"></span>
+          <button id="settingsDiscard" type="button" class="btn">Discard changes</button>
           <button type="submit" class="btn primary">Save settings</button>
         </div>
       </form>
+
+      <div class="panel history-panel">
+        <h2>Change history</h2>
+        <p class="muted">The last 50 saves of these settings, newest first, with what changed. Load an older version into the form above, check it, then <em>Save settings</em> to put it back.</p>
+        <button type="button" class="btn" data-history="settings">Show change history</button>
+        <div id="settingsHistory" class="history-list" hidden></div>
+      </div>
     </section>
   </main>
 
@@ -460,6 +483,8 @@
       </div>
     </div>
     <div class="actions">
+      <button id="holdBtn" type="button" class="btn" title="Put this trade aside and start another (kept on this computer)">Hold</button>
+      <select id="heldSelect" aria-label="Held trades" hidden></select>
       <button id="printBtn" type="button" class="btn">Print quote</button>
       <button id="completeBtn" type="button" class="btn primary">Complete trade</button>
       <button id="clearBtn" type="button" class="btn danger">New trade</button>

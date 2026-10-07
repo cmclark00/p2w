@@ -472,8 +472,10 @@ The site's **only server-side code**. Everything else is static.
     Secure on HTTPS, `SameSite=Strict`, path `/trade-in/`). There are no
     PHP sessions, so shared-host session GC can't log staff out.
   - Changing a password bumps `sessionVersion`, which logs out every device.
-  - Login and setup are limited to 8 failures per IP per 15 minutes
-    (`login-attempts.json`).
+  - Login and setup are limited to 20 failures per IP per 15 minutes
+    (`MAX_LOGIN_FAILS`, `login-attempts.json`; was 8, raised Oct 2026
+    because the whole shop shares one IP). A success clears that IP's
+    count; the 429 message says how many minutes until another try.
   - Writes must be JSON (`415` otherwise), and `Sec-Fetch-Site: cross-site`
     is refused.
 - **First-time setup** needs a one-time setup code. Only its SHA-256 is in
@@ -493,7 +495,18 @@ The site's **only server-side code**. Everything else is static.
     `/assets` online and to the local copy's `/assets` offline.
   - `index.html`, `app.js`, and `styles.css` are byte-identical in both
     places. **Keep them in sync** when editing; this repo is the source of
-    truth.
+    truth. **`scripts/shop-pc/Update-TradeInCalculator.ps1`** does it:
+    copied once into the `TradeInCalculator` folder, it downloads those
+    three files plus `assets/bulk-rates.json` from the live site, checks
+    each looks right, backs up the old copy (`backup-<date>/`), and only
+    replaces changed files. Safe to run every time the calculator starts
+    (e.g. from the start shortcut before `server.ps1`). It never touches
+    `server.ps1` or data. (`scripts/` isn't deployed.)
+  - Website-only features hide or degrade offline: Change history is
+    hidden (`auth: false`), the trade log's date range is also applied
+    client-side (the old server ignores `from`/`to` and caps at 100), and
+    Floor Pricing lacks sales/Amazon/sessions (below). `server.ps1` isn't
+    on the dev machine; to add routes, get a copy from the shop PC.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
   - **Hands-free by design** (owner request). PriceCharting's listed
@@ -608,12 +621,36 @@ The site's **only server-side code**. Everything else is static.
     for shitbox games (`autoShitboxReason()`) → minus the guide's
     missing-manual amount (`manualDeduction()`: CIB $10–$20 $0, $25–$50
     $5, $55–$100 $10, $105–$200 $20, $205+ 10% to the nearest $5).
-    Prices in the list are editable (`edited` flag).
+    Prices in the list are editable (`edited` flag). `floorResult()` is
+    the one place that turns a priced game into `{ b, r }` (pricer, Add to
+    list, and re-check all use it).
+  - **Hardware on the floor** (`floorIsHardware()`: `guessCategory()` of
+    the name isn't a game, or PriceCharting's genre says systems/
+    accessories): priced from sales the same way, but **no game rules**
+    (no $5 shitbox floor, no Manual missing box), with a badge saying so.
+  - **Duplicates:** adding a game already on the list in the same
+    condition (and manual state) asks first.
   - **Saved sessions** (`GET/PUT/DELETE api.php?route=floor-sessions`):
     named lists stored in `p2w-trade-in-data/floor-sessions.json` (one
     file, flock'd; the oldest drop off past `MAX_FLOOR_SESSIONS` = 300).
     The open list is also kept in `localStorage` (`p2w-floor`) so a
-    refresh doesn't lose it. Copy list (TSV) and Print list.
+    refresh doesn't lose it. Copy list (TSV) and Print list. **No silent
+    overwrites:** a save sends `baseUpdated` (the session's `updated` when
+    this browser opened/last saved it); if someone saved it since, the
+    server answers **409** with who/when, and the page offers to save
+    this list as "<name> (copy)" instead (`floorSaveConflict()`). `force`
+    exists server-side but the UI never sends it.
+  - **Re-check prices** (`recheckFloorPrices()`): re-runs every game on
+    the list through today's sales, GameStop and Amazon (one at a time;
+    the server throttles; ~5 s/game with Amazon; the button becomes Stop).
+    Results go on `it.recheck` (`{ price, basis, from, saleDate, at }` or
+    `{ error }`) as suggestions: **Use** / **Keep** per row, or "Use N new
+    prices" which **skips prices edited by hand**. A different session
+    opened mid-run stops it (`floorEpoch`).
+  - **Print labels** (`printFloorLabels()`): name, system · condition,
+    price on **Avery 5160/8160** sheets (letter, 3 × 10, 2⅝" × 1"), 30
+    per `.label-page`, via the named `@page labels { margin: 0 }`. Print
+    at 100% / Actual size or they drift.
   - **Amazon (SP-API).** The shop has a Professional seller account,
     so it uses its own **private SP-API app** (registered in Amazon's
     Solution Provider Portal with only the Pricing + Product Listing
@@ -636,10 +673,11 @@ The site's **only server-side code**. Everything else is static.
     lists more); the tab shows them all and "N lowest of M". Renewed
     copies are separate ASINs, so they never appear. Loose/CIB compare
     with **Used**, New with **New**. **Loaded automatically for every
-    game**, but **only modern systems use it in the price**; older
-    systems show it "for reference only" and price from eBay sales
-    (owner's choice — retro Amazon listings are third-party asking
-    prices, often far above actual sales). The game
+    game.** Modern systems take Amazon's lowest offer as a basis option;
+    older systems only go partway toward Amazon's typical offer (capped)
+    and treat "no offers" as scarcity — see **Older systems and Amazon**
+    above (retro Amazon listings are third-party asking prices, often far
+    above actual sales, hence the cap). The game
     needs a UPC on PriceCharting to match. `GET amazon/test` checks the
     keys (token exchange only). For local testing, `P2W_AMAZON_LWA` /
     `P2W_AMAZON_HOST` env vars point the server at a fake Amazon.
@@ -673,12 +711,30 @@ The site's **only server-side code**. Everything else is static.
     trade or remembered per device), payout (`cash` / `credit` / `split` with cents),
     totals, per-item snapshot (incl. serials), `idChecked`, and notes.
   - Search is a case-insensitive substring match on the raw JSON line,
-    newest first. It returns at most 100 results from the last 36 months.
+    newest first. It returns at most 100 results (`LOG_MAX`) from the last
+    36 months, or up to 2000 (`LOG_MAX_RANGE`) with a date range: `from`/
+    `to` are UTC ISO times in the log's own format (`2026-10-07T04:00:00+00:00`,
+    from inclusive, to exclusive); the page turns local From/To days into
+    those (`dayStartIso()`). With dates picked, a gold summary shows
+    trades, items, **cash paid out and store credit issued** (from each
+    trade's chosen payout, not the offers), and **Export CSV** downloads
+    one row per trade (date, trade #, customer, staff, payout, offers, ID
+    checked, items list, notes). **Today** fills both dates.
+  - **Trade #** = the record's `id`: printed on receipts, shown under the
+    date in the log and in the "saved" toast; searchable.
+  - "Save trade" / "Save & print" are disabled while the save is in
+    flight (`completing`), so a double-click can't log a trade twice.
   - Both roles can read and write it.
   - It holds customer names, so it lives with the other private data. Don't
     add ID numbers or DOBs to it; only an "ID checked" flag is stored.
   - The shop PC's `server.ps1` implements the same two routes with its own
     `data\trades` folder, so the offline log is separate from the website's.
+- **Held trades** (`holdTrade()` / `resumeHeld()`): **Hold** in the totals
+  bar parks the open trade (lines, customer, split, bulk counts, with the
+  prices it had) in `localStorage` (`p2w-held-trades`, this computer
+  only) and starts a fresh one; the "Held trades (N)…" menu brings one
+  back, and if a trade is open it goes on hold in its place (a swap).
+  Refused while lookups are pending.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
   mixed categories (games +50%, hardware +20%) stay fair. Staff can type
@@ -739,6 +795,21 @@ The site's **only server-side code**. Everything else is static.
     (PriceCharting redirects that to the product page). Hardware lines
     with a PriceCharting product keep the id as `matchedPcId` and link the
     PriceCharting name. Demo items (non-numeric ids) aren't linked.
+- **Change history** (managers, website only): every `PUT settings` /
+  `PUT hardware` also appends `{ time, role, data }` to
+  `p2w-trade-in-data/<settings|hardware>-history.jsonl` (`add_history()`,
+  last `HISTORY_KEEP` = 50; the first save also records the version it
+  replaces as role "before history"). `GET api.php?route=history&of=…`
+  returns them newest first. Each tab's **Change history** panel lists
+  what changed between saves (`settingsChanges()` names settings and
+  shows rule % changes; `hardwareChanges()` lists changed/added/removed
+  items) and **Load this version** puts an old one in the form/list
+  (settings go through `mergeSettings()`, so old versions migrate) for a
+  manager to check and save. Nothing is restored without a save.
+- **Unsaved Settings edits survive tab switches** (`settingsDirty`):
+  `showView('settings')` only refills the form when it's clean, the
+  status shows "Unsaved changes", **Discard changes** reloads it, and
+  closing the page warns (like unsaved hardware prices).
 - **Pricing rules live in `app.js`** as `DEFAULT_SETTINGS` and
   `SEED_HARDWARE` (transcribed from the shop's Game Buying Guide Google
   Sheet). Once a manager saves, the server copy wins. Code defaults only

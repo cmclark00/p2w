@@ -344,7 +344,7 @@ async function api(route, { method = 'GET', body, params } = {}) {
     throw new Error('Your login expired. Please log in again.');
   }
   if (!res.ok || data?.status === 'error') {
-    throw new Error(data?.['error-message'] || `Request failed (HTTP ${res.status})`);
+    throw Object.assign(new Error(data?.['error-message'] || `Request failed (HTTP ${res.status})`), { status: res.status, data });
   }
   return data;
 }
@@ -1690,34 +1690,45 @@ function deductionsFromForm() {
   })).filter((d) => d.label);
 }
 
-function fillSettingsForm() {
+// Unsaved edits in the Settings form: kept when switching tabs (the form isn't refilled), and the
+// page warns before closing.
+let settingsDirty = false;
+function setSettingsDirty(dirty) {
+  settingsDirty = dirty;
+  $('#settingsStatus').textContent = dirty ? 'Unsaved changes' : '';
+  $('#settingsStatus').classList.toggle('warn-text', dirty);
+}
+
+// s = the live settings, or a saved version from Change history (which then still needs saving).
+function fillSettingsForm(s = settings) {
   const f = $('#settingsForm').elements;
-  f.defaultCondition.value = settings.defaultCondition;
-  f.roundMode.value = settings.roundMode;
-  f.roundStep.value = String(settings.roundStep);
-  f.lowValue.value = plain(settings.lowValue);
-  f.slowSalesPerYear.value = settings.slowSalesPerYear;
-  f.partsPctOfLoose.value = pctText(settings.partsPctOfLoose);
-  f.thirdPartyPct.value = pctText(settings.thirdPartyPct);
-  f.boxedStepPct.value = pctText(settings.boxedStepPct);
-  f.flatKeywords.value = settings.flatItems.keywords.join('\n');
-  f.flatAmount.value = plain(settings.flatItems.amount);
-  f.floorPremiums.value = premiumsText(settings.floorPremiums);
-  f.shopName.value = settings.shopName;
-  f.quoteFooter.value = settings.quoteFooter;
-  f.guideEnabled.checked = settings.guide.enabled;
-  for (const key of GUIDE_LISTS) f[key].value = settings.guide[key].join('\n');
-  $('#rulesBody').innerHTML = Object.entries(settings.rules).map(([cat, rule]) => `<tr>
+  f.defaultCondition.value = s.defaultCondition;
+  f.roundMode.value = s.roundMode;
+  f.roundStep.value = String(s.roundStep);
+  f.lowValue.value = plain(s.lowValue);
+  f.slowSalesPerYear.value = s.slowSalesPerYear;
+  f.partsPctOfLoose.value = pctText(s.partsPctOfLoose);
+  f.thirdPartyPct.value = pctText(s.thirdPartyPct);
+  f.boxedStepPct.value = pctText(s.boxedStepPct);
+  f.flatKeywords.value = s.flatItems.keywords.join('\n');
+  f.flatAmount.value = plain(s.flatItems.amount);
+  f.floorPremiums.value = premiumsText(s.floorPremiums);
+  f.shopName.value = s.shopName;
+  f.quoteFooter.value = s.quoteFooter;
+  f.guideEnabled.checked = s.guide.enabled;
+  for (const key of GUIDE_LISTS) f[key].value = s.guide[key].join('\n');
+  $('#rulesBody').innerHTML = Object.entries(s.rules).map(([cat, rule]) => `<tr>
     <td>${esc(CATEGORIES[cat])}</td>
     <td>${basisCell(cat, rule)}</td>
     <td class="num"><span class="pct-input"><input type="number" min="0" step="any" name="cashPct-${cat}" value="${pctText(rule.cashPct)}"><span>%</span></span></td>
     <td class="num"><span class="pct-input"><input type="number" min="0" step="any" name="creditPct-${cat}" value="${pctText(rule.creditPct)}"><span>%</span></span></td>
     <td class="num muted" data-example="${cat}"></td>
   </tr>`).join('');
-  $('#dedBody').innerHTML = settings.deductions.map(dedRowHtml).join('');
+  $('#dedBody').innerHTML = s.deductions.map(dedRowHtml).join('');
   renderRuleExamples();
   renderTokenStatus();
   renderAmazonStatus();
+  setSettingsDirty(s !== settings); // a version loaded from Change history still needs saving
 }
 
 async function saveSettings(e) {
@@ -1850,6 +1861,91 @@ async function clearAmazonKeys() {
   }
 }
 
+/* ================================================================== change history (settings, hardware) */
+
+// The server keeps the last 50 saves of each (api.php add_history). Each row says what changed from the
+// save before it, and an older version can be loaded back in for a manager to check and save.
+const historyLists = { settings: [], hardware: [] };
+
+const SETTING_LABELS = {
+  defaultCondition: 'Default condition', roundMode: 'Rounding', roundStep: 'Rounding step', lowValue: 'Low-offer flag',
+  slowSalesPerYear: 'Slow-seller flag', partsPctOfLoose: 'Special-edition Parts %', thirdPartyPct: 'Third-party controller %',
+  boxedStepPct: 'Boxed controller minimums', flatItems: 'Flat-price items', floorPremiums: 'Floor price premiums',
+  shopName: 'Shop name', quoteFooter: 'Quote footer', deductions: 'Deductions', guide: 'Buying guide rules',
+};
+
+// What changed from an older settings save (a) to a newer one (b).
+function settingsChanges(a, b) {
+  if (!a) return ['Oldest saved version'];
+  const out = [];
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (k === 'version' || JSON.stringify(a[k]) === JSON.stringify(b[k])) continue;
+    if (k !== 'rules') { out.push(SETTING_LABELS[k] || k); continue; }
+    for (const [cat, rule] of Object.entries(b.rules || {})) {
+      const old = a.rules?.[cat] || {};
+      const name = CATEGORIES[cat] || cat;
+      if (old.cashPct !== rule.cashPct) out.push(`${name} cash ${pctText(old.cashPct)}% → ${pctText(rule.cashPct)}%`);
+      if (old.creditPct !== rule.creditPct) out.push(`${name} credit ${pctText(old.creditPct)}% → ${pctText(rule.creditPct)}%`);
+      if ((old.basis || '') !== (rule.basis || '')) out.push(`${name} value source`);
+    }
+  }
+  return out.length ? out : ['No changes'];
+}
+
+// What changed from an older hardware price list (a) to a newer one (b), by item name.
+function hardwareChanges(a, b) {
+  if (!a) return ['Oldest saved version'];
+  const byName = (list) => new Map((list || []).map((h) => [norm(h.name), h]));
+  const A = byName(a);
+  const B = byName(b);
+  const few = (names) => `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}`;
+  const added = [...B.entries()].filter(([k]) => !A.has(k)).map(([, h]) => h.name);
+  const removed = [...A.entries()].filter(([k]) => !B.has(k)).map(([, h]) => h.name);
+  const changed = [...B.entries()].filter(([k, h]) => A.has(k) && ['category', ...HW_FIELDS].some((f) => A.get(k)[f] !== h[f])).map(([, h]) => h.name);
+  const out = [];
+  if (changed.length) out.push(`Changed: ${few(changed)}`);
+  if (added.length) out.push(`Added: ${few(added)}`);
+  if (removed.length) out.push(`Removed: ${few(removed)}`);
+  return out.length ? out : ['No changes'];
+}
+
+async function showHistory(of) {
+  const box = $(`#${of}History`);
+  box.hidden = false;
+  box.innerHTML = '<p class="muted"><span class="spinner"></span>Loading…</p>';
+  try {
+    historyLists[of] = (await api('history', { params: { of } })) || [];
+  } catch (err) {
+    box.innerHTML = `<p class="error-text">${esc(err.message)}</p>`;
+    return;
+  }
+  const list = historyLists[of];
+  if (!list.length) { box.innerHTML = '<p class="muted">No saves recorded yet. History starts with the next save.</p>'; return; }
+  const diff = of === 'settings' ? settingsChanges : hardwareChanges;
+  box.innerHTML = `<table class="history"><thead><tr><th>Saved</th><th>By</th><th>What changed</th><th></th></tr></thead><tbody>${list.map((h, i) => {
+    const changes = diff(list[i + 1]?.data, h.data);
+    return `<tr><td class="nowrap">${esc(fmtTime(h.time))}</td><td>${esc(h.role === 'before history' ? '—' : `${h.role || ''} login`)}</td>
+      <td>${changes.map(esc).join('<br>')}</td>
+      <td>${i === 0 ? '<span class="muted">Current</span>' : `<button type="button" class="btn small" data-restore="${of}:${i}">Load this version</button>`}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function restoreHistory(of, i) {
+  const h = historyLists[of][i];
+  if (!h) return;
+  if (of === 'settings') {
+    fillSettingsForm(mergeSettings(h.data)); // migrates an old version to today's format; still needs Save
+    $('#settingsForm').scrollIntoView({ behavior: 'smooth' });
+  } else {
+    if (hwDirty && !confirm('Replace your unsaved hardware price changes with this older version?')) return;
+    hardware = clone(h.data);
+    setHwDirty(true);
+    renderHardware();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  toast(`Loaded the version saved ${fmtTime(h.time)}. Check it, then save to put it back.`);
+}
+
 /* ================================================================== print */
 
 const fmtTime = (iso) => new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
@@ -1879,14 +1975,14 @@ function tradeItems() {
 const creditBonusText = (it) => (it.creditBonus != null ? `Custom store credit +${it.creditBonus}%` : '');
 
 // One printed sheet for both quotes (current trade) and receipts (a logged trade).
-function printSheet({ receipt, time, customer, items, totals, payout, staff }) {
+function printSheet({ receipt, time, customer, items, totals, payout, staff, id }) {
   const rows = items.map((it) => {
     const detail = [it.detail, it.platform, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : ''].filter(Boolean).join(' · ');
     const cell = (c) => (it.dontBuy ? 'Not buying' : c == null ? '—' : money(c * it.qty));
     return `<tr><td>${esc(it.name)}${detail ? `<div class="sub">${esc(detail)}</div>` : ''}</td>
       <td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
   }).join('');
-  const meta = [receipt ? 'Trade-in receipt' : 'Trade-in quote', fmtTime(time), customer, receipt && staff ? `Bought in by ${staff}` : ''].filter(Boolean);
+  const meta = [receipt ? 'Trade-in receipt' : 'Trade-in quote', receipt && id ? `Trade #${id}` : '', fmtTime(time), customer, receipt && staff ? `Bought in by ${staff}` : ''].filter(Boolean);
   $('#printArea').innerHTML = `
     <h1>${esc(settings.shopName)}</h1>
     <p class="print-meta">${meta.map(esc).join(' · ')}</p>
@@ -1986,7 +2082,11 @@ function updateDialogSplit() {
   $(PAY_SPLIT_INPUTS[other]).value = plain(s ? s[other] : null);
 }
 
+// True while a completed trade is being sent, so a double-click can't log it twice.
+let completing = false;
+
 async function saveCompleted(print) {
+  if (completing) return;
   const error = $('#completeError');
   error.textContent = '';
   const t = tradeTotals();
@@ -2016,16 +2116,22 @@ async function saveCompleted(print) {
     idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
   };
   let saved;
+  const buttons = $$('#completeSave, #completePrint');
+  completing = true;
+  buttons.forEach((b) => { b.disabled = true; });
   try {
     saved = await api('trades', { method: 'POST', body: record });
   } catch (err) {
     error.textContent = `Couldn't save the trade: ${err.message}`;
     return;
+  } finally {
+    completing = false;
+    buttons.forEach((b) => { b.disabled = false; });
   }
   $('#completeDialog').close();
-  if (print) printSheet({ ...record, receipt: true, time: saved.time });
+  if (print) printSheet({ ...record, receipt: true, time: saved.time, id: saved.id });
   resetTrade();
-  toast('Trade saved to the trade log.');
+  toast(`Trade${saved?.id ? ` #${saved.id}` : ''} saved to the trade log.`);
 }
 
 // New trade: empty list, and the staff and customer names start blank again.
@@ -2036,22 +2142,132 @@ function resetTrade() {
   focusScan();
 }
 
+/* ---------------------------------------------------------------- held trades */
+
+// Hold the current trade (the customer is still shopping, or went to get more games) and start another.
+// Held trades live on this computer only (localStorage), with the prices they had when held.
+const HELD_KEY = 'p2w-held-trades';
+let heldTrades = store.get(HELD_KEY, []);
+
+const heldEntry = () => ({ id: uid(), heldAt: new Date().toISOString(), trade: clone(trade) });
+
+function holdTrade() {
+  if (trade.lines.some((l) => l.pending)) { toast('Wait for the lookups to finish.'); return; }
+  if (!trade.lines.some((l) => !l.failed)) { toast('Add some items first.'); return; }
+  const who = trade.customer.trim() || 'The trade';
+  heldTrades.unshift(heldEntry());
+  store.set(HELD_KEY, heldTrades);
+  resetTrade();
+  renderHeld();
+  toast(`${who} is on hold. Pick it from “Held trades” to finish it.`);
+}
+
+function resumeHeld(id) {
+  const i = heldTrades.findIndex((h) => h.id === id);
+  if (i < 0) return;
+  if (trade.lines.some((l) => l.pending)) { toast('Wait for the lookups to finish.'); return; }
+  const [h] = heldTrades.splice(i, 1);
+  if (trade.lines.length) heldTrades.unshift(heldEntry()); // swap: the open trade goes on hold instead
+  store.set(HELD_KEY, heldTrades);
+  Object.assign(trade, { customer: '', staff: '', split: null, cashTotal: null, bulk: { counts: {}, lineId: null } }, h.trade);
+  $('#customerName').value = trade.customer || '';
+  commit();
+  renderHeld();
+  focusScan();
+  toast(`Back to ${trade.customer || 'the held trade'}.`);
+}
+
+function renderHeld() {
+  const sel = $('#heldSelect');
+  sel.hidden = !heldTrades.length;
+  const items = (t) => t.lines.filter((l) => !l.pending && !l.failed).reduce((n, l) => n + (l.qty || 1), 0);
+  sel.innerHTML = `<option value="">Held trades (${heldTrades.length})…</option>${heldTrades.map((h) => `<option value="${esc(h.id)}">
+    ${esc(h.trade.customer || 'No name')} · ${items(h.trade)} item${items(h.trade) === 1 ? '' : 's'} · held ${esc(fmtTime(h.heldAt))}</option>`).join('')}`;
+}
+
+/* ---------------------------------------------------------------- trade log */
+
 let logRecords = [];
+let logQuery = {}; // what the shown records were loaded with (for the export's file name)
+
+// A local calendar day (YYYY-MM-DD, from a date box) -> the UTC time it starts at, in the trade log's format.
+function dayStartIso(day, addDays = 0) {
+  const d = new Date(`${day}T00:00:00`);
+  d.setDate(d.getDate() + addDays);
+  return d.toISOString().replace(/\.\d{3}Z$/, '+00:00');
+}
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 async function loadLog() {
   const q = $('#logSearch').value.trim();
+  const from = $('#logFrom').value;
+  const to = $('#logTo').value;
+  if (from && to && to < from) { toast('The "To" date is before the "From" date.', 'error'); return; }
+  const params = {};
+  if (q) params.q = q;
+  if (from) params.from = dayStartIso(from);
+  if (to) params.to = dayStartIso(to, 1); // through the end of that day
   $('#logNote').textContent = 'Loading…';
   try {
-    logRecords = (await api('trades', { params: q ? { q } : {} })) || [];
+    logRecords = (await api('trades', { params })) || [];
   } catch (err) {
     $('#logNote').textContent = err.message;
     return;
   }
+  // The shop PC's offline server ignores from/to, so the range is applied here too.
+  const inRange = (r) => (!params.from || new Date(r.time) >= new Date(params.from)) && (!params.to || new Date(r.time) < new Date(params.to));
+  logRecords = logRecords.filter(inRange);
+  logQuery = { q, from, to };
   $('#logBody').innerHTML = logRecords.map((r, i) => `<tr class="log-row" data-i="${i}">
-      <td>${esc(fmtTime(r.time))}</td><td>${esc(r.customer || '—')}</td><td>${esc(r.staff || '')}</td>
+      <td>${esc(fmtTime(r.time))}${r.id ? `<div class="sub">#${esc(r.id)}</div>` : ''}</td><td>${esc(r.customer || '—')}</td><td>${esc(r.staff || '')}</td>
       <td class="num">${r.totals?.count ?? (r.items || []).length}</td><td>${esc(payoutText(r.payout))}</td></tr>`).join('')
-    || `<tr><td colspan="5" class="empty-cell">${q ? 'No trades match that search.' : 'No trades yet. They show up here after “Complete trade”.'}</td></tr>`;
-  $('#logNote').textContent = logRecords.length >= 100 ? 'Showing the newest 100. Search to find older trades.' : '';
+    || `<tr><td colspan="5" class="empty-cell">${q || from || to ? 'No trades match.' : 'No trades yet. They show up here after “Complete trade”.'}</td></tr>`;
+  renderLogSummary(from || to);
+  const cap = from || to ? 2000 : 100;
+  $('#logNote').textContent = logRecords.length >= cap
+    ? `Showing the newest ${cap}.${from || to ? ' Pick a shorter date range to see them all.' : ' Pick dates or search to find older trades.'}` : '';
+}
+
+// Totals of what was actually paid out (the payout chosen at "Complete trade"), for the trades shown.
+function logTotals(records) {
+  return records.reduce((t, r) => ({
+    trades: t.trades + 1,
+    items: t.items + (r.totals?.count ?? (r.items || []).length),
+    cash: t.cash + (r.payout?.cash || 0),
+    credit: t.credit + (r.payout?.credit || 0),
+  }), { trades: 0, items: 0, cash: 0, credit: 0 });
+}
+
+function renderLogSummary(show) {
+  const el = $('#logSummary');
+  el.hidden = !show || !logRecords.length;
+  if (el.hidden) return;
+  const t = logTotals(logRecords);
+  el.innerHTML = `<strong>${t.trades}</strong> trade${t.trades === 1 ? '' : 's'} · ${t.items} item${t.items === 1 ? '' : 's'} · `
+    + `<strong>${money(t.cash)}</strong> cash paid out · <strong>${money(t.credit)}</strong> store credit issued`;
+}
+
+// One row per trade, for a spreadsheet or the bookkeeper.
+function exportLog() {
+  if (!logRecords.length) { toast('Search or pick dates first, then export what is shown.'); return; }
+  const cell = (v) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const dollars = (c) => (c == null ? '' : (c / 100).toFixed(2));
+  const rows = logRecords.map((r) => [
+    fmtTime(r.time), r.id || '', r.customer || '', r.staff || '', r.totals?.count ?? (r.items || []).length,
+    r.payout?.type || '', dollars(r.payout?.cash || 0), dollars(r.payout?.credit || 0),
+    dollars(r.totals?.cash), dollars(r.totals?.credit), r.idChecked ? 'yes' : '',
+    (r.items || []).map((it) => `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name}${it.platform ? ` (${it.platform})` : ''}${it.serial ? ` [serial ${it.serial}]` : ''}`).join('; '),
+    r.notes || '',
+  ]);
+  const head = ['Date', 'Trade #', 'Customer', 'Staff', 'Items', 'Payout', 'Cash paid', 'Store credit issued', 'Cash offer', 'Store credit offer', 'Photo ID checked', 'Items list', 'Notes'];
+  const csv = [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+  const { from, to } = logQuery;
+  const name = `trade-log${from ? `-${from}` : ''}${to && to !== from ? `-to-${to}` : ''}.csv`;
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv' })), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function logDetailHtml(r, i) {
@@ -2429,21 +2645,35 @@ function pickFloorGame(product) {
 async function loadFloorAmazon() {
   const cur = floorCur;
   if (!cur || !amazonSet) return;
-  const upc = String(cur.product.upc || '').split(/[,\s]+/)[0];
+  const upc = firstUpc(cur.product.upc);
   const cond = amazonCond(cur.condition);
-  if (!/^\d{8,14}$/.test(upc)) { cur.amazon = { error: 'No barcode for this game on PriceCharting, so Amazon can’t be matched.' }; renderFloorPricer(); return; }
-  const key = `${upc}|${cond}`;
-  if (floorAmazonCache.has(key)) { cur.amazon = floorAmazonCache.get(key); renderFloorPricer(); return; }
-  cur.amazon = { loading: true };
-  renderFloorPricer();
+  if (!floorAmazonCache.has(`${upc}|${cond}`)) { cur.amazon = { loading: true }; renderFloorPricer(); }
   try {
-    const d = await api('amazon/offers', { params: { upc, cond } });
-    floorAmazonCache.set(key, d);
+    const d = await fetchFloorAmazon(upc, cond);
     if (floorCur === cur && amazonCond(cur.condition) === cond) cur.amazon = d;
   } catch (err) {
     if (floorCur === cur) cur.amazon = { error: err.message };
   }
   if (floorCur === cur) renderFloorPricer();
+}
+
+// Amazon's offers for a barcode in a condition ('used' / 'new'), cached for this page.
+const firstUpc = (upc) => String(upc || '').split(/[,\s]+/)[0];
+async function fetchFloorAmazon(upc, cond) {
+  if (!/^\d{8,14}$/.test(upc)) throw new Error('No barcode for this game on PriceCharting, so Amazon can’t be matched.');
+  const key = `${upc}|${cond}`;
+  if (!floorAmazonCache.has(key)) floorAmazonCache.set(key, await api('amazon/offers', { params: { upc, cond } }));
+  return floorAmazonCache.get(key);
+}
+
+// A game's recent sales ({ loose, cib, new }), cached for this page.
+async function fetchFloorSales(id) {
+  if (floorSalesCache.has(id)) return floorSalesCache.get(id);
+  const d = await api('pc/sales', { params: { id } });
+  const sales = d?.sales || {};
+  if (!['loose', 'cib', 'new'].some((c) => sales[c]?.length)) throw new Error('PriceCharting shows no recent sales for this game.');
+  floorSalesCache.set(id, sales);
+  return sales;
 }
 
 async function loadFloorSales(product) {
@@ -2453,16 +2683,8 @@ async function loadFloorSales(product) {
     renderFloorPricer();
     return;
   }
-  if (floorSalesCache.has(id)) {
-    floorCur.sales = floorSalesCache.get(id);
-    renderFloorPricer();
-    return;
-  }
   try {
-    const d = await api('pc/sales', { params: { id } });
-    const sales = d?.sales || {};
-    if (!['loose', 'cib', 'new'].some((c) => sales[c]?.length)) throw new Error('PriceCharting shows no recent sales for this game.');
-    floorSalesCache.set(id, sales);
+    const sales = await fetchFloorSales(id);
     if (floorCur?.product === product) floorCur.sales = sales;
   } catch (err) {
     if (floorCur?.product === product) floorCur.salesError = err.message;
@@ -2532,6 +2754,22 @@ function floorBasis(cur = floorCur) {
   return { basis: null, sale, checks: [], need: 'No sales to go by. Check the links and type a price.' };
 }
 
+// Consoles, controllers and other hardware can be floor priced too, but the game rules (the $5 shitbox
+// floor, the missing-manual deduction) don't apply to them.
+const floorIsHardware = (p) => !isGameCat(guessCategory(p['product-name'] || '')) || /^(systems?|consoles?|accessor)/i.test(p.genre || '');
+
+// The shelf price for a game being priced (or re-checked): { b: floorBasis, r: floorPrice, shitbox, premium, hw }.
+function floorResult(cur) {
+  const p = cur.product;
+  const hw = floorIsHardware(p);
+  const shitbox = hw ? null : autoShitboxReason({ name: p['product-name'], genre: p.genre });
+  const b = floorBasis(cur);
+  const typed = b.from === 'typed';
+  const premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
+  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: !hw && cur.condition === 'cib' && cur.manualMissing, gs: typed ? null : floorGs(p), premium });
+  return { b, r, shitbox, premium, hw };
+}
+
 function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
@@ -2539,11 +2777,8 @@ function renderFloorPricer() {
   const cur = floorCur;
   const p = cur.product;
   const tier = floorTier(p['console-name']);
-  const shitbox = autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const links = floorLinks(p, cur.condition);
-  const b = floorBasis(cur);
-  const premium = b.from === 'typed' ? null : floorPremium(p['product-name'], p['console-name']);
-  const result = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: cur.condition === 'cib' && cur.manualMissing, gs: b.from === 'typed' ? null : floorGs(p), premium });
+  const { b, r: result, shitbox, premium, hw } = floorResult(cur);
   const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
   const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
@@ -2572,13 +2807,14 @@ function renderFloorPricer() {
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
         <div class="floor-rule">${esc(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
+        ${hw ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-controls">
       <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
-      ${cur.condition === 'cib' ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
+      ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
         ${tier.id !== 'retro' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
@@ -2643,17 +2879,23 @@ function floorMath(b, r) {
   return parts.join(' → ');
 }
 
+// Where a list item's price came from (kept on the item; shown in the "Based on" column).
+const floorBasisInfo = (b) => ({
+  basis: b.scarce ? b.scarce.base : b.basis, from: b.from,
+  saleDate: b.from === 'sale' || b.pull?.baseFrom === 'sale' ? b.sale?.date || '' : '',
+});
+
 function addFloorItem() {
   const cur = floorCur;
   const p = cur.product;
-  const b = floorBasis(cur);
-  const r = floorPrice(b.basis, { shitbox: !!autoShitboxReason({ name: p['product-name'], genre: p.genre }), manualMissing: cur.condition === 'cib' && cur.manualMissing,
-    gs: b.from === 'typed' ? null : floorGs(p), premium: b.from === 'typed' ? null : floorPremium(p['product-name'], p['console-name']) });
+  const { b, r, hw } = floorResult(cur);
   if (!r) return;
+  const manualMissing = !hw && cur.condition === 'cib' && !!cur.manualMissing;
+  const same = floor.items.find((x) => x.pcId === String(p.id) && x.condition === cur.condition && !!x.manualMissing === manualMissing);
+  if (same && !confirm(`${p['product-name']} (${GAME_CONDITIONS[cur.condition]}${manualMissing ? ', no manual' : ''}) is already on this list at ${money(same.price)}. Add it again?`)) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
-    manualMissing: cur.condition === 'cib' && cur.manualMissing, basis: b.scarce ? b.scarce.base : b.basis, from: b.from,
-    saleDate: b.from === 'sale' || b.pull?.baseFrom === 'sale' ? b.sale?.date || '' : '', price: r.price, edited: false,
+    manualMissing, ...floorBasisInfo(b), price: r.price, edited: false,
   });
   floor.dirty = true;
   saveFloorLocal();
@@ -2710,6 +2952,19 @@ function onFloorPricerChange(e) {
 
 const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
+// A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
+const recheckChanged = (it) => it.recheck?.price != null && it.recheck.price !== it.price;
+
+function recheckHtml(it) {
+  const rc = it.recheck;
+  if (!rc) return '';
+  if (rc.error) return `<div class="sub warn-text" title="${esc(rc.error)}">Couldn't re-check</div>`;
+  if (!recheckChanged(it)) return '<div class="sub">✓ Still this price</div>';
+  const up = rc.price > it.price;
+  return `<div class="sub recheck ${up ? 'up' : 'down'}">Now ${money(rc.price)} ${up ? '▲' : '▼'}
+    <button type="button" class="link" data-floor-use>Use</button><button type="button" class="link" data-floor-keep>Keep</button></div>`;
+}
+
 function renderFloorList() {
   const items = floor.items;
   $('#floorBody').innerHTML = items.map((it) => `<tr data-id="${esc(it.id)}">
@@ -2717,13 +2972,91 @@ function renderFloorList() {
       <td>${esc(it.platform)}</td>
       <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td>
       <td class="muted">${it.basis != null ? `${esc(FROM_LABELS[it.from] || '')} ${money(it.basis)}` : '—'}${it.saleDate ? `<div class="sub">${esc(it.saleDate)}</div>` : ''}</td>
-      <td class="num"><span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-price value="${esc(plain(it.price))}"${it.edited ? ' class="overridden" title="Edited by hand"' : ''} aria-label="Shelf price"></span></td>
+      <td class="num"><span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-price value="${esc(plain(it.price))}"${it.edited ? ' class="overridden" title="Edited by hand"' : ''} aria-label="Shelf price"></span>${recheckHtml(it)}</td>
       <td><button type="button" class="icon-btn" data-floor-remove title="Remove" aria-label="Remove">×</button></td>
     </tr>`).join('');
   $('#floorEmpty').hidden = items.length > 0;
   const total = items.reduce((sum, it) => sum + (it.price || 0), 0);
   $('#floorCount').textContent = items.length ? `${items.length} game${items.length === 1 ? '' : 's'} · ${money(total)} on the shelf` : '';
+  const changes = items.filter((it) => recheckChanged(it) && !it.edited).length;
+  $('#floorUseAll').hidden = !changes || floorRecheck.running;
+  $('#floorUseAll').textContent = `Use ${changes} new price${changes === 1 ? '' : 's'}`;
+  $('#floorRecheck').textContent = floorRecheck.running ? `Stop (${floorRecheck.done} of ${floorRecheck.total})` : 'Re-check prices';
+  $('#floorRecheck').disabled = !items.length;
   renderFloorStatus();
+}
+
+/* ---------------------------------------------------------------- re-checking a saved list */
+
+// Prices go stale: re-run every game on the list through today's sales, GameStop and Amazon, one at a time
+// (the server keeps PriceCharting and Amazon to their rate limits). Changes are suggestions until staff
+// press Use (or "Use N new prices", which skips prices edited by hand).
+const floorRecheck = { running: false, stop: false, done: 0, total: 0 };
+let floorEpoch = 0;
+
+async function recheckFloorPrices() {
+  if (floorRecheck.running) { floorRecheck.stop = true; return; }
+  const items = floor.items.filter((it) => /^\d+$/.test(it.pcId || ''));
+  if (!items.length) { toast('Nothing on the list can be re-checked.'); return; }
+  Object.assign(floorRecheck, { running: true, stop: false, done: 0, total: items.length });
+  renderFloorList();
+  const epoch = floorEpoch; // opening or starting another session bumps it
+  for (const it of items) {
+    if (floorRecheck.stop || floorEpoch !== epoch) break;
+    try {
+      const product = await PC.byId(it.pcId);
+      const sales = await fetchFloorSales(it.pcId);
+      let amazon = null;
+      if (amazonSet) amazon = await fetchFloorAmazon(firstUpc(product.upc), amazonCond(it.condition)).catch((err) => ({ error: err.message }));
+      const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, sales, pick: null, typed: null, amazon });
+      it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: 'no sales to go by' };
+    } catch (err) {
+      it.recheck = { error: err.message };
+    }
+    if (floorEpoch !== epoch) break;
+    floorRecheck.done += 1;
+    floor.dirty = true;
+    saveFloorLocal();
+    renderFloorList();
+  }
+  const stopped = floorRecheck.stop || floorEpoch !== epoch;
+  Object.assign(floorRecheck, { running: false, stop: false });
+  renderFloorList();
+  const changed = floor.items.filter(recheckChanged).length;
+  toast(`${stopped ? 'Stopped after' : 'Re-checked'} ${floorRecheck.done} game${floorRecheck.done === 1 ? '' : 's'}: ${changed ? `${changed} price${changed === 1 ? '' : 's'} changed` : 'no price changes'}.`);
+}
+
+function useRecheck(it) {
+  if (!recheckChanged(it)) return;
+  const { price, basis, from, saleDate } = it.recheck;
+  Object.assign(it, { price, basis, from, saleDate, edited: false });
+  delete it.recheck;
+}
+
+function useAllRechecks() {
+  const todo = floor.items.filter((it) => recheckChanged(it) && !it.edited);
+  todo.forEach(useRecheck);
+  const skipped = floor.items.filter(recheckChanged).length;
+  floor.dirty = true;
+  saveFloorLocal();
+  renderFloorList();
+  toast(`Updated ${todo.length} price${todo.length === 1 ? '' : 's'}.${skipped ? ` ${skipped} edited by hand ${skipped === 1 ? 'was' : 'were'} left for you to decide.` : ''}`);
+}
+
+/* ---------------------------------------------------------------- shelf labels */
+
+// Price labels on Avery 5160-size sheets (30 per letter page, 2⅝" × 1"), in list order.
+function printFloorLabels() {
+  if (!floor.items.length) { toast('Nothing to print yet.'); return; }
+  const labels = floor.items.map((it) => `<div class="label">
+      <div class="label-name">${esc(it.name)}</div>
+      <div class="label-sub">${esc([it.platform, `${GAME_CONDITIONS[it.condition] || it.condition}${it.manualMissing ? ', no manual' : ''}`].filter(Boolean).join(' · '))}</div>
+      <div class="label-price">${money(it.price)}</div>
+    </div>`);
+  const pages = [];
+  for (let i = 0; i < labels.length; i += 30) pages.push(`<div class="label-page">${labels.slice(i, i + 30).join('')}</div>`);
+  $('#printArea').innerHTML = pages.join('');
+  window.print();
 }
 
 function renderFloorStatus(msg) {
@@ -2747,8 +3080,18 @@ function onFloorListChange(e) {
 }
 
 function onFloorListClick(e) {
+  const tr = e.target.closest('tr[data-id]');
+  const it = tr && floor.items.find((x) => x.id === tr.dataset.id);
+  if (it && (e.target.closest('[data-floor-use]') || e.target.closest('[data-floor-keep]'))) {
+    if (e.target.closest('[data-floor-use]')) useRecheck(it);
+    else delete it.recheck;
+    floor.dirty = true;
+    saveFloorLocal();
+    renderFloorList();
+    return;
+  }
   if (!e.target.closest('[data-floor-remove]')) return;
-  const id = e.target.closest('tr[data-id]').dataset.id;
+  const id = tr.dataset.id;
   floor.items = floor.items.filter((x) => x.id !== id);
   floor.dirty = true;
   saveFloorLocal();
@@ -2803,7 +3146,8 @@ async function saveFloorSession() {
   if (!floor.items.length) { toast('Price some games first.'); return; }
   renderFloorStatus('Saving…');
   try {
-    const r = await api('floor-sessions', { method: 'PUT', body: { id: floor.id, name: floor.name, staff: floor.staff, items: floor.items } });
+    // baseUpdated: the server refuses (409) if someone else saved this session since we opened or saved it.
+    const r = await api('floor-sessions', { method: 'PUT', body: { id: floor.id, baseUpdated: floor.savedAt, name: floor.name, staff: floor.staff, items: floor.items } });
     Object.assign(floor, { id: r.id, savedAt: r.updated, dirty: false });
     saveFloorLocal();
     renderFloorStatus();
@@ -2811,11 +3155,25 @@ async function saveFloorSession() {
     loadFloorSessions();
   } catch (err) {
     renderFloorStatus();
+    if (err.status === 409 && err.data?.conflict) { floorSaveConflict(err.data.conflict); return; }
     toast(`Couldn't save: ${err.message}`, 'error');
   }
 }
 
-const floorUnsavedOk = () => !floor.dirty || !floor.items.length || confirm('This list has unsaved changes. Continue without saving them?');
+// Someone else saved this session after we opened it. Never overwrite their games: save ours as a copy.
+function floorSaveConflict(c) {
+  const who = c.staff ? `${c.staff} saved` : 'Someone saved';
+  if (!confirm(`${who} “${floor.name}” at ${fmtTime(c.updated)}, after you opened it.\n\nOK: save your list as a separate copy, so both are kept.\nCancel: don't save (open the session again to see their version).`)) return;
+  Object.assign(floor, { id: null, savedAt: null, name: `${floor.name} (copy)` });
+  $('#floorName').value = floor.name;
+  saveFloorSession();
+}
+
+function floorUnsavedOk() {
+  const ok = !floor.dirty || !floor.items.length || confirm('This list has unsaved changes. Continue without saving them?');
+  if (ok) floorEpoch += 1; // a re-check in progress belongs to the list being closed
+  return ok;
+}
 
 async function openFloorSession(id) {
   if (!id) return;
@@ -2899,6 +3257,9 @@ function wireFloor() {
   $('#floorOpen').addEventListener('change', (e) => openFloorSession(e.target.value));
   $('#floorCopy').addEventListener('click', copyFloorList);
   $('#floorPrint').addEventListener('click', printFloorList);
+  $('#floorLabels').addEventListener('click', printFloorLabels);
+  $('#floorRecheck').addEventListener('click', recheckFloorPrices);
+  $('#floorUseAll').addEventListener('click', useAllRechecks);
 }
 
 const VIEWS = ['trade', 'bulk', 'floor', 'log', 'hardware', 'settings'];
@@ -2910,7 +3271,9 @@ function showView(name) {
   $('#totalsBar').hidden = name !== 'trade';
   if (name === 'log') loadLog();
   if (name === 'hardware') renderHardware();
-  if (name === 'settings') fillSettingsForm();
+  if (name === 'settings') {
+    if (settingsDirty) { renderTokenStatus(); renderAmazonStatus(); } else fillSettingsForm(); // keep unsaved edits
+  }
   if (name === 'bulk') showBulk();
   if (name === 'floor') showFloor();
   if (name === 'trade') { renderLines(); focusScan(); }
@@ -2945,6 +3308,9 @@ function wireEvents() {
   $('#customerName').addEventListener('input', (e) => { trade.customer = e.target.value; saveTrade(); });
 
   $('#printBtn').addEventListener('click', printQuote);
+  $('#holdBtn').addEventListener('click', holdTrade);
+  $('#heldSelect').addEventListener('change', (e) => { const id = e.target.value; e.target.value = ''; resumeHeld(id); });
+  renderHeld();
   $('#clearBtn').addEventListener('click', () => {
     if (trade.lines.length && !confirm('Clear this trade and start a new one?')) return;
     resetTrade();
@@ -3013,13 +3379,25 @@ function wireEvents() {
   $('#hwPasteApply').addEventListener('click', applyPaste);
 
   $('#settingsForm').addEventListener('submit', saveSettings);
+  $('#settingsForm').addEventListener('input', () => setSettingsDirty(true));
+  $('#settingsForm').addEventListener('change', () => setSettingsDirty(true));
   $('#rulesBody').addEventListener('input', renderRuleExamples);
   $('#rulesBody').addEventListener('change', renderRuleExamples);
   $('#dedAdd').addEventListener('click', () => {
     $('#dedBody').insertAdjacentHTML('beforeend', dedRowHtml({ id: uid(), label: '', appliesTo: 'game', amount: 0, resurface: false }));
     $('#dedBody tr:last-child [data-k="label"]').focus();
+    setSettingsDirty(true);
   });
-  $('#dedBody').addEventListener('click', (e) => { e.target.closest('[data-action="del-ded"]')?.closest('tr').remove(); });
+  $('#dedBody').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-action="del-ded"]')?.closest('tr');
+    if (row) { row.remove(); setSettingsDirty(true); }
+  });
+  $('#settingsDiscard').addEventListener('click', () => fillSettingsForm());
+  $$('[data-history]').forEach((b) => b.addEventListener('click', () => showHistory(b.dataset.history)));
+  $$('.history-list').forEach((box) => box.addEventListener('click', (e) => {
+    const [of, i] = (e.target.closest('[data-restore]')?.dataset.restore || '').split(':');
+    if (of) restoreHistory(of, Number(i));
+  }));
   $('#tokenSave').addEventListener('click', saveToken);
   $('#amzSave').addEventListener('click', saveAmazonKeys);
   $('#amzTest').addEventListener('click', testAmazonKeys);
@@ -3095,10 +3473,15 @@ function wireEvents() {
 
   // Trade log
   $('#logSearchBtn').addEventListener('click', loadLog);
-  $('#logSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadLog(); });
+  $$('#logSearch, #logFrom, #logTo').forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadLog(); }));
+  $('#logToday').addEventListener('click', () => {
+    $('#logFrom').value = $('#logTo').value = localDay();
+    loadLog();
+  });
+  $('#logExport').addEventListener('click', exportLog);
   $('#logBody').addEventListener('click', onLogClick);
 
-  window.addEventListener('beforeunload', (e) => { if (hwDirty) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', (e) => { if (hwDirty || settingsDirty) { e.preventDefault(); e.returnValue = ''; } });
 }
 
 /* ================================================================== login (website only) */
@@ -3171,6 +3554,7 @@ function applyRole() {
   $('#account').hidden = !auth.enabled;
   $('#accountRole').textContent = manager ? 'Manager' : 'Staff';
   $('#passwordPanel').hidden = !(auth.enabled && manager);
+  $$('.history-panel').forEach((p) => { p.hidden = !(auth.enabled && manager); }); // the shop PC's server keeps no history
 }
 
 /* ================================================================== startup */

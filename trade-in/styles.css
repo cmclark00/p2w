@@ -383,6 +383,13 @@ label.check { flex-direction: row; align-items: center; gap: 10px; color: var(--
 #serialFields:empty { display: none; }
 .dialog .row-end { margin-top: 4px; flex-wrap: wrap; }
 
+#heldSelect { width: auto; max-width: 240px; }
+.history-list { margin-top: 12px; }
+table.history td { vertical-align: top; font-size: 0.88rem; }
+.toolbar .inline-label { flex-direction: row; align-items: center; gap: 6px; color: var(--muted); font-size: 0.9rem; }
+.toolbar .inline-label input { width: auto; }
+.log-summary { margin: 0 0 12px; padding: 10px 14px; background: var(--surface-2); border-left: 4px solid var(--gold); border-radius: 8px; }
+.log-summary strong { color: var(--gold); font-variant-numeric: tabular-nums; }
 table.log tr.log-row { cursor: pointer; }
 table.log tr.log-row:hover td, table.log tr.log-row.open td { background: rgba(49, 94, 203, 0.12); }
 table.log tr.log-detail > td { background: var(--ink); padding: 14px 16px; }
@@ -392,6 +399,22 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 @media print {
   #printArea .print-payout { margin-top: 12px; font-size: 10pt; }
   #printArea .print-sign { margin-top: 28px; }
+}
+
+/* Shelf labels: Avery 5160 / 8160 sheets (letter, 3 × 10 labels of 2⅝" × 1", ½" top, 3/16" sides). Print at
+   100% / "Actual size" with margins "None" or the labels drift. */
+@page labels { size: letter; margin: 0; }
+@media print {
+  #printArea .label-page {
+    page: labels; break-after: page;
+    display: grid; grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: 0.125in;
+    width: 8.5in; height: 11in; padding: 0.5in 0.1875in 0; box-sizing: border-box; overflow: hidden;
+  }
+  #printArea .label-page:last-child { break-after: auto; }
+  #printArea .label { display: flex; flex-direction: column; padding: 0.07in 0.12in; overflow: hidden; color: #000; }
+  #printArea .label-name { font-weight: 700; font-size: 9pt; line-height: 1.15; max-height: 2.3em; overflow: hidden; }
+  #printArea .label-sub { font-size: 7pt; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #printArea .label-price { margin-top: auto; text-align: right; font: 700 16pt/1 var(--font-display); }
 }
 
 /* ---------------------------------------------------------------- floor pricing */
@@ -431,7 +454,11 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-price strong { display: block; font: 700 2.2rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
 .floor-result .link { align-self: flex-start; padding: 0; font-size: 0.82rem; color: var(--muted); }
 .floor-list .money-input input { width: 80px; font-weight: 600; }
-.floor-foot { margin-bottom: 24px; }
+.floor-foot { margin-bottom: 24px; flex-wrap: wrap; }
+.floor-list .recheck { font-weight: 600; white-space: nowrap; }
+.floor-list .recheck.up { color: var(--green); }
+.floor-list .recheck.down { color: #ff8a99; }
+.floor-list .recheck .link { font-size: 0.8rem; color: var(--paper); }
 @media (max-width: 800px) {
   .floor-body { grid-template-columns: 1fr; }
 }

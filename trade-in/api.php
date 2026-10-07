@@ -20,10 +20,11 @@
  *   PUT  settings | hardware     manager
  *   PUT  token | passwords       manager
  *   GET  pc/product (id|upc|q), pc/products (q)   any logged-in user
- *   POST trades / GET trades (q) completed-trade log, any logged-in user
+ *   POST trades / GET trades (q, from, to) completed-trade log, any logged-in user
+ *   GET  history (of=settings|hardware)  manager: saved versions, newest first
  *   GET  pc/sales (id)           recent sold listings from a game's PriceCharting page (floor pricing)
  *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
- *   PUT  floor-sessions          save (create or update) a named session
+ *   PUT  floor-sessions          save (create or update) a named session; 409 if someone saved it since baseUpdated
  *   DELETE floor-sessions (id)   delete a saved session
  *   GET  amazon/offers (upc, cond) Amazon's lowest offers for a game, via the shop's SP-API app
  *   PUT  amazon / GET amazon/test  manager: save / check the Amazon SP-API keys
@@ -38,12 +39,15 @@ const SETUP_CODE_SHA256 = 'a3257f6bb85bfe885a89176d77c207ef600aecbaa6bf269e973da
 const COOKIE_NAME = 'p2w_tradein';
 const SESSION_DAYS = 30;
 const MIN_PASSWORD_LENGTH = 8;
-const MAX_LOGIN_FAILS = 8;          // per IP ...
+const MAX_LOGIN_FAILS = 20;         // per IP (the whole shop shares one IP, so not too few) ...
 const LOGIN_WINDOW_SECONDS = 900;   // ... per 15 minutes
 const PC_MIN_GAP_SECONDS = 1.1;     // PriceCharting allows 1 call/second
 const PC_CACHE_SECONDS = 1800;      // re-scanning a game within 30 min costs no API call
 const SALES_CACHE_SECONDS = 21600;  // a game's recent-sales list is re-read at most every 6 hours
 const MAX_FLOOR_SESSIONS = 300;     // oldest saved floor-pricing sessions drop off past this
+const HISTORY_KEEP = 50;            // saved versions of settings / hardware prices kept for "Change history"
+const LOG_MAX = 100;                // trade-log results without a date range ...
+const LOG_MAX_RANGE = 2000;         // ... and with one (end-of-day totals, export)
 const AMZ_MARKETPLACE = 'ATVPDKIKX0DER'; // amazon.com
 const AMZ_MIN_GAP_SECONDS = 2.1;    // getItemOffers allows 0.5 requests/second
 const AMZ_CACHE_SECONDS = 21600;    // a game's Amazon offers are re-read at most every 6 hours
@@ -222,8 +226,11 @@ function login_attempts(callable $update): array {
 function guard_login_rate(): void {
   $ip = client_ip();
   $all = login_attempts(function ($all) { return $all; });
-  if (count($all[$ip] ?? []) >= MAX_LOGIN_FAILS) {
-    fail(429, 'Too many wrong attempts. Wait 15 minutes and try again.');
+  $fails = $all[$ip] ?? [];
+  if (count($fails) >= MAX_LOGIN_FAILS) {
+    // The oldest counted failure drops out of the window first; that's when another try is allowed.
+    $mins = max(1, (int)ceil((min($fails) + LOGIN_WINDOW_SECONDS - time()) / 60));
+    fail(429, "Too many wrong passwords from this location. Try again in $mins minute" . ($mins === 1 ? '' : 's') . '.');
   }
 }
 
@@ -506,6 +513,30 @@ function amazon_offers(string $upc, string $cond): void {
   respond_raw(200, $json);
 }
 
+// Every save of settings / hardware prices also goes in <name>-history.jsonl (newest last, the last
+// HISTORY_KEEP kept), so a mistyped number can be found and undone. The first save also records the
+// version it replaces.
+function add_history(string $name, string $raw): void {
+  $file = data_path($name . '-history.jsonl');
+  $oneLine = function (string $json): string { return trim(str_replace(["\r", "\n"], ' ', $json)); }; // JSON strings never hold raw newlines
+  $lines = is_file($file) ? (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) : [];
+  if (!$lines && is_file(data_path($name . '.json'))) {
+    $prev = $oneLine((string)file_get_contents(data_path($name . '.json')));
+    if ($prev !== '' && $prev !== 'null' && is_array(json_decode($prev, true))) {
+      $lines[] = '{"time":' . json_encode(gmdate('c', (int)filemtime(data_path($name . '.json')))) . ',"role":"before history","data":' . $prev . '}';
+    }
+  }
+  $lines[] = '{"time":' . json_encode(gmdate('c')) . ',"role":' . json_encode(current_role()) . ',"data":' . $oneLine($raw) . '}';
+  $lines = array_slice($lines, -HISTORY_KEEP);
+  $tmp = $file . '.' . bin2hex(random_bytes(4)) . '.tmp';
+  if (file_put_contents($tmp, implode("\n", $lines) . "\n", LOCK_EX) === false || !@rename($tmp, $file)) @unlink($tmp);
+}
+
+// A trade-log line's time (UTC ISO, written by POST trades), without decoding the whole record.
+function trade_time(string $line): string {
+  return preg_match('/"time":"([^"]+)"/', $line, $m) ? $m[1] : '';
+}
+
 function clear_cache(): void {
   foreach ((array)glob(data_path('cache') . '/*.json') as $f) @unlink($f);
 }
@@ -591,8 +622,18 @@ switch ("$method $route") {
     $data = json_decode($raw, true);
     $valid = $route === 'hardware' ? (is_array($data) && array_values($data) === $data) : (is_array($data) && array_values($data) !== $data);
     if (!$valid) fail(400, 'That data is not in the right format.');
+    add_history($route, $raw);
     write_atomic($route . '.json', $raw);
     respond(200, ['ok' => true]);
+
+  // Saved versions of settings or hardware prices, newest first: [{ time, role, data }].
+  case 'GET history':
+    require_role('manager');
+    $of = (string)($_GET['of'] ?? '');
+    if (!in_array($of, ['settings', 'hardware'], true)) fail(400, 'Pass of=settings or of=hardware.');
+    $file = data_path($of . '-history.jsonl');
+    $lines = is_file($file) ? (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) : [];
+    respond_raw(200, '[' . implode(',', array_reverse($lines)) . ']');
 
   case 'PUT token':
     require_role('manager');
@@ -656,18 +697,30 @@ switch ("$method $route") {
     if (file_put_contents($dir . '/' . gmdate('Y-m') . '.jsonl', $line, FILE_APPEND | LOCK_EX) === false) fail(500, 'Could not save the trade.');
     respond(200, ['ok' => true, 'id' => $record['id'], 'time' => $record['time']]);
 
+  // q = substring search; from/to = UTC ISO times (from inclusive, to exclusive) for a date range,
+  // which also raises the cap from LOG_MAX to LOG_MAX_RANGE (end-of-day totals, export).
   case 'GET trades':
     require_role('staff');
     $q = strtolower(trim((string)($_GET['q'] ?? '')));
+    $from = (string)($_GET['from'] ?? '');
+    $to = (string)($_GET['to'] ?? '');
+    foreach ([$from, $to] as $t) {
+      if ($t !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $t)) fail(400, 'Dates must look like 2026-10-07T04:00:00+00:00.');
+    }
+    $max = ($from !== '' || $to !== '') ? LOG_MAX_RANGE : LOG_MAX;
     $found = [];
     $files = glob(data_path('trades') . '/*.jsonl') ?: [];
     rsort($files); // newest month first
     foreach (array_slice($files, 0, 36) as $file) { // search back 3 years
+      if ($from !== '' && basename($file, '.jsonl') < substr($from, 0, 7)) break; // whole month is before the range
       $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-      for ($i = count($lines) - 1; $i >= 0 && count($found) < 100; $i--) {
+      for ($i = count($lines) - 1; $i >= 0 && count($found) < $max; $i--) { // newest first
+        $time = ($from !== '' || $to !== '') ? trade_time($lines[$i]) : '';
+        if ($to !== '' && $time >= $to) continue;
+        if ($from !== '' && $time < $from) break 2; // everything older is outside the range too
         if ($q === '' || strpos(strtolower($lines[$i]), $q) !== false) $found[] = $lines[$i];
       }
-      if (count($found) >= 100) break;
+      if (count($found) >= $max) break;
     }
     respond_raw(200, '[' . implode(',', $found) . ']');
 
@@ -699,7 +752,13 @@ switch ("$method $route") {
     if (!is_array($in) || $name === '' || !is_array($in['items'] ?? null)) fail(400, 'A session needs a name and a list of games.');
     $id = (string)($in['id'] ?? '');
     if ($id !== '' && !preg_match('/^[a-f0-9]{12}$/', $id)) fail(400, 'That session id is not valid.');
-    $saved = floor_sessions(function ($all) use ($in, $id, $name) {
+    // baseUpdated = the session's "updated" time when this browser opened or last saved it. If someone
+    // saved it since, refuse (409) instead of silently overwriting their games; force = overwrite anyway.
+    $base = (string)($in['baseUpdated'] ?? '');
+    $saved = floor_sessions(function ($all) use ($in, $id, $name, $base) {
+      if ($id !== '' && isset($all[$id]) && $base !== '' && $all[$id]['updated'] !== $base && empty($in['force'])) {
+        return [$all, ['conflict' => true, 'updated' => $all[$id]['updated'], 'staff' => $all[$id]['staff'] ?? ''], false];
+      }
       $now = gmdate('c');
       if ($id === '' || !isset($all[$id])) $id = bin2hex(random_bytes(6));
       $all[$id] = [
@@ -712,6 +771,9 @@ switch ("$method $route") {
       }
       return [$all, ['id' => $id, 'updated' => $now], true];
     });
+    if (!empty($saved['conflict'])) {
+      respond(409, ['status' => 'error', 'error-message' => 'Someone else saved this session since you opened it.', 'conflict' => $saved]);
+    }
     respond(200, ['ok' => true] + $saved);
 
   case 'DELETE floor-sessions':

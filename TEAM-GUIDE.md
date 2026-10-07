@@ -603,8 +603,10 @@ and prices are changed on the page itself, not in the code.
   cash/credit percentages and buying guide lists (Settings tab), and the
   PriceCharting token.
 
-A device stays logged in for 30 days. After 8 wrong passwords in a row,
-that device is locked out for 15 minutes.
+A device stays logged in for 30 days. After 20 wrong passwords within 15
+minutes from the shop, logging in pauses for everyone there until the
+oldest wrong try is 15 minutes old (the message says how many minutes).
+Everyone in the store shares one internet address, so typos add up.
 
 **At the counter:**
 
@@ -661,6 +663,10 @@ that device is locked out for 15 minutes.
    and press Enter. Store credit adjusts to match. **↺ auto** puts it
    back, and changing the items clears it. **Print quote**
    prints a copy for the customer, and **New trade** clears the list.
+   **Customer still shopping, or went to get more games?** Click **Hold**.
+   Their trade is set aside and the screen clears for the next person.
+   Pick them from **Held trades** to finish it. (Held trades are kept on
+   that computer only, with the prices from when they were held.)
 6. **Part cash, part credit?** Click **Split payout** and type how much
    they want in cash, **or** how much they want in store credit. The other
    box fills in at the same rates.
@@ -674,14 +680,19 @@ that device is locked out for 15 minutes.
      checked**. The trade won't save without it when there's serialized
      hardware.
    - **Save trade**, or **Save & print receipt** for a copy with a
-     signature line.
-   The trade is saved to the **Trade Log** and the screen clears for the
-   next customer.
+     signature line. Click once; the buttons grey out while it saves.
+   The trade is saved to the **Trade Log** with a **trade number** (on the
+   receipt and in the log; handy for matching it up in the register), and
+   the screen clears for the next customer.
 
 **Trade Log tab:** every completed trade, newest first. Search by customer,
-staff name, item, or serial number, and click a trade to see its items or
-reprint the receipt. Trades can't be edited or deleted, so if one is saved
-wrong, add a note on the next one or tell a manager.
+staff name, item, serial number, or trade number, and click a trade to see
+its items or reprint the receipt. **End of the day:** click **Today** (or
+pick From/To dates and click **Search**) to see how many trades there were
+and the **cash paid out** and **store credit issued**. **Export CSV**
+downloads what's shown for a spreadsheet or the bookkeeper. Trades can't
+be edited or deleted, so if one is saved wrong, add a note on the next one
+or tell a manager.
 
 **Floor Pricing tab:** prices games for the shelf using the Game Pricing
 Guide (the Google Sheet tab).
@@ -700,12 +711,19 @@ Guide (the Google Sheet tab).
      **GameStop's pre-owned price**, **Amazon's lowest offer** (used, or
      new for New), and that sale.
    - **Amazon's offers show on every game**, listed under the sales
-     (prices include shipping). On older systems they're for reference
-     only: the price still comes from the eBay sales.
+     (prices include shipping). On older systems, when Amazon's typical
+     price is higher, the price moves partway toward it (at most 25%
+     more); with no Amazon copies at all, it goes by the highest sale
+     plus 10%.
+   - **Premiums:** some games get a set percentage on top (for example
+     older Pokémon games). The badge and the math line show it. Managers
+     set these under Settings → Floor price premiums.
+   - **Consoles and controllers** can be priced here too. They go by
+     their sales without the game rules (a badge says so).
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
-4. Only look closer when it says **Double-check** (very few sales, or no
-   sale in the last 6 months). To use a different number, click any sale
+4. Only look closer when it says **Double-check** (very few sales, no
+   sale in the last 6 months, or a price of $100 or more). To use a different number, click any sale
    in the list, or **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
@@ -714,10 +732,22 @@ Guide (the Google Sheet tab).
    missing-manual amount off. It's **never below GameStop's pre-owned
    price** (on any system), even after the manual deduction. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
+   (If that game is already on the list in the same condition, it asks
+   before adding it twice.)
 6. Prices in the list can be changed by hand. **Save session** keeps the
    list on the website under its name, so anyone can open it later from
-   **Saved sessions**. **Copy list** copies it for a spreadsheet, and
-   **Print list** prints it.
+   **Saved sessions**. If someone else saved the same session after you
+   opened it, your save won't erase theirs: it offers to save yours as a
+   copy instead. **Copy list** copies it for a spreadsheet, **Print list**
+   prints it, and **Print labels** prints a price sticker for every game
+   on **Avery 5160** label sheets (30 per page; print at 100% / "Actual
+   size").
+7. **Prices change.** Open an older session and click **Re-check prices**
+   to price every game again with today's sales (about 5 seconds a game;
+   click **Stop** to stop). Games whose price moved show **Now $X ▲/▼**:
+   click **Use** or **Keep** on each, or **Use N new prices** for all of
+   them at once. Prices you typed in by hand are never changed by that
+   button. Save the session afterwards.
 
 **Amazon keys (managers):** Amazon prices come from the shop's own
 Amazon seller API app. Its three keys (Client ID, Client secret, Refresh
@@ -748,9 +778,14 @@ a price; use the **PriceCharting ↗** link to see the sales.
   then **Save changes**. Nothing you already have is changed.
 - **Buying guide prices:** edit them on the **Hardware Prices** tab and
   click **Save changes**.
-- **Everything else:** percentages, deductions, and the dead-games and
-  sports lists are on the **Settings** tab.
+- **Everything else:** percentages, deductions, the dead-games and
+  sports lists, and floor price premiums are on the **Settings** tab.
+  Unsaved changes there stay put if you switch tabs; **Discard changes**
+  throws them away.
 - Changes apply to every device right away.
+- **Made a mistake?** Both tabs have a **Change history** panel at the
+  bottom: the last 50 saves, with what changed in each. **Load this
+  version** puts an older one back on the page; check it, then save.
 
 **If staff turnover happens:** a manager can change either password under
 **Settings → Passwords**. Changing a password logs out every other device.
@@ -760,6 +795,14 @@ a price; use the **PriceCharting ↗** link to see the sales.
   prices are fake. A manager adds the token under **Settings**.
 - **"Looking up…" rows** when scanning a stack quickly are normal.
   PriceCharting allows one lookup per second, so they fill in one at a time.
+- **The shop PC's offline copy** (the `TradeInCalculator` folder) has to
+  be updated when the website's calculator changes. Download
+  `scripts/shop-pc/Update-TradeInCalculator.ps1` from GitHub once and put
+  it in that folder. Then right-click it → **Run with PowerShell** (or have
+  the dev add it to the start shortcut so it runs every time). It only
+  replaces the calculator's page files, keeps backups, and never touches
+  prices, settings, or the offline trade log. Offline, Floor Pricing
+  can't read sales or save sessions, and Change history isn't available.
 - **Forgot the manager password, or need a fresh start?** Contact the dev.
   The saved passwords, token, and prices live in a private folder on the
   GoDaddy hosting account (`p2w-trade-in-data`, next to `public_html`),
