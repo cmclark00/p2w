@@ -58,7 +58,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 7,
+  version: 8,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -88,6 +88,8 @@ const DEFAULT_SETTINGS = {
   // live tool (Amazon included) against the shop's loose prices for 19 Pokemon games + Conker: older-system
   // Pokemon +25%, DS/3DS Pokemon none (the shop prices those at the sales / GameStop), Conker +15% took it
   // from 5 to 13 of 20 within $10 (avg miss $24 -> $14). Other systems keep the earlier +10% (no data).
+  // The per-game lines (owner request, same day) put the other 6 exactly on the shop's price; a negative %
+  // lowers the price. "Pokemon Black Version 2 = 0" keeps the "Pokemon Black" line off Black 2.
   floorPremiums: [
     { phrase: 'Pokemon', pct: 10 },
     { phrase: 'Pokemon', system: 'GameBoy', pct: 25 }, // also matches GameBoy Color / Advance
@@ -96,6 +98,13 @@ const DEFAULT_SETTINGS = {
     { phrase: 'Pokemon', system: 'Nintendo DS', pct: 0 },
     { phrase: 'Pokemon', system: 'Nintendo 3DS', pct: 0 },
     { phrase: "Conker's Bad Fur Day", pct: 15 },
+    { phrase: 'Pokemon Colosseum Bonus Disc', pct: 52 }, // $400
+    { phrase: 'Pokemon Red', system: 'GameBoy', pct: -5 }, // $125
+    { phrase: 'Pokemon LeafGreen', pct: 10 }, // $175
+    { phrase: 'Pokemon Black', system: 'Nintendo DS', pct: -14 }, // $120
+    { phrase: 'Pokemon Black Version 2', pct: 0 },
+    { phrase: 'Pokemon SoulSilver', pct: 13 }, // $200
+    { phrase: 'Hey You Pikachu', pct: 80 }, // $35
   ],
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
@@ -272,9 +281,11 @@ function mergeSettings(saved) {
   if (saved.version < 6 && !s.deductions.some((d) => d.id === 'modded')) {
     s.deductions.push(clone(DEFAULT_SETTINGS.deductions.find((d) => d.id === 'modded')));
   }
-  // Version 7: per-system Pokemon premiums + Conker replace the untouched old default (Pokemon = 10).
+  // Versions 7-8: per-system Pokemon premiums + Conker (v7), then per-game lines (v8), replace an untouched
+  // earlier default list (v6: Pokemon = 10; v7: the first 7 lines of today's list).
   const premiumKey = (list) => JSON.stringify(list.map((p) => [p.phrase, p.system || '', Number(p.pct)]));
-  if (saved.version < 7 && premiumKey(s.floorPremiums) === premiumKey([{ phrase: 'Pokemon', pct: 10 }])) {
+  const oldDefaults = [[{ phrase: 'Pokemon', pct: 10 }], DEFAULT_SETTINGS.floorPremiums.slice(0, 7)].map(premiumKey);
+  if (saved.version < 8 && oldDefaults.includes(premiumKey(s.floorPremiums))) {
     s.floorPremiums = clone(DEFAULT_SETTINGS.floorPremiums);
   }
   return s;
@@ -424,6 +435,7 @@ function shitboxReason(line, g) {
 
 // The shop's premium for a game on the shelf ({ phrase, system?, pct }), or null. The longest matching phrase
 // wins; for the same phrase, a line naming the game's system beats one without (system = PriceCharting console).
+// A negative pct lowers the price; 0 exempts the game from shorter lines.
 function floorPremium(name, system = '', s = settings) {
   const text = norm(name);
   const sys = norm(system);
@@ -433,19 +445,21 @@ function floorPremium(name, system = '', s = settings) {
     if (!hasPhrase(text, pr.phrase) || (pr.system && !hasPhrase(sys, pr.system))) continue;
     if (!best || rank(pr) > rank(best)) best = pr;
   }
-  return best && best.pct > 0 ? best : null;
+  return best && best.pct !== 0 ? best : null;
 }
-const premiumLabel = (pr) => (pr.system ? `${pr.phrase} on ${pr.system}` : pr.phrase);
+// "Pokemon on GameBoy premium +25%" / "Pokemon Red on GameBoy discount −5%"
+const premiumText = (pr) => `${pr.system ? `${pr.phrase} on ${pr.system}` : pr.phrase} ${pr.pct > 0 ? 'premium +' : 'discount −'}${pctText(Math.abs(pr.pct))}%`;
 
-// Settings text <-> premiums: one "phrase = 10" or "phrase @ system = 10" per line.
+// Settings text <-> premiums: one "phrase = 10" or "phrase @ system = -5" per line (more than -100).
 const premiumsText = (list) => (list || []).map((p) => `${p.phrase}${p.system ? ` @ ${p.system}` : ''} = ${pctText(p.pct)}`).join('\n');
 function premiumsFromText(text) {
-  return lines(text).map((l) => l.match(/^(.*?)\s*[=:]\s*(\d+(?:\.\d+)?)\s*%?$/)).filter((m) => m && m[1].trim())
+  return lines(text).map((l) => l.match(/^(.*?)\s*[=:]\s*([-−]?\d+(?:\.\d+)?)\s*%?$/)).filter((m) => m && m[1].trim())
     .map((m) => {
       const [phrase, system] = m[1].split('@').map((x) => x.trim());
-      return system ? { phrase, system, pct: Number(m[2]) } : { phrase, pct: Number(m[2]) };
+      const pct = Number(m[2].replace('−', '-'));
+      return system ? { phrase, system, pct } : { phrase, pct };
     })
-    .filter((p) => p.phrase);
+    .filter((p) => p.phrase && p.pct > -100);
 }
 
 // The flat-price phrase (steering wheels etc.) an item's name contains, or undefined.
@@ -2558,7 +2572,7 @@ function renderFloorPricer() {
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
         <div class="floor-rule">${esc(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
-        ${premium ? `<span class="badge guide">${esc(premiumLabel(premium))} premium +${pctText(premium.pct)}%</span>` : ''}
+        ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
@@ -2622,7 +2636,7 @@ function floorMath(b, r) {
     : b.scarce
       ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
       : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
-  if (r.premium) parts.push(`${premiumLabel(r.premium)} premium +${pctText(r.premium.pct)}%: ${money(r.premiumBasis)}`);
+  if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);

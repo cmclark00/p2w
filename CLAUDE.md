@@ -586,18 +586,21 @@ The site's **only server-side code**. Everything else is static.
     covers GameBoy Color/Advance and PAL), and beats the same phrase
     without one. `floorPrice()` adds it to the basis **before**
     rounding, after the eBay/GameStop/Amazon steps; typed prices get none.
-    Shown as a badge and a breakdown step. **Defaults (settings v7):**
+    Shown as a badge and a breakdown step. **Defaults (settings v7, + v8 below):**
     `Pokemon = 10`, `Pokemon @ GameBoy / Nintendo 64 / Gamecube = 25`,
     `Pokemon @ Nintendo DS / Nintendo 3DS = 0`, `Conker's Bad Fur Day =
     15`. Fit Oct 7 2026 by running the **live** tool (Amazon included)
     on the shop's loose prices for 19 Pokemon games + Conker: 5 → 13 of
     20 within $10, avg miss $24 → $14. Older Pokemon sit ~1.4× the top
     sale; DS is priced at the sales and 3DS at GameStop, where the Amazon
-    nudge already runs high. Still off: Colosseum Bonus Disc ($325 vs
-    $400), Red (+$40), LeafGreen (+$25), SoulSilver (−$25), Black (+$20),
-    Hey You Pikachu (no "Pokemon" in its name). Those are game-specific;
-    per-game lines would fix them but go stale as the market moves.
-    Switch etc. keep +10% (no data). **Re-run this comparison on the live
+    nudge already runs high. The other 6 got **per-game lines (v8)**
+    that hit the shop's price exactly on Oct 7 data: Colosseum Bonus Disc
+    52, `Pokemon Red @ GameBoy = -5`, LeafGreen 10, `Pokemon Black @
+    Nintendo DS = -14` (plus `Pokemon Black Version 2 = 0` so Black 2
+    isn't caught), SoulSilver 13, Hey You Pikachu 80. **Negative
+    percents lower the price** (shown as a "discount"; must be > −100).
+    Per-game lines go stale as the market moves: re-check them with the
+    rest. Switch etc. keep +10% (no data). **Re-run this comparison on the live
     tool before retuning** — a local copy can't see Amazon, which moves
     older systems by up to +25%.
   - **Price math** (`floorPrice()`): basis → round **up** to the next $5
@@ -835,7 +838,9 @@ The site's **only server-side code**. Everything else is static.
     credit 105%, v4 → v5 moved game cash from 73.5% to 70%; each only when
     a manager hadn't set custom numbers; v5 → v6 added the $60 **Modded**
     hardware deduction to saved deduction lists; v6 → v7 replaced an
-    untouched `Pokemon = 10` premium list with the per-system defaults). Bump `version` and add a
+    untouched `Pokemon = 10` premium list with the per-system defaults;
+    v7 → v8 added the per-game lines, replacing either untouched earlier
+    default list). Bump `version` and add a
     migration line when a default policy changes or a new default deduction
     ships (saved deduction lists replace the defaults wholesale), or live
     saved settings keep the old numbers.
