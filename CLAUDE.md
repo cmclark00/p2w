@@ -703,7 +703,25 @@ The site's **only server-side code**. Everything else is static.
 - **Trade log** (`POST`/`GET api.php?route=trades`): "Complete trade" saves
   a JSON record per trade to `p2w-trade-in-data/trades/YYYY-MM.jsonl`.
   - Each file holds one object per line, one file per UTC month.
-  - The log is **append-only by design** (no edit or delete route).
+  - **No deletes. Managers can correct a trade** (owner request, Oct 2026;
+    it used to be strictly append-only): **Edit trade** in a trade's
+    details (`logEditorHtml()`, website only, `canEditLog()`) edits the
+    customer, staff, notes, items (name/system/condition/qty/cash and
+    credit each/serial, add/remove), totals and payout; "Total the items"
+    sums them (`roundTotal`) and fills a cash/credit payout. **A reason is
+    required.** `PUT api.php?route=trades` `{ id, month (UTC YYYY-MM from
+    its time), reason, changes }` (manager only): `clean_trade_changes()`
+    validates/whitelists the fields, then the record is rewritten **in
+    place** in its month file under `flock` (the same lock `POST`'s
+    append waits on; a `.bak` of the month is copied first), and only the
+    fields that actually differ are applied, with their old values pushed
+    to the record's **`edits`** list `{ time, role, reason, before }`.
+    `id`/`time`/`role` can't change. The client sends only fields it saw
+    change (untouched items stay byte-identical). Shown as an "edited"
+    badge in the list, an **Edits** history under the details, "Corrected
+    <date>" on a reprinted receipt, and an Edits column in the CSV. The
+    shop PC's `server.ps1` has no edit route, so the button is hidden
+    offline.
   - The server adds `id`, `time` (UTC ISO), and `role`. The client sends
     staff name and customer (**both required**; stored per trade as
     `trade.staff`/`trade.customer` and cleared by `resetTrade()` on New

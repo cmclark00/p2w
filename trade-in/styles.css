@@ -390,6 +390,17 @@ table.history td { vertical-align: top; font-size: 0.88rem; }
 .toolbar .inline-label input { width: auto; }
 .log-summary { margin: 0 0 12px; padding: 10px 14px; background: var(--surface-2); border-left: 4px solid var(--gold); border-radius: 8px; }
 .log-summary strong { color: var(--gold); font-variant-numeric: tabular-nums; }
+.log-edits { margin: 6px 0 10px; }
+.log-edits p { margin: 2px 0; }
+.log-edit { display: flex; flex-direction: column; gap: 12px; }
+.log-edit-items input { width: 100%; min-width: 70px; }
+.log-edit-items .name-input { min-width: 200px; }
+.log-edit-items input[data-k="qty"] { width: 64px; min-width: 0; }
+.log-edit-items .money-input input { width: 80px; min-width: 0; }
+.log-edit-money { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.log-edit-money label { flex-direction: row; align-items: center; gap: 6px; color: var(--muted); }
+.log-edit-money .money-input input { width: 90px; }
+.log-edit-money select { width: auto; }
 table.log tr.log-row { cursor: pointer; }
 table.log tr.log-row:hover td, table.log tr.log-row.open td { background: rgba(49, 94, 203, 0.12); }
 table.log tr.log-detail > td { background: var(--ink); padding: 14px 16px; }

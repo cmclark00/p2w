@@ -690,9 +690,16 @@ staff name, item, serial number, or trade number, and click a trade to see
 its items or reprint the receipt. **End of the day:** click **Today** (or
 pick From/To dates and click **Search**) to see how many trades there were
 and the **cash paid out** and **store credit issued**. **Export CSV**
-downloads what's shown for a spreadsheet or the bookkeeper. Trades can't
-be edited or deleted, so if one is saved wrong, add a note on the next one
-or tell a manager.
+downloads what's shown for a spreadsheet or the bookkeeper.
+
+**Saved a trade wrong?** Tell a manager. Managers see **Edit trade** under
+a trade's details: change the customer, staff name, items (name, system,
+condition, quantity, cash and credit each, serial; add or remove items),
+totals, what the customer took, or notes. **Total the items** adds up the
+items for you. A reason is required, and the trade keeps a record of every
+edit (when, why, and what it said before), shown under **Edits**, with an
+"edited" tag in the list. Trades can't be deleted; to cancel one, edit it
+and explain why in the reason.
 
 **Floor Pricing tab:** prices games for the shelf using the Game Pricing
 Guide (the Google Sheet tab).

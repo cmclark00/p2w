@@ -1975,14 +1975,15 @@ function tradeItems() {
 const creditBonusText = (it) => (it.creditBonus != null ? `Custom store credit +${it.creditBonus}%` : '');
 
 // One printed sheet for both quotes (current trade) and receipts (a logged trade).
-function printSheet({ receipt, time, customer, items, totals, payout, staff, id }) {
+function printSheet({ receipt, time, customer, items, totals, payout, staff, id, edits }) {
   const rows = items.map((it) => {
     const detail = [it.detail, it.platform, it.condition, ...(it.deductions || []), creditBonusText(it), it.serial ? `Serial ${it.serial}` : ''].filter(Boolean).join(' · ');
     const cell = (c) => (it.dontBuy ? 'Not buying' : c == null ? '—' : money(c * it.qty));
     return `<tr><td>${esc(it.name)}${detail ? `<div class="sub">${esc(detail)}</div>` : ''}</td>
       <td class="num">${it.qty}</td><td class="num">${cell(it.cash)}</td><td class="num">${cell(it.credit)}</td></tr>`;
   }).join('');
-  const meta = [receipt ? 'Trade-in receipt' : 'Trade-in quote', receipt && id ? `Trade #${id}` : '', fmtTime(time), customer, receipt && staff ? `Bought in by ${staff}` : ''].filter(Boolean);
+  const meta = [receipt ? 'Trade-in receipt' : 'Trade-in quote', receipt && id ? `Trade #${id}` : '', fmtTime(time), customer, receipt && staff ? `Bought in by ${staff}` : '',
+    receipt && edits?.length ? `Corrected ${fmtTime(edits[edits.length - 1].time)}` : ''].filter(Boolean);
   $('#printArea').innerHTML = `
     <h1>${esc(settings.shopName)}</h1>
     <p class="print-meta">${meta.map(esc).join(' · ')}</p>
@@ -2218,9 +2219,7 @@ async function loadLog() {
   const inRange = (r) => (!params.from || new Date(r.time) >= new Date(params.from)) && (!params.to || new Date(r.time) < new Date(params.to));
   logRecords = logRecords.filter(inRange);
   logQuery = { q, from, to };
-  $('#logBody').innerHTML = logRecords.map((r, i) => `<tr class="log-row" data-i="${i}">
-      <td>${esc(fmtTime(r.time))}${r.id ? `<div class="sub">#${esc(r.id)}</div>` : ''}</td><td>${esc(r.customer || '—')}</td><td>${esc(r.staff || '')}</td>
-      <td class="num">${r.totals?.count ?? (r.items || []).length}</td><td>${esc(payoutText(r.payout))}</td></tr>`).join('')
+  $('#logBody').innerHTML = logRecords.map(logRowHtml).join('')
     || `<tr><td colspan="5" class="empty-cell">${q || from || to ? 'No trades match.' : 'No trades yet. They show up here after “Complete trade”.'}</td></tr>`;
   renderLogSummary(from || to);
   const cap = from || to ? 2000 : 100;
@@ -2258,8 +2257,9 @@ function exportLog() {
     dollars(r.totals?.cash), dollars(r.totals?.credit), r.idChecked ? 'yes' : '',
     (r.items || []).map((it) => `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name}${it.platform ? ` (${it.platform})` : ''}${it.serial ? ` [serial ${it.serial}]` : ''}`).join('; '),
     r.notes || '',
+    (r.edits || []).map((e) => `${fmtTime(e.time)}: ${e.reason || ''}`).join('; '),
   ]);
-  const head = ['Date', 'Trade #', 'Customer', 'Staff', 'Items', 'Payout', 'Cash paid', 'Store credit issued', 'Cash offer', 'Store credit offer', 'Photo ID checked', 'Items list', 'Notes'];
+  const head = ['Date', 'Trade #', 'Customer', 'Staff', 'Items', 'Payout', 'Cash paid', 'Store credit issued', 'Cash offer', 'Store credit offer', 'Photo ID checked', 'Items list', 'Notes', 'Edits'];
   const csv = [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
   const { from, to } = logQuery;
   const name = `trade-log${from ? `-${from}` : ''}${to && to !== from ? `-to-${to}` : ''}.csv`;
@@ -2268,6 +2268,13 @@ function exportLog() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function logRowHtml(r, i) {
+  return `<tr class="log-row" data-i="${i}">
+      <td>${esc(fmtTime(r.time))}${r.id ? `<div class="sub">#${esc(r.id)}</div>` : ''}</td><td>${esc(r.customer || '—')}</td><td>${esc(r.staff || '')}</td>
+      <td class="num">${r.totals?.count ?? (r.items || []).length}</td>
+      <td>${esc(payoutText(r.payout))}${r.edits?.length ? ' <span class="badge info">edited</span>' : ''}</td></tr>`;
 }
 
 function logDetailHtml(r, i) {
@@ -2280,7 +2287,169 @@ function logDetailHtml(r, i) {
   return `<tr class="log-detail"><td colspan="5">
     <table class="log-items"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Credit</th></tr></thead><tbody>${items}</tbody></table>
     <p class="muted small-print">${facts.map(esc).join(' · ')}</p>
-    <button type="button" class="btn small" data-reprint="${i}">Print receipt</button></td></tr>`;
+    ${logEditsHtml(r)}
+    <div class="row-start">
+      <button type="button" class="btn small" data-reprint="${i}">Print receipt</button>
+      ${canEditLog() && r.id ? `<button type="button" class="btn small" data-log-edit="${i}">Edit trade</button>` : ''}
+    </div></td></tr>`;
+}
+
+/* ---------------------------------------------------------------- editing a logged trade (managers) */
+
+// Managers can correct a logged trade (PUT api.php?route=trades). Every edit needs a reason, and the
+// server keeps what the trade looked like before on its "edits" list, shown under its details.
+const canEditLog = () => auth.enabled && isManager();
+const LOG_FIELD_LABELS = { customer: 'customer', staff: 'staff name', notes: 'notes', items: 'items', payout: 'payout', totals: 'totals' };
+
+function logEditsHtml(r) {
+  if (!r.edits?.length) return '';
+  const was = (k, v) => {
+    if (k === 'customer' || k === 'staff') return `${LOG_FIELD_LABELS[k]} was “${v || ''}”`;
+    if (k === 'payout') return `payout was ${payoutText(v) || '—'}`;
+    if (k === 'totals') return `totals were ${money(v?.cash)} cash / ${money(v?.credit)} credit`;
+    if (k === 'items') return `items were ${(v || []).map((it) => `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name} ${it.dontBuy ? '(not buying)' : `${money(it.cash)}/${money(it.credit)}`}`).join(', ')}`;
+    return `${LOG_FIELD_LABELS[k] || k} changed`;
+  };
+  return `<div class="log-edits"><div class="eyebrow">Edits</div>${r.edits.map((e) => `<p class="small-print">
+    <strong>${esc(fmtTime(e.time))}</strong>${e.role ? ` (${esc(e.role)} login)` : ''}: ${esc(e.reason || '')}
+    <span class="muted">· ${esc(Object.entries(e.before || {}).map(([k, v]) => was(k, v)).join(' · '))}</span></p>`).join('')}</div>`;
+}
+
+const logEditField = (k, it) => `<input type="text" data-k="${k}" value="${esc(it[k] ?? '')}" autocomplete="off">`;
+const logEditMoneyField = (k, v) => `<span class="money-input"><span>$</span><input type="text" inputmode="decimal" data-k="${k}" value="${esc(plain(v))}" autocomplete="off"></span>`;
+
+// One item row in the editor; j = its index in the logged trade, or "new" for an added item.
+function logEditItemRow(it, j) {
+  return `<tr data-j="${j}">
+      <td><input type="text" class="name-input" data-k="name" value="${esc(it.name || '')}" placeholder="Item" autocomplete="off"></td>
+      <td>${logEditField('platform', it)}</td><td>${logEditField('condition', it)}</td>
+      <td class="num"><input type="number" data-k="qty" min="1" step="1" value="${it.qty || 1}"></td>
+      <td class="num">${logEditMoneyField('cash', it.cash)}${it.dontBuy ? '<div class="sub">Not buying</div>' : ''}</td>
+      <td class="num">${logEditMoneyField('credit', it.credit)}</td>
+      <td>${logEditField('serial', it)}</td>
+      <td><button type="button" class="icon-btn" data-edit-remove title="Remove item" aria-label="Remove item">×</button></td></tr>`;
+}
+
+function logEditorHtml(r, i) {
+  const moneyField = logEditMoneyField;
+  const p = r.payout || { type: 'cash', cash: 0, credit: 0 };
+  return `<tr class="log-detail log-editing"><td colspan="5"><div class="log-edit" data-i="${i}">
+    <div class="grid-2">
+      <label>Customer <input type="text" data-f="customer" value="${esc(r.customer || '')}" autocomplete="off"></label>
+      <label>Staff <input type="text" data-f="staff" value="${esc(r.staff || '')}" autocomplete="off"></label>
+    </div>
+    <div class="table-wrap"><table class="log-edit-items">
+      <thead><tr><th>Item</th><th>System</th><th>Condition</th><th class="num">Qty</th><th class="num">Cash ea.</th><th class="num">Credit ea.</th><th>Serial</th><th></th></tr></thead>
+      <tbody>${(r.items || []).map(logEditItemRow).join('')}</tbody></table></div>
+    <div class="row-start"><button type="button" class="btn small" data-edit-add>+ Add item</button></div>
+    <div class="log-edit-money">
+      <label>Totals: cash ${moneyField('totalCash', r.totals?.cash)}</label>
+      <label>credit ${moneyField('totalCredit', r.totals?.credit)}</label>
+      <button type="button" class="btn small" data-edit-total>Total the items</button>
+      <label>Customer took <select data-f="payoutType">
+        ${['cash', 'credit', 'split'].map((t) => `<option value="${t}"${p.type === t ? ' selected' : ''}>${{ cash: 'Cash', credit: 'Store credit', split: 'Split' }[t]}</option>`).join('')}</select></label>
+      <label>cash ${moneyField('payoutCash', p.cash)}</label>
+      <label>credit ${moneyField('payoutCredit', p.credit)}</label>
+    </div>
+    <label>Notes <textarea data-f="notes" rows="2">${esc(r.notes || '')}</textarea></label>
+    <label>Why is this being changed? (required, kept with the trade)
+      <input type="text" data-f="reason" autocomplete="off" placeholder="e.g. Wrong price on Halo 3, customer was paid $12"></label>
+    <p class="error-text" data-edit-error role="alert"></p>
+    <div class="row-end">
+      <button type="button" class="btn" data-edit-cancel>Cancel</button>
+      <button type="button" class="btn primary" data-edit-save>Save changes</button>
+    </div></div></td></tr>`;
+}
+
+// The editor's items as trade-log items: each existing item keeps its other fields (deductions, upc…);
+// a key is only set when its box differs, so an untouched item stays exactly as logged.
+function logEditItems(box, r) {
+  return $$('.log-edit-items > tbody > tr[data-j]', box).map((tr) => {
+    const j = tr.dataset.j;
+    const it = j === 'new' ? { type: 'Other' } : clone(r.items[Number(j)]);
+    const get = (k) => $(`[data-k="${k}"]`, tr).value.trim();
+    for (const k of ['name', 'platform', 'condition', 'serial']) if (get(k) !== (it[k] ?? '')) it[k] = get(k);
+    if (!it.name) throw new Error('Every item needs a name.');
+    const qty = Number(get('qty'));
+    if (!Number.isInteger(qty) || qty < 1) throw new Error(`Check the quantity for ${it.name}.`);
+    if (qty !== it.qty) it.qty = qty;
+    for (const k of ['cash', 'credit']) {
+      const cents = parseMoney(get(k));
+      if (Number.isNaN(cents)) throw new Error(`Check the ${k} amount for ${it.name}.`);
+      if (cents !== (it[k] ?? null)) it[k] = cents;
+    }
+    if (it.dontBuy && it.cash > 0) delete it.dontBuy; // a price typed on a "not buying" item means it was bought
+    return it;
+  });
+}
+
+function logEditMoney(box, k) {
+  const cents = parseMoney($(`[data-k="${k}"]`, box).value);
+  if (cents == null || Number.isNaN(cents)) throw new Error('Check the totals and payout amounts.');
+  return cents;
+}
+
+// Totals from the editor's items (rounded like a trade's totals), and the payout to match for cash / credit.
+function logEditTotal(box) {
+  let items;
+  try { items = logEditItems(box, logRecords[Number(box.dataset.i)]); } catch (err) { $('[data-edit-error]', box).textContent = err.message; return; }
+  const sum = (k) => roundTotal(items.filter((it) => !it.dontBuy).reduce((s, it) => s + (it[k] || 0) * it.qty, 0));
+  $('[data-k="totalCash"]', box).value = plain(sum('cash'));
+  $('[data-k="totalCredit"]', box).value = plain(sum('credit'));
+  logEditPayoutFill(box);
+}
+
+function logEditPayoutFill(box) {
+  const type = $('[data-f="payoutType"]', box).value;
+  if (type === 'split') return; // staff type both parts of a split
+  $('[data-k="payoutCash"]', box).value = type === 'cash' ? $('[data-k="totalCash"]', box).value : '0.00';
+  $('[data-k="payoutCredit"]', box).value = type === 'credit' ? $('[data-k="totalCredit"]', box).value : '0.00';
+}
+
+async function saveLogEdit(box) {
+  const i = Number(box.dataset.i);
+  const r = logRecords[i];
+  const error = $('[data-edit-error]', box);
+  error.textContent = '';
+  const val = (f) => $(`[data-f="${f}"]`, box).value.trim();
+  const changes = {};
+  try {
+    for (const k of ['customer', 'staff']) {
+      if (!val(k)) throw new Error(`${k === 'customer' ? 'Customer' : 'Staff'} can't be blank.`);
+      if (val(k) !== (r[k] || '')) changes[k] = val(k);
+    }
+    if (val('notes') !== (r.notes || '')) changes.notes = val('notes');
+    const items = logEditItems(box, r);
+    if (!items.length) throw new Error('A trade needs at least one item. To cancel a trade, note it instead.');
+    if (JSON.stringify(items) !== JSON.stringify(r.items)) changes.items = items;
+    const totals = { cash: logEditMoney(box, 'totalCash'), credit: logEditMoney(box, 'totalCredit'), count: items.filter((it) => !it.dontBuy).reduce((n, it) => n + it.qty, 0) };
+    if (totals.cash !== r.totals?.cash || totals.credit !== r.totals?.credit || totals.count !== r.totals?.count) changes.totals = totals;
+    const payout = { type: val('payoutType'), cash: logEditMoney(box, 'payoutCash'), credit: logEditMoney(box, 'payoutCredit') };
+    if (payout.type !== r.payout?.type || payout.cash !== r.payout?.cash || payout.credit !== r.payout?.credit) changes.payout = payout;
+  } catch (err) {
+    error.textContent = err.message;
+    return;
+  }
+  if (!Object.keys(changes).length) { error.textContent = 'Nothing was changed.'; return; }
+  if (!val('reason')) { error.textContent = 'Say why the trade is being changed.'; $('[data-f="reason"]', box).focus(); return; }
+  const btn = $('[data-edit-save]', box);
+  btn.disabled = true;
+  try {
+    const res = await api('trades', { method: 'PUT', body: { id: r.id, month: r.time.slice(0, 7), reason: val('reason'), changes } });
+    logRecords[i] = res.record;
+  } catch (err) {
+    error.textContent = `Couldn't save: ${err.message}`;
+    btn.disabled = false;
+    return;
+  }
+  const row = $(`#logBody tr.log-row[data-i="${i}"]`);
+  box.closest('tr').remove();
+  row.outerHTML = logRowHtml(logRecords[i], i);
+  const fresh = $(`#logBody tr.log-row[data-i="${i}"]`);
+  fresh.classList.add('open');
+  fresh.insertAdjacentHTML('afterend', logDetailHtml(logRecords[i], i));
+  renderLogSummary(logQuery.from || logQuery.to);
+  toast('Trade updated. The change and its reason are kept with the trade.');
 }
 
 function onLogClick(e) {
@@ -2290,8 +2459,32 @@ function onLogClick(e) {
     printSheet({ ...r, receipt: true });
     return;
   }
+  const edit = e.target.closest('[data-log-edit]');
+  if (edit) {
+    const i = Number(edit.dataset.logEdit);
+    edit.closest('tr').outerHTML = logEditorHtml(logRecords[i], i);
+    $(`#logBody .log-edit[data-i="${i}"] [data-f="reason"]`).scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  const box = e.target.closest('.log-edit');
+  if (box) {
+    if (e.target.closest('[data-edit-remove]')) e.target.closest('tr[data-j]').remove();
+    else if (e.target.closest('[data-edit-add]')) {
+      const body = $('.log-edit-items > tbody', box);
+      body.insertAdjacentHTML('beforeend', logEditItemRow({ name: '', qty: 1, cash: 0, credit: 0 }, 'new'));
+      $('[data-k="name"]', body.lastElementChild).focus();
+    } else if (e.target.closest('[data-edit-total]')) logEditTotal(box);
+    else if (e.target.closest('[data-edit-save]')) saveLogEdit(box);
+    else if (e.target.closest('[data-edit-cancel]')) {
+      const i = Number(box.dataset.i);
+      box.closest('tr').outerHTML = logDetailHtml(logRecords[i], i);
+    }
+    return;
+  }
   const row = e.target.closest('tr.log-row');
   if (!row) return;
+  const editing = $('#logBody .log-edit');
+  if (editing && !confirm('Close the trade you are editing without saving?')) return;
   const open = row.nextElementSibling?.classList.contains('log-detail');
   $$('#logBody tr.log-detail').forEach((d) => d.remove());
   $$('#logBody tr.log-row').forEach((r) => r.classList.remove('open'));
@@ -3480,6 +3673,9 @@ function wireEvents() {
   });
   $('#logExport').addEventListener('click', exportLog);
   $('#logBody').addEventListener('click', onLogClick);
+  $('#logBody').addEventListener('change', (e) => {
+    if (e.target.matches('[data-f="payoutType"]')) logEditPayoutFill(e.target.closest('.log-edit'));
+  });
 
   window.addEventListener('beforeunload', (e) => { if (hwDirty || settingsDirty) { e.preventDefault(); e.returnValue = ''; } });
 }

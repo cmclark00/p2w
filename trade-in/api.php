@@ -21,6 +21,7 @@
  *   PUT  token | passwords       manager
  *   GET  pc/product (id|upc|q), pc/products (q)   any logged-in user
  *   POST trades / GET trades (q, from, to) completed-trade log, any logged-in user
+ *   PUT  trades                  manager: correct a logged trade (kept: who/when/why + what it was before)
  *   GET  history (of=settings|hardware)  manager: saved versions, newest first
  *   GET  pc/sales (id)           recent sold listings from a game's PriceCharting page (floor pricing)
  *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
@@ -532,6 +533,65 @@ function add_history(string $name, string $raw): void {
   if (file_put_contents($tmp, implode("\n", $lines) . "\n", LOCK_EX) === false || !@rename($tmp, $file)) @unlink($tmp);
 }
 
+// The fields a manager may correct on a logged trade (PUT trades), checked and trimmed. Anything else
+// in $c is ignored; id, time, role and edits can never be changed.
+function clean_trade_changes(array $c): array {
+  $money = function ($v): bool { return is_int($v) && $v >= 0 && $v <= 100000000; };
+  $text = function ($v): string { return is_scalar($v) ? trim((string)$v) : ''; }; // never "Array" or a notice
+  $out = [];
+  foreach (['customer' => 'Customer', 'staff' => 'Staff name'] as $k => $label) {
+    if (!array_key_exists($k, $c)) continue;
+    $v = $text($c[$k]);
+    if ($v === '') fail(400, "$label can't be blank.");
+    $out[$k] = cut_text($v, 120);
+  }
+  if (array_key_exists('notes', $c)) {
+    $v = $text($c['notes']);
+    $out['notes'] = $v === '' ? null : cut_text($v, 1000);
+  }
+  if (array_key_exists('items', $c)) {
+    if (!is_array($c['items']) || !$c['items'] || array_values($c['items']) !== $c['items'] || count($c['items']) > 500) fail(400, 'A trade needs at least one item.');
+    $items = [];
+    foreach ($c['items'] as $it) {
+      if (!is_array($it)) fail(400, 'That item is not in the right format.');
+      $name = $text($it['name'] ?? '');
+      if ($name === '') fail(400, 'Every item needs a name.');
+      $qty = $it['qty'] ?? 1;
+      if (!is_int($qty) || $qty < 1 || $qty > 9999) fail(400, "Check the quantity for $name.");
+      foreach (['cash', 'credit'] as $k) {
+        if (array_key_exists($k, $it) && $it[$k] !== null && !$money($it[$k])) fail(400, "Check the $k amount for $name.");
+      }
+      $clean = ['name' => cut_text($name, 200), 'qty' => $qty, 'cash' => $it['cash'] ?? null, 'credit' => $it['credit'] ?? null];
+      foreach (['platform', 'type', 'condition', 'note', 'upc', 'serial', 'detail'] as $k) {
+        if (isset($it[$k]) && $text($it[$k]) !== '') $clean[$k] = cut_text($text($it[$k]), 500);
+      }
+      if (!empty($it['dontBuy'])) $clean['dontBuy'] = true;
+      if (!empty($it['cashEdited'])) $clean['cashEdited'] = true;
+      if (isset($it['creditBonus']) && is_numeric($it['creditBonus'])) $clean['creditBonus'] = $it['creditBonus'] + 0;
+      if (isset($it['deductions']) && is_array($it['deductions'])) {
+        $clean['deductions'] = array_values(array_map(function ($d) { return cut_text((string)$d, 120); }, array_filter($it['deductions'], 'is_string')));
+      }
+      $items[] = $clean;
+    }
+    $out['items'] = $items;
+  }
+  if (array_key_exists('payout', $c)) {
+    $p = $c['payout'];
+    if (!is_array($p) || !in_array($p['type'] ?? '', ['cash', 'credit', 'split'], true) || !$money($p['cash'] ?? null) || !$money($p['credit'] ?? null)) {
+      fail(400, 'Check the payout amounts.');
+    }
+    $out['payout'] = ['type' => $p['type'], 'cash' => $p['cash'], 'credit' => $p['credit']];
+  }
+  if (array_key_exists('totals', $c)) {
+    $t = $c['totals'];
+    if (!is_array($t) || !$money($t['cash'] ?? null) || !$money($t['credit'] ?? null) || !is_int($t['count'] ?? null) || $t['count'] < 0) {
+      fail(400, 'Check the trade totals.');
+    }
+    $out['totals'] = ['cash' => $t['cash'], 'credit' => $t['credit'], 'count' => $t['count']];
+  }
+  return $out;
+}
+
 // A trade-log line's time (UTC ISO, written by POST trades), without decoding the whole record.
 function trade_time(string $line): string {
   return preg_match('/"time":"([^"]+)"/', $line, $m) ? $m[1] : '';
@@ -680,8 +740,8 @@ switch ("$method $route") {
     if ($q === '') fail(400, 'Pass q.');
     pricecharting('products', 'q', $q);
 
-  // Trade log: one JSON object per line, one file per month (trades/2026-09.jsonl). Append-only -
-  // there is deliberately no edit or delete route.
+  // Trade log: one JSON object per line, one file per month (trades/2026-09.jsonl). No delete route;
+  // managers can correct a trade with PUT trades, which keeps what it said before (below).
   case 'POST trades':
     require_role('staff');
     $raw = (string)file_get_contents('php://input');
@@ -696,6 +756,59 @@ switch ("$method $route") {
     $line = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
     if (file_put_contents($dir . '/' . gmdate('Y-m') . '.jsonl', $line, FILE_APPEND | LOCK_EX) === false) fail(500, 'Could not save the trade.');
     respond(200, ['ok' => true, 'id' => $record['id'], 'time' => $record['time']]);
+
+  // Managers can correct a logged trade: { id, month: "YYYY-MM" (UTC, from its time), reason, changes }.
+  // The record is rewritten in place in its month file, under the same lock POST trades appends with,
+  // and what it looked like before goes on its "edits" list with when, which login, and why. Records are
+  // never deleted. Returns the updated record.
+  case 'PUT trades':
+    require_role('manager');
+    $raw = (string)file_get_contents('php://input');
+    if (strlen($raw) > 262144) fail(413, 'That trade is too large to save.');
+    $in = json_decode($raw, true);
+    if (!is_array($in)) fail(400, 'That edit is not in the right format.');
+    $id = is_string($in['id'] ?? null) ? $in['id'] : '';
+    $month = is_string($in['month'] ?? null) ? $in['month'] : '';
+    if (!preg_match('/^[a-f0-9]{12}$/', $id) || !preg_match('/^\d{4}-\d{2}$/', $month)
+        || !is_array($in['changes'] ?? null) || array_values($in['changes']) === $in['changes']) {
+      fail(400, 'That edit is not in the right format.');
+    }
+    $reason = is_string($in['reason'] ?? null) ? cut_text(trim($in['reason']), 300) : '';
+    if ($reason === '') fail(400, 'Say why the trade is being changed.');
+    $changes = clean_trade_changes($in['changes']);
+    $file = data_path('trades') . '/' . $month . '.jsonl';
+    if (!is_file($file)) fail(404, 'That trade was not found.');
+    $fh = fopen($file, 'c+');
+    if (!$fh) fail(500, 'Could not open the trade log.');
+    flock($fh, LOCK_EX); // released at exit, so the fail()s below can't leave it locked
+    $lines = explode("\n", rtrim((string)stream_get_contents($fh), "\n"));
+    $updated = null;
+    foreach ($lines as $i => $line) {
+      if (strpos($line, '"id":"' . $id . '"') === false) continue;
+      $rec = json_decode($line, true);
+      if (!is_array($rec) || ($rec['id'] ?? '') !== $id) continue;
+      $before = [];
+      foreach ($changes as $k => $v) {
+        $old = $rec[$k] ?? null;
+        if (json_encode($old) === json_encode($v)) continue;
+        $before[$k] = $old;
+        if ($v === null) unset($rec[$k]); else $rec[$k] = $v;
+      }
+      if (!$before) fail(400, 'Nothing was changed.');
+      $rec['edits'] = array_merge((array)($rec['edits'] ?? []), [['time' => gmdate('c'), 'role' => current_role(), 'reason' => $reason, 'before' => $before]]);
+      $lines[$i] = json_encode($rec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+      $updated = $rec;
+      break;
+    }
+    if ($updated === null) fail(404, 'That trade was not found.');
+    @copy($file, $file . '.bak'); // the month as it was, in case a rewrite is ever cut short
+    ftruncate($fh, 0);
+    rewind($fh);
+    if (fwrite($fh, implode("\n", $lines) . "\n") === false) fail(500, 'Could not save the change. The backup is ' . basename($file) . '.bak.');
+    fflush($fh);
+    flock($fh, LOCK_UN);
+    fclose($fh);
+    respond(200, ['ok' => true, 'record' => $updated]);
 
   // q = substring search; from/to = UTC ISO times (from inclusive, to exclusive) for a date range,
   // which also raises the cap from LOG_MAX to LOG_MAX_RANGE (end-of-day totals, export).
