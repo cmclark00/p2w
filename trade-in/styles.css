@@ -364,7 +364,7 @@ label.check { flex-direction: row; align-items: center; gap: 10px; color: var(--
 .split-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
 .split-box label { flex-direction: row; align-items: center; gap: 6px; color: var(--muted); }
 .split-box .money-input input { width: 80px; }
-.split-credit strong { color: var(--gold); }
+.split-credit input, #paySplitCredit { color: var(--gold); }
 
 .dialog {
   width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto;

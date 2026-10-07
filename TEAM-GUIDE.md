@@ -662,7 +662,8 @@ that device is locked out for 15 minutes.
    back, and changing the items clears it. **Print quote**
    prints a copy for the customer, and **New trade** clears the list.
 6. **Part cash, part credit?** Click **Split payout** and type how much
-   they want in cash. The rest is shown as store credit at the same rates.
+   they want in cash, **or** how much they want in store credit. The other
+   box fills in at the same rates.
 7. When the customer agrees, click **Complete trade**:
    - Pick what they're taking: cash, store credit, or the split.
    - Type **your name** and the **customer's name**. Both are required,

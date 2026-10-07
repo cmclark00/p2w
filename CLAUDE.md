@@ -663,7 +663,10 @@ The site's **only server-side code**. Everything else is static.
     `data\trades` folder, so the offline log is separate from the website's.
 - **Split payouts** are proportional (`splitPayout()`): taking $X of the
   cash total converts the rest at the trade's own credit/cash ratio, so
-  mixed categories (games +50%, hardware +20%) stay fair.
+  mixed categories (games +50%, hardware +20%) stay fair. Staff can type
+  either part: `trade.split` is `{ by: 'cash'|'credit', amount }` and the
+  other box is worked out from it (the same both ways in the Complete
+  dialog). Old `{ cash }` splits saved in `localStorage` convert on load.
 - **Editable cash total** (`#totalCash` input, `trade.cashTotal`): staff
   can type a different cash total in the totals bar. It rounds to whole
   dollars. Store credit then scales by the same ratio (items' credit ×
@@ -815,8 +818,11 @@ The site's **only server-side code**. Everything else is static.
   - Saved settings carry a `version`. `mergeSettings` migrates older saves
     (v2 → v3 moved game cash from 50% to ÷ 1.5, v3 → v4 moved games to
     credit 105%, v4 → v5 moved game cash from 73.5% to 70%; each only when
-    a manager hadn't set custom numbers). Bump `version` and add a migration line when a
-    default policy changes, or live saved settings keep the old number.
+    a manager hadn't set custom numbers; v5 → v6 added the $60 **Modded**
+    hardware deduction to saved deduction lists). Bump `version` and add a
+    migration line when a default policy changes or a new default deduction
+    ships (saved deduction lists replace the defaults wholesale), or live
+    saved settings keep the old numbers.
 
 ## Shop (CrystalCommerce) — `shop/`, PREVIEW
 

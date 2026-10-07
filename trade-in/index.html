@@ -454,8 +454,8 @@
     <div class="split">
       <button id="splitBtn" type="button" class="btn small">Split payout</button>
       <div id="splitBox" class="split-box" hidden>
-        <label>Cash <span class="money-input"><span>$</span><input id="splitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></span></label>
-        <span class="split-credit">+ <strong id="splitCredit">$0.00</strong> credit</span>
+        <label>Cash <span class="money-input"><span>$</span><input id="splitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" title="Type the cash the customer wants; store credit fills in"></span></label>
+        <label class="split-credit">+ Credit <span class="money-input"><span>$</span><input id="splitCredit" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" title="Type the store credit the customer wants; cash fills in"></span></label>
         <button id="splitClear" type="button" class="icon-btn" title="Cancel split" aria-label="Cancel split">×</button>
       </div>
     </div>
@@ -475,8 +475,10 @@
         <label class="choice"><input type="radio" name="payout" value="cash"> Cash <strong id="payCash"></strong></label>
         <label class="choice"><input type="radio" name="payout" value="credit"> Store credit <strong id="payCredit"></strong></label>
         <label class="choice"><input type="radio" name="payout" value="split"> Split:
-          <span class="money-input"><span>$</span><input id="paySplitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></span>
-          cash + <strong id="paySplitCredit">$0.00</strong> credit</label>
+          <span class="money-input"><span>$</span><input id="paySplitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Split: cash"></span>
+          cash +
+          <span class="money-input"><span>$</span><input id="paySplitCredit" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Split: store credit"></span>
+          credit</label>
       </fieldset>
       <div class="grid-2">
         <label>Your name

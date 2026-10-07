@@ -58,7 +58,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 5,
+  version: 6,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -100,6 +100,7 @@ const DEFAULT_SETTINGS = {
     { id: 'no-ctrl-xseries', label: 'Missing controller (Xbox Series)', amount: 5000, appliesTo: 'hardware' },
     { id: 'no-ctrl-vb', label: 'Missing controller (Virtual Boy)', amount: 14500, appliesTo: 'hardware' },
     { id: 'no-gamepad-wiiu', label: 'Missing Wii U GamePad or console', amount: 7000, appliesTo: 'hardware' },
+    { id: 'modded', label: 'Modded', amount: 6000, appliesTo: 'hardware' },
   ],
   guide: {
     enabled: true,
@@ -256,6 +257,10 @@ function mergeSettings(saved) {
   if (saved.version < 5 && game.creditPct === GAME_CREDIT_PCT && Math.abs(game.cashPct - V4_GAME_CASH_PCT) < 0.001) {
     game.cashPct = GAME_CASH_PCT;
   }
+  // Version 6: new "Modded" hardware deduction ($60) joins saved deduction lists.
+  if (saved.version < 6 && !s.deductions.some((d) => d.id === 'modded')) {
+    s.deductions.push(clone(DEFAULT_SETTINGS.deductions.find((d) => d.id === 'modded')));
+  }
   return s;
 }
 
@@ -283,6 +288,8 @@ const auth = { enabled: false, role: null, mode: 'login' };
 const isManager = () => auth.role === 'manager';
 const trade = store.get('p2w-trade', null) || { customer: '', staff: '', lines: [] };
 trade.lines = trade.lines.filter((l) => !l.pending); // drop lookups interrupted by a reload
+// Split payouts used to be cash-only ({ cash }); now staff type either part ({ by, amount }).
+if (trade.split && !trade.split.by) trade.split = { by: 'cash', amount: trade.split.cash ?? null };
 
 /* ================================================================== server + PriceCharting */
 
@@ -1858,7 +1865,7 @@ function printQuote() {
   const items = tradeItems();
   if (!items.length) { toast('Add some items first.'); return; }
   const t = tradeTotals();
-  const split = trade.split ? splitPayout(t, trade.split.cash ?? 0) : null;
+  const split = trade.split ? splitPayout(t, trade.split.amount ?? 0, trade.split.by) : null;
   printSheet({
     time: new Date().toISOString(), customer: trade.customer, items, totals: t,
     payout: split ? { type: 'split', ...split } : null,
@@ -1869,11 +1876,24 @@ function printQuote() {
 
 // Customer takes part in cash; the rest becomes store credit in proportion
 // (credit rates differ by category, so this keeps every item's cash/credit ratio).
+// Staff type either part (by = 'cash' or 'credit'); the other is worked out from it.
 // Both parts round to whole dollars, like the totals.
-function splitPayout(t, cashWanted) {
-  if (cashWanted == null || Number.isNaN(cashWanted) || t.cash <= 0) return null;
-  const cash = roundTotal(Math.min(Math.max(0, cashWanted), t.cash));
-  return { cash, credit: roundTotal(t.credit * (1 - cash / t.cash)) };
+function splitPayout(t, amount, by = 'cash') {
+  const other = by === 'cash' ? 'credit' : 'cash';
+  if (amount == null || Number.isNaN(amount) || t[by] <= 0) return null;
+  const typed = roundTotal(Math.min(Math.max(0, amount), t[by]));
+  return { [by]: typed, [other]: roundTotal(t[other] * (1 - typed / t[by])) };
+}
+
+const SPLIT_INPUTS = { cash: '#splitCash', credit: '#splitCredit' };
+const PAY_SPLIT_INPUTS = { cash: '#paySplitCash', credit: '#paySplitCredit' };
+
+// What a split box shows: the typed part as typed, the other part worked out from it.
+function splitShown(t, k) {
+  const { by, amount } = trade.split;
+  if (k === by) return plain(amount);
+  const s = splitPayout(t, amount ?? 0, by);
+  return plain(s ? s[k] : null);
 }
 
 function renderSplit(t) {
@@ -1881,10 +1901,10 @@ function renderSplit(t) {
   $('#splitBtn').hidden = open;
   $('#splitBox').hidden = !open;
   if (!open) return;
-  const s = splitPayout(t, trade.split.cash ?? 0);
-  $('#splitCredit').textContent = money(s ? s.credit : t.credit);
-  const input = $('#splitCash');
-  if (document.activeElement !== input) input.value = plain(trade.split.cash);
+  for (const [k, sel] of Object.entries(SPLIT_INPUTS)) {
+    const input = $(sel);
+    if (document.activeElement !== input) input.value = splitShown(t, k);
+  }
 }
 
 /* ================================================================== complete trade + trade log */
@@ -1901,7 +1921,8 @@ function openComplete() {
   $('#payCash').textContent = money(t.cash);
   $('#payCredit').textContent = money(t.credit);
   f.payout.value = trade.split ? 'split' : 'credit';
-  $('#paySplitCash').value = plain(trade.split?.cash ?? null);
+  dialogSplitBy = trade.split?.by || 'cash';
+  $(PAY_SPLIT_INPUTS[dialogSplitBy]).value = plain(trade.split?.amount ?? null);
   updateDialogSplit();
   // Staff and customer names belong to this trade only: both start blank on every new trade.
   $('#staffName').value = trade.staff || '';
@@ -1917,9 +1938,13 @@ function openComplete() {
   $(!trade.staff ? '#staffName' : !trade.customer ? '#completeCustomer' : '#completeSave').focus();
 }
 
+// The dialog's split part staff typed last ('cash' or 'credit'); the other box is worked out from it.
+let dialogSplitBy = 'cash';
+
 function updateDialogSplit() {
-  const s = splitPayout(tradeTotals(), parseMoney($('#paySplitCash').value) ?? 0);
-  $('#paySplitCredit').textContent = money(s ? s.credit : null);
+  const other = dialogSplitBy === 'cash' ? 'credit' : 'cash';
+  const s = splitPayout(tradeTotals(), parseMoney($(PAY_SPLIT_INPUTS[dialogSplitBy]).value) ?? 0, dialogSplitBy);
+  $(PAY_SPLIT_INPUTS[other]).value = plain(s ? s[other] : null);
 }
 
 async function saveCompleted(print) {
@@ -1935,8 +1960,8 @@ async function saveCompleted(print) {
   if (type === 'cash') payout = { type, cash: t.cash, credit: 0 };
   else if (type === 'credit') payout = { type, cash: 0, credit: t.credit };
   else {
-    const s = splitPayout(t, parseMoney($('#paySplitCash').value));
-    if (!s) { error.textContent = 'Enter how much of it is cash.'; return; }
+    const s = splitPayout(t, parseMoney($(PAY_SPLIT_INPUTS[dialogSplitBy]).value), dialogSplitBy);
+    if (!s) { error.textContent = 'Enter how much of it is cash or store credit.'; return; }
     payout = { type: 'split', ...s };
   }
   $$('#serialFields [data-serial]').forEach((input) => {
@@ -2965,29 +2990,35 @@ function wireEvents() {
 
   // Split payout (totals bar)
   $('#splitBtn').addEventListener('click', () => {
-    trade.split = { cash: null };
+    trade.split = { by: 'cash', amount: null };
     saveTrade();
     renderTotals();
     $('#splitCash').focus();
   });
-  $('#splitCash').addEventListener('input', (e) => {
-    const cents = parseMoney(e.target.value);
-    if (!Number.isNaN(cents)) trade.split.cash = cents;
-    saveTrade();
-    renderTotals();
-  });
-  $('#splitCash').addEventListener('change', (e) => {
-    const t = tradeTotals();
-    if (trade.split.cash > t.cash) {
-      trade.split.cash = t.cash;
-      toast(`Cash can't be more than the ${money(t.cash)} cash total.`);
-    }
-    if (trade.split.cash != null) trade.split.cash = roundTotal(trade.split.cash);
-    e.target.value = plain(trade.split.cash);
-    saveTrade();
-    renderTotals();
-  });
-  $('#splitCash').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.target.blur(); focusScan(); } });
+  // Type the cash or the store credit the customer wants; the other box fills in.
+  for (const [by, sel] of Object.entries(SPLIT_INPUTS)) {
+    $(sel).addEventListener('input', (e) => {
+      const cents = parseMoney(e.target.value);
+      if (!Number.isNaN(cents)) trade.split = { by, amount: cents };
+      saveTrade();
+      renderTotals();
+    });
+    $(sel).addEventListener('change', (e) => {
+      const t = tradeTotals();
+      if (trade.split.by === by && trade.split.amount != null) {
+        if (trade.split.amount > t[by]) {
+          trade.split.amount = t[by];
+          toast(by === 'cash' ? `Cash can't be more than the ${money(t.cash)} cash total.`
+            : `Store credit can't be more than the ${money(t.credit)} store credit total.`);
+        }
+        trade.split.amount = roundTotal(trade.split.amount);
+      }
+      e.target.value = splitShown(t, by);
+      saveTrade();
+      renderTotals();
+    });
+    $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.target.blur(); focusScan(); } });
+  }
   $('#splitClear').addEventListener('click', () => {
     trade.split = null;
     saveTrade();
@@ -3008,14 +3039,18 @@ function wireEvents() {
     saveTrade();
   });
   $('#completeDialog').addEventListener('close', focusScan);
-  $('#paySplitCash').addEventListener('input', () => {
-    $('#completeForm').elements.payout.value = 'split';
-    updateDialogSplit();
-  });
-  $('#paySplitCash').addEventListener('change', (e) => { // show the whole-dollar cash that will be paid
-    const s = splitPayout(tradeTotals(), parseMoney(e.target.value));
-    if (s) e.target.value = plain(s.cash);
-  });
+  for (const [by, sel] of Object.entries(PAY_SPLIT_INPUTS)) {
+    $(sel).addEventListener('input', () => {
+      dialogSplitBy = by;
+      $('#completeForm').elements.payout.value = 'split';
+      updateDialogSplit();
+    });
+    $(sel).addEventListener('change', (e) => { // show the whole-dollar amount that will be paid
+      if (dialogSplitBy !== by) return;
+      const s = splitPayout(tradeTotals(), parseMoney(e.target.value), by);
+      if (s) e.target.value = plain(s[by]);
+    });
+  }
 
   // Trade log
   $('#logSearchBtn').addEventListener('click', loadLog);
