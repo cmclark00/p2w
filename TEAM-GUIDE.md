@@ -634,6 +634,14 @@ Everyone in the store shares one internet address, so typos add up.
    or credit, in any condition. The calculator does this automatically.
    A manager can add more items (or change the $5) under Settings →
    Flat-price items.
+   **Guitar Hero, Rock Band, DJ Hero and other instrument games:** the
+   search shows **Disc only** or **With instruments** next to each
+   result. Pick the bundle (for example "[Band Kit]" or "[Guitar Bundle]")
+   when the customer brings the game *with* its box and instruments. For a
+   loose game with loose instruments, add the **disc** and each
+   **instrument** (search "rock band drum kit", "guitar hero guitar", etc.)
+   as their own items, because PriceCharting's loose price for a bundle is
+   often just the disc. The line's note reminds you.
    **Something the calculator can't find?** Click **+ Custom item**,
    describe it, pick its type, and type the cash offer in the **Cash**
    column. Store credit fills in from the type.
@@ -727,6 +735,12 @@ Guide (the Google Sheet tab).
      set these under Settings → Floor price premiums.
    - **Consoles and controllers** can be priced here too. They go by
      their sales without the game rules (a badge says so).
+   - **Instrument games** (Guitar Hero, Rock Band, DJ Hero…): pick the
+     **Disc only** or **With instruments** product. Disc prices ignore
+     sales that came with instruments, and bundle prices ignore disc-only
+     sales. A **loose** bundle (no box) gets no automatic price, because
+     PriceCharting's loose sales for bundles are mostly just the disc:
+     click a sale that clearly has the instruments, or type a price.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
 4. Only look closer when it says **Double-check** (very few sales, no

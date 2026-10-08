@@ -630,6 +630,27 @@ The site's **only server-side code**. Everything else is static.
     (no $5 shitbox floor, no Manual missing box), with a badge saying so.
   - **Duplicates:** adding a game already on the list in the same
     condition (and manual state) asks first.
+  - **Rhythm games with instruments** (`rhythmKind()`; Guitar Hero, Rock
+    Band, DJ Hero, Band Hero, Rocksmith, Power Gig, Donkey Konga, Taiko,
+    DDR…): PriceCharting lists the disc and each instrument bundle as
+    separate products ("Guitar Hero World Tour" vs "… [Band Kit]"), and
+    `rhythmKind(name)` returns `'disc'`, `'bundle'` (bracketed
+    `[…Bundle/Kit/Band/Guitar/Drum/Turntable/Cable/Grip…]`, Rock Band's
+    `[Special Edition]`, or unbracketed "Bundle"/"Superbundle"/"w/
+    Bongos"), or `null` (an instrument/accessory alone, or a console
+    bundle). Checked against ~340 real PriceCharting names, Oct 2026. Search
+    results in both tabs show a **Disc only** / **With instruments** tag
+    (`rhythmTag()`). **Floor sales:** for a disc, sales that came with
+    instruments are odd (`WITH_INSTRUMENTS_RE`); for a bundle, disc-only
+    sales are odd (`NO_INSTRUMENTS_RE`), but "bundle"/"with controllers"
+    in a title is normal (`ODD_SALE_FOR_BUNDLES_RE`; the plain filter
+    used to throw out nearly every real bundle sale). **PriceCharting's
+    Loose price for a bundle is unreliable**: it often holds disc-only
+    sales (World Tour [Band Kit], PS3, Oct 2026: loose $5.45, CIB
+    $361.35; 27 of 30 loose sales were "game only" and the other 3 sold
+    for $7 / $0.99 / $0.07). So a **loose bundle gets no automatic floor
+    price** (`floorBasis()` asks staff to click a sale with the
+    instruments or type one), and the trade-in line shows a warning.
   - **Saved sessions** (`GET/PUT/DELETE api.php?route=floor-sessions`):
     named lists stored in `p2w-trade-in-data/floor-sessions.json` (one
     file, flock'd; the oldest drop off past `MAX_FLOOR_SESSIONS` = 300).
@@ -909,6 +930,17 @@ The site's **only server-side code**. Everything else is static.
   - **Hardware matches keep agreed prices:** when `applyHardwareMatches()`
     turns a PriceCharting line into a guide line, it carries over
     `cashOverride` and `creditBonus`.
+  - **Rhythm games in trade-ins** (see `rhythmKind()` under Floor
+    Pricing): `guessCategory()` types bundles and discs as games and an
+    instrument alone ("DJ Hero Turntable", "Rock Band Drum Kit") as an
+    accessory (it used to be a game, so "DJ Hero Turntable" hit the
+    DJ Hero shitbox rule at $0.10). Bundles are never shitbox games
+    (`autoShitboxReason()`), and a **loose bundle isn't "disc only"** in
+    `guideCheck()` (it used to get the $0.50/$0.10 disc tiers off the
+    disc-only loose price). Line badges: disc → "add instruments as
+    their own items, or pick the bundle"; loose bundle → PriceCharting's
+    loose price is often just the disc; CIB/New bundle → check every
+    instrument.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

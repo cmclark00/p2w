@@ -405,6 +405,9 @@ function slimProduct(p) {
 function guessCategory(name) {
   const n = name.toLowerCase();
   if (flatItemMatch(name)) return 'accessory';
+  // Rhythm games first: "Rocksmith [With Cable]" and "Taiko … [Controller Bundle]" are games with their
+  // instrument; "Rock Band Drum Kit" and "DJ Hero Turntable" are instruments.
+  if (RHYTHM_RE.test(name) && !RHYTHM_CONSOLE_RE.test(name)) return rhythmKind(name) ? 'game' : 'accessory';
   if (/\b(controller|joy-?cons?|remote|nunchuk|memory card|adapter|cable|charger|headset|dock)\b/.test(n)) return 'accessory';
   if (/\b(console|system)\b/.test(n)) {
     return /game ?boy|\bds\b|\b[23]ds\b|\bdsi\b|psp|vita|game gear|switch lite/.test(n) ? 'handheld' : 'console';
@@ -412,10 +415,55 @@ function guessCategory(name) {
   return /pok[eé]mon/.test(n) ? 'pokemon' : 'game';
 }
 
+// Rhythm games played with an instrument (guitar, drums, turntable, bongos, maracas, dance mat). PriceCharting
+// lists the disc and each instrument bundle as separate products ("Guitar Hero World Tour" vs "Guitar Hero
+// World Tour [Band Kit]"), so the tool labels which is which. Its Loose price for a bundle is unreliable: it
+// often holds disc-only sales (World Tour [Band Kit], Oct 2026: loose $5.45, CIB $361).
+// (Longer titles first, so "Taiko Drum Master" is a title, not a drum.)
+const RHYTHM_RE = /\b(guitar hero|rock band|band hero|dj hero|rock revolution|power gig|rocksmith|donkey konga|samba de amigo|taiko drum master|taiko no tatsujin|taiko|drum 'n' fun|drum session|drum ?mania|guitar ?freaks|beatmania|dance dance revolution)\b/i;
+const RHYTHM_ALL_RE = new RegExp(RHYTHM_RE.source, 'gi');
+// The bracketed edition of an instrument bundle: [Bundle], [Guitar Bundle], [Guitar Kit], [Band Kit],
+// [Superbundle], [Complete Band Pack], [Dual Guitar], [With Guitar Grip], Rocksmith [With Cable], Rock Band's
+// [Special Edition]… ("[Fan Pack]" and "[Not For Resale]" aren't.)
+const INSTRUMENT_BUNDLE_RE = /\[[^\]]*\b(bundles?|superbundle|kit|band|guitars?|drums?|turntable|controller|mat|pad|bongos?|maracas|instruments?|cable|grip|special edition)\b[^\]]*\]/i;
+// Unbracketed bundles: "Rock Band 2 Bundle", "Band Hero Superbundle", "Donkey Konga w/ Bongos", "DDR Ultramix w/ Pad".
+const INSTRUMENT_WITH_RE = /\b(super ?)?bundles?\b|\b(w\/|with)\s+(\w+\s+)?(bongos?|guitars?|drums?|turntables?|cable|pad|mat|grip|controllers?)\b/i;
+// "(Game Only)", "[Game Only]", "[No Cable]": the disc, even when the base product is a bundle.
+const RHYTHM_DISC_ONLY_RE = /\b(game|disc|disk|software) only\b|\[no [^\]]*\]/i;
+// "[Guitar Only]": the instrument without the game.
+const INSTRUMENT_ONLY_RE = /\b(guitars?|drums?|controllers?|turntables?) only\b/i;
+// Words that make a rhythm-game product an instrument or accessory on its own ("Rock Band Drum Kit", "DJ Hero
+// Turntable", "Rock Band 4 Pro Cymbals", "Rocksmith Real Tone Cable", "Guitar Hero Live Dongle").
+const INSTRUMENT_WORD_RE = /\b(controllers?|guitars?|bass|drums?|drum (kit|set)|cymbals?|turntables?|keyboard|keytar|microphones?|bongos?|maracas|dance (pad|mat)s?|cable|adapter|dongle|memory card|stage kit|ottoman|pedals?|grip|stratocaster|telecaster|les paul|jaguar|mustang)\b/i;
+// A console or handheld bundled with a rhythm game ("Nintendo DS Lite [Guitar Hero Limited Edition Pack]").
+const RHYTHM_CONSOLE_RE = /\b(console|system)\b|^(nintendo )?(ds ?lite|dsi|[23]ds)\b|^psp\b|^ps ?vita\b/i;
+
+// 'bundle' (the game with its instruments), 'disc' (the game alone), or null (not an instrument rhythm game,
+// an instrument or accessory sold by itself, or a console bundle). Checked against ~340 real PriceCharting
+// names (Oct 2026).
+function rhythmKind(name) {
+  const n = String(name || '');
+  if (!RHYTHM_RE.test(n) || RHYTHM_CONSOLE_RE.test(n) || INSTRUMENT_ONLY_RE.test(n)) return null;
+  if (RHYTHM_DISC_ONLY_RE.test(n)) return 'disc';
+  if (INSTRUMENT_BUNDLE_RE.test(n) || INSTRUMENT_WITH_RE.test(n)) return 'bundle';
+  if (INSTRUMENT_WORD_RE.test(n.replace(RHYTHM_ALL_RE, ' ').replace(/\[[^\]]*\]/g, ' '))) return null;
+  return 'disc';
+}
+
+// A small label for search results and the pricer: which kind of rhythm-game product this is.
+function rhythmTag(name) {
+  const kind = rhythmKind(name);
+  if (kind === 'disc') return ' <span class="badge info">Disc only</span>';
+  if (kind === 'bundle') return ' <span class="badge guide">With instruments</span>';
+  return '';
+}
+
 /* ================================================================== buying guide */
 
 // Why a game counts as a low-value ("shitbox") game per the guide, or null.
 function autoShitboxReason(line, g = settings.guide) {
+  // A rhythm game bundled with its instruments isn't a cheap "needs an accessory" disc: it comes with it.
+  if (rhythmKind(line.name) === 'bundle') return null;
   const text = norm(line.name);
   if (g.lowValueTitles.some((t) => hasPhrase(text, t))) return 'guide-list game';
   const acc = g.accessoryKeywords.find((k) => hasPhrase(text, k));
@@ -482,7 +530,8 @@ function guideCheck(line, s) {
   const reason = shitboxReason(line, g);
   const loose = line.prices?.['loose-price'];
   const condMarket = line.prices?.[PC_FIELDS.market[line.condition]];
-  const discOnly = line.condition === 'loose' && DISC_PLATFORM_RE.test(norm(line.platform));
+  // A loose rhythm-game bundle is the disc plus its instruments, not a disc-only game.
+  const discOnly = line.condition === 'loose' && DISC_PLATFORM_RE.test(norm(line.platform)) && rhythmKind(line.name) !== 'bundle';
 
   // The guide's "outliers" (outlier: true) are divided by 5 when the disc needs resurfacing.
   if (discOnly) {
@@ -1041,6 +1090,10 @@ function updateRow(tr, line) {
   else if (p.guide?.info) flags.push(`<span class="badge info">${esc(p.guide.note)}</span>`);
   if (!p.flat && !p.dontBuy && p.cash != null && p.cash < settings.lowValue) flags.push('<span class="badge low">Low value</span>');
   if (line.category === 'pokemon') flags.push('<span class="badge info">Check authenticity – fakes exist</span>');
+  const rhythm = line.source === 'pc' ? rhythmKind(line.name) : null;
+  if (rhythm === 'disc') flags.push('<span class="badge info">Disc only. Instruments with it? Add them as their own items, or pick the bundle</span>');
+  if (rhythm === 'bundle' && line.condition === 'loose') flags.push('<span class="badge warn">Loose bundle: PriceCharting\'s loose price is often just the disc. Check it, or add the disc and each instrument separately</span>');
+  else if (rhythm === 'bundle') flags.push('<span class="badge info">Bundle with instruments: check every instrument is there and works</span>');
   if (isGameCat(line.category) && p.base >= 10000) flags.push('<span class="badge info">Over $100: anything missing or damaged? Ask Keith or Mark</span>');
   // Front End Processes: expensive, slow-selling, or rare items get checked against eBay sold listings.
   if (line.salesVolume != null && line.salesVolume < settings.slowSalesPerYear && p.base >= SLOW_SELLER_MIN_VALUE && !p.flat && !p.dontBuy) {
@@ -1396,7 +1449,7 @@ function renderResults() {
     html += `<div class="results-group">PriceCharting <span>${search.alt ? `including results for “${esc(search.alt)}” · ` : ''}click a condition to ${attach ? 'use' : 'add'}</span></div>`;
     if (!search.pc.length) html += `<div class="results-note">No matches. Try fewer words${attach ? '' : ', or add it as a custom item'}.</div>`;
     for (const p of search.pc) {
-      const sub = `<div class="r-main"><div class="r-name">${esc(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}`;
+      const sub = `<div class="r-main"><div class="r-name">${esc(p['product-name'])}${rhythmTag(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}`;
       if (attach) {
         const i = search.items.push({ kind: 'pc', product: p }) - 1;
         html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${pcCondBtns(p, attach.category, attach.unit)}</div></div>`;
@@ -2692,9 +2745,18 @@ const BUNDLE_HW = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?
 // A specific handheld model first, then "with"/"w/" ("Nintendo DS Lite w/ Pokemon Diamond"); not plain platform
 // names, which normal listings start with ("Nintendo Game Boy Advance Pokemon Emerald CIB w/ poster").
 const BUNDLE_MODEL = String.raw`(?:nintendo |new )?(?:ds ?lite|dsi(?: xl)?|[23]ds(?: xl)?|(?:game ?boy advance|gba) sp|psp|ps ?vita)`;
-const BUNDLE_RE = new RegExp(String.raw`\b(charger|charging cable|power (cord|supply)|ac adapter)\b|\b(with|w\/) ?(the |a )?(console|system|handheld)\b|^${BUNDLE_HW}\b[^+]*\+|\+ ?${BUNDLE_HW}\b|^${BUNDLE_MODEL}\b.*?(\bwith\b|\bw\/)`
+const CONSOLE_BUNDLE_SRC = String.raw`\b(charger|charging cable|power (cord|supply)|ac adapter)\b|\b(with|w\/) ?(the |a )?(console|system|handheld)\b|^${BUNDLE_HW}\b[^+]*\+|\+ ?${BUNDLE_HW}\b|^${BUNDLE_MODEL}\b.*?(\bwith\b|\bw\/)`;
+const BUNDLE_RE = new RegExp(CONSOLE_BUNDLE_SRC
   // "GameCube Console Tested With Controller And Cords", "Console With Cables", "+ controller"
   + String.raw`|\bconsole\b.*\b(controllers?|cables?|cords?)\b|\b(with|w\/|\+) ?(a |the )?(controllers?|cables|cords)\b`, 'i');
+// Rhythm games (see rhythmKind). A disc-only product's sales that came with instruments aren't a disc...
+const WITH_INSTRUMENTS_RE = /(?:\bwith|\bw\/|\+|&|\band|\bplus|\bincl(?:udes?|uding)?)\s*(?:the\s+|a\s+|an\s+|\d\s+|two\s+|both\s+)?(?:wireless\s+|wired\s+|original\s+)?(?:guitars?|drums?|drum (?:kit|set)|turntables?|instruments?|bongos?|maracas|dance (?:pad|mat)s?|(?:guitar|drum) controllers?)\b|\b(?:band kit|guitar kit|guitar bundle|drum kit|complete band|full band|band in a box)\b/i;
+// ...and a bundle's sales that are just the disc aren't the bundle. PriceCharting files plenty of those under a
+// bundle's Loose price (World Tour [Band Kit]: 30 of 30 loose sales were "(game only)").
+const NO_INSTRUMENTS_RE = /\b(game only|disc only|disk only|software only|no (guitars?|drums?|instruments?|controllers?|turntable|mic))\b/i;
+// For bundles, "bundle" in a title is normal, and so is "with controllers"; only console bundles stay odd.
+const ODD_SALE_FOR_BUNDLES_RE = new RegExp(ODD_SALE_RE.source.replace('bundle|bundled|', ''), 'i');
+const CONSOLE_BUNDLE_RE = new RegExp(CONSOLE_BUNDLE_SRC, 'i');
 
 function floorTier(platform) {
   const p = norm(platform).replace(/^(pal|jp) /, '');
@@ -2729,9 +2791,16 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null }
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
 const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
-const floorOdd = (sale, condition) => ODD_SALE_RE.test(sale.title) || BUNDLE_RE.test(sale.title)
-  || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(sale.title) : NOT_COMPLETE_RE.test(sale.title))
-  || (condition !== 'new' && SEALED_RE.test(sale.title));
+// rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
+function floorOdd(sale, condition, rhythm = null) {
+  const t = sale.title;
+  if (rhythm === 'bundle') {
+    return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && SEALED_RE.test(t));
+  }
+  return ODD_SALE_RE.test(t) || BUNDLE_RE.test(t) || (rhythm === 'disc' && WITH_INSTRUMENTS_RE.test(t))
+    || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(t) : NOT_COMPLETE_RE.test(t))
+    || (condition !== 'new' && SEALED_RE.test(t));
+}
 
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
@@ -2810,7 +2879,7 @@ function renderFloorResults() {
     html = '<div class="results-group">PriceCharting <span>click a game to price it</span></div>';
     if (!floorSearch.results.length) html += '<div class="results-note">No matches. Try fewer words.</div>';
     floorSearch.results.forEach((p, i) => {
-      html += `<div class="result" data-i="${i}"><div class="r-main"><div class="r-name">${esc(p['product-name'])}</div>
+      html += `<div class="result" data-i="${i}"><div class="r-main"><div class="r-name">${esc(p['product-name'])}${rhythmTag(p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])}</div></div>
         <div class="r-offer muted">CIB ${money(Number(p['cib-price']) || null)}</div></div>`;
     });
@@ -2898,7 +2967,8 @@ async function loadFloorSales(product) {
 
 // The condition's sales, highest first, each with its index into that list.
 function floorSales(cur = floorCur) {
-  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition) }))
+  const rhythm = rhythmKind(cur.product?.['product-name']);
+  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition, rhythm) }))
     .sort((a, b) => b.price - a.price);
 }
 
@@ -2934,6 +3004,13 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
+  // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting files mostly disc-only
+  // copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
+  // [Band Kit], Oct 2026: 27 of 30 were "game only"; the other 3 sold for $7, $0.99 and $0.07). No automatic
+  // price, then: staff click a sale that has the instruments, or type one.
+  if (cur.pick == null && cur.condition === 'loose' && rhythmKind(cur.product['product-name']) === 'bundle') {
+    return { basis: null, sale: null, checks: [], need: 'Loose bundle: PriceCharting\'s loose sales for instrument bundles are mostly the disc alone, so there\'s no automatic price. Click a sale that includes the instruments, or type a price (the eBay sold link shows real ones).' };
+  }
   const amz = amzInfo && amzInfo.lowest > 0 ? amzInfo.lowest : null;
   // Older systems compare with Amazon's typical offer: the (lower) middle of the offers, which come lowest first.
   const amzOffers = (amzInfo?.offers || []).filter((o) => o.price > 0);
@@ -2983,6 +3060,7 @@ function renderFloorPricer() {
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
   const { b, r: result, shitbox, premium, hw } = floorResult(cur);
+  const rhythm = rhythmKind(p['product-name']);
   const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
   const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
@@ -3012,6 +3090,8 @@ function renderFloorPricer() {
         <div class="floor-rule">${esc(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
+        ${rhythm === 'disc' ? '<span class="badge info">Disc only: sales that came with instruments don\'t count</span>' : ''}
+        ${rhythm === 'bundle' ? `<span class="badge guide">With instruments: disc-only sales don't count${cur.condition === 'loose' ? '. PriceCharting files many disc-only sales under a bundle\'s Loose price, so check what\'s left' : ''}</span>` : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
