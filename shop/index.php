@@ -10,6 +10,7 @@
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/kiosk.php';
+require __DIR__ . '/checkout.php';
 
 // While the owners review it: kept out of search engines and the site nav.
 const SHOP_PREVIEW = true;
@@ -22,8 +23,16 @@ header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
 if (SHOP_PREVIEW) header('X-Robots-Tag: noindex, nofollow');
 
+// While SHOP_PASSWORD is set, the shop asks for it first (kiosks and their /shop/kiosk/... links skip it).
+if (($parts[0] ?? '') !== 'kiosk' && web_gate_on() && !kiosk_active()) {
+  if (($parts[0] ?? '') === 'login') web_gate_page();
+  if (!web_gate_passed()) kiosk_redirect('/shop/login?next=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? '/shop')));
+}
+
 if (($parts[0] ?? '') === 'kiosk') {
   kiosk_route(array_slice($parts, 1));
+} elseif (in_array($parts[0] ?? '', ['cart', 'checkout', 'order'], true) && !kiosk_active()) {
+  web_route($parts);   // online cart + PayPal checkout (checkout.php)
 } elseif (!$idx) {
   shop_page('Shop', 'Play2Win Games inventory.', shop_unavailable(), ['crumbs' => []]);
 } elseif (!$parts) {
@@ -70,7 +79,9 @@ function shop_home(array $idx): void {
       <h1>Shop Play2Win’s in-stock inventory.</h1>
       <p class="lead">' . (kiosk_active()
         ? 'Find your cards, add them to your cart, and place your order. Then pay at the register and we’ll hand them over.'
-        : 'Singles, sealed product, and more, straight from our shelves. Checkout happens on our secure online store, with shipping or in-store pickup.') . '</p>
+        : (web_checkout_on()
+          ? 'Singles, sealed product, and more, straight from our shelves. Order and pay online, then pick it up at the store for free.'
+          : 'Singles, sealed product, and more, straight from our shelves. Checkout happens on our secure online store, with shipping or in-store pickup.')) . '</p>
       ' . shop_search_form('') . '
     </section>
     <section class="shop-section">
@@ -114,11 +125,13 @@ function shop_results(array $idx, array $q, string $basePath): void {
 
 function shop_product(array $idx, array $p): void {
   $kiosk = kiosk_active();
+  $web = !$kiosk && web_checkout_on(); // online cart + checkout (checkout.php)
   $rows = '';
   foreach ($p['l'] as $l) {
     $stock = $l['q'] === 1 ? 'Last one' : $l['q'] . ' in stock';
     $rows .= '<tr><td><strong>' . h($l['c']) . '</strong>' . ($l['v'] !== '' ? '<div class="muted">' . h($l['v']) . '</div>' : '') . '</td>
-      <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td>' . ($kiosk ? '<td>' . kiosk_add_form($l) . '</td>' : '') . '</tr>';
+      <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td>'
+      . ($kiosk ? '<td>' . kiosk_add_form($l) . '</td>' : ($web ? '<td>' . web_add_form($l) . '</td>' : '')) . '</tr>';
   }
   $more = array_values(array_filter($idx['products'], function ($o) use ($p) {
     return $o['id'] !== $p['id'] && $p['setSlug'] !== '' && $o['setSlug'] === $p['setSlug'];
@@ -135,13 +148,15 @@ function shop_product(array $idx, array $p): void {
         <h1>' . h($p['name']) . '</h1>
         ' . ($meta ? '<p class="shop-product-meta">' . h(implode(' · ', $meta)) . '</p>' : '') . '
         <table class="shop-variants">
-          <thead><tr><th>Condition</th><th>Available</th><th>Price</th>' . ($kiosk ? '<th><span class="sr-only">Add to cart</span></th>' : '') . '</tr></thead>
+          <thead><tr><th>Condition</th><th>Available</th><th>Price</th>' . ($kiosk || $web ? '<th><span class="sr-only">Add to cart</span></th>' : '') . '</tr></thead>
           <tbody>' . $rows . '</tbody>
         </table>
         ' . ($kiosk
           ? '<p class="shop-note muted">Add it to your cart, place your order, and pay at the register to pick it up.</p>'
-          : '<p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
-        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>') . '
+          : ($web
+            ? '<p class="shop-note muted">Add it to your cart, pay online, and pick it up at the store for free. Stock and prices are checked again before you pay.</p>'
+            : '<p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
+        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>')) . '
         ' . ($p['desc'] !== '' ? '<div class="shop-desc">' . nl2br(h(strip_tags($p['desc']))) . '</div>' : '') . '
       </div>
     </section>' . ($more ? '<section class="shop-section">
@@ -364,6 +379,12 @@ function shop_page(string $title, string $description, string $body, array $opt)
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         <span class="header-phone-number">865-910-8357</span>
       </a>
+      <?php if (web_checkout_on()): ?>
+      <a class="web-cart-btn" href="/shop/cart" aria-label="Cart, <?= web_cart_count() ?> items">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span class="kiosk-cart-count"><?= web_cart_count() ?></span>
+      </a>
+      <?php endif; ?>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>

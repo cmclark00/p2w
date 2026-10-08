@@ -1202,10 +1202,68 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
       under it. First live pass (Oct 3 2026): 3,957 of 4,346 matched
       (322 via the only-variant fallback), 389 unmatched → "Ask at the
       register".
+- **Online checkout — `shop/checkout.php` (built Oct 2026, testing).**
+  A cart for everyone (not just kiosks), **free in-store pickup only**,
+  paid online with **PayPal**, a **CrystalCommerce Preorder** under the
+  owner's test customer, and an email to the shopper. All switches live
+  in the private `.env` (see `.env.example`), so nothing changes on the
+  live site until they're set:
+  - **Password gate** (`SHOP_PASSWORD`): every `/shop` page redirects to
+    `/shop/login` first; signed `p2w_shopgate` cookie (30 days, tied to
+    the password, so changing it signs everyone out). Kiosks and
+    `/shop/kiosk/...` skip it. `sync.php` / `admin-check.php` aren't
+    routed through `index.php`, so they're unaffected.
+  - **On when PayPal keys exist** for `PAYPAL_MODE` (`sandbox` default /
+    `live`): `PAYPAL_{SANDBOX,LIVE}_{CLIENT_ID,SECRET}`. Off = the old
+    "Buy on our online store" hand-off. Product pages then get **Add to
+    cart** (`web_add_form()`; "In store only" without a variant id), the
+    header a cart button, and routes `/shop/cart`, `/shop/checkout`,
+    `/shop/checkout/create|capture` (JSON, from `shop.js`), and
+    `/shop/order/<num>?k=<hmac>` (confirmation; the HMAC keeps strangers
+    out). Cart = signed `p2w_cart` cookie, same shape/limits as the
+    kiosk's. Cookies/links are signed with `shop-secret.key`, made on
+    first use in the private folder.
+  - **Flow:** PayPal JS SDK buttons. `onClick` requires name + email.
+    **create** re-checks every line live (`web_check_cart()`, same as the
+    kiosk: stock + price per variant, cart updated, problems returned)
+    and opens a PayPal Orders v2 order (`intent CAPTURE`, item + tax
+    breakdown, `NO_SHIPPING`, `PayPal-Request-Id` per step). **capture**
+    re-checks again and only captures when items/qty/prices are
+    identical; requires `COMPLETED` and the exact amount (anything else
+    that moved money is refunded). Then, with **`SHOP_ORDERS=live`**,
+    `web_cc_order()` creates the CrystalCommerce order in the kiosk's
+    proven shape but **paid**: status **Preorder** (holds the cards),
+    `employee_name` "WEBSITE - PAID ONLINE", tax filled in, payment
+    Received for the total with the PayPal capture id, In Store method 1,
+    customer **`SHOP_CC_CUSTOMER_ID` (default 202607, the owner's test
+    account)**, store address with the shopper's name, comments with
+    their email/phone; read back to confirm it saved as Preorder. **If
+    CrystalCommerce refuses after payment, the capture is refunded at
+    once** (and `SHOP_ORDER_BCC` gets a problem email). `SHOP_ORDERS=test`
+    (default) stops before CrystalCommerce (order numbers `W1001…`,
+    marked TEST). Our record of every checkout is `shop-orders.json`
+    (flock'd; status pending/paid/abandoned/refunded).
+  - **Tax** `SHOP_TAX_RATE` (9.25% default) on everything (all pickup).
+  - **Email** to the shopper (`web_mail_confirmation()`), optional copy
+    to `SHOP_ORDER_BCC`: SMTP when `SHOP_SMTP_HOST` is set (465 SSL, else
+    STARTTLS; minimal client `web_smtp()`), else PHP `mail()`.
+  - **Testing:** `P2W_PAYPAL_API_BASE` (a real environment variable,
+    never the `.env`) points PayPal calls at a fake. It was tested end to
+    end on PHP 8.3's built-in server with a fake PayPal + CrystalCommerce
+    (23 checks: gate, cart, totals, create/capture, Preorder payload,
+    refund on CC failure, price change / sold out / decline, no double
+    charge, link key). A portable PHP lives in the session scratchpad
+    only; see [[local-php-testing]]. Real PayPal (the JS SDK popup)
+    needs sandbox keys.
+  - **Rollout:** sandbox + `SHOP_ORDERS=test` → sandbox + `live` on 15¢
+    cards (cancel after) → `PAYPAL_MODE=live` with one real purchase,
+    refunded → remove `SHOP_PASSWORD`. Shipping and the policy pages
+    (refunds, shipping, privacy update) come later.
 - **Secrets:** `.env.example` lists the settings; real values go in
   `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
   git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,
-  `KIOSK_KEY`, `KIOSK_STAFF_KEY`, `KIOSK_MODE`.
+  `KIOSK_KEY`, `KIOSK_STAFF_KEY`, `KIOSK_MODE`, and the checkout's
+  `SHOP_PASSWORD`, `PAYPAL_*`, `SHOP_ORDERS`, `SHOP_SMTP_*`.
 - **Go-live checklist:** set `SHOP_PREVIEW = false`; point the nav's
   "TCG Inventory" button (`nav-cta`, every page) and the other
   CrystalCommerce links at `/shop`; add `/shop` to `sitemap.xml`; update

@@ -69,6 +69,63 @@
     arm();
   }
 
+  // Online checkout (checkout.php): PayPal's buttons. The server re-checks stock and price when PayPal opens
+  // (create) and again before taking the money (capture), and answers { problems } when something changed.
+  var pp = document.getElementById('paypal-buttons');
+  if (pp && pp.dataset.client) {
+    var form = document.querySelector('[data-checkout-form]');
+    var box = document.querySelector('[data-checkout-problems]');
+    var show = function (problems, reload) {
+      box.innerHTML = '<strong>Please check your order:</strong><ul>' + problems.map(function (p) {
+        var li = document.createElement('li'); li.textContent = p; return li.outerHTML;
+      }).join('') + '</ul>' + (reload ? '<p><a class="button primary" href="/shop/checkout">Review the updated order</a></p>' : '');
+      box.hidden = false;
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    var details = function () {
+      return { name: form.name.value, email: form.email.value, phone: form.phone.value };
+    };
+    var post = function (url, body) {
+      return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); });
+    };
+    var s = document.createElement('script');
+    s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(pp.dataset.client) + '&currency=USD&intent=capture';
+    s.onerror = function () { pp.innerHTML = '<p class="kiosk-problems">PayPal didn’t load. Check your connection and refresh the page.</p>'; };
+    s.onload = function () {
+      pp.innerHTML = '';
+      window.paypal.Buttons({
+        style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+        // Name and email are needed before PayPal opens (the receipt goes to that email).
+        onClick: function (data, actions) {
+          box.hidden = true;
+          if (!form.reportValidity()) return actions.reject();
+          return actions.resolve();
+        },
+        createOrder: function () {
+          return post('/shop/checkout/create', details()).then(function (d) {
+            if (d.problems) { show(d.problems, d.reload); throw new Error('checkout-problems'); }
+            return d.id;
+          });
+        },
+        onApprove: function (data, actions) {
+          pp.classList.add('is-busy');
+          return post('/shop/checkout/capture', { id: data.orderID }).then(function (d) {
+            if (d.redirect) { location.href = d.redirect; return; }
+            pp.classList.remove('is-busy');
+            if (d.retry && actions.restart) return actions.restart(); // declined: let them pick another way to pay
+            show(d.problems || ['Something went wrong. You weren’t charged; please try again.'], d.reload);
+          });
+        },
+        onError: function (err) {
+          if (err && String(err.message || err).indexOf('checkout-problems') !== -1) return;
+          show(['PayPal ran into a problem. You weren’t charged; please try again.']);
+        }
+      }).render('#paypal-buttons');
+    };
+    document.head.appendChild(s);
+  }
+
   // Empty boxes stay out of the URL (?min=&max=).
   document.querySelectorAll('.shop-filters form, .shop-search').forEach(function (form) {
     form.addEventListener('submit', function () {

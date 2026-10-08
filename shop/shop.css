@@ -1012,3 +1012,77 @@ body.kiosk > main {
     text-align: left;
   }
 }
+
+/* ================================================================== online checkout (checkout.php) */
+
+/* Cart button in the site header, next to the phone pill. */
+.web-cart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--red);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.web-cart-btn:hover,
+.web-cart-btn:focus-visible {
+  background: #b5172c;
+}
+
+.web-cart-btn .kiosk-cart-count {
+  padding: 0 6px;
+  font-size: 0.85rem;
+}
+
+.web-test-banner {
+  font-weight: 700;
+}
+
+/* Password gate and the checkout details form share the same stacked-field look. */
+.web-gate-form,
+.web-details {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  margin: 16px 0;
+}
+
+.web-gate-form { margin-inline: auto; text-align: left; }
+
+.web-gate-form input,
+.web-details input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.18));
+  border-radius: 8px;
+  font: inherit;
+}
+
+.web-details label,
+.web-gate-form label {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.web-gate-form button { margin-top: 10px; }
+
+.web-subline {
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.web-paypal {
+  max-width: 420px;
+  margin: 12px 0;
+}
+
+.web-paypal.is-busy {
+  pointer-events: none;
+  opacity: 0.5;
+}
