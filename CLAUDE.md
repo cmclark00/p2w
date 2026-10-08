@@ -649,8 +649,24 @@ The site's **only server-side code**. Everything else is static.
     sales (World Tour [Band Kit], PS3, Oct 2026: loose $5.45, CIB
     $361.35; 27 of 30 loose sales were "game only" and the other 3 sold
     for $7 / $0.99 / $0.07). So a **loose bundle gets no automatic floor
-    price** (`floorBasis()` asks staff to click a sale with the
-    instruments or type one), and the trade-in line shows a warning.
+    price when its loose sales look like discs** (`looseBundleUnreliable()`:
+    under 3 left after filtering, or their median < ¼ of the CIB median;
+    `floorBasis()` then asks staff to click a sale with the instruments or
+    type one); bundles with real loose sales price normally (Guitar Hero
+    Live [Bundle], Wii U: $25–$59 game + guitar). The trade-in line warns.
+    **The disc side is contaminated too:** sellers list bundles under the
+    disc's product (Guitar Hero Live, Wii U, Oct 2026: loose $7.00, **CIB
+    $38.90**, New $59.95; half its CIB sales were $31–$100 bundles, many
+    titled just "Guitar Hero Live (Wii U, 2015)"). So for a disc:
+    `rhythmDiscSaleCap()` treats any sale above **3× the disc's loose
+    median** (5× for New) as odd, and ignores GameStop / Amazon prices
+    above that cap (`floorGsFor()`, `rhythmCap` in `floorBasis()`);
+    dongle / USB-receiver sales count as "with instruments". That took GH
+    Live Wii U from ~$50 CIB to $10 (owner: should be $5–$10). In
+    trade-ins, `rhythmDiscCap()` caps a disc's CIB value at **2× its loose
+    value** and New at **3×** (`RHYTHM_DISC_CAP`, same price basis), with a
+    "capped" badge; applied in `autoBase()` and the search buttons'
+    `basisPrice()`.
   - **Saved sessions** (`GET/PUT/DELETE api.php?route=floor-sessions`):
     named lists stored in `p2w-trade-in-data/floor-sessions.json` (one
     file, flock'd; the oldest drop off past `MAX_FLOOR_SESSIONS` = 300).

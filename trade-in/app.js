@@ -450,6 +450,18 @@ function rhythmKind(name) {
   return 'disc';
 }
 
+// Rhythm-game discs: PriceCharting's CIB / New prices for a disc often come from instrument bundles sold under
+// the disc's listing (Guitar Hero Live, Wii U, Oct 2026: loose $7.00, CIB $38.90, New $59.95; half its CIB
+// sales were "Guitar And Game" bundles). So in trade-ins a disc's CIB value is capped at 2× its loose value and
+// New at 3× (same price basis: retail buy or market). prices = PriceCharting fields (a product or line.prices).
+const RHYTHM_DISC_CAP = { cib: 2, new: 3 };
+function rhythmDiscCap(name, prices, basis, cond) {
+  const mult = RHYTHM_DISC_CAP[cond];
+  if (!mult || rhythmKind(name) !== 'disc') return null;
+  const loose = Number(prices?.[PC_FIELDS[basis || 'retail-buy'].loose]);
+  return loose > 0 ? Math.round(loose * mult) : null;
+}
+
 // A small label for search results and the pricer: which kind of rhythm-game product this is.
 function rhythmTag(name) {
   const kind = rhythmKind(name);
@@ -609,7 +621,9 @@ function autoBase(line, rule, s = settings) {
   if (line.source === 'hw' && isPcCondition(line.condition)) return boxedPrice(line.prices, lineHw(line).unit, line.category, line.condition, s);
   if (line.source === 'pc') {
     const v = line.prices?.[pcPriceKey(line, rule)];
-    return v > 0 ? v : null;
+    if (!(v > 0)) return null;
+    const cap = rhythmDiscCap(line.name, line.prices, rule.basis, line.condition);
+    return cap != null && v > cap ? cap : v;
   }
   if (line.source === 'hw') {
     const hw = lineHw(line);
@@ -1092,6 +1106,13 @@ function updateRow(tr, line) {
   if (line.category === 'pokemon') flags.push('<span class="badge info">Check authenticity – fakes exist</span>');
   const rhythm = line.source === 'pc' ? rhythmKind(line.name) : null;
   if (rhythm === 'disc') flags.push('<span class="badge info">Disc only. Instruments with it? Add them as their own items, or pick the bundle</span>');
+  if (rhythm === 'disc' && line.override == null) {
+    const rule = settings.rules[line.category] || settings.rules.other;
+    const cap = rhythmDiscCap(line.name, line.prices, rule.basis, line.condition);
+    if (cap != null && line.prices?.[pcPriceKey(line, rule)] > cap) {
+      flags.push(`<span class="badge guide">${GAME_CONDITIONS[line.condition]} value capped at ${RHYTHM_DISC_CAP[line.condition]}× loose (${money(cap)}): PriceCharting's ${GAME_CONDITIONS[line.condition]} price for this disc includes instrument bundles</span>`);
+    }
+  }
   if (rhythm === 'bundle' && line.condition === 'loose') flags.push('<span class="badge warn">Loose bundle: PriceCharting\'s loose price is often just the disc. Check it, or add the disc and each instrument separately</span>');
   else if (rhythm === 'bundle') flags.push('<span class="badge info">Bundle with instruments: check every instrument is there and works</span>');
   if (isGameCat(line.category) && p.base >= 10000) flags.push('<span class="badge info">Over $100: anything missing or damaged? Ask Keith or Mark</span>');
@@ -1408,8 +1429,10 @@ async function runPcSearch(q) {
 function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '')) {
   if (flatItemMatch(raw['product-name'])) return settings.flatItems.amount; // steering wheels etc.
   const rule = settings.rules[category] || settings.rules.game;
-  const v = raw[PC_FIELDS[rule.basis || 'retail-buy'][cond]];
-  return v > 0 ? Number(v) : null;
+  const v = Number(raw[PC_FIELDS[rule.basis || 'retail-buy'][cond]]);
+  if (!(v > 0)) return null;
+  const cap = rhythmDiscCap(raw['product-name'], raw, rule.basis, cond);
+  return cap != null && v > cap ? cap : v;
 }
 
 // Result buttons show the flat price for steering wheels etc., which pay the same in any condition.
@@ -2750,7 +2773,8 @@ const BUNDLE_RE = new RegExp(CONSOLE_BUNDLE_SRC
   // "GameCube Console Tested With Controller And Cords", "Console With Cables", "+ controller"
   + String.raw`|\bconsole\b.*\b(controllers?|cables?|cords?)\b|\b(with|w\/|\+) ?(a |the )?(controllers?|cables|cords)\b`, 'i');
 // Rhythm games (see rhythmKind). A disc-only product's sales that came with instruments aren't a disc...
-const WITH_INSTRUMENTS_RE = /(?:\bwith|\bw\/|\+|&|\band|\bplus|\bincl(?:udes?|uding)?)\s*(?:the\s+|a\s+|an\s+|\d\s+|two\s+|both\s+)?(?:wireless\s+|wired\s+|original\s+)?(?:guitars?|drums?|drum (?:kit|set)|turntables?|instruments?|bongos?|maracas|dance (?:pad|mat)s?|(?:guitar|drum) controllers?)\b|\b(?:band kit|guitar kit|guitar bundle|drum kit|complete band|full band|band in a box)\b/i;
+// (A dongle / USB receiver is the wireless guitar's: Guitar Hero Live "Game w/ USB Dongle" sold for 2× a disc.)
+const WITH_INSTRUMENTS_RE = /(?:\bwith|\bw\/|\+|&|\band|\bplus|\bincl(?:udes?|uding)?)\s*(?:the\s+|a\s+|an\s+|\d\s+|two\s+|both\s+)?(?:wireless\s+|wired\s+|original\s+)?(?:guitars?|drums?|drum (?:kit|set)|turntables?|instruments?|bongos?|maracas|dance (?:pad|mat)s?|(?:guitar|drum) controllers?)\b|\b(?:band kit|guitar kit|guitar bundle|drum kit|complete band|full band|band in a box|dongle|usb receiver)\b/i;
 // ...and a bundle's sales that are just the disc aren't the bundle. PriceCharting files plenty of those under a
 // bundle's Loose price (World Tour [Band Kit]: 30 of 30 loose sales were "(game only)").
 const NO_INSTRUMENTS_RE = /\b(game only|disc only|disk only|software only|no (guitars?|drums?|instruments?|controllers?|turntable|mic))\b/i;
@@ -2968,8 +2992,40 @@ async function loadFloorSales(product) {
 // The condition's sales, highest first, each with its index into that list.
 function floorSales(cur = floorCur) {
   const rhythm = rhythmKind(cur.product?.['product-name']);
-  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition, rhythm) }))
+  const cap = rhythmDiscSaleCap(cur);
+  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition, rhythm) || s.price > cap }))
     .sort((a, b) => b.price - a.price);
+}
+
+// Rhythm-game discs: a sale far above the disc's typical loose sale came with instruments, titled or not
+// (Guitar Hero Live, Wii U, Oct 2026: loose median $7.42; half its CIB sales were $31–$100 bundles, many titled
+// just "Guitar Hero Live (Wii U, 2015)"). Above RHYTHM_DISC_SALE_CAP × that median a sale doesn't count, and
+// neither does a GameStop price (floorGsFor). Infinity when it doesn't apply or there are under 3 loose sales.
+const RHYTHM_DISC_SALE_CAP = { loose: 3, cib: 3, new: 5 };
+function rhythmDiscSaleCap(cur) {
+  const rhythm = rhythmKind(cur.product?.['product-name']);
+  if (rhythm !== 'disc') return Infinity;
+  const loose = (cur.sales?.loose || []).filter((s) => !floorOdd(s, 'loose', rhythm)).map((s) => s.price).sort((a, b) => a - b);
+  if (loose.length < 3) return Infinity;
+  return loose[Math.floor((loose.length - 1) / 2)] * RHYTHM_DISC_SALE_CAP[cur.condition];
+}
+
+// A rhythm-game bundle's loose sales can't be trusted when, after the disc-only filter, fewer than 3 are left or
+// their median is under a quarter of the boxed (CIB) sales' median: they're discs nobody titled "game only".
+function looseBundleUnreliable(cur) {
+  const median = (cond) => {
+    const a = (cur.sales?.[cond] || []).filter((s) => !floorOdd(s, cond, 'bundle')).map((s) => s.price).sort((x, y) => x - y);
+    return a.length >= 3 ? a[Math.floor((a.length - 1) / 2)] : null;
+  };
+  const loose = median('loose');
+  const cib = median('cib');
+  return loose == null || (cib != null && loose < cib * 0.25);
+}
+
+// GameStop's pre-owned price as a floor, except for a rhythm-game disc whose GameStop price looks like a bundle's.
+function floorGsFor(cur) {
+  const gs = floorGs(cur.product);
+  return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
 
 // The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH; the highest when copies are scarce). sales are
@@ -2995,7 +3051,7 @@ function floorBasis(cur = floorCur) {
   const scarce = !tier.amazon && cur.pick == null && !!amzInfo && !(amzInfo.offers || []).length;
   const auto = floorAutoSale(sales, scarce);
   const sale = cur.pick != null ? sales.find((s) => s.i === cur.pick) : auto.sale;
-  const gs = floorGs(cur.product); // a minimum on every system; GameStop is never cheaper
+  const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
   const checks = [];
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
@@ -3004,18 +3060,21 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
-  // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting files mostly disc-only
-  // copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
-  // [Band Kit], Oct 2026: 27 of 30 were "game only"; the other 3 sold for $7, $0.99 and $0.07). No automatic
-  // price, then: staff click a sale that has the instruments, or type one.
-  if (cur.pick == null && cur.condition === 'loose' && rhythmKind(cur.product['product-name']) === 'bundle') {
+  // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
+  // disc-only copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
+  // [Band Kit], Oct 2026: 27 of 30 were "game only"; the other 3 sold for $7, $0.99 and $0.07). When what's left
+  // looks like discs (looseBundleUnreliable), no automatic price: staff click a sale with the instruments, or
+  // type one. Other bundles' loose sales are real (Guitar Hero Live [Bundle], Wii U: $25–$59, game + guitar).
+  if (cur.pick == null && cur.condition === 'loose' && rhythmKind(cur.product['product-name']) === 'bundle' && looseBundleUnreliable(cur)) {
     return { basis: null, sale: null, checks: [], need: 'Loose bundle: PriceCharting\'s loose sales for instrument bundles are mostly the disc alone, so there\'s no automatic price. Click a sale that includes the instruments, or type a price (the eBay sold link shows real ones).' };
   }
-  const amz = amzInfo && amzInfo.lowest > 0 ? amzInfo.lowest : null;
+  // For a rhythm-game disc, Amazon offers above the bundle cap are likely the bundle sold under the disc's barcode.
+  const rhythmCap = rhythmDiscSaleCap(cur);
+  const amz = amzInfo && amzInfo.lowest > 0 && amzInfo.lowest <= rhythmCap ? amzInfo.lowest : null;
   // Older systems compare with Amazon's typical offer: the (lower) middle of the offers, which come lowest first.
   const amzOffers = (amzInfo?.offers || []).filter((o) => o.price > 0);
   const amzMidIndex = amzOffers.length ? Math.floor((amzOffers.length - 1) / 2) : -1;
-  const amzTypical = amzMidIndex >= 0 ? amzOffers[amzMidIndex].price : null;
+  const amzTypical = amzMidIndex >= 0 && amzOffers[amzMidIndex].price <= rhythmCap ? amzOffers[amzMidIndex].price : null;
   const waiting = amazonSet && cur.amazon?.loading; // don't let staff add it before Amazon answers
   const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [tier.amazon ? amz : null, 'amazon']].filter(([v]) => v > 0);
   if (options.length) {
@@ -3047,7 +3106,7 @@ function floorResult(cur) {
   const b = floorBasis(cur);
   const typed = b.from === 'typed';
   const premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
-  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: !hw && cur.condition === 'cib' && cur.manualMissing, gs: typed ? null : floorGs(p), premium });
+  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: !hw && cur.condition === 'cib' && cur.manualMissing, gs: typed ? null : floorGsFor(cur), premium });
   return { b, r, shitbox, premium, hw };
 }
 
@@ -3061,7 +3120,7 @@ function renderFloorPricer() {
   const links = floorLinks(p, cur.condition);
   const { b, r: result, shitbox, premium, hw } = floorResult(cur);
   const rhythm = rhythmKind(p['product-name']);
-  const belowGs = b.from === 'typed' && result && floorGs(p) && result.price < floorGs(p);
+  const belowGs = b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ');
   const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
 
@@ -3117,7 +3176,7 @@ function renderFloorPricer() {
         ${b.checks.map((c) => `<p class="floor-need">Double-check: ${esc(c)}</p>`).join('')}
         ${result && result.price >= FLOOR_REVIEW ? `<p class="floor-need">Double-check: $${FLOOR_REVIEW / 100} or more. Look over the sales and links before it goes on the shelf.</p>` : ''}
         ${b.scarce ? `<p class="muted small-print">No ${amazonCond(cur.condition)} copies on Amazon right now, so this goes by the highest normal sale plus ${Math.round(FLOOR_SCARCE_MARKUP * 100)}%.</p>` : ''}
-        ${belowGs ? `<p class="floor-need">Below GameStop's pre-owned price (${money(floorGs(p))}). Our price shouldn't be under GameStop's.</p>` : ''}
+        ${belowGs ? `<p class="floor-need">Below GameStop's pre-owned price (${money(floorGsFor(cur))}). Our price shouldn't be under GameStop's.</p>` : ''}
         <label${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>

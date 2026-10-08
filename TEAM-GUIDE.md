@@ -738,9 +738,12 @@ Guide (the Google Sheet tab).
    - **Instrument games** (Guitar Hero, Rock Band, DJ Hero…): pick the
      **Disc only** or **With instruments** product. Disc prices ignore
      sales that came with instruments, and bundle prices ignore disc-only
-     sales. A **loose** bundle (no box) gets no automatic price, because
-     PriceCharting's loose sales for bundles are mostly just the disc:
-     click a sale that clearly has the instruments, or type a price.
+     sales. Sellers often list guitar bundles under the plain game, so a
+     disc's price also ignores sales far above what the disc alone sells
+     for (Guitar Hero Live for Wii U: $10, not the ~$50 bundle price). If
+     a **loose** bundle (no box) shows no automatic price, PriceCharting's
+     loose sales for it are mostly just the disc: click a sale that clearly
+     has the instruments, or type a price.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
 4. Only look closer when it says **Double-check** (very few sales, no
