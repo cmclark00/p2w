@@ -131,6 +131,32 @@ function shop_cc(string $method, string $path, string $scope, $body = null): arr
   return [$status, json_decode($raw, true), $raw];
 }
 
+/* ------------------------------------------------------------------ keeping the index fresh */
+
+// GitHub's "every 15 minutes" schedule for the sync actually ran only every 4–6 hours (Oct 2026: GitHub delays
+// and drops frequent scheduled jobs), so the shop kicks the sync itself: when someone opens a shop page and the
+// listings are over SYNC_STALE_MINUTES old, it starts /shop/sync.php in the background (at most once every
+// SYNC_KICK_MINUTES) and doesn't wait for it. sync.php keeps running after the caller hangs up, refuses to
+// re-read listings more often than every 10 minutes, and runs one at a time, so extra kicks are harmless.
+const SYNC_STALE_MINUTES = 12;
+const SYNC_KICK_MINUTES = 5;
+
+function shop_kick_sync(?array $idx): void {
+  $age = time() - (int)($idx['listingsAt'] ?? $idx['built'] ?? 0);
+  if ($age < SYNC_STALE_MINUTES * 60) return;
+  $kick = shop_data_dir() . '/sync-kick.txt';
+  $last = is_file($kick) ? (int)file_get_contents($kick) : 0;
+  if (time() - $last < SYNC_KICK_MINUTES * 60) return;
+  @file_put_contents($kick, (string)time());
+  $url = shop_env('SHOP_SYNC_URL') ?: 'https://play2wingames.com/shop/sync.php';
+  $ch = curl_init($url);
+  // Long enough to connect and send the request; then hang up and let sync.php work on its own.
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT_MS => 1500, CURLOPT_NOSIGNAL => true,
+    CURLOPT_USERAGENT => 'Play2WinGames-Shop/1.0 (sync kick)']);
+  @curl_exec($ch);
+  curl_close($ch);
+}
+
 /* ------------------------------------------------------------------ the index */
 
 // Loaded once per request. Shape: { built, products: { id: {...} }, types: {...} } (see sync.php).

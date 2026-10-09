@@ -1,6 +1,9 @@
 name: Shop inventory sync
 
 # Keeps /shop current: asks the live site to re-read Play2Win's CrystalCommerce inventory.
+# GitHub starts "every 15 minutes" schedules late or skips them (Oct 2026: runs came every 4-6 hours),
+# so the shop pages also kick the sync themselves when stock is stale (shop_kick_sync in lib.php);
+# this job is the backup for quiet hours.
 # The work happens in shop/sync.php on the server (data stays outside the website folder);
 # this job only calls it. Each call fills in up to ~40 seconds of product details and, every few
 # hours, reads a small batch of CrystalCommerce variant ids for the kiosks, so a run repeats the
@@ -28,9 +31,11 @@ jobs:
           for i in $(seq 1 25); do
             out=$(curl -sS --max-time 120 https://play2wingames.com/shop/sync.php || echo '{"status":"error","error":"request failed"}')
             echo "$out"
-            status=$(echo "$out" | jq -r '.status // "error"')
-            missing=$(echo "$out" | jq -r '.missing // 1')
-            pending=$(echo "$out" | jq -r '.variants.pending // 0')
+            # A non-JSON answer (an error page during a blip) counts as an error and is retried, instead of
+            # jq's parse error ending the whole run (exit code 5, Oct 9 2026).
+            status=$(echo "$out" | jq -r '.status // "error"' 2>/dev/null || echo error)
+            missing=$(echo "$out" | jq -r '.missing // 1' 2>/dev/null || echo 1)
+            pending=$(echo "$out" | jq -r '.variants.pending // 0' 2>/dev/null || echo 0)
             if [ "$status" = "ok" ] && [ "$missing" = "0" ] && [ "$pending" = "0" ]; then exit 0; fi
             if [ "$status" = "error" ] && [ "$i" -ge 3 ]; then exit 1; fi
             if [ "$pending" != "0" ]; then sleep 60; else sleep 5; fi

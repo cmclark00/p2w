@@ -1018,9 +1018,20 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   (photo, set, product-type slug per product — Core2 has **no batch
   product endpoint**, so details are fetched 6 at a time on a time budget
   and cached forever), `index.json` (what pages read), `state.json`.
-  `.github/workflows/shop-sync.yml` calls it every 15 min and repeats
-  until `missing` is 0. Can also run from cPanel cron: `php
-  public_html/shop/sync.php`.
+  `.github/workflows/shop-sync.yml` is scheduled every 15 min and repeats
+  until `missing` is 0 — **but GitHub actually started it only every 4–6
+  hours** (Oct 2026; frequent schedules get delayed/dropped), so the shop
+  was hours stale. Fix: **the shop kicks the sync itself** —
+  `shop_kick_sync()` (lib.php), registered as a shutdown function in
+  `index.php` after `fastcgi_finish_request()` so nobody waits: when the
+  listings are over `SYNC_STALE_MINUTES` (12) old, it fires a request at
+  `SHOP_SYNC_URL` (default the live `sync.php`) at most every
+  `SYNC_KICK_MINUTES` (5, `sync-kick.txt`) and hangs up after 1.5 s;
+  `sync.php` has `ignore_user_abort(true)` so it finishes on its own. The
+  workflow is the backup for quiet hours, and now treats a non-JSON answer
+  as a retryable error (a jq parse failure, exit code 5, used to fail the
+  whole run). **Most reliable option (🔑 owner, cPanel → Cron Jobs):**
+  `*/10 * * * * php ~/public_html/shop/sync.php >/dev/null 2>&1`.
 - **`shop/index.php`** renders every page server-side (Google can read
   it; works without JS) with the site's header/footer copied in and
   **`<base href="/">`** so the shared relative links (`assets/…`,

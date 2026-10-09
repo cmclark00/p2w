@@ -18,6 +18,11 @@ const SHOP_PREVIEW = true;
 $path = trim(preg_replace('#^/shop#', '', (string)parse_url($_SERVER['REQUEST_URI'] ?? '/shop', PHP_URL_PATH)), '/');
 $parts = $path === '' ? [] : explode('/', $path);
 $idx = shop_index();
+// Stale stock? Start a sync in the background (lib.php), after this page has been sent, so nobody waits for it.
+register_shutdown_function(function () use ($idx) {
+  if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+  shop_kick_sync($idx);
+});
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');

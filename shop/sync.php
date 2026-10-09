@@ -37,6 +37,9 @@ header('X-Robots-Tag: noindex');
 $cli = PHP_SAPI === 'cli';
 $budget = $cli ? 600 : 40;     // seconds for product details (web requests must finish quickly)
 @set_time_limit($cli ? 0 : 90);
+// The shop pages kick this off in the background and hang up at once (shop_kick_sync in lib.php):
+// keep going after the caller disconnects.
+ignore_user_abort(true);
 $t0 = microtime(true);
 
 function done(array $status): void {
