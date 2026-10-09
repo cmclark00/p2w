@@ -38,7 +38,7 @@ ErrorDocument 404 /404.html
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Strict-Transport-Security "max-age=31536000"
-  Header always set Permissions-Policy "camera=(self), geolocation=(), microphone=(), payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), usb=()"
+  Header always set Permissions-Policy "camera=(self), geolocation=(), microphone=(), payment=(), usb=()"
 
   # Observe violations before enforcing a CSP. The current site deliberately
   # uses inline scripts/styles plus Firebase, Formspree, Google Maps, Google
