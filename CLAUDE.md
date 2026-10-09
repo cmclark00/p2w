@@ -46,7 +46,15 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
   heuristic-cache HTML, which repeatedly served stale inline JS on
   `pairings-admin.html` mid-tournament even through hard refreshes. Edit it
   in the repo, not on the server, or a deploy will overwrite your
-  server-side change.
+  server-side change. **A syntax error in it takes the whole site down
+  (HTTP 500 on every page)** — it happened Oct 9 2026 for ~3 minutes when
+  a `Permissions-Policy` value got bare `"…"` origins inside the
+  double-quoted `Header` value. Never put unescaped double quotes inside a
+  `Header … "…"` value, keep `.htaccess` changes in their own small
+  commit, and check `curl -s -o /dev/null -w "%{http_code}"
+  https://play2wingames.com/` the moment the deploy lands; revert first,
+  investigate after. (`payment=()` stays: allowing PayPal there needs
+  quoted origins, i.e. `\"` escaping, and PayPal's buttons don't need it.)
 - **Remaining 🔑 handoff items** (don't block the live site): turn off
   GitHub Pages, move Formspree/Calendar/Firebase to shop accounts, transfer
   the repo to `play2wingames/p2w`, set up Google Search Console. See the
