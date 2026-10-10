@@ -412,5 +412,6 @@ function sync_variant_url(int $category, int $page): string {
 done([
   'status' => 'ok', 'listings' => count($listings), 'fromAdmin' => $adminAdded, 'products' => count($products), 'listingsRefreshed' => !$fresh,
   'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats,
-  'memoryMB' => round(memory_get_peak_usage() / 1048576), 'memoryLimit' => ini_get('memory_limit'), 'seconds' => round(microtime(true) - $t0, 1),
+  'memoryMB' => round(memory_get_peak_usage() / 1048576), 'memoryLimit' => ini_get('memory_limit'),
+  'sqlite' => class_exists('PDO') ? in_array('sqlite', PDO::getAvailableDrivers(), true) : false, 'php' => PHP_VERSION, 'seconds' => round(microtime(true) - $t0, 1),
 ]);
