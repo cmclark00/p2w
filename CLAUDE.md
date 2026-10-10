@@ -1011,29 +1011,57 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   (`/llms.txt` lists every page). **Neither API has search by name**, so
   the shop searches its own index.
 - **Core2 only has part of the store** (Oct 9 2026: 4,901 Core2 listings
-  vs 47,392 Admin API variants; e.g. 931 Pokémon singles products). So the
-  variants pass (below) also keeps every **in-stock** variant (`stock` in
-  `variants-catalog.json`: variant id, Core2 product id, name, Admin
-  category, condition, other descriptors, qty, price), and sync step **1b**
-  adds every in-stock variant that no Core2 listing (in stock **or sold
-  out**, `listings-soldout.json`) matches. Core2 wins where both have it
-  (refreshed every 10 min; the catalog every ~6 h); checkout re-checks
+  vs 47,393 Admin API variants, **46,627 in stock**; e.g. 931 Pokémon
+  singles products). So the variants pass (below) keeps every variant's
+  stock and price, and the index adds every in-stock variant that no Core2
+  listing (in stock **or sold out**) matches. Core2 wins where both have
+  it (refreshed every 10 min; the catalog every ~6 h); checkout re-checks
   stock live anyway. Those listings get id `ADMIN_LISTING_BASE`
-  (1,000,000,000) + variant id, and `sync_variant_map` maps them straight
-  back, so they're always orderable. Their product type is the Core2 type
-  most seen in that Admin category, else the category name
-  (`sync_category_type`: "Magic (Sealed)" → "Magic Sealed"). Variants
-  with no `product_catalog_id` are skipped (counted as `noCatalogId`).
-  Product details missing from Core2 are given up after 3 tries
-  (`detailTries`) so `missing` reaches 0.
+  (1,000,000,000) + variant id and carry their variant id, so they're
+  always orderable. Their product type is the Core2 type most seen in
+  that Admin category, else the category name (`sync_category_type`:
+  "Magic (Sealed)" → "Magic Sealed"). Variants with no
+  `product_catalog_id` are skipped (counted as `noCatalogId`).
+  `ADMIN_STOCK` in `sync.php` switches the extra stock off (Core2 only).
+- **Storage is SQLite, not JSON** (Oct 9 2026). The whole store as a JSON
+  index needed ~170 MB on every page and the host's PHP limit is
+  **128 MB** (`memory_limit`; PHP 8.3 with pdo_sqlite): the first try ran
+  `sync.php` out of memory (HTTP 500). Two files in `<home>/p2w-shop-data/`:
+  - `shop.sqlite` (the sync's own, WAL): `core2` (Core2 listings incl.
+    sold out, with the matched `vid`), `details` (Core2 photo/set/type per
+    product; `ok`, `tries` — given up after 3 misses so `missing` reaches
+    0), `variants` (the Admin catalog: vid, Core2 pid, name, category,
+    condition, descriptor key, shown descriptors, qty, price; a pass
+    fills `variants_new`, then swaps it in), `kv` (`catalogAt`, catalog
+    counts, Admin category names).
+  - `shop-index.sqlite` (what pages read, opened read-only): `products`
+    (`hay` = " name set type " for word search), `listings` (`vid`,
+    `crank` = `shop_condition_rank()` for sorting), `types`, `meta`.
+    `sync_build_index()` builds it in a temp file with the store attached
+    and renames it into place, only when something changed (listings
+    refreshed, details fetched, a new catalog, or the index missing).
+  - Pages use `shop_index()` (meta + types only), `shop_products(ids)`,
+    `shop_product_get()`, `shop_listing_get()` (cart/kiosk),
+    `shop_newest()`, `shop_set_more()`, `shop_type_sets()`, and
+    `shop_query()`, which does the search, facets, sorting and paging in
+    SQL with the old rules (word substring match on `hay`; facets ignore
+    their own filter; best match = name starts with the search ×3, whole
+    words ×2, +1 per word in the name).
+  - `sync_migrate()` moved the old `products.json` /
+    `variants-catalog.json` in once (renamed `*.migrated`; the old
+    `index.json`/`listings*.json` became `*.old`), so no details were
+    re-fetched and no extra pass ran.
+  - `variants.json` is now just the stats for the kiosk status page.
 - **`shop/sync.php`** (public URL; only reads public data, one run at a
-  time via `sync.lock`, listings re-read at most every 10 min) writes the
-  private index to `<home>/p2w-shop-data/` (outside the docroot, like the
-  trade-in data; override with `P2W_SHOP_DATA`): `listings.json` (in-stock
-  only: quantity − reserved > 0, priced, org 2020), `products.json`
-  (photo, set, product-type slug per product — Core2 has **no batch
-  product endpoint**, so details are fetched 6 at a time on a time budget
-  and cached forever), `index.json` (what pages read), `state.json`.
+  time via `sync.lock`, listings re-read at most every 10 min) keeps the
+  data above in `<home>/p2w-shop-data/` (outside the docroot, like the
+  trade-in data; override with `P2W_SHOP_DATA`) plus `state.json`. Core2
+  has **no batch product endpoint**, so details come `DETAILS_PER_RUN`
+  (400) per run, `DETAILS_PARALLEL` (4) at a time; a new catalog with
+  thousands of new products takes a few hours to fill in photos (they
+  show a "Photo coming soon" tile meanwhile). The status JSON reports
+  `index` (products, listings, fromAdmin, matched…), `missing`, `raw`
+  (Core2 counts before the in-stock filter), `memoryMB`.
   `.github/workflows/shop-sync.yml` is scheduled every 15 min and repeats
   until `missing` is 0 — **but GitHub actually started it only every 4–6
   hours** (Oct 2026; frequent schedules get delayed/dropped), so the shop
@@ -1205,21 +1233,22 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     last 300 closed). `/shop/kiosk/status` (kiosk or staff) shows the
     mode, the IP seen, whether this kiosk can order, and the variant-map
     match count.
-  - **Variant ids:** `sync.php` maps every listing to CC's variant id
-    (`variants.json`) by product (`product_catalog_id` = Core2 product
-    id) + normalized condition + other descriptors, falling back to the
-    only variant of a product. It's the **last** sync step (after
-    `index.json` is saved), wrapped in try/catch, in two parts:
+  - **Variant ids:** `sync.php` maps every Core2 listing to CC's variant
+    id (`sync_match()`, stored as `vid` in the index) by product
+    (`product_catalog_id` = Core2 product id) + normalized condition +
+    other descriptors, falling back to the only variant of a product;
+    Admin-only listings carry theirs. Reading the catalog is the **last**
+    sync step (after the index is saved), wrapped in try/catch, in two parts:
     - **Full pass, gently paced** (owner-approved Oct 2026): every
       variants page (~256 slow pages / ~47k variants, out-of-stock ones
       included) at most every `VARIANT_PASS_HOURS` (6), only
       `VARIANT_PAGES_PER_RUN` (20) pages per sync run, `VARIANT_PARALLEL`
       (2) at a time with `VARIANT_PAUSE_MS` (1 s) between batches.
-      Progress (slimmed rows) lives in `variants-progress.json`; a page
-      that fails 3 times drops the pass and keeps the old catalog. The
-      result is **`variants-catalog.json`** (byPid → [variant id,
-      condition, descriptors, price]).
-    - **Matching** (`sync_variant_map()`) runs against the saved catalog
+      Rows go into `variants_new` in `shop.sqlite` as they're read (the
+      queue in `variants-progress.json`); a page that fails 3 times drops
+      the pass and keeps the old catalog; a finished pass replaces the
+      `variants` table and the next run rebuilds the index.
+    - **Matching** (`sync_match()` in `sync_build_index()`) runs against the saved catalog
       with **no API calls** whenever the listings refresh or a pass
       finishes, so a restocked card of a known product is orderable at
       once; only brand-new products wait for the next pass.

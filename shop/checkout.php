@@ -568,7 +568,7 @@ function web_cart_post(): void {
 function web_add_form(array $l): string {
   $inCart = web_cart()[(int)$l['id']]['q'] ?? 0;
   $left = min((int)$l['q'], KIOSK_MAX_QTY) - $inCart;
-  if (kiosk_variants() && !kiosk_variant_id((int)$l['id'])) return '<span class="muted kiosk-ask">In store only</span>';
+  if (empty($l['vid'])) return '<span class="muted kiosk-ask">In store only</span>';
   if ($left <= 0) return '<a class="kiosk-incart" href="/shop/cart">In your cart (' . $inCart . ')</a>';
   $qty = '';
   if ($left > 1) {

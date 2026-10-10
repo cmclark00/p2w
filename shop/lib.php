@@ -159,14 +159,119 @@ function shop_kick_sync(?array $idx): void {
 
 /* ------------------------------------------------------------------ the index */
 
-// Loaded once per request. Shape: { built, products: { id: {...} }, types: {...} } (see sync.php).
+// The index is an SQLite file (shop-index.sqlite) that sync.php rebuilds and swaps in whole. With the
+// full store (~40k products, Oct 2026) a JSON index needed ~170 MB on every page, over the host's 128 MB
+// limit; SQLite lets each page read only the rows it shows.
+const SHOP_INDEX_DB = 'shop-index.sqlite';
+
+function shop_db(): ?PDO {
+  static $db = false;
+  if ($db === false) {
+    $db = null;
+    $path = shop_data_dir() . '/' . SHOP_INDEX_DB;
+    if (is_file($path)) {
+      try {
+        $db = new PDO('sqlite:' . $path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+          PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY]);
+      } catch (Throwable $e) {
+        $db = null;
+      }
+    }
+  }
+  return $db;
+}
+
+// Loaded once per request: { built, listingsAt, count (products), types: { slug: { name, game, kind, count } } }.
 function shop_index(): ?array {
   static $idx = false;
   if ($idx === false) {
-    $idx = shop_read_json('index.json');
-    if (!is_array($idx) || !isset($idx['products'])) $idx = null;
+    $idx = null;
+    try {
+      $db = shop_db();
+      if ($db) {
+        $meta = [];
+        foreach ($db->query('SELECT k, v FROM meta') as $r) $meta[$r['k']] = $r['v'];
+        $types = [];
+        foreach ($db->query('SELECT slug, name, game, kind, count FROM types ORDER BY slug') as $r) {
+          $types[$r['slug']] = ['name' => $r['name'], 'game' => $r['game'], 'kind' => $r['kind'], 'count' => (int)$r['count']];
+        }
+        $idx = ['built' => (int)($meta['built'] ?? 0), 'listingsAt' => (int)($meta['listingsAt'] ?? 0), 'count' => (int)($meta['products'] ?? 0), 'types' => $types];
+      }
+    } catch (Throwable $e) {
+      $idx = null;
+    }
   }
   return $idx;
+}
+
+// Products by id, in the order given, each with its listings ('l', best condition first), in the shape the
+// pages use: id, name, n, slug, img, thumb, set, setSlug, type, typeSlug, game, kind, rel, desc, qty, from, l.
+function shop_products(array $ids): array {
+  $ids = array_values(array_unique(array_map('intval', $ids)));
+  $db = shop_db();
+  if (!$ids || !$db) return [];
+  $in = implode(',', array_fill(0, count($ids), '?'));
+  $st = $db->prepare("SELECT * FROM products WHERE id IN ($in)");
+  $st->execute($ids);
+  $rows = [];
+  foreach ($st as $r) {
+    $rows[(int)$r['id']] = ['id' => (int)$r['id'], 'name' => $r['name'], 'n' => $r['n'], 'slug' => $r['slug'], 'img' => $r['img'], 'thumb' => $r['thumb'],
+      'set' => $r['set_name'], 'setSlug' => $r['set_slug'], 'type' => $r['type'], 'typeSlug' => $r['type_slug'], 'game' => $r['game'], 'kind' => $r['kind'],
+      'rel' => (int)$r['rel'], 'desc' => $r['descr'], 'qty' => (int)$r['qty'], 'from' => (int)$r['from_p'], 'l' => []];
+  }
+  $st = $db->prepare("SELECT id, pid, c, v, q, p, vid FROM listings WHERE pid IN ($in) ORDER BY pid, crank, c, p, id");
+  $st->execute($ids);
+  foreach ($st as $l) {
+    if (isset($rows[(int)$l['pid']])) $rows[(int)$l['pid']]['l'][] = ['id' => (int)$l['id'], 'c' => $l['c'], 'v' => $l['v'], 'q' => (int)$l['q'], 'p' => (int)$l['p'],
+      'vid' => $l['vid'] !== null ? (int)$l['vid'] : null];
+  }
+  $out = [];
+  foreach ($ids as $id) if (isset($rows[$id]) && $rows[$id]['l']) $out[$id] = $rows[$id];
+  return $out;
+}
+
+function shop_product_get(int $id): ?array {
+  return shop_products([$id])[$id] ?? null;
+}
+
+// [product, listing] for a listing id, or null when it's no longer in stock.
+function shop_listing_get(int $lid): ?array {
+  $db = shop_db();
+  if (!$db) return null;
+  $st = $db->prepare('SELECT pid FROM listings WHERE id = ?');
+  $st->execute([$lid]);
+  $pid = $st->fetchColumn();
+  $p = $pid !== false ? shop_product_get((int)$pid) : null;
+  foreach ($p['l'] ?? [] as $l) if ($l['id'] === $lid) return [$p, $l];
+  return null;
+}
+
+// Product ids from a query on the products table (no user input in $sql; values go in $args).
+function shop_product_ids(string $sql, array $args = []): array {
+  $db = shop_db();
+  if (!$db) return [];
+  $st = $db->prepare($sql);
+  $st->execute($args);
+  return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+}
+
+function shop_newest(int $n): array {
+  return array_values(shop_products(shop_product_ids('SELECT id FROM products ORDER BY rel DESC, n, id LIMIT ?', [$n])));
+}
+
+// Other products from the same set, priciest first.
+function shop_set_more(array $p, int $n): array {
+  if ($p['setSlug'] === '') return [];
+  return array_values(shop_products(shop_product_ids('SELECT id FROM products WHERE set_slug = ? AND id <> ? ORDER BY from_p DESC, id LIMIT ?', [$p['setSlug'], $p['id'], $n])));
+}
+
+// slug => name of the sets in a product type.
+function shop_type_sets(string $type): array {
+  $db = shop_db();
+  if (!$db) return [];
+  $st = $db->prepare("SELECT DISTINCT set_slug, set_name FROM products WHERE type_slug = ? AND set_slug <> ''");
+  $st->execute([$type]);
+  return $st->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
 function shop_norm(string $s): string {
@@ -196,62 +301,65 @@ function shop_split_type(string $type): array {
  * Returns { items, total, page, pages, facets: { types, sets, conds } }.
  */
 function shop_query(array $q): array {
-  $idx = shop_index();
-  $all = $idx['products'] ?? [];
   $words = array_values(array_filter(explode(' ', shop_norm((string)($q['q'] ?? '')))));
   $type = (string)($q['type'] ?? '');
   $set = (string)($q['set'] ?? '');
   $cond = (string)($q['cond'] ?? '');
   $min = is_numeric($q['min'] ?? null) ? (int)round($q['min'] * 100) : null;
   $max = is_numeric($q['max'] ?? null) ? (int)round($q['max'] * 100) : null;
-
-  $hits = [];
-  $facetTypes = $facetSets = $facetConds = [];
-  foreach ($all as $p) {
-    $score = 0;
-    if ($words) {
-      $name = $p['n'];
-      $hay = $name . ' ' . shop_norm($p['set'] ?? '') . ' ' . shop_norm($p['type'] ?? '');
-      foreach ($words as $w) if (strpos(" $hay ", $w) === false) continue 2;
-      $joined = implode(' ', $words);
-      $score = (strpos($name, $joined) === 0 ? 3 : 0) + (strpos(" $name ", " $joined ") !== false ? 2 : 0)
-        + count(array_filter($words, function ($w) use ($name) { return strpos($name, $w) !== false; }));
-    }
-    // Price range and condition narrow the listings considered for this product.
-    $listings = array_values(array_filter($p['l'], function ($l) use ($cond, $min, $max) {
-      return ($cond === '' || $l['c'] === $cond) && ($min === null || $l['p'] >= $min) && ($max === null || $l['p'] <= $max);
-    }));
-    if (!$listings) continue;
-    // Facet counts ignore their own filter, so the menus keep offering the other choices.
-    if ($set === '' || ($p['setSlug'] ?? '') === $set) $facetTypes[$p['typeSlug']] = ($facetTypes[$p['typeSlug']] ?? 0) + 1;
-    if ($type !== '' && $p['typeSlug'] !== $type) continue;
-    if (!empty($p['setSlug'])) $facetSets[$p['setSlug']] = ($facetSets[$p['setSlug']] ?? 0) + 1;
-    foreach ($p['l'] as $l) $facetConds[$l['c']] = true;
-    if ($set !== '' && ($p['setSlug'] ?? '') !== $set) continue;
-    $p['_score'] = $score;
-    $p['_from'] = min(array_column($listings, 'p'));
-    $hits[] = $p;
-  }
-
   $sort = (string)($q['sort'] ?? ($words ? 'relevance' : 'name'));
-  usort($hits, function ($a, $b) use ($sort) {
-    switch ($sort) {
-      case 'price_asc': return [$a['_from'], $a['n']] <=> [$b['_from'], $b['n']];
-      case 'price_desc': return [$b['_from'], $a['n']] <=> [$a['_from'], $b['n']];
-      case 'newest': return [$b['rel'] ?? 0, $a['n']] <=> [$a['rel'] ?? 0, $b['n']];
-      case 'relevance': return [$b['_score'], $a['n']] <=> [$a['_score'], $b['n']];
-      default: return $a['n'] <=> $b['n'];
-    }
-  });
+  $empty = ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'sort' => $sort, 'facets' => ['types' => [], 'sets' => [], 'conds' => []]];
+  $db = shop_db();
+  if (!$db) return $empty;
 
-  $total = count($hits);
+  // m: products matching the words, with their cheapest listing among those the condition and price allow.
+  // Words are shop_norm()ed (a-z, 0-9 only), so they're safe inside LIKE patterns. hay = " name set type ".
+  $where = [];
+  $args = [];
+  foreach ($words as $w) { $where[] = 'p.hay LIKE ?'; $args[] = "%$w%"; }
+  if ($cond !== '') { $where[] = 'l.c = ?'; $args[] = $cond; }
+  if ($min !== null) { $where[] = 'l.p >= ?'; $args[] = $min; }
+  if ($max !== null) { $where[] = 'l.p <= ?'; $args[] = $max; }
+  $m = 'WITH m AS (SELECT p.id, p.type_slug AS t, p.set_slug AS s, MIN(l.p) AS fp FROM products p JOIN listings l ON l.pid = p.id'
+    . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' GROUP BY p.id) ';
+  $run = function (string $sql, array $more) use ($db, $m, $args) {
+    $st = $db->prepare($m . $sql);
+    $st->execute(array_merge($args, $more));
+    return $st;
+  };
+
+  // Facet counts ignore their own filter, so the menus keep offering the other choices.
+  $facetTypes = array_map('intval', $run("SELECT t, COUNT(*) FROM m WHERE (? = '' OR s = ?) GROUP BY t", [$set, $set])->fetchAll(PDO::FETCH_KEY_PAIR));
+  $facetSets = array_map('intval', $run("SELECT s, COUNT(*) FROM m WHERE (? = '' OR t = ?) AND s <> '' GROUP BY s", [$type, $type])->fetchAll(PDO::FETCH_KEY_PAIR));
+  $conds = $run("SELECT DISTINCT l.c FROM m JOIN listings l ON l.pid = m.id WHERE (? = '' OR m.t = ?)", [$type, $type])->fetchAll(PDO::FETCH_COLUMN);
+  usort($conds, 'shop_condition_order');
+
+  $filter = "(? = '' OR m.t = ?) AND (? = '' OR m.s = ?)";
+  $fargs = [$type, $type, $set, $set];
+  $total = (int)$run("SELECT COUNT(*) FROM m WHERE $filter", $fargs)->fetchColumn();
   $pages = max(1, (int)ceil($total / SHOP_PER_PAGE));
   $page = min($pages, max(1, (int)($q['page'] ?? 1)));
-  $conds = array_keys($facetConds);
-  usort($conds, 'shop_condition_order');
+
+  // Best match: the name starts with the search (3), contains it as whole words (2), plus 1 per word in the name.
+  $score = '0';
+  $sargs = [];
+  if ($words) {
+    $joined = implode(' ', $words);
+    $score = "(instr(p.n, ?) = 1) * 3 + (instr(' ' || p.n || ' ', ?) > 0) * 2";
+    $sargs = [$joined, " $joined "];
+    foreach ($words as $w) { $score .= ' + (instr(p.n, ?) > 0)'; $sargs[] = $w; }
+  }
+  $order = ['price_asc' => 'm.fp, p.n', 'price_desc' => 'm.fp DESC, p.n', 'newest' => 'p.rel DESC, p.n', 'relevance' => 'sc DESC, p.n'][$sort] ?? 'p.n';
+  $rows = $run("SELECT m.id, m.fp, $score AS sc FROM m JOIN products p ON p.id = m.id WHERE $filter ORDER BY $order, p.id LIMIT ? OFFSET ?",
+    array_merge($sargs, $fargs, [SHOP_PER_PAGE, ($page - 1) * SHOP_PER_PAGE]))->fetchAll();
+  $products = shop_products(array_column($rows, 'id'));
+  $items = [];
+  foreach ($rows as $r) {
+    if (!isset($products[(int)$r['id']])) continue;
+    $items[] = $products[(int)$r['id']] + ['_from' => (int)$r['fp'], '_score' => (int)$r['sc']];
+  }
   return [
-    'items' => array_slice($hits, ($page - 1) * SHOP_PER_PAGE, SHOP_PER_PAGE),
-    'total' => $total, 'page' => $page, 'pages' => $pages, 'sort' => $sort,
+    'items' => $items, 'total' => $total, 'page' => $page, 'pages' => $pages, 'sort' => $sort,
     'facets' => ['types' => $facetTypes, 'sets' => $facetSets, 'conds' => $conds],
   ];
 }
@@ -269,15 +377,17 @@ function shop_condition_label(string $c): string {
 
 // Conditions best first; anything unrecognized after, alphabetically.
 function shop_condition_order(string $a, string $b): int {
-  $rank = function ($c) {
-    $n = shop_norm($c);
-    foreach (['new' => 0, 'sealed' => 0, 'mint' => 1, 'nm' => 1, 'near mint' => 1, 'lightly' => 2, 'lp' => 2, 'moderately' => 3, 'mp' => 3,
-      'heavily' => 4, 'hp' => 4, 'damaged' => 5, 'dmg' => 5] as $k => $r) {
-      if (strpos(" $n ", " $k") !== false) return $r;
-    }
-    return 9;
-  };
-  return [$rank($a), $a] <=> [$rank($b), $b];
+  return [shop_condition_rank($a), $a] <=> [shop_condition_rank($b), $b];
+}
+
+// 0 new/sealed … 5 damaged, 9 unrecognized (sync.php stores it as listings.crank for sorting).
+function shop_condition_rank(string $c): int {
+  $n = shop_norm($c);
+  foreach (['new' => 0, 'sealed' => 0, 'mint' => 1, 'nm' => 1, 'near mint' => 1, 'lightly' => 2, 'lp' => 2, 'moderately' => 3, 'mp' => 3,
+    'heavily' => 4, 'hp' => 4, 'damaged' => 5, 'dmg' => 5] as $k => $r) {
+    if (strpos(" $n ", " $k") !== false) return $r;
+  }
+  return 9;
 }
 
 // CrystalCommerce keeps each photo in several sizes beside the original:

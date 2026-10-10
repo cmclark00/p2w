@@ -46,8 +46,8 @@ if (($parts[0] ?? '') === 'kiosk') {
   shop_results($idx, $_GET, '/shop/search');
 } elseif ($parts[0] === 'category' && count($parts) === 2 && isset($idx['types'][$parts[1]])) {
   shop_results($idx, ['type' => $parts[1]] + $_GET, '/shop/category/' . $parts[1]);
-} elseif ($parts[0] === 'product' && count($parts) === 2 && preg_match('/^(\d+)/', $parts[1], $m) && isset($idx['products'][$m[1]])) {
-  shop_product($idx, $idx['products'][$m[1]]);
+} elseif ($parts[0] === 'product' && count($parts) === 2 && preg_match('/^(\d+)/', $parts[1], $m) && ($prod = shop_product_get((int)$m[1]))) {
+  shop_product($idx, $prod);
 } else {
   http_response_code(404);
   shop_not_found();
@@ -77,8 +77,7 @@ function shop_home(array $idx): void {
     }
     $tiles .= '<div class="shop-game"><h3>' . h($game) . '</h3><div class="shop-game-links">' . $links . '</div></div>';
   }
-  $newest = $idx['products'];
-  usort($newest, function ($a, $b) { return [$b['rel'] ?? 0, $a['n']] <=> [$a['rel'] ?? 0, $b['n']]; });
+  $newest = shop_newest(12);
   $body = '<section class="page-hero shop-hero">
       <p class="eyebrow">' . (kiosk_active() ? 'Shop in store' : 'Shop online') . '</p>
       <h1>Shop Play2Win’s in-stock inventory.</h1>
@@ -90,12 +89,12 @@ function shop_home(array $idx): void {
       ' . shop_search_form('') . '
     </section>
     <section class="shop-section">
-      <div class="shop-section-head"><h2>Browse by game</h2><p class="muted">' . number_format(count($idx['products'])) . ' products in stock · ' . h(shop_fresh_text($idx)) . '</p></div>
+      <div class="shop-section-head"><h2>Browse by game</h2><p class="muted">' . number_format($idx['count']) . ' products in stock · ' . h(shop_fresh_text($idx)) . '</p></div>
       <div class="shop-games">' . $tiles . '</div>
     </section>
     <section class="shop-section">
       <div class="shop-section-head"><h2>Newest releases in stock</h2><a class="text-link" href="/shop/search?sort=newest">See all</a></div>
-      <div class="shop-grid">' . implode('', array_map('shop_card', array_slice($newest, 0, 12))) . '</div>
+      <div class="shop-grid">' . implode('', array_map('shop_card', $newest)) . '</div>
     </section>';
   shop_page('Shop', 'Shop Play2Win Games in-stock trading cards, sealed product, and more.', $body, ['crumbs' => []]);
 }
@@ -138,10 +137,7 @@ function shop_product(array $idx, array $p): void {
       <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td>'
       . ($kiosk ? '<td>' . kiosk_add_form($l) . '</td>' : ($web ? '<td>' . web_add_form($l) . '</td>' : '')) . '</tr>';
   }
-  $more = array_values(array_filter($idx['products'], function ($o) use ($p) {
-    return $o['id'] !== $p['id'] && $p['setSlug'] !== '' && $o['setSlug'] === $p['setSlug'];
-  }));
-  usort($more, function ($a, $b) { return $b['from'] <=> $a['from']; });
+  $more = shop_set_more($p, 6);
   $img = $p['img'] !== ''
     ? '<img src="' . h(shop_img($p['img'], 'large')) . '" srcset="' . h(shop_img($p['img'], 'large')) . ' 1x, ' . h($p['img']) . ' 2x" alt="' . h($p['name']) . '" width="460" height="640">'
     : shop_placeholder($p);
@@ -166,7 +162,7 @@ function shop_product(array $idx, array $p): void {
       </div>
     </section>' . ($more ? '<section class="shop-section">
       <div class="shop-section-head"><h2>More from ' . h($p['set']) . '</h2><a class="text-link" href="/shop/category/' . h($p['typeSlug']) . '?set=' . h(rawurlencode($p['setSlug'])) . '">See all</a></div>
-      <div class="shop-grid">' . implode('', array_map('shop_card', array_slice($more, 0, 6))) . '</div></section>' : '');
+      <div class="shop-grid">' . implode('', array_map('shop_card', $more)) . '</div></section>' : '');
   $ld = [
     '@context' => 'https://schema.org', '@type' => 'Product', 'name' => $p['name'], 'image' => $p['img'] ?: null,
     'category' => $p['type'],
@@ -193,7 +189,7 @@ function shop_unavailable(): string {
 function kiosk_add_form(array $l): string {
   $inCart = kiosk_cart()[(int)$l['id']]['q'] ?? 0;
   $left = min((int)$l['q'], KIOSK_MAX_QTY) - $inCart;
-  if (kiosk_variants() && !kiosk_variant_id((int)$l['id'])) return '<span class="muted kiosk-ask">Ask at the register</span>';
+  if (empty($l['vid'])) return '<span class="muted kiosk-ask">Ask at the register</span>';
   if ($left <= 0) return '<a class="kiosk-incart" href="/shop/kiosk/cart">In your cart (' . $inCart . ')</a>';
   $qty = '';
   if ($left > 1) {
@@ -250,8 +246,7 @@ function shop_filters(array $idx, array $r, array $q, string $basePath): string 
   }
   $setField = '';
   if ($type !== '' && $r['facets']['sets']) {
-    $sets = [];
-    foreach ($idx['products'] as $p) if ($p['typeSlug'] === $type && $p['setSlug'] !== '') $sets[$p['setSlug']] = $p['set'];
+    $sets = shop_type_sets($type);
     asort($sets);
     $setOpts = $opt('', 'All sets', $q['set'] ?? '');
     foreach ($sets as $slug => $name) if (isset($r['facets']['sets'][$slug])) $setOpts .= $opt($slug, $name . ' (' . $r['facets']['sets'][$slug] . ')', $q['set'] ?? '');

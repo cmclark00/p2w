@@ -5,7 +5,7 @@ name: Shop inventory sync
 # so the shop pages also kick the sync themselves when stock is stale (shop_kick_sync in lib.php);
 # this job is the backup for quiet hours.
 # The work happens in shop/sync.php on the server (data stays outside the website folder);
-# this job only calls it. Each call fills in up to ~40 seconds of product details and, every few
+# this job only calls it. Each call fills in up to 400 products' details and, every few
 # hours, reads a small batch of CrystalCommerce variant ids for the kiosks, so a run repeats the
 # call until nothing is missing and no variants pass is pending. While a variants pass is pending it
 # waits a minute between calls, to stay gentle on CrystalCommerce's API.
@@ -38,5 +38,6 @@ jobs:
             pending=$(echo "$out" | jq -r '.variants.pending // 0' 2>/dev/null || echo 0)
             if [ "$status" = "ok" ] && [ "$missing" = "0" ] && [ "$pending" = "0" ]; then exit 0; fi
             if [ "$status" = "error" ] && [ "$i" -ge 3 ]; then exit 1; fi
-            if [ "$pending" != "0" ]; then sleep 60; else sleep 5; fi
+            # Product details come 400 per call; a short pause keeps Core2's load gentle while thousands fill in.
+            if [ "$pending" != "0" ]; then sleep 60; else sleep 20; fi
           done

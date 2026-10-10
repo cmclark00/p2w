@@ -121,20 +121,17 @@ function kiosk_cart_count(): int {
 
 // [product, listing] for a listing id in the index, or null when it's no longer in stock.
 function kiosk_listing(int $lid): ?array {
-  static $map = null;
-  if ($map === null) {
-    $map = [];
-    foreach (shop_index()['products'] ?? [] as $p) foreach ($p['l'] as $l) $map[(int)$l['id']] = [$p, $l];
-  }
-  return $map[$lid] ?? null;
+  static $cache = [];
+  if (!array_key_exists($lid, $cache)) $cache[$lid] = shop_listing_get($lid);
+  return $cache[$lid];
 }
 
-// CrystalCommerce's variant id for a listing (from sync.php's variants.json), or null.
+// CrystalCommerce's variant id for a listing (matched by sync.php, stored in the index), or null.
 function kiosk_variant_id(int $lid): ?int {
-  $v = kiosk_variants();
-  return isset($v['map'][$lid]) ? (int)$v['map'][$lid] : null;
+  return kiosk_listing($lid)[1]['vid'] ?? null;
 }
 
+// The variant-matching stats sync.php saves (for the status page).
 function kiosk_variants(): array {
   static $v = null;
   if ($v === null) $v = shop_read_json('variants.json') ?: [];
