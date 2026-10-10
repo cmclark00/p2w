@@ -67,14 +67,21 @@ if (!$fresh) {
   for ($p = 2; $p <= $pages; $p++) $urls[] = "$base/api/listings?organization_id=" . rawurlencode($org) . '&per_page=' . SYNC_PER_PAGE . "&page=$p";
   $rest = $urls ? shop_fetch_json($urls, 3, 60) : [];
   $listings = [];
+  // What CrystalCommerce sent, before the in-stock filter (shown in the status, to spot missing pages).
+  $raw = ['pages' => $pages, 'meta' => array_diff_key($first, ['listings' => 1]), 'perPage' => [], 'rows' => 0, 'skipped' => ['noStock' => 0, 'noPrice' => 0, 'otherOrg' => 0]];
   foreach (array_merge([$first], array_values($rest)) as $i => $page) {
     if (!is_array($page) || !isset($page['listings'])) done(['status' => 'error', 'error' => 'A listings page failed; the old index was kept', 'page' => $i + 1]);
     // Listings come grouped by store location; flatten.
     $groups = is_array($page['listings']) ? $page['listings'] : [];
+    $n = 0;
     foreach ((array_values($groups) === $groups ? [$groups] : $groups) as $group) {
       foreach ($group as $l) {
+        $n++;
         $qty = !empty($l['infinite_quantity']) ? 99 : (int)($l['quantity'] ?? 0) - (int)($l['reserved_quantity'] ?? 0);
         $price = $l['ally_agreement_price'] ?? null;
+        if ((int)($l['organization_id'] ?? 0) !== (int)$org) $raw['skipped']['otherOrg']++;
+        elseif ($qty <= 0) $raw['skipped']['noStock']++;
+        elseif (!is_numeric($price) || $price <= 0) $raw['skipped']['noPrice']++;
         if ($qty <= 0 || !is_numeric($price) || $price <= 0 || (int)($l['organization_id'] ?? 0) !== (int)$org) continue;
         $d = is_array($l['descriptors'] ?? null) ? $l['descriptors'] : [];
         $cond = shop_condition_label((string)($d['condition'] ?? ''));
@@ -86,10 +93,13 @@ if (!$fresh) {
         ];
       }
     }
+    $raw['perPage'][] = $n;
+    $raw['rows'] += $n;
   }
   shop_write_json('listings.json', $listings);
   $state['listingsAt'] = time();
   $state['listingsCount'] = count($listings);
+  $state['listingsRaw'] = $raw;
 }
 
 /* ---------------------------------------------------------------- 2. product details */
@@ -199,7 +209,7 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
         if (!empty($c['category']['id'])) $queue[] = sync_variant_url((int)$c['category']['id'], 1);
       }
       if (!$queue) return ['error' => "Could not read CrystalCommerce categories (HTTP $s)"];
-      $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'count' => 0, 'pages' => 0];
+      $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'count' => 0, 'pages' => 0, 'inStock' => 0];
     }
   }
 
@@ -242,8 +252,10 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
           }
           sort($other);
           $prog['byPid'][(string)(int)$v['product_catalog_id']][] = [(int)$v['id'], $cond !== '' ? $cond : 'Standard', implode(' ', $other),
-            (int)($v['sell_price']['money']['cents'] ?? 0)];
+            (int)($v['sell_price']['money']['cents'] ?? 0), (int)($v['qty'] ?? 0)];
           $prog['count']++;
+          // Counted only on passes started with this code (an older pass in progress has no 'inStock').
+          if ((int)($v['qty'] ?? 0) > 0 && isset($prog['inStock'])) $prog['inStock']++;
         }
         $prog['pages']++;
       }
@@ -252,7 +264,7 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
     if ($prog['queue']) {
       $out = ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count']];
     } else {
-      $catalog = ['at' => time(), 'variants' => $prog['count'], 'pages' => $prog['pages'],
+      $catalog = ['at' => time(), 'variants' => $prog['count'], 'inStock' => $prog['inStock'] ?? null, 'pages' => $prog['pages'],
         'passMinutes' => (int)round((time() - $prog['started']) / 60), 'byPid' => $prog['byPid']];
       shop_write_json('variants-catalog.json', $catalog);
       @unlink(shop_data_dir() . '/' . $progressFile);
@@ -293,7 +305,8 @@ function sync_variant_map(array $listings, array $catalog): array {
     // A few examples for the status check: how the listing and its candidate variants are described.
     if (count($examples) < 12) $examples[] = ['listing' => [$l['c'], $want], 'variants' => array_map(function ($c) { return [$c[1], $c[2]]; }, array_slice($cands, 0, 6)), 'variantCount' => count($cands)];
   }
-  $stats = ['at' => time(), 'catalogAt' => (int)$catalog['at'], 'variants' => (int)($catalog['variants'] ?? 0), 'listings' => count($listings),
+  $stats = ['at' => time(), 'catalogAt' => (int)$catalog['at'], 'variants' => (int)($catalog['variants'] ?? 0),
+    'variantsInStock' => $catalog['inStock'] ?? null, 'listings' => count($listings),
     'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing];
   shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'map' => $map]);
   return $stats;
@@ -306,5 +319,5 @@ function sync_variant_url(int $category, int $page): string {
 
 done([
   'status' => 'ok', 'listings' => count($listings), 'products' => count($products), 'listingsRefreshed' => !$fresh,
-  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'variants' => $variantStats, 'seconds' => round(microtime(true) - $t0, 1),
+  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats, 'seconds' => round(microtime(true) - $t0, 1),
 ]);
