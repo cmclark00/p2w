@@ -29,6 +29,9 @@ const VARIANT_PASS_HOURS = 6;        // a full variants pass (~256 pages) at mos
 const VARIANT_PAGES_PER_RUN = 20;    // pages per sync run
 const VARIANT_PARALLEL = 2;          // pages at a time
 const VARIANT_PAUSE_MS = 1000;       // pause between batches
+// Listing ids for stock that only the Admin API knows: this + the CrystalCommerce variant id, so they can
+// never clash with Core2 listing ids (and sync_variant_map maps them straight back to the variant).
+const ADMIN_LISTING_BASE = 1000000000;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -67,6 +70,7 @@ if (!$fresh) {
   for ($p = 2; $p <= $pages; $p++) $urls[] = "$base/api/listings?organization_id=" . rawurlencode($org) . '&per_page=' . SYNC_PER_PAGE . "&page=$p";
   $rest = $urls ? shop_fetch_json($urls, 3, 60) : [];
   $listings = [];
+  $soldOut = []; // Core2 listings with no stock: their variants must not come back in from the (older) Admin catalog
   // What CrystalCommerce sent, before the in-stock filter (shown in the status, to spot missing pages).
   $raw = ['pages' => $pages, 'meta' => array_diff_key($first, ['listings' => 1]), 'perPage' => [], 'rows' => 0, 'skipped' => ['noStock' => 0, 'noPrice' => 0, 'otherOrg' => 0]];
   foreach (array_merge([$first], array_values($rest)) as $i => $page) {
@@ -82,10 +86,15 @@ if (!$fresh) {
         if ((int)($l['organization_id'] ?? 0) !== (int)$org) $raw['skipped']['otherOrg']++;
         elseif ($qty <= 0) $raw['skipped']['noStock']++;
         elseif (!is_numeric($price) || $price <= 0) $raw['skipped']['noPrice']++;
-        if ($qty <= 0 || !is_numeric($price) || $price <= 0 || (int)($l['organization_id'] ?? 0) !== (int)$org) continue;
+        if ((int)($l['organization_id'] ?? 0) !== (int)$org) continue;
         $d = is_array($l['descriptors'] ?? null) ? $l['descriptors'] : [];
         $cond = shop_condition_label((string)($d['condition'] ?? ''));
         unset($d['condition']);
+        if ($qty <= 0 || !is_numeric($price) || $price <= 0) {
+          $soldOut[] = ['id' => (int)$l['id'], 'pid' => (int)$l['product_id'], 'c' => $cond !== '' ? $cond : 'Standard',
+            'v' => implode(' · ', array_filter(array_map('strval', array_values($d)))), 'p' => is_numeric($price) ? (int)$price : 0];
+          continue;
+        }
         $listings[] = [
           'id' => (int)$l['id'], 'pid' => (int)$l['product_id'], 'name' => (string)($l['product_name'] ?? ''),
           'type' => trim((string)($l['product_type_name'] ?? '')), 'c' => $cond !== '' ? $cond : 'Standard',
@@ -97,9 +106,45 @@ if (!$fresh) {
     $raw['rows'] += $n;
   }
   shop_write_json('listings.json', $listings);
+  shop_write_json('listings-soldout.json', $soldOut);
   $state['listingsAt'] = time();
   $state['listingsCount'] = count($listings);
   $state['listingsRaw'] = $raw;
+}
+
+/* ---------------------------------------------------------------- 1b. stock only the Admin API knows */
+
+// Core2's listings are only part of the store (Oct 9 2026: 4,901 listings, while the Admin API has 47k
+// variants). The saved variants catalog (step 4) lists every in-stock variant, so anything Core2 doesn't
+// cover is added from it. Core2 stays first: it's refreshed every few minutes, the catalog every few hours,
+// so a variant Core2 lists (in stock or sold out) always comes from Core2. Checkout re-checks stock live.
+$catalog = shop_read_json('variants-catalog.json');
+$adminAdded = 0;
+if (is_array($catalog) && isset($catalog['stock'], $catalog['byPid'])) {
+  $stockCat = [];
+  foreach ($catalog['stock'] as $s) $stockCat[$s[0]] = $s[3];
+  $taken = [];
+  $typeVotes = []; // Admin category -> the store's Core2 product type names seen for it
+  foreach (array_merge($listings, shop_read_json('listings-soldout.json') ?: []) as $l) {
+    $m = sync_match_listing($l, $catalog);
+    if ($m === null) continue;
+    $taken[$m[0]] = true;
+    if (($l['type'] ?? '') !== '' && isset($stockCat[$m[0]])) {
+      $cat = $stockCat[$m[0]];
+      $typeVotes[$cat][$l['type']] = ($typeVotes[$cat][$l['type']] ?? 0) + 1;
+    }
+  }
+  $catType = [];
+  foreach ($catalog['stock'] as [$vid, $pid, $name, $cat, $cond, $v, $qty, $cents]) {
+    if (isset($taken[$vid]) || $qty <= 0 || $cents <= 0) continue;
+    if (!isset($catType[$cat])) {
+      $votes = $typeVotes[$cat] ?? [];
+      arsort($votes);
+      $catType[$cat] = $votes ? (string)array_key_first($votes) : sync_category_type((string)($catalog['cats'][$cat] ?? ''));
+    }
+    $listings[] = ['id' => ADMIN_LISTING_BASE + $vid, 'pid' => $pid, 'name' => $name, 'type' => $catType[$cat], 'c' => $cond, 'v' => $v, 'q' => $qty, 'p' => $cents];
+    $adminAdded++;
+  }
 }
 
 /* ---------------------------------------------------------------- 2. product details */
@@ -113,7 +158,12 @@ while ($need && microtime(true) - $t0 < $budget - 8) {
   $res = shop_fetch_json(array_map(function ($id) use ($base) { return "$base/api/v2/products/$id"; }, $batch), 6, 20);
   foreach ($batch as $id) {
     $r = $res["$base/api/v2/products/$id"] ?? null;
-    if (!is_array($r) || empty($r['id'])) continue; // retried next run
+    if (!is_array($r) || empty($r['id'])) {
+      // Retried next run; after 3 misses it's shown without a photo or set, so the sync can finish.
+      $state['detailTries'][$id] = ($state['detailTries'][$id] ?? 0) + 1;
+      if ($state['detailTries'][$id] >= 3) { $details[$id] = ['none' => true]; unset($state['detailTries'][$id]); }
+      continue;
+    }
     $details[$id] = [
       'slug' => (string)($r['name_slug'] ?? ''), 'img' => (string)($r['image'] ?? ''), 'thumb' => (string)($r['image_thumb'] ?? ''),
       'set' => (string)($r['category_name'] ?? ''), 'setSlug' => (string)($r['category_slug'] ?? ''),
@@ -200,20 +250,26 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
   $passAge = time() - (int)($catalog['at'] ?? 0);
   $out = [];
 
-  if (!is_array($prog) || !isset($prog['queue'])) {
+  // A pass started before the catalog kept stock (Oct 9 2026) can't feed the shop: start over.
+  if (!is_array($prog) || !isset($prog['queue'], $prog['stock'])) {
     $prog = null;
-    if (!is_array($catalog) || $passAge >= VARIANT_PASS_HOURS * 3600) {
+    if (!is_array($catalog) || $passAge >= VARIANT_PASS_HOURS * 3600 || !isset($catalog['stock'])) {
       [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
       $queue = [];
+      $names = [];
       foreach ((is_array($cats) ? $cats['category']['children'] ?? [] : []) as $c) {
-        if (!empty($c['category']['id'])) $queue[] = sync_variant_url((int)$c['category']['id'], 1);
+        if (empty($c['category']['id'])) continue;
+        $queue[] = sync_variant_url((int)$c['category']['id'], 1);
+        $names[(int)$c['category']['id']] = (string)($c['category']['name'] ?? '');
       }
       if (!$queue) return ['error' => "Could not read CrystalCommerce categories (HTTP $s)"];
-      $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'count' => 0, 'pages' => 0, 'inStock' => 0];
+      $prog = ['started' => time(), 'queue' => $queue, 'tries' => [], 'byPid' => [], 'stock' => [], 'cats' => $names,
+        'count' => 0, 'pages' => 0, 'noCatalogId' => 0];
     }
   }
 
   $passDone = false;
+  $ranPass = (bool)$prog;
   if ($prog) {
     $headers = shop_cc_headers('admin:read-inventory');
     $read = 0;
@@ -236,36 +292,49 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
           continue;
         }
         $pc = $r['paginated_collection'];
-        if (preg_match('/[?&]category_id=(\d+).*[?&]page=1$/', $u, $m)) {
-          for ($p = 2; $p <= (int)($pc['total_pages'] ?? 1); $p++) $prog['queue'][] = sync_variant_url((int)$m[1], $p);
+        preg_match('/[?&]category_id=(\d+)/', $u, $cm);
+        $catId = (int)($cm[1] ?? 0);
+        if (preg_match('/[?&]page=1$/', $u)) {
+          for ($p = 2; $p <= (int)($pc['total_pages'] ?? 1); $p++) $prog['queue'][] = sync_variant_url($catId, $p);
         }
         foreach ($pc['entries'] ?? [] as $e) {
           $v = $e['variant'] ?? $e;
-          if (empty($v['id']) || empty($v['product_catalog_id'])) continue;
+          if (empty($v['id'])) continue;
+          $qty = (int)($v['available_qty'] ?? $v['qty'] ?? 0);
+          if (empty($v['product_catalog_id'])) {
+            if ($qty > 0) $prog['noCatalogId']++; // no Core2 product (photo, set, page id) to show it with
+            continue;
+          }
           $cond = '';
           $other = [];
+          $shown = [];
           foreach ($v['descriptors'] ?? [] as $d) {
             $d = is_array($d) ? ($d['variant_descriptor'] ?? $d) : [];
             $value = is_scalar($d['value'] ?? null) ? (string)$d['value'] : '';
             if (strcasecmp((string)($d['name'] ?? ''), 'condition') === 0) $cond = shop_condition_label($value);
-            elseif ($value !== '') $other[] = shop_norm($value);
+            elseif ($value !== '') { $other[] = shop_norm($value); $shown[] = $value; }
           }
           sort($other);
-          $prog['byPid'][(string)(int)$v['product_catalog_id']][] = [(int)$v['id'], $cond !== '' ? $cond : 'Standard', implode(' ', $other),
-            (int)($v['sell_price']['money']['cents'] ?? 0), (int)($v['qty'] ?? 0)];
+          $cond = $cond !== '' ? $cond : 'Standard';
+          $cents = (int)($v['sell_price']['money']['cents'] ?? 0);
+          $pid = (int)$v['product_catalog_id'];
+          $prog['byPid'][(string)$pid][] = [(int)$v['id'], $cond, implode(' ', $other), $cents];
           $prog['count']++;
-          // Counted only on passes started with this code (an older pass in progress has no 'inStock').
-          if ((int)($v['qty'] ?? 0) > 0 && isset($prog['inStock'])) $prog['inStock']++;
+          // In stock: everything the shop needs to list it (step 1b).
+          if ($qty > 0 && $cents > 0) {
+            $prog['stock'][] = [(int)$v['id'], $pid, (string)($v['product_name'] ?? ''), $catId, $cond, implode(' · ', $shown), $qty, $cents];
+          }
         }
         $prog['pages']++;
       }
       shop_write_json($progressFile, $prog);
     }
     if ($prog['queue']) {
-      $out = ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count']];
+      $out = ['pending' => count($prog['queue']), 'pagesRead' => $prog['pages'], 'variantsSoFar' => $prog['count'], 'inStockSoFar' => count($prog['stock'])];
     } else {
-      $catalog = ['at' => time(), 'variants' => $prog['count'], 'inStock' => $prog['inStock'] ?? null, 'pages' => $prog['pages'],
-        'passMinutes' => (int)round((time() - $prog['started']) / 60), 'byPid' => $prog['byPid']];
+      $catalog = ['at' => time(), 'variants' => $prog['count'], 'inStock' => count($prog['stock']), 'noCatalogId' => $prog['noCatalogId'],
+        'pages' => $prog['pages'], 'passMinutes' => (int)round((time() - $prog['started']) / 60),
+        'cats' => $prog['cats'], 'byPid' => $prog['byPid'], 'stock' => $prog['stock']];
       shop_write_json('variants-catalog.json', $catalog);
       @unlink(shop_data_dir() . '/' . $progressFile);
       $passDone = true;
@@ -273,12 +342,11 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
     unset($prog);
   }
 
-  // Match the listings against the saved catalog (no API calls).
-  $old = shop_read_json('variants.json');
-  if (is_array($catalog) && isset($catalog['byPid']) && ($passDone || $listingsChanged || !is_array($old) || (int)($old['catalogAt'] ?? 0) !== (int)$catalog['at'])) {
+  // Match the listings against the saved catalog (no API calls) every run: the listings now include the
+  // catalog's own stock (step 1b), which changes whenever either side does.
+  if (is_array($catalog) && isset($catalog['byPid'])) {
     $out = sync_variant_map($listings, $catalog) + $out;
-  } elseif (!$out) {
-    $out = ['upToDate' => true, 'nextPassInMinutes' => max(0, (int)ceil((VARIANT_PASS_HOURS * 3600 - $passAge) / 60))];
+    if (!$ranPass) $out['nextPassInMinutes'] = max(0, (int)ceil((VARIANT_PASS_HOURS * 3600 - $passAge) / 60));
   }
   return $out;
 }
@@ -287,29 +355,50 @@ function sync_variants(array $listings, bool $listingsChanged, float $deadline):
 function sync_variant_map(array $listings, array $catalog): array {
   $map = [];
   $examples = [];
-  $loose = $missing = 0;
+  $loose = $missing = $fromAdmin = 0;
   foreach ($listings as $l) {
-    $cands = $catalog['byPid'][(string)$l['pid']] ?? [];
-    $want = array_map('shop_norm', array_filter(explode(' · ', $l['v']), 'strlen'));
-    sort($want);
-    $want = implode(' ', $want);
-    $same = array_values(array_filter($cands, function ($c) use ($l, $want) { return $c[1] === $l['c'] && $c[2] === $want; }));
-    if (count($same) > 1) {
-      $samePrice = array_values(array_filter($same, function ($c) use ($l) { return $c[3] === $l['p']; }));
-      if ($samePrice) $same = $samePrice;
-    }
-    if ($same) { $map[$l['id']] = $same[0][0]; continue; }
-    // A product with a single variant can only be that one, even if its descriptors are spelled differently.
-    if (count($cands) === 1) { $map[$l['id']] = $cands[0][0]; $loose++; continue; }
+    // Added from the catalog in step 1b: the id is the variant id.
+    if ($l['id'] >= ADMIN_LISTING_BASE) { $map[$l['id']] = $l['id'] - ADMIN_LISTING_BASE; $fromAdmin++; continue; }
+    $m = sync_match_listing($l, $catalog);
+    if ($m !== null) { $map[$l['id']] = $m[0]; if ($m[1]) $loose++; continue; }
     $missing++;
     // A few examples for the status check: how the listing and its candidate variants are described.
-    if (count($examples) < 12) $examples[] = ['listing' => [$l['c'], $want], 'variants' => array_map(function ($c) { return [$c[1], $c[2]]; }, array_slice($cands, 0, 6)), 'variantCount' => count($cands)];
+    $cands = $catalog['byPid'][(string)$l['pid']] ?? [];
+    if (count($examples) < 12) $examples[] = ['listing' => [$l['c'], sync_descriptor_key($l['v'])], 'variants' => array_map(function ($c) { return [$c[1], $c[2]]; }, array_slice($cands, 0, 6)), 'variantCount' => count($cands)];
   }
   $stats = ['at' => time(), 'catalogAt' => (int)$catalog['at'], 'variants' => (int)($catalog['variants'] ?? 0),
-    'variantsInStock' => $catalog['inStock'] ?? null, 'listings' => count($listings),
-    'matched' => count($map), 'loose' => $loose, 'unmatched' => $missing];
+    'variantsInStock' => $catalog['inStock'] ?? null, 'noCatalogId' => $catalog['noCatalogId'] ?? null, 'listings' => count($listings),
+    'matched' => count($map), 'fromAdmin' => $fromAdmin, 'loose' => $loose, 'unmatched' => $missing];
   shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'map' => $map]);
   return $stats;
+}
+
+// [variant id, matched loosely?] for a Core2 listing: same product, condition and other descriptors (the
+// price breaks a tie); a product with a single variant can only be that one, however it's spelled.
+function sync_match_listing(array $l, array $catalog): ?array {
+  $cands = $catalog['byPid'][(string)$l['pid']] ?? [];
+  $want = sync_descriptor_key($l['v']);
+  $same = array_values(array_filter($cands, function ($c) use ($l, $want) { return $c[1] === $l['c'] && $c[2] === $want; }));
+  if (count($same) > 1) {
+    $samePrice = array_values(array_filter($same, function ($c) use ($l) { return $c[3] === $l['p']; }));
+    if ($samePrice) $same = $samePrice;
+  }
+  if ($same) return [$same[0][0], false];
+  if (count($cands) === 1) return [$cands[0][0], true];
+  return null;
+}
+
+function sync_descriptor_key(string $v): string {
+  $want = array_map('shop_norm', array_filter(explode(' · ', $v), 'strlen'));
+  sort($want);
+  return implode(' ', $want);
+}
+
+// An Admin API category name as a product type when no Core2 listing shows the store's own spelling:
+// "Magic (Sealed)" -> "Magic Sealed" (shop_split_type then files it as Magic / Sealed).
+function sync_category_type(string $cat): string {
+  $t = trim(preg_replace('/\s+/', ' ', str_replace(['(', ')'], ' ', $cat)));
+  return $t !== '' ? $t : 'Other';
 }
 
 function sync_variant_url(int $category, int $page): string {
@@ -318,6 +407,6 @@ function sync_variant_url(int $category, int $page): string {
 
 
 done([
-  'status' => 'ok', 'listings' => count($listings), 'products' => count($products), 'listingsRefreshed' => !$fresh,
+  'status' => 'ok', 'listings' => count($listings), 'fromAdmin' => $adminAdded, 'products' => count($products), 'listingsRefreshed' => !$fresh,
   'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats, 'seconds' => round(microtime(true) - $t0, 1),
 ]);

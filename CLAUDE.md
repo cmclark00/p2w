@@ -1010,6 +1010,22 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   `activity_logs` for changes). Docs: crystal-service.readme.io
   (`/llms.txt` lists every page). **Neither API has search by name**, so
   the shop searches its own index.
+- **Core2 only has part of the store** (Oct 9 2026: 4,901 Core2 listings
+  vs 47,392 Admin API variants; e.g. 931 Pokémon singles products). So the
+  variants pass (below) also keeps every **in-stock** variant (`stock` in
+  `variants-catalog.json`: variant id, Core2 product id, name, Admin
+  category, condition, other descriptors, qty, price), and sync step **1b**
+  adds every in-stock variant that no Core2 listing (in stock **or sold
+  out**, `listings-soldout.json`) matches. Core2 wins where both have it
+  (refreshed every 10 min; the catalog every ~6 h); checkout re-checks
+  stock live anyway. Those listings get id `ADMIN_LISTING_BASE`
+  (1,000,000,000) + variant id, and `sync_variant_map` maps them straight
+  back, so they're always orderable. Their product type is the Core2 type
+  most seen in that Admin category, else the category name
+  (`sync_category_type`: "Magic (Sealed)" → "Magic Sealed"). Variants
+  with no `product_catalog_id` are skipped (counted as `noCatalogId`).
+  Product details missing from Core2 are given up after 3 tries
+  (`detailTries`) so `missing` reaches 0.
 - **`shop/sync.php`** (public URL; only reads public data, one run at a
   time via `sync.lock`, listings re-read at most every 10 min) writes the
   private index to `<home>/p2w-shop-data/` (outside the docroot, like the
