@@ -32,6 +32,7 @@ const VARIANT_PAUSE_MS = 1000;       // pause between batches
 // Listing ids for stock that only the Admin API knows: this + the CrystalCommerce variant id, so they can
 // never clash with Core2 listing ids (and sync_variant_map maps them straight back to the variant).
 const ADMIN_LISTING_BASE = 1000000000;
+const ADMIN_STOCK = false; // step 1b on/off
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -118,8 +119,10 @@ if (!$fresh) {
 // variants). The saved variants catalog (step 4) lists every in-stock variant, so anything Core2 doesn't
 // cover is added from it. Core2 stays first: it's refreshed every few minutes, the catalog every few hours,
 // so a variant Core2 lists (in stock or sold out) always comes from Core2. Checkout re-checks stock live.
-$catalog = shop_read_json('variants-catalog.json');
 $adminAdded = 0;
+// Off for now: with the whole store (46k in-stock variants, Oct 9 2026) this ran out of memory (HTTP 500)
+// and the index would be too big for every shop page to load. Back on once the index is stored in pieces.
+$catalog = ADMIN_STOCK ? shop_read_json('variants-catalog.json') : null;
 if (is_array($catalog) && isset($catalog['stock'], $catalog['byPid'])) {
   $stockCat = [];
   foreach ($catalog['stock'] as $s) $stockCat[$s[0]] = $s[3];
@@ -408,5 +411,6 @@ function sync_variant_url(int $category, int $page): string {
 
 done([
   'status' => 'ok', 'listings' => count($listings), 'fromAdmin' => $adminAdded, 'products' => count($products), 'listingsRefreshed' => !$fresh,
-  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats, 'seconds' => round(microtime(true) - $t0, 1),
+  'detailsFetched' => $fetched, 'missing' => $state['missingDetails'], 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats,
+  'memoryMB' => round(memory_get_peak_usage() / 1048576), 'memoryLimit' => ini_get('memory_limit'), 'seconds' => round(microtime(true) - $t0, 1),
 ]);
