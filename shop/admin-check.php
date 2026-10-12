@@ -15,7 +15,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
-if (!isset($_GET['stock']) && !isset($_GET['pid']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
+if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
 $base = rtrim(shop_env('CC_ADMIN_BASE_URL') ?: 'https://playtowingames-admin.crystalcommerce.com/api/v1', '/');
@@ -45,6 +45,28 @@ function shape($json): array {
   if (!is_array($first)) return [];
   $inner = count($first) === 1 && is_array(reset($first)) ? reset($first) : $first;
   return array_keys($inner);
+}
+
+// ?compare=1: how Core2's stock compares with the store's own (the saved Admin catalog), from our data only.
+if (isset($_GET['compare'])) {
+  $db = new PDO('sqlite:' . shop_data_dir() . '/shop.sqlite', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+  $one = function (string $sql) use ($db) { return (int)$db->query($sql)->fetchColumn(); };
+  $res = [
+    'core2InStock' => $one('SELECT COUNT(*) FROM core2 WHERE live = 1'),
+    'noStoreVariant' => $one('SELECT COUNT(*) FROM core2 WHERE live = 1 AND vid IS NULL'),
+    'noStoreVariantQty1' => $one('SELECT COUNT(*) FROM core2 WHERE live = 1 AND vid IS NULL AND q = 1'),
+    'storeSaysZero' => $one('SELECT COUNT(*) FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 1 AND v.qty = 0'),
+    'sameQty' => $one('SELECT COUNT(*) FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 1 AND v.qty = c.q'),
+    'core2Higher' => $one('SELECT COUNT(*) FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 1 AND c.q > v.qty AND v.qty > 0'),
+    'core2Lower' => $one('SELECT COUNT(*) FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 1 AND c.q < v.qty'),
+    'core2SoldOutStoreHas' => $one('SELECT COUNT(*) FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 0 AND v.qty > 0'),
+    'core2QtyHistogram' => $db->query('SELECT q, COUNT(*) AS n FROM core2 WHERE live = 1 GROUP BY q ORDER BY n DESC LIMIT 8')->fetchAll(),
+    'storeQtyHistogram' => $db->query('SELECT qty, COUNT(*) AS n FROM variants WHERE qty > 0 GROUP BY qty ORDER BY n DESC LIMIT 8')->fetchAll(),
+    'examplesNoStoreVariant' => $db->query('SELECT pid, name, c, q, p FROM core2 WHERE live = 1 AND vid IS NULL LIMIT 8')->fetchAll(),
+    'examplesStoreZero' => $db->query('SELECT c.pid, c.name, c.c, c.q AS core2Qty, v.qty AS storeQty FROM core2 c JOIN variants v ON v.vid = c.vid WHERE c.live = 1 AND v.qty = 0 LIMIT 8')->fetchAll(),
+  ];
+  echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 // ?pid=<Core2 product id>: everything the shop knows about one product (our index, Core2's listings, the
