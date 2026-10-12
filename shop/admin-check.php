@@ -15,7 +15,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
-if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && !isset($_GET['find']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
+if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && !isset($_GET['find']) && !isset($_GET['product']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
 $base = rtrim(shop_env('CC_ADMIN_BASE_URL') ?: 'https://playtowingames-admin.crystalcommerce.com/api/v1', '/');
@@ -45,6 +45,18 @@ function shape($json): array {
   if (!is_array($first)) return [];
   $inner = count($first) === 1 && is_array(reset($first)) ? reset($first) : $first;
   return array_keys($inner);
+}
+
+// ?product=<store product id> (the number at the end of a storefront link): the store's own record of that
+// product, live, read-only: its fields (nested ones as field names), to find where its photo lives.
+if (isset($_GET['product'])) {
+  $id = (int)$_GET['product'];
+  [$s, $d] = cc_get($base, "/products/$id", 'admin:read-inventory', $secret, $user);
+  $p = is_array($d) ? ($d['product'] ?? $d) : [];
+  $res = ['checkedAt' => gmdate('c'), 'status' => $s, 'fields' => []];
+  foreach ($p as $k => $v) $res['fields'][$k] = is_array($v) ? $v : (is_string($v) && strlen($v) > 300 ? substr($v, 0, 300) . '…' : $v);
+  echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 // ?find=<words>: products (and their Core2 details) whose name or set contains the words, plus the set names
