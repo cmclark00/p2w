@@ -148,13 +148,13 @@ $missing = (int)$db->query("SELECT COUNT(*) FROM ($needSql)")->fetchColumn();
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
 $rebuild = !$fresh || $fetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 4;
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 5;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 4;
+  $state['indexVersion'] = 5;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -333,7 +333,8 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
         (SELECT type FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS ltype,
         (SELECT s.set_name FROM st.variants s WHERE s.pid = g.pid AND s.set_name <> \'\' GROUP BY s.set_name ORDER BY COUNT(*) DESC LIMIT 1) AS store_set, d.slug, d.img, d.thumb, d.set_name, d.set_slug, d.type_slug, d.type_name, d.descr, d.rel
       FROM (SELECT pid, SUM(q) AS qty, MIN(p) AS fp FROM listings GROUP BY pid) g LEFT JOIN st.details d ON d.pid = g.pid');
-    $count = 0;
+    $count = $badDetails = 0;
+    $badExamples = [];
     while ($r = $rows->fetch()) {
       $lt = (string)$r['ltype'];
       $dSlug = (string)($r['type_slug'] ?? '');
@@ -353,6 +354,16 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
       [$game, $kind] = shop_split_type($type);
       $name = (string)$r['name'];
       $n = shop_norm($name);
+      // Core2's details must describe this card: Oct 12 2026, the store's 30th Celebration promos pointed at
+      // Core2 products of another store ("Downers Grove Store Inventory": a Friends dice set, Journey Together
+      // packs...), so the cards showed those photos. Trusted only when the first words of the name are in
+      // Core2's name slug; otherwise its photo, description and set are left out ("Photo coming soon").
+      if (!sync_details_match($name, (string)($r['slug'] ?? ''))) {
+        $badDetails++;
+        if (count($badExamples) < 10) $badExamples[] = $name . ' <> ' . (string)$r['slug'];
+        foreach (['img', 'thumb', 'descr', 'slug'] as $k) $r[$k] = '';
+        if ((string)($r['store_set'] ?? '') === '') { $set = ''; $setSlug = ''; }
+      }
       $ins->execute([(int)$r['pid'], $name, $n, ' ' . trim("$n " . shop_norm($set) . ' ' . shop_norm($type)) . ' ',
         (string)($r['slug'] ?? '') !== '' ? $r['slug'] : shop_slug($name), (string)($r['img'] ?? ''), (string)($r['thumb'] ?? ''),
         $set, $setSlug, $type, $typeSlug, $game, $kind, (int)($r['rel'] ?? 0), (string)($r['descr'] ?? ''), (int)$r['qty'], (int)$r['fp']]);
@@ -376,10 +387,11 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
   if (!@rename($tmp, $path)) { @unlink($tmp); throw new RuntimeException('Could not save the shop index'); }
 
   $stats = ['at' => time(), 'catalogAt' => (int)sync_kv($db, 'catalogAt'), 'products' => $count, 'listings' => $listings, 'fromAdmin' => $fromAdmin,
-    'core2NotInStore' => $droppedCore2,
+    'core2NotInStore' => $droppedCore2, 'detailsMismatch' => $badDetails,
     'matched' => $orderable, 'loose' => $loose, 'unmatched' => $unmatched] + (json_decode((string)sync_kv($db, 'catalog'), true) ?: []);
   // For the kiosk status page.
-  shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples]);
+  shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'detailsMismatchExamples' => $badExamples]);
+  $stats['detailsMismatchExamples'] = $badExamples;
   return $stats;
 }
 
@@ -395,6 +407,17 @@ function sync_match(array $l, array $cands): ?array {
   if ($same) return [(int)$same[0][0], false];
   if (count($cands) === 1) return [(int)$cands[0][0], true];
   return null;
+}
+
+// Whether Core2's product details (by name slug) are for the card with this name: the first two words of the
+// name (not numbers, so "Mew ex - 152/128" -> mew, ex) must both appear in the slug. No slug = can't tell, kept.
+function sync_details_match(string $name, string $slug): bool {
+  if ($slug === '') return true;
+  $words = array_slice(array_values(array_filter(explode(' ', shop_norm($name)), function ($w) { return !ctype_digit($w); })), 0, 2);
+  // Substring of the slug without hyphens, so accents ("pok mon" from Pokémon on some systems) and joined words pass.
+  $have = str_replace('-', '', strtolower($slug));
+  foreach ($words as $w) if (strpos($have, $w) === false) return false;
+  return true;
 }
 
 // Descriptors other than condition, normalized and sorted, so both APIs' spellings compare equal.
