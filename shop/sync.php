@@ -145,13 +145,13 @@ $missing = (int)$db->query("SELECT COUNT(*) FROM ($needSql)")->fetchColumn();
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
 $rebuild = !$fresh || $fetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 3;
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 4;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 3;
+  $state['indexVersion'] = 4;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -190,9 +190,13 @@ function sync_store(): PDO {
   return $db;
 }
 
-// The variants catalog: every Admin API variant (in stock or not), by Core2 product id.
+// The variants catalog: every Admin API variant (in stock or not), by Core2 product id. set_name is the
+// store's own category for it (its set, as the storefront shows it), when that's more than the top level.
 function sync_variants_table(PDO $db, string $name): void {
-  $db->exec("CREATE TABLE IF NOT EXISTS $name (vid INTEGER PRIMARY KEY, pid INTEGER, name TEXT, cat INTEGER, cond TEXT, dkey TEXT, shown TEXT, qty INTEGER, cents INTEGER)");
+  $db->exec("CREATE TABLE IF NOT EXISTS $name (vid INTEGER PRIMARY KEY, pid INTEGER, name TEXT, cat INTEGER, cond TEXT, dkey TEXT, shown TEXT, qty INTEGER, cents INTEGER,
+    set_name TEXT DEFAULT '')");
+  $cols = array_column($db->query("PRAGMA table_info($name)")->fetchAll(), 'name');
+  if (!in_array('set_name', $cols, true)) $db->exec("ALTER TABLE $name ADD COLUMN set_name TEXT DEFAULT ''"); // tables from before Oct 12 2026
   $db->exec("CREATE INDEX IF NOT EXISTS {$name}_pid ON $name (pid)");
 }
 
@@ -323,7 +327,8 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
     $ins = $ix->prepare('INSERT INTO products (id, name, n, hay, slug, img, thumb, set_name, set_slug, type, type_slug, game, kind, rel, descr, qty, from_p)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     $rows = $ix->query('SELECT g.pid, g.qty, g.fp, (SELECT name FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS name,
-        (SELECT type FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS ltype, d.slug, d.img, d.thumb, d.set_name, d.set_slug, d.type_slug, d.type_name, d.descr, d.rel
+        (SELECT type FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS ltype,
+        (SELECT s.set_name FROM st.variants s WHERE s.pid = g.pid AND s.set_name <> \'\' GROUP BY s.set_name ORDER BY COUNT(*) DESC LIMIT 1) AS store_set, d.slug, d.img, d.thumb, d.set_name, d.set_slug, d.type_slug, d.type_name, d.descr, d.rel
       FROM (SELECT pid, SUM(q) AS qty, MIN(p) AS fp FROM listings GROUP BY pid) g LEFT JOIN st.details d ON d.pid = g.pid');
     $count = 0;
     while ($r = $rows->fetch()) {
@@ -335,12 +340,19 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
       $typeSlug = shop_slug($type);
       $setOk = (string)($r['set_name'] ?? '') !== '' && ($dSlug === $typeSlug || $lt === '');
       $set = $setOk ? (string)$r['set_name'] : '';
+      $setSlug = $setOk ? (string)$r['set_slug'] : '';
+      // The store's own category wins (Oct 12 2026): Core2 filed the 30th Celebration promos the store sells
+      // under another store's "Downers Grove Store Inventory", so they had no set in the filter.
+      if ((string)($r['store_set'] ?? '') !== '') {
+        $set = (string)$r['store_set'];
+        $setSlug = $typeSlug . '-' . shop_slug($set);
+      }
       [$game, $kind] = shop_split_type($type);
       $name = (string)$r['name'];
       $n = shop_norm($name);
       $ins->execute([(int)$r['pid'], $name, $n, ' ' . trim("$n " . shop_norm($set) . ' ' . shop_norm($type)) . ' ',
         (string)($r['slug'] ?? '') !== '' ? $r['slug'] : shop_slug($name), (string)($r['img'] ?? ''), (string)($r['thumb'] ?? ''),
-        $set, $setOk ? (string)$r['set_slug'] : '', $type, $typeSlug, $game, $kind, (int)($r['rel'] ?? 0), (string)($r['descr'] ?? ''), (int)$r['qty'], (int)$r['fp']]);
+        $set, $setSlug, $type, $typeSlug, $game, $kind, (int)($r['rel'] ?? 0), (string)($r['descr'] ?? ''), (int)$r['qty'], (int)$r['fp']]);
       $count++;
     }
     $rows->closeCursor();
@@ -434,7 +446,9 @@ function sync_variants(PDO $db, float $deadline): array {
   }
 
   $headers = shop_cc_headers('admin:read-inventory');
-  $ins = $db->prepare('INSERT OR REPLACE INTO variants_new (vid, pid, name, cat, cond, dkey, shown, qty, cents) VALUES (?,?,?,?,?,?,?,?,?)');
+  sync_variants_table($db, 'variants_new'); // adds set_name to a pass started before it existed
+  $ins = $db->prepare('INSERT OR REPLACE INTO variants_new (vid, pid, name, cat, cond, dkey, shown, qty, cents, set_name) VALUES (?,?,?,?,?,?,?,?,?,?)');
+  $topNames = array_flip(array_map('shop_norm', $prog['cats']));
   $read = 0;
   // A batch can take up to the 30 s request timeout, so only start one with time to spare.
   while ($prog['queue'] && $read < VARIANT_PAGES_PER_RUN && microtime(true) < $deadline - 32) {
@@ -480,8 +494,11 @@ function sync_variants(PDO $db, float $deadline): array {
         }
         sort($other);
         $cents = (int)($v['sell_price']['money']['cents'] ?? 0);
+        // The store's category for the card is its set ("ME 30th Celebration"), unless it's just the top level.
+        $set = trim((string)($v['category_name'] ?? ''));
+        if (isset($topNames[shop_norm($set)])) $set = '';
         $ins->execute([(int)$v['id'], (int)$v['product_catalog_id'], (string)($v['product_name'] ?? ''), $catId, $cond !== '' ? $cond : 'Standard',
-          implode(' ', $other), implode(' · ', $shown), $qty, $cents]);
+          implode(' ', $other), implode(' · ', $shown), $qty, $cents, $set]);
         $prog['count']++;
         if ($qty > 0 && $cents > 0) $prog['inStock']++;
       }

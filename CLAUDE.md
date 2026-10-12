@@ -1021,6 +1021,14 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   showed sold-out cards: 442 of 4,976 in-stock Core2 listings had no
   variant in the store at all (Lycanroc 138/128 showed "Last one") and 10
   were 0 in the store. Checkout re-checks stock live anyway.
+  **Sets come from the store too** (Oct 12 2026): each variant's
+  `category_name` (the storefront category, e.g. "ME 30th Celebration")
+  is kept as `set_name` in the catalog, unless it's just a top-level
+  category name, and wins over Core2's set (slug `<type slug>-<set>`).
+  Core2 had filed the store's 30th Celebration promos under another
+  store's "Downers Grove Store Inventory", so they had no set; it also
+  has a separate "Mega Evolution - 30th Celebration" catalog of the same
+  cards that the store doesn't use (dropped as not in the store).
   `shop/admin-check.php?compare=1` (Core2 vs store counts, our data only)
   and `?pid=<Core2 product id>` (one product across our data + a live read
   of its variants) are the diagnostics. Those listings get id `ADMIN_LISTING_BASE`
