@@ -64,6 +64,7 @@ if (isset($_GET['find'])) {
     'byName' => $run('SELECT p.id, p.name, p.set_name, p.type, p.type_slug, d.set_name AS detail_set, d.type_slug AS detail_type, d.ok, d.tries
       FROM products p LEFT JOIN st.details d ON d.pid = p.id WHERE ' . $like('p.name') . ' LIMIT 15', $args),
     'storeCategories' => $run('SELECT v.cat, COUNT(*) AS n FROM st.variants v WHERE ' . $like('v.name') . ' AND v.qty > 0 GROUP BY v.cat', $args),
+    'storeByName' => $run('SELECT v.vid, v.pid, v.name, v.cat, v.cond, v.qty, v.cents FROM st.variants v WHERE ' . $like('v.name') . ' LIMIT 15', $args),
     // Products whose Core2 set matches, with what Core2 and the store catalog say about each.
     'setProducts' => $run('SELECT d.pid, d.set_name, (SELECT COUNT(*) FROM products p WHERE p.id = d.pid) AS inIndex,
         (SELECT group_concat(c.c || " q" || c.q || " live" || c.live || " vid" || ifnull(c.vid, "-"), "; ") FROM st.core2 c WHERE c.pid = d.pid) AS core2,
