@@ -1014,9 +1014,16 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   vs 47,393 Admin API variants, **46,627 in stock**; e.g. 931 Pokémon
   singles products). So the variants pass (below) keeps every variant's
   stock and price, and the index adds every in-stock variant that no Core2
-  listing (in stock **or sold out**) matches. Core2 wins where both have
-  it (refreshed every 10 min; the catalog every ~6 h); checkout re-checks
-  stock live anyway. Those listings get id `ADMIN_LISTING_BASE`
+  listing (in stock **or sold out**) matches. **The store's catalog is
+  the authority** (Oct 12 2026): a Core2 listing only shows when its
+  matched store variant is in stock, with the **lower** of the two counts
+  (`core2NotInStore` in the status counts the dropped ones). Core2 alone
+  showed sold-out cards: 442 of 4,976 in-stock Core2 listings had no
+  variant in the store at all (Lycanroc 138/128 showed "Last one") and 10
+  were 0 in the store. Checkout re-checks stock live anyway.
+  `shop/admin-check.php?compare=1` (Core2 vs store counts, our data only)
+  and `?pid=<Core2 product id>` (one product across our data + a live read
+  of its variants) are the diagnostics. Those listings get id `ADMIN_LISTING_BASE`
   (1,000,000,000) + variant id and carry their variant id, so they're
   always orderable. Their product type is the Core2 type most seen in
   that Admin category, else the category name (`sync_category_type`:

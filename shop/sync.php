@@ -145,13 +145,13 @@ $missing = (int)$db->query("SELECT COUNT(*) FROM ($needSql)")->fetchColumn();
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
 $rebuild = !$fresh || $fetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 2;
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 3;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 2;
+  $state['indexVersion'] = 3;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -292,7 +292,14 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
     $ix->exec('CREATE TABLE listings (id INTEGER PRIMARY KEY, pid INTEGER, c TEXT, v TEXT, q INTEGER, p INTEGER, vid INTEGER, crank INTEGER, src INTEGER, name TEXT, type TEXT)');
     $ix->exec('ATTACH DATABASE ' . $ix->quote(shop_data_dir() . '/' . STORE_DB) . ' AS st');
     $ix->beginTransaction();
-    $ix->exec('INSERT INTO listings (id, pid, c, v, q, p, vid, crank, src, name, type) SELECT id, pid, c, v, q, p, vid, 9, 0, name, type FROM st.core2 WHERE live = 1');
+    // Core2's listings count only when the store's own catalog has that card in stock, and then with the
+    // lower of the two counts. Oct 12 2026: 442 of 4,976 in-stock Core2 listings had no variant in the store
+    // at all (e.g. Lycanroc 138/128 "Last one", not in the store) and 10 more were 0 in the store, so
+    // Core2 alone showed sold-out cards; the store's catalog is what its storefront and checkout use.
+    $ix->exec('INSERT INTO listings (id, pid, c, v, q, p, vid, crank, src, name, type)
+      SELECT c.id, c.pid, c.c, c.v, MIN(c.q, s.qty), c.p, c.vid, 9, 0, c.name, c.type FROM st.core2 c JOIN st.variants s ON s.vid = c.vid
+      WHERE c.live = 1 AND s.qty > 0');
+    $droppedCore2 = (int)$ix->query('SELECT COUNT(*) FROM st.core2 WHERE live = 1')->fetchColumn() - (int)$ix->query('SELECT COUNT(*) FROM listings')->fetchColumn();
     $fromAdmin = 0;
     if (ADMIN_STOCK) {
       $add = $ix->prepare('INSERT INTO listings (id, pid, c, v, q, p, vid, crank, src, name, type)
@@ -354,6 +361,7 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
   if (!@rename($tmp, $path)) { @unlink($tmp); throw new RuntimeException('Could not save the shop index'); }
 
   $stats = ['at' => time(), 'catalogAt' => (int)sync_kv($db, 'catalogAt'), 'products' => $count, 'listings' => $listings, 'fromAdmin' => $fromAdmin,
+    'core2NotInStore' => $droppedCore2,
     'matched' => $orderable, 'loose' => $loose, 'unmatched' => $unmatched] + (json_decode((string)sync_kv($db, 'catalog'), true) ?: []);
   // For the kiosk status page.
   shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples]);
