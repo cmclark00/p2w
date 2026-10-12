@@ -15,7 +15,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
-if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
+if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && !isset($_GET['find']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
 $base = rtrim(shop_env('CC_ADMIN_BASE_URL') ?: 'https://playtowingames-admin.crystalcommerce.com/api/v1', '/');
@@ -45,6 +45,28 @@ function shape($json): array {
   if (!is_array($first)) return [];
   $inner = count($first) === 1 && is_array(reset($first)) ? reset($first) : $first;
   return array_keys($inner);
+}
+
+// ?find=<words>: products (and their Core2 details) whose name or set contains the words, plus the set names
+// that look alike, from our data only. For "why isn't set X in the filter" questions.
+if (isset($_GET['find'])) {
+  $words = array_values(array_filter(explode(' ', shop_norm((string)$_GET['find']))));
+  $open = function (string $f) { return new PDO('sqlite:' . shop_data_dir() . '/' . $f, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]); };
+  $ix = $open('shop-index.sqlite');
+  $ix->exec('ATTACH DATABASE ' . $ix->quote(shop_data_dir() . '/shop.sqlite') . ' AS st');
+  $like = function (string $col) use ($words) { return $words ? implode(' AND ', array_map(function () use ($col) { return "lower($col) LIKE ?"; }, $words)) : '1'; };
+  $args = array_map(function ($w) { return "%$w%"; }, $words);
+  $run = function (string $sql, array $a) use ($ix) { $st = $ix->prepare($sql); $st->execute($a); return $st->fetchAll(); };
+  $res = [
+    'words' => $words,
+    'indexSets' => $run('SELECT set_name, set_slug, type_slug, COUNT(*) AS n FROM products WHERE ' . $like('set_name') . ' GROUP BY set_slug, type_slug', $args),
+    'detailSets' => $run('SELECT set_name, set_slug, type_slug, type_name, COUNT(*) AS n FROM st.details WHERE ' . $like('set_name') . ' GROUP BY set_slug, type_slug', $args),
+    'byName' => $run('SELECT p.id, p.name, p.set_name, p.type, p.type_slug, d.set_name AS detail_set, d.type_slug AS detail_type, d.ok, d.tries
+      FROM products p LEFT JOIN st.details d ON d.pid = p.id WHERE ' . $like('p.name') . ' LIMIT 15', $args),
+    'storeCategories' => $run('SELECT v.cat, COUNT(*) AS n FROM st.variants v WHERE ' . $like('v.name') . ' AND v.qty > 0 GROUP BY v.cat', $args),
+  ];
+  echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 // ?compare=1: how Core2's stock compares with the store's own (the saved Admin catalog), from our data only.
