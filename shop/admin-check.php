@@ -47,6 +47,53 @@ function shape($json): array {
   return array_keys($inner);
 }
 
+// ?stock=1: which variant fields hold the stock count (Oct 2026: the variants list's `qty` showed out-of-stock
+// cards as in stock). One list page from the middle of a category plus 6 single-variant reads, numbers and
+// field names only. Cached separately, 10 minutes.
+if (isset($_GET['stock'])) {
+  $sc = shop_data_dir() . '/admin-check-stock.json';
+  if (is_file($sc) && time() - filemtime($sc) < 600) { readfile($sc); exit; }
+  $nums = function ($v) {
+    $r = [];
+    foreach ($v as $k => $x) {
+      if (is_scalar($x) || $x === null) { if (preg_match('/qty|quantit|stock|avail|reserv|hold|count|track|infinite|active|hidden|sell/i', (string)$k)) $r[$k] = $x; }
+      elseif (preg_match('/qty|quantit|stock|avail|price/i', (string)$k)) $r[$k] = $x;
+    }
+    return $r;
+  };
+  [$s, $cats] = cc_get($base, '/categories', 'admin:read-inventory', $secret, $user);
+  $cat = null;
+  foreach ($cats['category']['children'] ?? [] as $c) if (stripos($c['category']['name'] ?? '', 'pokemon singles') !== false) $cat = $c['category'];
+  $res = ['checkedAt' => gmdate('c'), 'category' => $cat['name'] ?? null];
+  if ($cat) {
+    [$s, $j] = cc_get($base, '/variants?category_id=' . (int)$cat['id'] . '&per_page=50&page=1', 'admin:read-inventory', $secret, $user);
+    $pages = (int)($j['paginated_collection']['total_pages'] ?? 1);
+    $mid = max(1, intdiv($pages, 2));
+    [$s, $j] = cc_get($base, '/variants?category_id=' . (int)$cat['id'] . "&per_page=50&page=$mid", 'admin:read-inventory', $secret, $user);
+    $entries = $j['paginated_collection']['entries'] ?? [];
+    $first = $entries[0]['variant'] ?? $entries[0] ?? [];
+    $res['listPage'] = ['status' => $s, 'page' => $mid, 'of' => $pages, 'total' => $j['paginated_collection']['total_entries'] ?? null];
+    $res['listFields'] = array_keys($first);
+    $rows = [];
+    foreach ($entries as $e) {
+      $v = $e['variant'] ?? $e;
+      $rows[] = ['id' => $v['id'] ?? null, 'name' => $v['product_name'] ?? null] + $nums($v);
+    }
+    $res['list'] = $rows;
+    $res['single'] = [];
+    foreach (array_slice($rows, 0, 6) as $r) {
+      [$s, $d] = cc_get($base, '/variants/' . (int)$r['id'], 'admin:read-inventory', $secret, $user);
+      $v = is_array($d) ? ($d['variant'] ?? $d) : [];
+      $res['single'][] = ['id' => $r['id'], 'status' => $s] + $nums($v);
+    }
+    $res['singleFields'] = isset($v) && is_array($v) ? array_keys($v) : [];
+  }
+  $json = json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  @file_put_contents($sc, $json);
+  echo $json;
+  exit;
+}
+
 $out = ['ok' => true, 'checkedAt' => gmdate('c'), 'base' => $base, 'username' => $user, 'checks' => []];
 
 // 1. Categories (inventory scope).
