@@ -15,7 +15,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
-if (is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
+if (!isset($_GET['stock']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
 $base = rtrim(shop_env('CC_ADMIN_BASE_URL') ?: 'https://playtowingames-admin.crystalcommerce.com/api/v1', '/');
