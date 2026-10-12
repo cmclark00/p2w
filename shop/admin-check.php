@@ -15,7 +15,7 @@ header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
-if (!isset($_GET['stock']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
+if (!isset($_GET['stock']) && !isset($_GET['pid']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }
 
 $secret = shop_env('CC_API_PROXY_SECRET');
 $base = rtrim(shop_env('CC_ADMIN_BASE_URL') ?: 'https://playtowingames-admin.crystalcommerce.com/api/v1', '/');
@@ -45,6 +45,41 @@ function shape($json): array {
   if (!is_array($first)) return [];
   $inner = count($first) === 1 && is_array(reset($first)) ? reset($first) : $first;
   return array_keys($inner);
+}
+
+// ?pid=<Core2 product id>: everything the shop knows about one product (our index, Core2's listings, the
+// saved variants catalog) next to a live read of each of its CrystalCommerce variants. Product data only.
+if (isset($_GET['pid'])) {
+  $pid = (int)$_GET['pid'];
+  $res = ['checkedAt' => gmdate('c'), 'pid' => $pid];
+  $q = function (string $file, string $sql, array $args) {
+    $path = shop_data_dir() . '/' . $file;
+    if (!is_file($path)) return null;
+    $db = new PDO('sqlite:' . $path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $st = $db->prepare($sql);
+    $st->execute($args);
+    return $st->fetchAll();
+  };
+  try {
+    $res['index'] = $q('shop-index.sqlite', 'SELECT id, c, v, q, p, vid, src, name, type FROM listings WHERE pid = ?', [$pid]);
+    $res['core2'] = $q('shop.sqlite', 'SELECT id, c, v, q, p, live, vid FROM core2 WHERE pid = ?', [$pid]);
+    $res['catalog'] = $q('shop.sqlite', 'SELECT vid, name, cat, cond, shown, qty, cents FROM variants WHERE pid = ?', [$pid]);
+    $res['catalogAt'] = gmdate('c', (int)($q('shop.sqlite', "SELECT v FROM kv WHERE k = 'catalogAt'", [])[0]['v'] ?? 0));
+  } catch (Throwable $t) {
+    $res['dbError'] = $t->getMessage();
+  }
+  $res['live'] = [];
+  foreach (array_slice($res['catalog'] ?? [], 0, 12) as $row) {
+    [$s, $d] = cc_get($base, '/variants/' . (int)$row['vid'], 'admin:read-inventory', $secret, $user);
+    $v = is_array($d) ? ($d['variant'] ?? $d) : [];
+    $live = ['vid' => (int)$row['vid'], 'status' => $s];
+    foreach (['qty', 'available_qty', 'inventory_qty', 'reserved_qty', 'wtb_qty', 'is_infinite_qty'] as $k) $live[$k] = $v[$k] ?? null;
+    $live['sell_cents'] = $v['sell_price']['money']['cents'] ?? null;
+    $live['descriptors'] = array_map(function ($x) { $x = $x['variant_descriptor'] ?? $x; return ($x['name'] ?? '') . ': ' . ($x['value'] ?? ''); }, $v['descriptors'] ?? []);
+    $res['live'][] = $live;
+  }
+  echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 // ?stock=1: which variant fields hold the stock count (Oct 2026: the variants list's `qty` showed out-of-stock
