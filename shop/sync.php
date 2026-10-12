@@ -148,13 +148,13 @@ $missing = (int)$db->query("SELECT COUNT(*) FROM ($needSql)")->fetchColumn();
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
 $rebuild = !$fresh || $fetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 5;
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 6;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 5;
+  $state['indexVersion'] = 6;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -356,8 +356,8 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
       $n = shop_norm($name);
       // Core2's details must describe this card: Oct 12 2026, the store's 30th Celebration promos pointed at
       // Core2 products of another store ("Downers Grove Store Inventory": a Friends dice set, Journey Together
-      // packs...), so the cards showed those photos. Trusted only when the first words of the name are in
-      // Core2's name slug; otherwise its photo, description and set are left out ("Photo coming soon").
+      // packs...), so the cards showed those photos. Trusted only when the card number or the first word of the
+      // name is in Core2's name slug; otherwise its photo, description and set are left out ("Photo coming soon").
       if (!sync_details_match($name, (string)($r['slug'] ?? ''))) {
         $badDetails++;
         if (count($badExamples) < 10) $badExamples[] = $name . ' <> ' . (string)$r['slug'];
@@ -409,15 +409,23 @@ function sync_match(array $l, array $cands): ?array {
   return null;
 }
 
-// Whether Core2's product details (by name slug) are for the card with this name: the first two words of the
-// name (not numbers, so "Mew ex - 152/128" -> mew, ex) must both appear in the slug. No slug = can't tell, kept.
+// Whether Core2's product details (by name slug) are for the card with this name: its card number or the first
+// word of its name must appear in the slug. No slug = can't tell, kept.
 function sync_details_match(string $name, string $slug): bool {
   if ($slug === '') return true;
-  $words = array_slice(array_values(array_filter(explode(' ', shop_norm($name)), function ($w) { return !ctype_digit($w); })), 0, 2);
-  // Substring of the slug without hyphens, so accents ("pok mon" from Pokémon on some systems) and joined words pass.
+  // Compared without hyphens, so accents ("pok mon" from Pokémon on some systems) and joined words pass.
   $have = str_replace('-', '', strtolower($slug));
-  foreach ($words as $w) if (strpos($have, $w) === false) return false;
-  return true;
+  // The card number ("152/128", "DR3-EN059", "MEP094") is the surest sign; Core2's spellings of names vary
+  // ("Cemetery"/"cemetary", "Equip Shoot"/"equip-shot").
+  if (preg_match_all('#[A-Za-z0-9]*\d[A-Za-z0-9/\-]*#', $name, $m)) {
+    foreach ($m[0] as $code) {
+      $code = preg_replace('/[^a-z0-9]/', '', strtolower($code));
+      if (strlen($code) >= 3 && strpos($have, $code) !== false) return true;
+    }
+  }
+  // Else the first word of the name (not a number).
+  $words = array_values(array_filter(explode(' ', shop_norm($name)), function ($w) { return !ctype_digit($w); }));
+  return $words && strpos($have, $words[0]) !== false;
 }
 
 // Descriptors other than condition, normalized and sorted, so both APIs' spellings compare equal.
