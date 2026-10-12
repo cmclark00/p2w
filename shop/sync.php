@@ -38,6 +38,9 @@ const VARIANT_PASS_HOURS = 6;        // a full variants pass (~256 pages) at mos
 const VARIANT_PAGES_PER_RUN = 20;    // pages per sync run
 const VARIANT_PARALLEL = 2;          // pages at a time
 const VARIANT_PAUSE_MS = 1000;       // pause between batches
+// A catalog read before this time (Unix seconds) is stale whatever its age, so raising it starts a new pass
+// on the next run (same pace). Oct 12 2026: forced once (owner's request) to pick up the store's set names.
+const CATALOG_NOT_BEFORE = 1791838977;
 // Listing ids for stock that only the Admin API knows: this + the CrystalCommerce variant id, so they can
 // never clash with Core2 listing ids.
 const ADMIN_LISTING_BASE = 1000000000;
@@ -428,7 +431,7 @@ function sync_variants(PDO $db, float $deadline): array {
   if (!is_array($prog) || !isset($prog['queue'], $prog['v2'])) {
     if ($prog !== null) @unlink(shop_data_dir() . '/' . $progressFile); // a pass from the JSON-era code
     $prog = null;
-    if ($passAge < VARIANT_PASS_HOURS * 3600) {
+    if ($passAge < VARIANT_PASS_HOURS * 3600 && (int)sync_kv($db, 'catalogAt') >= CATALOG_NOT_BEFORE) {
       return ['upToDate' => true, 'nextPassInMinutes' => max(0, (int)ceil((VARIANT_PASS_HOURS * 3600 - $passAge) / 60))];
     }
     [$s, $cats] = shop_cc('GET', '/categories', 'admin:read-inventory');
