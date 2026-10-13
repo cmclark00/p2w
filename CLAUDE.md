@@ -1000,6 +1000,20 @@ The site's **only server-side code**. Everything else is static.
     their own items, or pick the bundle"; loose bundle → PriceCharting's
     loose price is often just the disc; CIB/New bundle → check every
     instrument.
+  - **Case only** (`CASE_ONLY` condition on PriceCharting game lines, owner
+    Oct 13 2026): an empty case. First-party games (`caseFirstParty()`:
+    name has a phrase from `settings.cases.firstParty`, ~95 Nintendo/Sony/
+    Microsoft franchises, managers edit under Settings → Case only; staff
+    override per line via `line.firstParty` 'yes'/'no' from the "+
+    Deduction…" menu) pay PriceCharting's **box-only price**
+    (`box-only-price`, `BOX_KEY`; kept by `slimProduct()`, fetched by
+    `loadBoxPrice()` when a search result lacked it) in store credit and
+    that **÷ 1.5** (`CASE_CASH_DIVISOR`) in cash; everything else, or a
+    first-party case with no box price, pays `settings.cases.amount`
+    ($0.25) flat. No deductions on case lines. Handled first in
+    `priceWith()`, before the guide rules. Settings v9 also adds the
+    `Killzone Shadow Fall @ Playstation 4 = -45` floor premium (shop $10)
+    to saved lists.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

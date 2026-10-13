@@ -39,6 +39,13 @@ const PC_FIELDS = {
   market: { loose: 'loose-price', cib: 'cib-price', new: 'new-price' },
 };
 const PRICE_KEYS = [...Object.values(PC_FIELDS['retail-buy']), ...Object.values(PC_FIELDS.market)];
+// PriceCharting's "box only" price (an empty case or box), for Case only game lines. Kept when a product has it,
+// but not required (search results may lack it; a Case only line loads it when it needs it).
+const BOX_KEY = 'box-only-price';
+// Case only: a game's empty case (owner, Oct 2026): first-party games pay PriceCharting's box-only price in store
+// credit and that ÷ 1.5 in cash (the old game rule); anything else pays settings.cases.amount ($0.25) flat.
+const CASE_ONLY = 'case';
+const CASE_CASH_DIVISOR = 1.5;
 
 // PriceCharting console names for disc-based systems (the guide's "disc only" rules apply to these).
 const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
@@ -58,7 +65,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 8,
+  version: 9,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -105,7 +112,34 @@ const DEFAULT_SETTINGS = {
     { phrase: 'Pokemon Black Version 2', pct: 0 },
     { phrase: 'Pokemon SoulSilver', pct: 13 }, // $200
     { phrase: 'Hey You Pikachu', pct: 80 }, // $35
+    // Owner, Oct 13 2026: the shop sells Killzone: Shadow Fall at $10, below its own sales ($16–18 top, $10–13
+    // typical), so no sales rule fits it; -45% puts both loose and CIB on $10.
+    { phrase: 'Killzone Shadow Fall', system: 'Playstation 4', pct: -45 },
   ],
+  // Case only game lines: names containing one of these phrases are first-party games (Nintendo, Sony,
+  // Microsoft), whose cases pay PriceCharting's box-only price (credit) / ÷ 1.5 (cash); every other case pays
+  // amount (cents). Staff can mark a single line either way. PriceCharting doesn't say who published a game.
+  cases: {
+    amount: 25,
+    firstParty: [
+      // Nintendo
+      'Mario', 'Luigi', 'Zelda', 'Pokemon', 'Kirby', 'Metroid', 'Donkey Kong', 'Yoshi', 'Wario', 'Smash Bros', 'Animal Crossing',
+      'Splatoon', 'Pikmin', 'Fire Emblem', 'Xenoblade', 'Star Fox', 'F-Zero', 'Wii Sports', 'Wii Fit', 'Wii Play', 'Nintendogs',
+      'Brain Age', 'Ring Fit', '1-2-Switch', 'Advance Wars', 'Kid Icarus', 'Punch-Out', 'EarthBound', 'Golden Sun', 'Bayonetta 2',
+      'Bayonetta 3', 'Excite', 'Chibi-Robo', 'Custom Robo', 'Pilotwings', 'WarioWare',
+      // Sony
+      'God of War', 'Uncharted', 'The Last of Us', "Marvel's Spider-Man", 'Horizon Zero Dawn', 'Horizon Forbidden West',
+      'Gran Turismo', 'Ratchet', 'Jak and Daxter', 'Jak 2', 'Jak 3', 'Sly Cooper', 'Killzone', 'Infamous', 'Ghost of Tsushima',
+      'Bloodborne', 'The Last Guardian', 'Shadow of the Colossus', 'Ico', 'LittleBigPlanet', 'Days Gone', 'Returnal',
+      "Demon's Souls", 'Until Dawn', 'Detroit Become Human', 'Heavy Rain', 'Twisted Metal', 'MLB The Show', 'Resistance',
+      'MotorStorm', 'Wipeout', 'Astro Bot', 'Sackboy', 'Knack', 'Ape Escape', 'Gravity Rush', 'Patapon', 'LocoRoco',
+      'Syphon Filter', 'SOCOM', 'Death Stranding',
+      // Microsoft
+      'Halo', 'Gears of War', 'Forza', 'Fable', 'Sea of Thieves', 'State of Decay', 'Crackdown', 'Perfect Dark', 'Banjo',
+      'Viva Pinata', 'Kameo', 'Ori and the', 'Starfield', 'Flight Simulator', 'Age of Empires', 'Kinect Sports', 'Project Gotham',
+      'Lost Odyssey', 'Blue Dragon',
+    ],
+  },
   deductions: [
     { id: 'scratch-light', label: 'Light scratching (resurface)', amount: 200, appliesTo: 'game', resurface: true },
     { id: 'scratch-heavy', label: 'Heavy scratching (resurface)', amount: 300, appliesTo: 'game', resurface: true },
@@ -260,6 +294,7 @@ function mergeSettings(saved) {
     if (saved[k] !== undefined) s[k] = saved[k];
   }
   if (saved.flatItems && typeof saved.flatItems === 'object') Object.assign(s.flatItems, saved.flatItems);
+  if (saved.cases && typeof saved.cases === 'object') Object.assign(s.cases, saved.cases);
   if (Array.isArray(saved.floorPremiums)) s.floorPremiums = saved.floorPremiums;
   if (saved.version >= 2) { // version 1 saves used a different percentage format - keep the new defaults
     for (const cat of Object.keys(s.rules)) Object.assign(s.rules[cat], saved.rules?.[cat] || {});
@@ -287,6 +322,10 @@ function mergeSettings(saved) {
   const oldDefaults = [[{ phrase: 'Pokemon', pct: 10 }], DEFAULT_SETTINGS.floorPremiums.slice(0, 7)].map(premiumKey);
   if (saved.version < 8 && oldDefaults.includes(premiumKey(s.floorPremiums))) {
     s.floorPremiums = clone(DEFAULT_SETTINGS.floorPremiums);
+  }
+  // Version 9: the Killzone: Shadow Fall discount line (owner request) joins saved premium lists.
+  if (saved.version < 9 && !s.floorPremiums.some((p) => norm(p.phrase) === 'killzone shadow fall')) {
+    s.floorPremiums.push(clone(DEFAULT_SETTINGS.floorPremiums.find((p) => norm(p.phrase) === 'killzone shadow fall')));
   }
   return s;
 }
@@ -392,7 +431,7 @@ function pcLink(id, text, cls = '') {
 
 function slimProduct(p) {
   const prices = {};
-  for (const k of PRICE_KEYS) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
+  for (const k of [...PRICE_KEYS, BOX_KEY]) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
   const positive = (v) => (Number(v) > 0 ? Number(v) : null); // PriceCharting uses 0 for "GameStop doesn't carry it"
   return {
     id: String(p.id), name: p['product-name'] || 'Unknown item', platform: p['console-name'] || '',
@@ -615,8 +654,19 @@ function boxedPrice(prices, unit, category, condition, s = settings) {
   return condition === 'cib' ? cib : Math.max(pc('new') ?? 0, Math.round(cib * step));
 }
 
+// Case only: is this a first-party game's case? Staff's mark on the line wins over the settings list.
+function caseFirstParty(line, s = settings) {
+  if (line.firstParty === 'yes') return true;
+  if (line.firstParty === 'no') return false;
+  const text = norm(line.name);
+  return (s.cases?.firstParty || []).some((k) => hasPhrase(text, k));
+}
+const isCaseLine = (line) => line.source === 'pc' && line.condition === CASE_ONLY;
+
 function autoBase(line, rule, s = settings) {
   if (line.source === 'bulk') return line.bulkTotal ?? null;
+  // A first-party case's value is PriceCharting's box-only price (it's paid as store credit); others are flat.
+  if (isCaseLine(line)) return caseFirstParty(line, s) && line.prices?.[BOX_KEY] > 0 ? line.prices[BOX_KEY] : null;
   if (line.source === 'pc' && line.condition === 'parts') return pcPartsPrice(line, s)?.price ?? null;
   if (line.source === 'hw' && isPcCondition(line.condition)) return boxedPrice(line.prices, lineHw(line).unit, line.category, line.condition, s);
   if (line.source === 'pc') {
@@ -637,7 +687,8 @@ function autoBase(line, rule, s = settings) {
 // and there's no store credit bump (credit = cash).
 const isPartsLine = (line) => (line.source === 'hw' || line.source === 'pc') && line.condition === 'parts';
 // Custom items: the typed cash is the final offer, so there's nothing for a deduction to come off.
-const takesDeductions = (line) => !isPartsLine(line) && line.source !== 'bulk' && line.source !== 'custom';
+// Case only lines are a flat case price too.
+const takesDeductions = (line) => !isPartsLine(line) && !isCaseLine(line) && line.source !== 'bulk' && line.source !== 'custom';
 
 function lineDeductions(line, s = settings) {
   if (!takesDeductions(line)) return []; // kept on the line in case it's switched back from Parts
@@ -672,6 +723,7 @@ function normalCreditBonus(line, s = settings) {
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
 function normalCreditBonusOf(line, p, s) {
   if (isPartsLine(line) || line.source === 'bulk' || p.flat) return 0;
+  if (isCaseLine(line)) return (CASE_CASH_DIVISOR - 1) * 100; // credit = cash × 1.5
   const rule = s.rules[line.category] || s.rules.other;
   return rule.cashPct > 0 ? (rule.creditPct / rule.cashPct - 1) * 100 : 0;
 }
@@ -697,6 +749,20 @@ function priceWith(line, s, deds) {
   if (line.pending || line.failed) return out;
   const rule = s.rules[line.category] || s.rules.other;
   out.base = line.override ?? autoBase(line, rule, s);
+  // Case only: a first-party case pays its value (PriceCharting's box-only price, or a typed Value) in store credit
+  // and that ÷ 1.5 in cash; any other case, or one PriceCharting has no box price for, pays the flat case amount.
+  if (isCaseLine(line)) {
+    const first = caseFirstParty(line, s);
+    if (first && out.base != null) {
+      Object.assign(out, { credit: roundOffer(out.base, s), cash: roundOffer(out.base / CASE_CASH_DIVISOR, s),
+        guide: { info: true, note: `First-party case: ${line.override == null ? 'PriceCharting box-only' : 'typed'} ${money(out.base)} in store credit, ÷ ${CASE_CASH_DIVISOR} in cash` } });
+      return out;
+    }
+    const amount = s.cases?.amount ?? 25;
+    Object.assign(out, { cash: amount, credit: amount, flat: true,
+      guide: { note: first ? `First-party case, no PriceCharting box price → ${money(amount)}` : `Case only → ${money(amount)}` } });
+    return out;
+  }
   const dedTotal = deds.reduce((sum, d) => sum + d.amount, 0);
   // Guide rules run first: their tiers use the market price, so they work even without a retail buy price.
   out.guide = line.override == null ? guideCheck(line, s) : null;
@@ -748,7 +814,7 @@ function flash(id) {
   tr.classList.add('flash');
 }
 
-const isPlain = (l) => l.override == null && l.cashOverride == null && !(l.deductions || []).length && !l.guideFlag && l.creditBonus == null;
+const isPlain = (l) => l.override == null && l.cashOverride == null && !(l.deductions || []).length && !l.guideFlag && !l.firstParty && l.creditBonus == null;
 
 function placeLine(line, replaceId) {
   const i = replaceId ? trade.lines.findIndex((l) => l.id === replaceId) : -1;
@@ -950,6 +1016,20 @@ async function attachPcProduct(target, raw, condition) {
   flash(line.id);
 }
 
+// A first-party Case only line whose stored prices lack PriceCharting's box-only price (search results may not
+// carry it): fetch the full product once.
+async function loadBoxPrice(line) {
+  if (!isCaseLine(line) || !caseFirstParty(line) || BOX_KEY in (line.prices || {}) || !/^\d+$/.test(line.pcId || '')) return;
+  try {
+    const full = await PC.byId(line.pcId);
+    const box = Number(full?.[BOX_KEY]);
+    line.prices = { ...(line.prices || {}), [BOX_KEY]: box > 0 ? box : 0 };
+    commit();
+  } catch (err) {
+    toast(`Couldn't load the box-only price: ${err.message}`, 'error');
+  }
+}
+
 // A hardware line switched to CIB/New whose stored PriceCharting prices lack that condition's price
 // (e.g. it came from a search result with partial prices): fetch the full product once.
 async function loadLinePrices(line) {
@@ -964,7 +1044,7 @@ async function loadLinePrices(line) {
 }
 
 function conditionLabel(line) {
-  if (line.source === 'pc') return line.condition === 'parts' ? 'Parts' : GAME_CONDITIONS[line.condition];
+  if (line.source === 'pc') return line.condition === 'parts' ? 'Parts' : line.condition === CASE_ONLY ? 'Case only' : GAME_CONDITIONS[line.condition];
   if (line.source === 'hw' && line.condition === THIRD_PARTY) return '3rd party';
   if (line.source === 'hw') return HW_PC_CONDITIONS[line.condition] ||hwConditionLabels((hwItem(line) || line).category)[line.condition] || '';
   return '';
@@ -975,7 +1055,8 @@ function refLine(line) {
   const fmt = (basis) => Object.entries(PC_FIELDS[basis]).map(([c, k]) => `${GAME_CONDITIONS[c]} ${money(p[k] > 0 ? p[k] : null)}`).join(' · ');
   const gs = line.gamestop || {};
   const gamestop = gs.trade || gs.sell ? `<br>GameStop: pays ${money(gs.trade)} cash · sells for ${money(gs.sell)}` : '';
-  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}${gamestop}`;
+  const box = p[BOX_KEY] > 0 ? ` · Box only ${money(p[BOX_KEY])}` : '';
+  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}${box}${gamestop}`;
 }
 
 function conditionSelect(line) {
@@ -983,6 +1064,7 @@ function conditionSelect(line) {
   if (line.source === 'pc') {
     const conds = Object.entries(GAME_CONDITIONS);
     if (isHwCat(line.category) || line.condition === 'parts') conds.push(['parts', 'Parts']);
+    if (isGameCat(line.category) || line.condition === CASE_ONLY) conds.push([CASE_ONLY, 'Case only']);
     return `<select data-field="condition">${conds.map(opt).join('')}</select>`;
   }
   if (line.source === 'hw') {
@@ -1005,7 +1087,16 @@ function adjustHtml(line) {
   const dedOpts = settings.deductions.filter((d) => takesDeductions(line) && d.appliesTo === target && !applied.has(d.id))
     .map((d) => `<option value="ded:${esc(d.id)}">${esc(d.label)} (−${money(d.amount)})</option>`).join('');
   let guideOpt = '';
-  if (line.source === 'pc' && isGameCat(line.category) && settings.guide.enabled && !line.guideFlag) {
+  if (isCaseLine(line)) {
+    // Case only: staff can override whether it's a first-party game's case.
+    if (line.firstParty) {
+      chips.push(`<span class="chip">${line.firstParty === 'yes' ? 'Marked first-party' : 'Marked not first-party'}<button type="button" data-action="unfirstparty" aria-label="Undo">×</button></span>`);
+    } else {
+      guideOpt = caseFirstParty(line)
+        ? '<option value="firstparty:no">Not a first-party game – flat case price</option>'
+        : '<option value="firstparty:yes">First-party game – box-only price</option>';
+    }
+  } else if (line.source === 'pc' && isGameCat(line.category) && settings.guide.enabled && !line.guideFlag) {
     guideOpt = autoShitboxReason(line)
       ? '<option value="flag:normal">Not a shitbox game – price normally</option>'
       : '<option value="flag:shitbox">Mark as shitbox game</option>';
@@ -1248,6 +1339,10 @@ function onLineChange(e) {
     const val = v.slice(i + 1);
     if (kind === 'ded') line.deductions = [...(line.deductions || []), val];
     if (kind === 'flag') line.guideFlag = val;
+    if (kind === 'firstparty') {
+      line.firstParty = val;
+      if (val === 'yes') loadBoxPrice(line);
+    }
     commit();
     return;
   }
@@ -1262,6 +1357,7 @@ function onLineChange(e) {
     line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === target);
     if (!isGameCat(v)) delete line.guideFlag;
     if (line.source === 'pc' && line.condition === 'parts' && !isHwCat(v)) line.condition = 'loose';
+    if (line.source === 'pc' && line.condition === CASE_ONLY && !isGameCat(v)) line.condition = 'loose';
     commit();
     return;
   }
@@ -1295,7 +1391,11 @@ function onLineChange(e) {
       commit(); // Parts hides/shows the deduction menu; CIB/New show PriceCharting prices
       return;
     }
-    if (line.source === 'pc') { commit(); return; } // Parts hides/shows the deduction menu
+    if (line.source === 'pc') { // Parts and Case only hide/show the deduction menu
+      if (v === CASE_ONLY) loadBoxPrice(line);
+      commit();
+      return;
+    }
   } else if (field === 'name') {
     line.name = v.trim();
   }
@@ -1327,6 +1427,10 @@ function onLineClick(e) {
     commit();
   } else if (action === 'unflag') {
     delete line.guideFlag;
+    commit();
+  } else if (action === 'unfirstparty') {
+    delete line.firstParty;
+    loadBoxPrice(line);
     commit();
   } else if (action === 'resetcash') {
     line.cashOverride = null;
@@ -1788,6 +1892,8 @@ function fillSettingsForm(s = settings) {
   f.boxedStepPct.value = pctText(s.boxedStepPct);
   f.flatKeywords.value = s.flatItems.keywords.join('\n');
   f.flatAmount.value = plain(s.flatItems.amount);
+  f.caseFirstParty.value = (s.cases?.firstParty || []).join('\n');
+  f.caseAmount.value = plain(s.cases?.amount);
   f.floorPremiums.value = premiumsText(s.floorPremiums);
   f.shopName.value = s.shopName;
   f.quoteFooter.value = s.quoteFooter;
@@ -1812,6 +1918,7 @@ async function saveSettings(e) {
   const f = e.target.elements;
   const lowValue = parseMoney(f.lowValue.value);
   const flatAmount = parseMoney(f.flatAmount.value);
+  const caseAmount = parseMoney(f.caseAmount.value);
   const guide = { enabled: f.guideEnabled.checked };
   for (const key of GUIDE_LISTS) guide[key] = lines(f[key].value);
   const next = {
@@ -1827,6 +1934,10 @@ async function saveSettings(e) {
     flatItems: {
       amount: Number.isNaN(flatAmount) || flatAmount == null ? settings.flatItems.amount : flatAmount,
       keywords: lines(f.flatKeywords.value),
+    },
+    cases: {
+      amount: Number.isNaN(caseAmount) || caseAmount == null ? settings.cases.amount : caseAmount,
+      firstParty: lines(f.caseFirstParty.value),
     },
     floorPremiums: premiumsFromText(f.floorPremiums.value),
     shopName: f.shopName.value.trim(),
@@ -1946,7 +2057,7 @@ const historyLists = { settings: [], hardware: [] };
 const SETTING_LABELS = {
   defaultCondition: 'Default condition', roundMode: 'Rounding', roundStep: 'Rounding step', lowValue: 'Low-offer flag',
   slowSalesPerYear: 'Slow-seller flag', partsPctOfLoose: 'Special-edition Parts %', thirdPartyPct: 'Third-party controller %',
-  boxedStepPct: 'Boxed controller minimums', flatItems: 'Flat-price items', floorPremiums: 'Floor price premiums',
+  boxedStepPct: 'Boxed controller minimums', flatItems: 'Flat-price items', cases: 'Case only', floorPremiums: 'Floor price premiums',
   shopName: 'Shop name', quoteFooter: 'Quote footer', deductions: 'Deductions', guide: 'Buying guide rules',
 };
 

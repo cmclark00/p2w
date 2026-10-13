@@ -755,7 +755,13 @@ Everyone in the store shares one internet address, so typos add up.</p>
    <strong>Something the calculator can't find?</strong> Click <strong>+ Custom item</strong>,
    describe it, pick its type, and type the cash offer in the <strong>Cash</strong>
    column. Store credit fills in from the type.</li>
-<li>Set each game's condition (<strong>Loose / CIB / New</strong>). Use a line's
+<li>Set each game's condition (<strong>Loose / CIB / New</strong>, or <strong>Case only</strong>
+   for just an empty case: a first-party game's case, like Mario, Zelda,
+   Pokémon, God of War or Halo, pays PriceCharting's box-only price in
+   store credit and that ÷ 1.5 in cash; any other case pays $0.25. If the
+   calculator gets first-party wrong, fix it from the line's
+   <strong>+ Deduction</strong> menu; managers edit the list under Settings → Case
+   only). Use a line's
    <strong>+ Deduction</strong> menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on <strong>Parts</strong> has no
    deductions, and store credit is the same as cash. Items worth $0.50 or
@@ -830,9 +836,16 @@ Guide (the Google Sheet tab).</p>
      doesn't set the price. For games selling around <strong>$80 and up</strong> it
      uses the <strong>second-highest</strong> sale instead, since pricier games go on
      the shelf nearer the top. That sale is highlighted in the list.</li>
-<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> the highest of
-     <strong>GameStop's pre-owned price</strong>, <strong>Amazon's lowest offer</strong> (used, or
-     new for New), and that sale.</li>
+<li><strong>PS4, PS5, Xbox One / Series, Switch, Switch 2:</strong> the <strong>highest
+     normal sale</strong> (the guide's "eBay highest sold"), or GameStop's
+     pre-owned price or Amazon's lowest offer (used, or new for New) when
+     one of those is higher. An Amazon offer more than twice eBay and
+     PriceCharting is ignored (a note says so).</li>
+<li><strong>PriceCharting's own price</strong> counts on every system: when it's
+     higher than the sale, GameStop or Amazon, the price goes by it.</li>
+<li><strong>Never counted:</strong> lots, sealed copies, bundles with a console, and
+     sales of another edition (Steelbook, GOTY, Collector's…) listed under
+     the plain game. They show dimmed.</li>
 <li><strong>Amazon's offers show on every game</strong>, listed under the sales
      (prices include shipping). On older systems, when Amazon's typical
      price is higher, the price moves partway toward it (at most 25%

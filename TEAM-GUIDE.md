@@ -645,7 +645,13 @@ Everyone in the store shares one internet address, so typos add up.
    **Something the calculator can't find?** Click **+ Custom item**,
    describe it, pick its type, and type the cash offer in the **Cash**
    column. Store credit fills in from the type.
-3. Set each game's condition (**Loose / CIB / New**). Use a line's
+3. Set each game's condition (**Loose / CIB / New**, or **Case only**
+   for just an empty case: a first-party game's case, like Mario, Zelda,
+   Pokémon, God of War or Halo, pays PriceCharting's box-only price in
+   store credit and that ÷ 1.5 in cash; any other case pays $0.25. If the
+   calculator gets first-party wrong, fix it from the line's
+   **+ Deduction** menu; managers edit the list under Settings → Case
+   only). Use a line's
    **+ Deduction** menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on **Parts** has no
    deductions, and store credit is the same as cash. Items worth $0.50 or
@@ -722,9 +728,16 @@ Guide (the Google Sheet tab).
      doesn't set the price. For games selling around **$80 and up** it
      uses the **second-highest** sale instead, since pricier games go on
      the shelf nearer the top. That sale is highlighted in the list.
-   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the highest of
-     **GameStop's pre-owned price**, **Amazon's lowest offer** (used, or
-     new for New), and that sale.
+   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the **highest
+     normal sale** (the guide's "eBay highest sold"), or GameStop's
+     pre-owned price or Amazon's lowest offer (used, or new for New) when
+     one of those is higher. An Amazon offer more than twice eBay and
+     PriceCharting is ignored (a note says so).
+   - **PriceCharting's own price** counts on every system: when it's
+     higher than the sale, GameStop or Amazon, the price goes by it.
+   - **Never counted:** lots, sealed copies, bundles with a console, and
+     sales of another edition (Steelbook, GOTY, Collector's…) listed under
+     the plain game. They show dimmed.
    - **Amazon's offers show on every game**, listed under the sales
      (prices include shipping). On older systems, when Amazon's typical
      price is higher, the price moves partway toward it (at most 25%
