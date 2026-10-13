@@ -2723,7 +2723,7 @@ const FLOOR_TIERS = [
   },
   {
     id: 'modern', gamestop: true, amazon: true,
-    rule: "Highest of the second-highest recent eBay sale, PriceCharting's price, GameStop's pre-owned price, and Amazon's lowest offer (ignored when it's over twice eBay and PriceCharting)",
+    rule: "Highest of the top recent eBay sale, PriceCharting's price, GameStop's pre-owned price, and Amazon's lowest offer (ignored when it's over twice eBay and PriceCharting)",
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
@@ -3042,15 +3042,15 @@ function floorGsFor(cur) {
 
 // The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH; the highest when copies are scarce). sales are
 // highest first; odd listings never count.
-// Modern systems (top = true) use the second-highest normal sale (owner, Oct 13 2026: "when eBay is higher than
-// GameStop or Amazon, go off eBay"): the 90th percentile tuned on PS2/GameCube shelf prices sat under Amazon even
-// when eBay ran higher (GTA V [Premium Edition], PS4, CIB: sales up to $17.99, 90th percentile $14.79, Amazon $14.99
-// -> $15; the shop prices it at $20). Second-highest, not highest, so one lucky sale still can't set it.
+// Modern systems (top = true) use the highest normal sale, the Game Pricing Guide's own "eBay highest sold" (owner,
+// Oct 13 2026). The 90th percentile tuned on PS2/GameCube shelf prices sat under Amazon even when eBay ran higher,
+// and the second-highest still came out a step low. The shop's prices match the highest normal sale: GTA V
+// [Premium Edition] PS4 CIB $17.99 -> $20, Fallout 4 PS4 CIB $19.95 -> $20, Dragon Age: Inquisition Xbox One
+// loose $9.99 -> $10. Odd listings (lots, sealed, bundles...) still never count.
 function floorAutoSale(sales, scarce = false, top = false) {
   const normal = sales.filter((s) => !s.odd);
   if (!normal.length) return { sale: null, count: 0 };
-  if (scarce) return { sale: normal[0], count: normal.length, high: true };
-  if (top) return { sale: normal[1] || normal[0], count: normal.length, high: true };
+  if (scarce || top) return { sale: normal[0], count: normal.length, high: true };
   const asc = [...normal].reverse();
   const p90 = asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))];
   const sale = p90.price >= FLOOR_HIGH && normal.length > 1 ? normal[1] : p90;
@@ -3166,7 +3166,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The price goes by the highlighted sale: ${tier.id === 'modern' ? 'the second-highest normal sale' : 'the high end of normal sales (90th percentile; the second-highest sale for games selling around $80 and up)'}, so one lucky sale doesn't set it. Click any sale to use it instead. Lots, sealed copies, and other odd listings never count.</p>`;
+      <p class="muted small-print">The price goes by the highlighted sale: ${tier.id === 'modern' ? 'the highest normal sale (the pricing guide\'s "eBay highest sold")' : 'the high end of normal sales (90th percentile; the second-highest sale for games selling around $80 and up), so one lucky sale doesn\'t set it'}. Click any sale to use it instead. Lots, sealed copies, and other odd listings never count.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
