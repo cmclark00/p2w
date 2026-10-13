@@ -42,10 +42,10 @@ const PRICE_KEYS = [...Object.values(PC_FIELDS['retail-buy']), ...Object.values(
 // PriceCharting's "box only" price (an empty case or box), for Case only game lines. Kept when a product has it,
 // but not required (search results may lack it; a Case only line loads it when it needs it).
 const BOX_KEY = 'box-only-price';
-// Case only: a game's empty case (owner, Oct 2026): first-party games pay PriceCharting's box-only price in store
-// credit and that ÷ 1.5 in cash (the old game rule); anything else pays settings.cases.amount ($0.25) flat.
+// Case only: a game's empty case (owner, Oct 2026): a first-party game's case is valued like the game (its box's
+// share of the CIB price, through the game rule, so cash = credit ÷ 1.5); anything else pays settings.cases.amount
+// ($0.25) flat.
 const CASE_ONLY = 'case';
-const CASE_CASH_DIVISOR = 1.5;
 
 // PriceCharting console names for disc-based systems (the guide's "disc only" rules apply to these).
 const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
@@ -665,8 +665,18 @@ const isCaseLine = (line) => line.source === 'pc' && line.condition === CASE_ONL
 
 function autoBase(line, rule, s = settings) {
   if (line.source === 'bulk') return line.bulkTotal ?? null;
-  // A first-party case's value is PriceCharting's box-only price (it's paid as store credit); others are flat.
-  if (isCaseLine(line)) return caseFirstParty(line, s) && line.prices?.[BOX_KEY] > 0 ? line.prices[BOX_KEY] : null;
+  // A first-party case is valued like the game: the box's share of the CIB market price, applied to the game's own
+  // buying basis (retail buy for games). PriceCharting's box-only price is a market price, and paid as-is it beat
+  // the whole game (The Last Guardian, PS4, Oct 2026: box $6.40 vs CIB $16.44 market, but the CIB offer comes from
+  // the much lower retail buy). Others are flat.
+  if (isCaseLine(line)) {
+    const box = line.prices?.[BOX_KEY];
+    if (!caseFirstParty(line, s) || !(box > 0)) return null;
+    if ((rule.basis || 'retail-buy') === 'market') return box;
+    const cibBasis = line.prices?.[PC_FIELDS['retail-buy'].cib];
+    const cibMarket = line.prices?.[PC_FIELDS.market.cib];
+    return cibBasis > 0 && cibMarket > 0 ? Math.round((box * Math.min(cibBasis, cibMarket)) / cibMarket) : null;
+  }
   if (line.source === 'pc' && line.condition === 'parts') return pcPartsPrice(line, s)?.price ?? null;
   if (line.source === 'hw' && isPcCondition(line.condition)) return boxedPrice(line.prices, lineHw(line).unit, line.category, line.condition, s);
   if (line.source === 'pc') {
@@ -723,7 +733,6 @@ function normalCreditBonus(line, s = settings) {
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
 function normalCreditBonusOf(line, p, s) {
   if (isPartsLine(line) || line.source === 'bulk' || p.flat) return 0;
-  if (isCaseLine(line)) return (CASE_CASH_DIVISOR - 1) * 100; // credit = cash × 1.5
   const rule = s.rules[line.category] || s.rules.other;
   return rule.cashPct > 0 ? (rule.creditPct / rule.cashPct - 1) * 100 : 0;
 }
@@ -749,18 +758,22 @@ function priceWith(line, s, deds) {
   if (line.pending || line.failed) return out;
   const rule = s.rules[line.category] || s.rules.other;
   out.base = line.override ?? autoBase(line, rule, s);
-  // Case only: a first-party case pays its value (PriceCharting's box-only price, or a typed Value) in store credit
-  // and that ÷ 1.5 in cash; any other case, or one PriceCharting has no box price for, pays the flat case amount.
+  // Case only: a first-party case pays its value (see autoBase, or a typed Value) through the game's own rule, so
+  // store credit is cash × 1.5 and it can't beat the game; any other case, or one PriceCharting has no box or CIB
+  // price for, pays the flat case amount. The guide's rules don't apply to an empty case.
   if (isCaseLine(line)) {
     const first = caseFirstParty(line, s);
     if (first && out.base != null) {
-      Object.assign(out, { credit: roundOffer(out.base, s), cash: roundOffer(out.base / CASE_CASH_DIVISOR, s),
-        guide: { info: true, note: `First-party case: ${line.override == null ? 'PriceCharting box-only' : 'typed'} ${money(out.base)} in store credit, ÷ ${CASE_CASH_DIVISOR} in cash` } });
+      const box = line.prices?.[BOX_KEY];
+      Object.assign(out, { cash: roundOffer((out.base * rule.cashPct) / 100, s), credit: roundOffer((out.base * rule.creditPct) / 100, s),
+        guide: { info: true, note: line.override == null
+          ? `First-party case: box ${money(box)} of CIB ${money(line.prices?.[PC_FIELDS.market.cib])} on PriceCharting, valued like the game`
+          : 'First-party case: typed value, game rule' } });
       return out;
     }
     const amount = s.cases?.amount ?? 25;
     Object.assign(out, { cash: amount, credit: amount, flat: true,
-      guide: { note: first ? `First-party case, no PriceCharting box price → ${money(amount)}` : `Case only → ${money(amount)}` } });
+      guide: { note: first ? `First-party case, PriceCharting is missing its box or CIB price → ${money(amount)}` : `Case only → ${money(amount)}` } });
     return out;
   }
   const dedTotal = deds.reduce((sum, d) => sum + d.amount, 0);

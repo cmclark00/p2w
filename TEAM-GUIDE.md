@@ -647,8 +647,9 @@ Everyone in the store shares one internet address, so typos add up.
    column. Store credit fills in from the type.
 3. Set each game's condition (**Loose / CIB / New**, or **Case only**
    for just an empty case: a first-party game's case, like Mario, Zelda,
-   Pokémon, God of War or Halo, pays PriceCharting's box-only price in
-   store credit and that ÷ 1.5 in cash; any other case pays $0.25. If the
+   Pokémon, God of War or Halo, is valued like the game itself (its box's
+   share of the CIB price), so store credit is cash × 1.5 and a case never
+   pays more than the game; any other case pays $0.25. If the
    calculator gets first-party wrong, fix it from the line's
    **+ Deduction** menu; managers edit the list under Settings → Case
    only). Use a line's
