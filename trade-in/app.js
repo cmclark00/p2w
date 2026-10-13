@@ -2709,23 +2709,25 @@ function showBulk() {
 /* ================================================================== floor pricing */
 
 // Game Pricing Guide (the Google Sheet tab), made hands-free: the sales PriceCharting lists are eBay
-// sold listings, so they stand in for "eBay highest sold" at any price. Modern systems take the highest
-// of GameStop's pre-owned price, Amazon's lowest offer, and that sale (owner's choice).
+// sold listings, so they stand in for "eBay highest sold" at any price. PriceCharting's own price for the
+// condition counts too, and the highest number wins (owner, Oct 2026: when eBay or PriceCharting is higher than
+// GameStop or Amazon, go by them). Modern systems also take GameStop's pre-owned price and Amazon's lowest offer
+// (owner's choice), unless that Amazon offer is far above eBay and PriceCharting (FLOOR_AMAZON_OUTLIER).
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
-    id: 'retro', rule: "Top recent eBay sales (from PriceCharting), never below GameStop's pre-owned price, nudged toward Amazon when it's higher",
+    id: 'retro', rule: "Top recent eBay sales or PriceCharting's price, whichever is higher, never below GameStop's pre-owned price, nudged toward Amazon when it's higher",
     systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
       'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast', 'gamecube',
       'playstation 3', 'xbox 360'],
   },
   {
     id: 'modern', gamestop: true, amazon: true,
-    rule: "Highest of GameStop's pre-owned price, Amazon's lowest offer, and the top recent eBay sales",
+    rule: "Highest of the top recent eBay sales, PriceCharting's price, GameStop's pre-owned price, and Amazon's lowest offer (ignored when it's over twice eBay and PriceCharting)",
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
-const FLOOR_OTHER = { id: 'other', rule: 'Not in the Game Pricing Guide: top recent eBay sales (from PriceCharting), nudged toward Amazon. Double-check it' };
+const FLOOR_OTHER = { id: 'other', rule: "Not in the Game Pricing Guide: top recent eBay sales or PriceCharting's price, whichever is higher, nudged toward Amazon. Double-check it" };
 // The sale the price comes from: the 90th percentile of the condition's normal recent sales (about the
 // 4th highest of 30). Checked against a month of the shop's own shelf prices (140 PS2/GameCube games,
 // Sept 2026): the single highest sale ran ~$12 high on average and was within $5 only 40% of the time;
@@ -2751,6 +2753,8 @@ const FLOOR_STEP = 500; // suggested prices round up to the next $5
 //    highest normal sale plus FLOOR_SCARCE_MARKUP. Pokemon Emerald (GBA, loose): $275 (second-highest)
 //    -> highest sale $314.95 + 10% -> $350, the shop's price.
 const FLOOR_AMAZON_PULL = 0.25;
+// Modern systems: an Amazon lowest offer more than this many times eBay/PriceCharting doesn't count (see floorBasis).
+const FLOOR_AMAZON_OUTLIER = 2;
 const FLOOR_SCARCE_MARKUP = 0.10;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph|\d+ (more )?games)\b/i;
@@ -3078,13 +3082,25 @@ function floorBasis(cur = floorCur) {
   }
   // For a rhythm-game disc, Amazon offers above the bundle cap are likely the bundle sold under the disc's barcode.
   const rhythmCap = rhythmDiscSaleCap(cur);
-  const amz = amzInfo && amzInfo.lowest > 0 && amzInfo.lowest <= rhythmCap ? amzInfo.lowest : null;
+  // PriceCharting's own price for the condition counts too (owner, Oct 2026: when eBay or PriceCharting is higher
+  // than GameStop or Amazon, the price goes by them). Not for a rhythm-game disc above the bundle cap.
+  const pcRaw = Number(cur.product[PC_FIELDS.market[cur.condition]]) || null;
+  const pc = pcRaw && pcRaw <= rhythmCap ? pcRaw : null;
+  let amz = amzInfo && amzInfo.lowest > 0 && amzInfo.lowest <= rhythmCap ? amzInfo.lowest : null;
+  // An Amazon offer far above both eBay and PriceCharting is a wrong match or an inflated third-party listing
+  // (Dragon Age: Inquisition, Xbox One, Oct 2026: eBay ~$9.99, PriceCharting $4.69, Amazon set it to $60).
+  const reference = Math.max(sale?.price || 0, pc || 0);
+  if (tier.amazon && amz && reference > 0 && amz > reference * FLOOR_AMAZON_OUTLIER) {
+    checks.push(`Amazon's lowest offer (${money(amz)}) is more than ${FLOOR_AMAZON_OUTLIER}× eBay and PriceCharting, so it doesn't count`);
+    amz = null;
+  }
   // Older systems compare with Amazon's typical offer: the (lower) middle of the offers, which come lowest first.
   const amzOffers = (amzInfo?.offers || []).filter((o) => o.price > 0);
   const amzMidIndex = amzOffers.length ? Math.floor((amzOffers.length - 1) / 2) : -1;
   const amzTypical = amzMidIndex >= 0 && amzOffers[amzMidIndex].price <= rhythmCap ? amzOffers[amzMidIndex].price : null;
   const waiting = amazonSet && cur.amazon?.loading; // don't let staff add it before Amazon answers
-  const options = [[sale?.price, 'sale'], [gs, 'gamestop'], [tier.amazon ? amz : null, 'amazon']].filter(([v]) => v > 0);
+  // The highest of these wins; on a tie, the earlier one (eBay, then PriceCharting) is named.
+  const options = [[sale?.price, 'sale'], [pc, 'pricecharting'], [gs, 'gamestop'], [tier.amazon ? amz : null, 'amazon']].filter(([v]) => v > 0);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
     // Older systems: halfway toward a higher Amazon price, at most FLOOR_AMAZON_PULL above (automatic price only).
@@ -3301,7 +3317,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'eBay sale', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { sale: 'eBay sale', pricecharting: 'PriceCharting', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => it.recheck?.price != null && it.recheck.price !== it.price;

@@ -532,6 +532,18 @@ The site's **only server-side code**. Everything else is static.
     **and the sale** (owner's choice). "Add to list" waits while Amazon
     is still loading so the price can't be added low. Systems not in the guide
     (`FLOOR_OTHER`) price from the sales too, with a "double-check" rule.
+    **PriceCharting's own price** for the condition (`PC_FIELDS.market`) is a
+    basis option on every tier too, and the highest option wins (owner, Oct 13
+    2026: "when eBay or PriceCharting is higher than GameStop or Amazon, go
+    off the former"; from `'pricecharting'`). **Amazon outliers:** on modern
+    systems an Amazon lowest offer over `FLOOR_AMAZON_OUTLIER` (2×) the
+    higher of the eBay sale and PriceCharting doesn't count, with a
+    double-check note (Dragon Age: Inquisition, Xbox One: eBay ~$9.99,
+    PriceCharting $4.69, Amazon had set it to $60; now $10). The **eBay sold
+    link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
+    filter eBay's used grades (3000/2750/4000/5000/6000), New = 1000; Loose
+    excludes sealed/complete/CIB words, CIB asks for "complete" or "cib",
+    New adds "sealed".
   - **Older systems and Amazon** (retro + other tiers, owner's rules Oct
     2026; automatic price only, not a clicked sale or a typed price):
     when Amazon's **typical** offer (the lower middle of the up-to-20
