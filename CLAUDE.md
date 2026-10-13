@@ -539,7 +539,13 @@ The site's **only server-side code**. Everything else is static.
     systems an Amazon lowest offer over `FLOOR_AMAZON_OUTLIER` (2×) the
     higher of the eBay sale and PriceCharting doesn't count, with a
     double-check note (Dragon Age: Inquisition, Xbox One: eBay ~$9.99,
-    PriceCharting $4.69, Amazon had set it to $60; now $10). The **eBay sold
+    PriceCharting $4.69, Amazon had set it to $60; now $10). **Modern
+    systems' eBay figure is the second-highest normal sale**
+    (`floorAutoSale(…, top)`), not the 90th percentile: GTA V [Premium
+    Edition] PS4 CIB had sales up to $17.99 but a 90th percentile of
+    $14.79, under Amazon's $14.99, so it came out $15 (shop: $20; now
+    $17.95 → $20). Older systems keep the PS2/GameCube-tuned 90th
+    percentile. The **eBay sold
     link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
     filter eBay's used grades (3000/2750/4000/5000/6000), New = 1000; Loose
     excludes sealed/complete/CIB words, CIB asks for "complete" or "cib",
