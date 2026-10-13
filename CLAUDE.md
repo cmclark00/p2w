@@ -1112,7 +1112,19 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   `about.html`, konami.js) work on `/shop/...` paths — so shop links must
   be root-relative (`/shop/...`) and the skip link uses the full path.
   Search, filters (game & type, set, condition, price), sorting and
-  pagination are `shop_query()` in `shop/lib.php`. Game/type comes from
+  pagination are `shop_query()` in `shop/lib.php`. **Look (Oct 13 2026
+  redesign):** each game has an accent color (`shop_game_accent()`, set
+  inline as `--accent`) used by the game tiles, card glows and the product
+  page's "case"; home = hero with a pill search, popular-game chips and a
+  stock/pickup ribbon → "Shop by game" tiles (biggest first, each fanning
+  its 3 priciest photographed cards, `shop_showcase()`) → "Chase cards"
+  rail (priciest singles) → newest grid. Cards split the name with
+  `shop_name_parts()` ("Charizard ex" / "136/128 · Uncommon"), show a red
+  "Last one" badge, and get a foil glint on hover. Results have a toolbar
+  (count, removable filter chips `shop_active_filters()`, sort
+  `shop_sort_form()`; sort left the sidebar). Product page: lit card case,
+  "from $X", one row per condition (`.shop-cond`) with the cart button,
+  and a perks line. Game/type comes from
   Core2's product type ("Pokemon Singles" → game Pokemon, kind Singles).
 - **Buying:** each product's **Buy on our online store** opens the
   CrystalCommerce storefront search for that exact product name

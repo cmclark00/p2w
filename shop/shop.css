@@ -13,8 +13,11 @@
   border: 0;
 }
 
+/* Each game has an accent color (--accent, set inline from shop_game_accent() in lib.php): game tiles, card
+   glows, and the product page's case pick it up. The site's gold is the fallback. */
 .shop-section {
-  padding: clamp(28px, 4vw, 48px) var(--page-x);
+  --accent: var(--gold);
+  padding: clamp(28px, 4vw, 52px) var(--page-x);
 }
 
 .shop-crumbs {
@@ -36,53 +39,163 @@
   color: var(--paper);
 }
 
+.shop-section .eyebrow,
+.shop-results-head .eyebrow,
+.shop-product-info .eyebrow {
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ hero + search */
+
 /* Shorter hero than the content pages: the shop's job is to get people to products fast. */
 .page-hero.shop-hero {
   min-height: 0;
-  padding-block: clamp(48px, 7vw, 84px) clamp(32px, 4vw, 48px);
+  padding-block: clamp(52px, 8vw, 96px) clamp(32px, 4vw, 52px);
+}
+
+.shop-hero h1 {
+  max-width: 14ch;
 }
 
 .shop-search {
+  position: relative;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 6px;
   width: 100%;
-  max-width: 720px;
-  margin-top: 8px;
+  max-width: 760px;
+  margin-top: 10px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(17, 18, 23, 0.86);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.shop-search:focus-within {
+  border-color: var(--gold);
+}
+
+.shop-search-icon {
+  flex-shrink: 0;
+  margin-left: 12px;
+  color: var(--muted);
 }
 
 .shop-search input {
   flex: 1;
   min-width: 0;
-  min-height: 48px;
-  padding: 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  min-height: 46px;
+  padding: 8px 6px;
+  border: 0;
+  background: transparent;
   color: var(--paper);
   font: inherit;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
-.shop-search input:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
+.shop-search input:focus {
+  outline: none;
+}
+
+.shop-search .button {
+  min-height: 46px;
+  border-radius: 999px;
+  padding-inline: 24px;
 }
 
 .page-hero > .shop-search {
   align-self: stretch;
 }
 
+/* Popular games under the search box. */
+.shop-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.shop-quick a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(17, 18, 23, 0.7);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: border-color 0.16s, background 0.16s;
+}
+
+.shop-quick a::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.shop-quick a:hover,
+.shop-quick a:focus-visible {
+  border-color: var(--accent);
+  background: rgba(17, 18, 23, 0.92);
+}
+
+/* Stock count, freshness, and pickup in one line. */
+.shop-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.shop-ribbon li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shop-ribbon li + li::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.shop-ribbon strong {
+  color: var(--gold);
+  font-family: var(--font-display);
+}
+
+/* ------------------------------------------------------------------ section heads */
+
 .shop-section-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px 16px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .shop-section-head h2 {
   margin: 0;
+}
+
+.shop-section-head .eyebrow {
+  margin: 0 0 4px;
 }
 
 .shop-section-head .muted,
@@ -91,41 +204,112 @@
   color: var(--muted);
 }
 
-/* Browse by game */
+/* ------------------------------------------------------------------ shop by game */
+
 .shop-games {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  gap: 16px;
 }
 
 .shop-game {
-  padding: 18px 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
-  border-left: 4px solid var(--gold);
-  border-radius: 8px;
+  border-top: 3px solid var(--accent);
+  border-radius: 16px;
   background: var(--surface);
+  background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%), var(--surface);
+  overflow: hidden;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s, border-color 0.2s;
 }
 
-.shop-game h3 {
-  margin: 0 0 10px;
+.shop-game:hover,
+.shop-game:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.shop-game-main {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 4px;
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.shop-game-main h3 {
+  margin: 14px 0 0;
   font-family: var(--font-display);
+  font-size: 1.45rem;
+  line-height: 1.1;
+  overflow-wrap: normal;
+}
+
+.shop-game-main p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Three of the game's priciest cards, fanned out; they spread on hover. */
+.shop-game-fan {
+  position: relative;
+  height: 122px;
+}
+
+.shop-game-fan img {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 70px;
+  height: auto;
+  margin-left: -35px;
+  border-radius: 5px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+  transform-origin: 50% 120%;
+  transform: rotate(calc((var(--i) - 1) * 11deg));
+  transition: transform 0.3s var(--ease);
+}
+
+.shop-game-fan img:nth-child(2) { z-index: 1; }
+
+.shop-game:hover .shop-game-fan img,
+.shop-game:focus-within .shop-game-fan img {
+  transform: rotate(calc((var(--i) - 1) * 18deg)) translateY(-4px);
+}
+
+.shop-game-initial {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 700;
+  opacity: 0.6;
 }
 
 .shop-game-links {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: auto;
+  padding: 12px 20px 18px;
 }
 
 .shop-game-links a {
   display: inline-flex;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
+  background: rgba(17, 18, 23, 0.45);
   color: var(--paper);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-decoration: none;
 }
 
@@ -136,82 +320,184 @@
 
 .shop-game-links a:hover,
 .shop-game-links a:focus-visible {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
-/* Product grid */
+/* ------------------------------------------------------------------ product cards */
+
 .shop-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 18px;
+}
+
+/* A sideways-scrolling row (chase cards, more from this set). */
+.shop-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 214px);
+  gap: 18px;
+  margin-inline: calc(var(--page-x) * -1);
+  padding: 4px var(--page-x) 18px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--page-x);
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.shop-rail > * {
+  scroll-snap-align: start;
 }
 
 .shop-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1c1f28, var(--surface));
   color: var(--paper);
   text-decoration: none;
   overflow: hidden;
-  transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s, border-color 0.2s;
 }
 
 .shop-card:hover,
 .shop-card:focus-visible {
-  transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+/* The card sits in a lit "display case" tinted with its game's color. */
 .shop-card-img {
-  aspect-ratio: 5 / 7;
+  position: relative;
+  aspect-ratio: 6 / 7;
   display: grid;
   place-items: center;
-  padding: 10px;
+  padding: 16px 16px 12px;
   background: var(--surface-2);
+  background: radial-gradient(85% 70% at 50% 40%, color-mix(in srgb, var(--accent) 24%, #272b37), #191b22 78%);
+  overflow: hidden;
 }
 
 .shop-card-img img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.55));
+  transition: transform 0.35s var(--ease);
+}
+
+.shop-card:hover .shop-card-img img,
+.shop-card:focus-visible .shop-card-img img {
+  transform: scale(1.05);
+}
+
+/* Foil glint that sweeps across on hover. */
+.shop-card-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.16) 48%, transparent 60%);
+  transform: translateX(-120%);
+  transition: transform 0.75s var(--ease);
+  pointer-events: none;
+}
+
+.shop-card:hover .shop-card-img::after,
+.shop-card:focus-visible .shop-card-img::after {
+  transform: translateX(120%);
+}
+
+.shop-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--red);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(217, 31, 56, 0.45);
 }
 
 .shop-card-body {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   padding: 12px 14px 14px;
+  border-top: 2px solid var(--accent);
+  border-top-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.shop-card-meta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shop-card h3 {
+  display: -webkit-box;
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.3;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.shop-card-meta,
-.shop-card-stock {
+.shop-card-sub {
   margin: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .shop-card-price {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--gold);
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 700;
 }
 
 .shop-card-price span {
   color: var(--muted);
   font-family: var(--font-body);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 400;
+}
+
+.shop-card-stock {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .shop-noimg {
@@ -221,37 +507,39 @@
   display: grid;
   place-content: center;
   gap: 6px;
-  border: 1px dashed var(--line);
-  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
   color: var(--muted);
   text-align: center;
 }
 
 .shop-noimg span {
   font-family: var(--font-display);
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.22);
+  color: var(--accent);
+  opacity: 0.55;
 }
 
 .shop-noimg small {
   font-size: 0.72rem;
 }
 
-/* Results: filters beside the grid */
+/* ------------------------------------------------------------------ results: filters beside the grid */
+
 .shop-results-head {
   padding-bottom: 0;
 }
 
 .shop-results-head h1 {
   margin: 0 0 14px;
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
 }
 
 .shop-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
-  gap: 24px;
+  gap: 26px;
   align-items: start;
 }
 
@@ -259,12 +547,13 @@
   position: sticky;
   top: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--surface);
 }
 
 .shop-filters summary {
   padding: 14px 18px;
+  font-family: var(--font-display);
   font-weight: 700;
   cursor: pointer;
 }
@@ -280,21 +569,29 @@
   display: grid;
   gap: 6px;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
 .shop-filters select,
-.shop-filters input {
+.shop-filters input,
+.shop-sort select {
   min-height: 42px;
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface-2);
   color: var(--paper);
   font: inherit;
   font-weight: 400;
+}
+
+.shop-filters select:focus-visible,
+.shop-filters input:focus-visible,
+.shop-sort select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
 }
 
 .shop-price-range {
@@ -332,8 +629,75 @@
   padding: 8px 12px;
 }
 
+/* Count, the filters in use, and sort, above the grid. */
+.shop-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 18px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
 .shop-count {
-  margin: 0 0 14px;
+  margin: 0;
+}
+
+.shop-count strong {
+  color: var(--paper);
+  font-family: var(--font-display);
+}
+
+.shop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--paper);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.shop-chip span[aria-hidden] {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.shop-chip:hover,
+.shop-chip:focus-visible {
+  border-color: var(--red);
+}
+
+.shop-sort {
+  margin-left: auto;
+}
+
+.shop-sort label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.shop-sort select {
+  width: auto;
+  min-height: 38px;
 }
 
 .shop-pager {
@@ -341,7 +705,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  margin-top: 28px;
+  margin-top: 30px;
 }
 
 .shop-pager a,
@@ -349,7 +713,7 @@
   min-width: 42px;
   padding: 9px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--paper);
   text-align: center;
   text-decoration: none;
@@ -371,11 +735,12 @@
   color: var(--muted);
 }
 
-/* Empty / error states */
+/* ------------------------------------------------------------------ empty / error states */
+
 .shop-state {
   padding: clamp(32px, 5vw, 56px) clamp(20px, 4vw, 40px);
   border: 1px dashed var(--line);
-  border-radius: 8px;
+  border-radius: 14px;
   text-align: center;
 }
 
@@ -395,72 +760,162 @@ section.shop-state {
   color: var(--muted);
 }
 
-/* Product page */
+/* ------------------------------------------------------------------ product page */
+
 .shop-product {
   display: grid;
-  grid-template-columns: minmax(220px, 420px) minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 56px);
+  grid-template-columns: minmax(240px, 460px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 64px);
   align-items: start;
 }
 
 .shop-product-media {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  position: sticky;
+  top: 16px;
 }
 
-.shop-product-media img {
+/* The card in a lit case, tilting slightly toward the pointer's side on hover. */
+.shop-case {
+  padding: clamp(18px, 3vw, 34px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  background: radial-gradient(90% 70% at 50% 38%, color-mix(in srgb, var(--accent) 30%, #262a36), #15171d 78%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 70px rgba(0, 0, 0, 0.4);
+  perspective: 1000px;
+}
+
+.shop-case img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: 12px;
+  filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.55));
+  transition: transform 0.45s var(--ease);
 }
 
-.shop-product-media .shop-noimg {
+.shop-case:hover img {
+  transform: rotateY(-7deg) rotateX(3deg) scale(1.02);
+}
+
+.shop-case .shop-noimg {
   aspect-ratio: 5 / 7;
 }
 
 .shop-product-info h1 {
-  margin: 0 0 6px;
-  font-size: clamp(1.7rem, 3.6vw, 2.5rem);
-  line-height: 1.12;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
 }
 
-.shop-product-meta {
-  margin: 0 0 22px;
+.shop-product-sub {
+  margin: 8px 0 0;
   color: var(--muted);
+  font-size: 1.05rem;
 }
 
-.shop-variants {
-  width: 100%;
-  margin-bottom: 22px;
-  border-collapse: collapse;
-}
-
-.shop-variants th {
-  padding: 8px 12px 8px 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-  text-align: left;
-  text-transform: uppercase;
-}
-
-.shop-variants td {
-  padding: 12px 12px 12px 0;
-  border-top: 1px solid var(--line);
-  vertical-align: top;
-}
-
-.shop-variants .muted {
-  font-size: 0.85rem;
-}
-
-.shop-price {
+.shop-product-price {
+  margin: 18px 0 20px;
   color: var(--gold);
   font-family: var(--font-display);
+  font-size: clamp(2rem, 3.6vw, 2.6rem);
   font-weight: 700;
-  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.shop-product-price span {
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+/* One row per condition: name, stock, price, and the cart button. */
+.shop-conds {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.shop-cond {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.shop-cond:has(.shop-cond-add) {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.shop-cond-name strong {
+  display: block;
+}
+
+.shop-cond-name small {
+  color: var(--muted);
+}
+
+.shop-cond-stock {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.shop-cond-stock.is-last {
+  background: rgba(217, 31, 56, 0.16);
+  color: #ff8a98;
+  font-weight: 700;
+}
+
+.shop-cond-price {
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.shop-cond-add .kiosk-add {
+  justify-content: flex-end;
+}
+
+.shop-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.shop-perks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.shop-perks li::before {
+  content: '✓';
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(241, 200, 75, 0.15);
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 800;
 }
 
 .shop-note {
@@ -470,16 +925,21 @@ section.shop-state {
 
 .shop-desc {
   max-width: 70ch;
-  margin-top: 18px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
   color: var(--muted);
 }
+
+/* ------------------------------------------------------------------ small screens */
 
 @media (max-width: 860px) {
   .shop-layout {
     grid-template-columns: 1fr;
   }
 
-  .shop-filters {
+  .shop-filters,
+  .shop-product-media {
     position: static;
   }
 
@@ -488,13 +948,26 @@ section.shop-state {
   }
 
   .shop-product-media {
-    max-width: 360px;
+    max-width: 380px;
+  }
+
+  .shop-sort {
+    margin-left: 0;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .shop-search {
-    flex-direction: column;
+    border-radius: 18px;
+    flex-wrap: wrap;
+  }
+
+  .shop-search input {
+    flex-basis: calc(100% - 44px);
+  }
+
+  .shop-search .button {
+    flex: 1 0 100%;
   }
 
   .shop-grid {
@@ -502,19 +975,104 @@ section.shop-state {
     gap: 10px;
   }
 
+  /* Two compact game tiles per row. */
+  .shop-games {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .shop-game-main {
+    padding: 14px 14px 2px;
+  }
+
+  .shop-game-fan {
+    height: 84px;
+  }
+
+  .shop-game-fan img {
+    width: 50px;
+    margin-left: -25px;
+  }
+
+  .shop-game-main h3 {
+    margin-top: 10px;
+    font-size: 1.12rem;
+  }
+
+  .shop-game-main p {
+    font-size: 0.8rem;
+  }
+
+  .shop-game-links {
+    gap: 6px;
+    padding: 8px 14px 14px;
+  }
+
+  .shop-game-links a {
+    padding: 4px 9px;
+    font-size: 0.78rem;
+  }
+
+  .shop-rail {
+    grid-auto-columns: 44%;
+    gap: 10px;
+  }
+
   .shop-card-body {
     padding: 10px;
+  }
+
+  .shop-card-price {
+    font-size: 1.1rem;
+  }
+
+  /* Condition and stock on the left, price on the right, the cart button underneath. */
+  .shop-cond,
+  .shop-cond:has(.shop-cond-add) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .shop-cond-name { grid-column: 1; grid-row: 1; }
+
+  .shop-cond-stock {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .shop-cond-price {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-size: 1.35rem;
+  }
+
+  .shop-cond-add {
+    grid-column: 1 / -1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shop-card {
+  .shop-card,
+  .shop-card-img img,
+  .shop-card-img::after,
+  .shop-game,
+  .shop-game-fan img,
+  .shop-case img {
     transition: none;
   }
 
   .shop-card:hover,
-  .shop-card:focus-visible {
+  .shop-card:focus-visible,
+  .shop-game:hover,
+  .shop-game:focus-within,
+  .shop-card:hover .shop-card-img img,
+  .shop-case:hover img {
     transform: none;
+  }
+
+  .shop-card-img::after {
+    display: none;
   }
 }
 

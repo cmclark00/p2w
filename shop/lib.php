@@ -265,6 +265,35 @@ function shop_set_more(array $p, int $n): array {
   return array_values(shop_products(shop_product_ids('SELECT id FROM products WHERE set_slug = ? AND id <> ? ORDER BY from_p DESC, id LIMIT ?', [$p['setSlug'], $p['id'], $n])));
 }
 
+// The priciest in-stock products with a photo, for showcases (the home page's game tiles and chase cards).
+// $types limits it to those product type slugs; [] = every type of that kind.
+function shop_showcase(array $types, string $kind, int $n): array {
+  $where = "img <> ''";
+  $args = [];
+  if ($types) { $where .= ' AND type_slug IN (' . implode(',', array_fill(0, count($types), '?')) . ')'; $args = array_values($types); }
+  if ($kind !== '') { $where .= ' AND kind = ?'; $args[] = $kind; }
+  $args[] = $n;
+  return array_values(shop_products(shop_product_ids("SELECT id FROM products WHERE $where ORDER BY from_p DESC, id LIMIT ?", $args)));
+}
+
+// A card's name in two parts for display: "Charizard ex - 136/128 - Uncommon" -> ["Charizard ex", "136/128 · Uncommon"].
+function shop_name_parts(string $name): array {
+  $parts = array_map('trim', explode(' - ', $name));
+  $title = array_shift($parts);
+  return [$title !== '' ? $title : $name, implode(' · ', array_filter($parts, 'strlen'))];
+}
+
+// Each game's accent color (the tile and card edges on the shop pages); the site's gold for anything else.
+function shop_game_accent(string $game): string {
+  $g = shop_norm($game);
+  foreach (['pokemon' => '#f2c230', 'magic' => '#e0793a', 'yu gi oh' => '#9b6bff', 'yugioh' => '#9b6bff', 'lorcana' => '#4aa3f0', 'one piece' => '#ef5a4c',
+    'digimon' => '#29a8e0', 'gundam' => '#8fa3bf', 'riftbound' => '#22c3b0', 'cyberpunk' => '#f5e33b', 'flesh and blood' => '#c8344a', 'star wars' => '#e8d24a',
+    'dragon ball' => '#f59a23', 'weiss' => '#e46aa6', 'union arena' => '#f07f3c', 'supplies' => '#9aa0ad'] as $k => $c) {
+    if (strpos(" $g ", " $k") !== false) return $c;
+  }
+  return '#f1c84b';
+}
+
 // slug => name of the sets in a product type.
 function shop_type_sets(string $type): array {
   $db = shop_db();

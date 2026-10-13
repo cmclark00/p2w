@@ -63,37 +63,75 @@ function shop_not_found(): void {
 }
 
 function shop_home(array $idx): void {
+  // Games, biggest first, each with its product types and total.
   $games = [];
-  foreach ($idx['types'] as $slug => $t) $games[$t['game']][$slug] = $t;
-  ksort($games);
+  foreach ($idx['types'] as $slug => $t) {
+    $games[$t['game']]['types'][$slug] = $t;
+    $games[$t['game']]['count'] = ($games[$t['game']]['count'] ?? 0) + $t['count'];
+  }
+  uasort($games, function ($a, $b) { return $b['count'] <=> $a['count']; });
   $tiles = '';
-  foreach ($games as $game => $types) {
-    $links = '';
+  $quick = '';
+  foreach ($games as $game => $g) {
+    $types = $g['types'];
     $kinds = array_count_values(array_column($types, 'kind'));
+    $links = '';
     foreach ($types as $slug => $t) {
       // "Singles" is enough under the game's name, unless two of its types are both singles.
       $label = $t['kind'] === 'Other' || $kinds[$t['kind']] > 1 ? $t['name'] : $t['kind'];
       $links .= '<a href="/shop/category/' . h($slug) . '">' . h($label) . ' <span>' . number_format($t['count']) . '</span></a>';
     }
-    $tiles .= '<div class="shop-game"><h3>' . h($game) . '</h3><div class="shop-game-links">' . $links . '</div></div>';
+    // The tile opens the game's singles (or its biggest type) and fans out its three priciest cards.
+    $singles = array_keys(array_filter($types, function ($t) { return $t['kind'] === 'Singles'; }));
+    uasort($types, function ($a, $b) { return $b['count'] <=> $a['count']; });
+    $main = $singles[0] ?? array_key_first($types);
+    $fan = '';
+    foreach (shop_showcase($singles ?: array_keys($types), '', 3) as $i => $p) {
+      $fan .= '<img src="' . h(shop_img($p['img'], 'medium')) . '" alt="" loading="lazy" decoding="async" width="173" height="240" style="--i:' . $i . '">';
+    }
+    $accent = shop_game_accent($game);
+    $tiles .= '<article class="shop-game" style="--accent:' . $accent . '">
+        <a class="shop-game-main" href="/shop/category/' . h($main) . '">
+          <div class="shop-game-fan" aria-hidden="true">' . ($fan !== '' ? $fan : '<span class="shop-game-initial">' . h(mb_substr($game, 0, 1)) . '</span>') . '</div>
+          <h3>' . h($game) . '</h3>
+          <p>' . number_format($g['count']) . ' in stock</p>
+        </a>
+        <div class="shop-game-links">' . $links . '</div>
+      </article>';
+    if (substr_count($quick, '<a') < 6 && $game !== 'Supplies & accessories') {
+      $quick .= '<a href="/shop/category/' . h($main) . '" style="--accent:' . $accent . '">' . h($game) . '</a>';
+    }
   }
+  $chase = shop_showcase([], 'Singles', 10);
   $newest = shop_newest(12);
+  $kiosk = kiosk_active();
+  $pickup = $kiosk ? 'Pay at the register' : (web_checkout_on() ? 'Free in-store pickup' : 'Ship or pick up in store');
   $body = '<section class="page-hero shop-hero">
-      <p class="eyebrow">' . (kiosk_active() ? 'Shop in store' : 'Shop online') . '</p>
-      <h1>Shop Play2Win’s in-stock inventory.</h1>
-      <p class="lead">' . (kiosk_active()
+      <p class="eyebrow">' . ($kiosk ? 'Shop in store' : 'Shop online') . '</p>
+      <h1>Find your next pull.</h1>
+      <p class="lead">' . ($kiosk
         ? 'Find your cards, add them to your cart, and place your order. Then pay at the register and we’ll hand them over.'
         : (web_checkout_on()
           ? 'Singles, sealed product, and more, straight from our shelves. Order and pay online, then pick it up at the store for free.'
           : 'Singles, sealed product, and more, straight from our shelves. Checkout happens on our secure online store, with shipping or in-store pickup.')) . '</p>
       ' . shop_search_form('') . '
+      ' . ($quick !== '' ? '<nav class="shop-quick" aria-label="Popular games">' . $quick . '</nav>' : '') . '
+      <ul class="shop-ribbon">
+        <li><strong>' . number_format($idx['count']) . '</strong> products in stock</li>
+        <li>' . h(ucfirst(shop_fresh_text($idx))) . '</li>
+        <li>' . h($pickup) . '</li>
+      </ul>
     </section>
     <section class="shop-section">
-      <div class="shop-section-head"><h2>Browse by game</h2><p class="muted">' . number_format($idx['count']) . ' products in stock · ' . h(shop_fresh_text($idx)) . '</p></div>
+      <div class="shop-section-head"><div><p class="eyebrow">Browse</p><h2>Shop by game</h2></div></div>
       <div class="shop-games">' . $tiles . '</div>
     </section>
+    ' . ($chase ? '<section class="shop-section shop-chase">
+      <div class="shop-section-head"><div><p class="eyebrow">In the case</p><h2>Chase cards</h2></div><a class="text-link" href="/shop/search?sort=price_desc">See all</a></div>
+      <div class="shop-rail">' . implode('', array_map('shop_card', $chase)) . '</div>
+    </section>' : '') . '
     <section class="shop-section">
-      <div class="shop-section-head"><h2>Newest releases in stock</h2><a class="text-link" href="/shop/search?sort=newest">See all</a></div>
+      <div class="shop-section-head"><div><p class="eyebrow">Just out</p><h2>Newest releases in stock</h2></div><a class="text-link" href="/shop/search?sort=newest">See all</a></div>
       <div class="shop-grid">' . implode('', array_map('shop_card', $newest)) . '</div>
     </section>';
   shop_page('Shop', 'Shop Play2Win Games in-stock trading cards, sealed product, and more.', $body, ['crumbs' => []]);
@@ -103,66 +141,74 @@ function shop_results(array $idx, array $q, string $basePath): void {
   $r = shop_query($q);
   $type = (string)($q['type'] ?? '');
   $typeInfo = $idx['types'][$type] ?? null;
-  $title = $typeInfo ? $typeInfo['name'] : (trim((string)($q['q'] ?? '')) !== '' ? 'Search: ' . trim((string)$q['q']) : 'All products');
+  $words = trim((string)($q['q'] ?? ''));
+  $title = $typeInfo ? $typeInfo['name'] : ($words !== '' ? '“' . $words . '”' : 'All products');
+  $accent = $typeInfo ? shop_game_accent($typeInfo['game']) : '#f1c84b';
 
   $grid = $r['items']
     ? '<div class="shop-grid">' . implode('', array_map('shop_card', $r['items'])) . '</div>' . shop_pager($r, $q, $basePath)
     : '<div class="shop-state shop-empty"><h2>No matches in stock.</h2><p>Try fewer words or clear a filter. Looking for something we don’t have listed? Call us at <a href="tel:+18659108357">865-910-8357</a>; it may be in the store.</p>
         <p><a class="button secondary" href="' . h($basePath) . '">Clear filters</a></p></div>';
 
-  $body = '<section class="shop-section shop-results-head">
-      <p class="eyebrow">Shop</p>
+  $body = '<section class="shop-section shop-results-head" style="--accent:' . $accent . '">
+      <p class="eyebrow">' . ($typeInfo ? h($typeInfo['game']) : ($words !== '' ? 'Search results' : 'Shop')) . '</p>
       <h1>' . h($title) . '</h1>
-      ' . shop_search_form((string)($q['q'] ?? ''), $type) . '
+      ' . shop_search_form($words, $type) . '
     </section>
     <section class="shop-section shop-layout">
       ' . shop_filters($idx, $r, $q, $basePath) . '
       <div class="shop-main">
-        <p class="shop-count" role="status">' . number_format($r['total']) . ' product' . ($r['total'] === 1 ? '' : 's') . ' in stock</p>
+        <div class="shop-toolbar">
+          <p class="shop-count" role="status"><strong>' . number_format($r['total']) . '</strong> product' . ($r['total'] === 1 ? '' : 's') . ' in stock</p>
+          ' . shop_active_filters($q, $basePath) . '
+          ' . shop_sort_form($r, $q, $basePath) . '
+        </div>
         ' . $grid . '
       </div>
     </section>';
   $crumbs = [['Shop', '/shop']];
   if ($typeInfo) $crumbs[] = [$typeInfo['name'], '/shop/category/' . $type];
-  shop_page($title . ' | Shop', 'Shop ' . $title . ' in stock at Play2Win Games.', $body, ['crumbs' => $crumbs]);
+  shop_page(($typeInfo ? $typeInfo['name'] : ($words !== '' ? 'Search: ' . $words : 'All products')) . ' | Shop',
+    'Shop ' . ($typeInfo ? $typeInfo['name'] : 'products') . ' in stock at Play2Win Games.', $body, ['crumbs' => $crumbs]);
 }
 
 function shop_product(array $idx, array $p): void {
   $kiosk = kiosk_active();
   $web = !$kiosk && web_checkout_on(); // online cart + checkout (checkout.php)
+  [$title, $sub] = shop_name_parts($p['name']);
   $rows = '';
   foreach ($p['l'] as $l) {
     $stock = $l['q'] === 1 ? 'Last one' : $l['q'] . ' in stock';
-    $rows .= '<tr><td><strong>' . h($l['c']) . '</strong>' . ($l['v'] !== '' ? '<div class="muted">' . h($l['v']) . '</div>' : '') . '</td>
-      <td>' . h($stock) . '</td><td class="shop-price">' . shop_money($l['p']) . '</td>'
-      . ($kiosk ? '<td>' . kiosk_add_form($l) . '</td>' : ($web ? '<td>' . web_add_form($l) . '</td>' : '')) . '</tr>';
+    $rows .= '<div class="shop-cond">
+        <div class="shop-cond-name"><strong>' . h($l['c'] === 'Standard' ? 'In stock' : $l['c']) . '</strong>' . ($l['v'] !== '' ? '<small>' . h($l['v']) . '</small>' : '') . '</div>
+        <span class="shop-cond-stock' . ($l['q'] === 1 ? ' is-last' : '') . '">' . h($stock) . '</span>
+        <span class="shop-cond-price">' . shop_money($l['p']) . '</span>
+        ' . ($kiosk ? '<div class="shop-cond-add">' . kiosk_add_form($l) . '</div>' : ($web ? '<div class="shop-cond-add">' . web_add_form($l) . '</div>' : '')) . '
+      </div>';
   }
-  $more = shop_set_more($p, 6);
+  $more = shop_set_more($p, 8);
   $img = $p['img'] !== ''
     ? '<img src="' . h(shop_img($p['img'], 'large')) . '" srcset="' . h(shop_img($p['img'], 'large')) . ' 1x, ' . h($p['img']) . ' 2x" alt="' . h($p['name']) . '" width="460" height="640">'
     : shop_placeholder($p);
-  $meta = array_filter([$p['set'], $p['type']]);
-  $body = '<section class="shop-section shop-product">
-      <div class="shop-product-media">' . $img . '</div>
+  $perks = $kiosk
+    ? ['Add it to your cart', 'Place your order here', 'Pay at the register']
+    : ($web ? ['Free in-store pickup', 'Stock checked before you pay', 'Questions? 865-910-8357'] : ['Ship or pick up in store', 'Secure checkout', 'Questions? 865-910-8357']);
+  $body = '<section class="shop-section shop-product" style="--accent:' . shop_game_accent($p['game']) . '">
+      <div class="shop-product-media"><div class="shop-case">' . $img . '</div></div>
       <div class="shop-product-info">
-        <p class="eyebrow">' . h($p['game']) . '</p>
-        <h1>' . h($p['name']) . '</h1>
-        ' . ($meta ? '<p class="shop-product-meta">' . h(implode(' · ', $meta)) . '</p>' : '') . '
-        <table class="shop-variants">
-          <thead><tr><th>Condition</th><th>Available</th><th>Price</th>' . ($kiosk || $web ? '<th><span class="sr-only">Add to cart</span></th>' : '') . '</tr></thead>
-          <tbody>' . $rows . '</tbody>
-        </table>
-        ' . ($kiosk
-          ? '<p class="shop-note muted">Add it to your cart, place your order, and pay at the register to pick it up.</p>'
-          : ($web
-            ? '<p class="shop-note muted">Add it to your cart, pay online, and pick it up at the store for free. Stock and prices are checked again before you pay.</p>'
-            : '<p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
-        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>')) . '
+        <p class="eyebrow">' . h(implode(' · ', array_filter([$p['game'], $p['set']]))) . '</p>
+        <h1>' . h($title) . '</h1>
+        ' . ($sub !== '' ? '<p class="shop-product-sub">' . h($sub) . '</p>' : '') . '
+        <p class="shop-product-price">' . (count($p['l']) > 1 ? '<span>from</span> ' : '') . shop_money($p['from']) . '</p>
+        <div class="shop-conds" role="list" aria-label="Conditions and prices">' . str_replace('<div class="shop-cond">', '<div class="shop-cond" role="listitem">', $rows) . '</div>
+        ' . ($kiosk || $web ? '' : '<p><a class="button primary shop-buy" href="' . h(shop_buy_url($p)) . '">Buy on our online store</a></p>
+        <p class="shop-note muted">Checkout happens on our secure CrystalCommerce store, where you can choose shipping or in-store pickup. Stock updates every few minutes, so the last copy can sell in between.</p>') . '
+        <ul class="shop-perks">' . implode('', array_map(function ($t) { return '<li>' . h($t) . '</li>'; }, $perks)) . '</ul>
         ' . ($p['desc'] !== '' ? '<div class="shop-desc">' . nl2br(h(strip_tags($p['desc']))) . '</div>' : '') . '
       </div>
     </section>' . ($more ? '<section class="shop-section">
-      <div class="shop-section-head"><h2>More from ' . h($p['set']) . '</h2><a class="text-link" href="/shop/category/' . h($p['typeSlug']) . '?set=' . h(rawurlencode($p['setSlug'])) . '">See all</a></div>
-      <div class="shop-grid">' . implode('', array_map('shop_card', $more)) . '</div></section>' : '');
+      <div class="shop-section-head"><div><p class="eyebrow">Same set</p><h2>More from ' . h($p['set']) . '</h2></div><a class="text-link" href="/shop/category/' . h($p['typeSlug']) . '?set=' . h(rawurlencode($p['setSlug'])) . '">See all</a></div>
+      <div class="shop-rail">' . implode('', array_map('shop_card', $more)) . '</div></section>' : '');
   $ld = [
     '@context' => 'https://schema.org', '@type' => 'Product', 'name' => $p['name'], 'image' => $p['img'] ?: null,
     'category' => $p['type'],
@@ -205,6 +251,7 @@ function kiosk_add_form(array $l): string {
 function shop_search_form(string $value, string $type = ''): string {
   return '<form class="shop-search" action="/shop/search" method="get" role="search">
       <label class="sr-only" for="shop-q">Search the shop</label>
+      <svg class="shop-search-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.6-3.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="shop-q" type="search" name="q" value="' . h($value) . '" placeholder="Search cards, sets, and sealed product" autocomplete="off">
       ' . ($type !== '' ? '<input type="hidden" name="type" value="' . h($type) . '">' : '') . '
       <button class="button primary" type="submit">Search</button>
@@ -213,26 +260,74 @@ function shop_search_form(string $value, string $type = ''): string {
 
 function shop_card(array $p): string {
   $url = '/shop/product/' . $p['id'] . '-' . $p['slug'];
+  [$title, $sub] = shop_name_parts($p['name']);
   // Medium photo, large on high-density screens (CrystalCommerce's own thumb is only 46px wide).
   $img = $p['img'] !== ''
     ? '<img src="' . h(shop_img($p['img'], 'medium')) . '" srcset="' . h(shop_img($p['img'], 'medium')) . ' 1x, ' . h(shop_img($p['img'], 'large')) . ' 2x" alt="" loading="lazy" decoding="async" width="173" height="240">'
     : shop_placeholder($p);
-  $stock = $p['qty'] === 1 ? 'Last one' : $p['qty'] . ' in stock';
+  $last = $p['qty'] === 1;
   // "Standard" just means the listing has no condition set; it's left off the card.
-  $conds = count($p['l']) > 1 ? ' · ' . count($p['l']) . ' conditions' : ($p['l'][0]['c'] !== 'Standard' ? ' · ' . h($p['l'][0]['c']) : '');
-  return '<a class="shop-card" href="' . h($url) . '">
-      <div class="shop-card-img">' . $img . '</div>
+  $conds = count($p['l']) > 1 ? count($p['l']) . ' conditions' : ($p['l'][0]['c'] !== 'Standard' ? $p['l'][0]['c'] : '');
+  $stock = implode(' · ', array_filter([$last ? '' : $p['qty'] . ' in stock', $conds]));
+  return '<a class="shop-card" href="' . h($url) . '" style="--accent:' . shop_game_accent($p['game']) . '">
+      <div class="shop-card-img">' . $img . ($last ? '<span class="shop-badge">Last one</span>' : '') . '</div>
       <div class="shop-card-body">
-        <h3>' . h($p['name']) . '</h3>
         <p class="shop-card-meta">' . h($p['set'] !== '' ? $p['set'] : $p['type']) . '</p>
-        <p class="shop-card-price">' . (count($p['l']) > 1 ? '<span>from</span> ' : '') . shop_money($p['_from'] ?? $p['from']) . '</p>
-        <p class="shop-card-stock">' . h($stock) . $conds . '</p>
+        <h3>' . h($title) . '</h3>
+        ' . ($sub !== '' ? '<p class="shop-card-sub">' . h($sub) . '</p>' : '') . '
+        <div class="shop-card-foot">
+          <p class="shop-card-price">' . (count($p['l']) > 1 ? '<span>from</span> ' : '') . shop_money($p['_from'] ?? $p['from']) . '</p>
+          ' . ($stock !== '' ? '<p class="shop-card-stock">' . h($stock) . '</p>' : '') . '
+        </div>
       </div>
     </a>';
 }
 
 function shop_placeholder(array $p): string {
   return '<div class="shop-noimg" aria-hidden="true"><span>' . h(preg_match('/./u', $p['game'] ?: $p['name'], $m) ? $m[0] : '?') . '</span><small>Photo coming soon</small></div>';
+}
+
+// Sort menu above the results; it carries the other filters along as hidden fields.
+function shop_sort_form(array $r, array $q, string $basePath): string {
+  $sorts = ['name' => 'Name A–Z', 'price_asc' => 'Price: low to high', 'price_desc' => 'Price: high to low', 'newest' => 'Newest releases'];
+  if (trim((string)($q['q'] ?? '')) !== '') $sorts = ['relevance' => 'Best match'] + $sorts;
+  $opts = '';
+  foreach ($sorts as $k => $label) $opts .= '<option value="' . h($k) . '"' . ($k === $r['sort'] ? ' selected' : '') . '>' . h($label) . '</option>';
+  $hidden = '';
+  foreach (['q', 'type', 'set', 'cond', 'min', 'max'] as $k) {
+    if ($k === 'type' && $basePath !== '/shop/search') continue;
+    if (isset($q[$k]) && (string)$q[$k] !== '') $hidden .= '<input type="hidden" name="' . $k . '" value="' . h((string)$q[$k]) . '">';
+  }
+  return '<form class="shop-sort" action="' . h($basePath) . '" method="get">' . $hidden . '
+      <label><span>Sort</span><select name="sort" data-autosubmit>' . $opts . '</select></label>
+      <noscript><button class="button secondary" type="submit">Sort</button></noscript>
+    </form>';
+}
+
+// The filters in use, each as a chip that removes it.
+function shop_active_filters(array $q, string $basePath): string {
+  $type = (string)($q['type'] ?? '');
+  $labels = [];
+  if (trim((string)($q['q'] ?? '')) !== '') $labels['q'] = '“' . trim((string)$q['q']) . '”';
+  if ((string)($q['set'] ?? '') !== '') {
+    $sets = $type !== '' ? shop_type_sets($type) : [];
+    $labels['set'] = $sets[(string)$q['set']] ?? 'Set';
+  }
+  if ((string)($q['cond'] ?? '') !== '') $labels['cond'] = (string)$q['cond'];
+  if (is_numeric($q['min'] ?? null)) $labels['min'] = 'From $' . (0 + $q['min']);
+  if (is_numeric($q['max'] ?? null)) $labels['max'] = 'Up to $' . (0 + $q['max']);
+  if (!$labels) return '';
+  $keep = $q;
+  unset($keep['page']);
+  if ($basePath !== '/shop/search') unset($keep['type']);
+  $chips = '';
+  foreach ($labels as $k => $label) {
+    $rest = $keep;
+    unset($rest[$k]);
+    $qs = http_build_query(array_filter($rest, function ($v) { return $v !== '' && $v !== null; }));
+    $chips .= '<a class="shop-chip" href="' . h($basePath . ($qs ? "?$qs" : '')) . '">' . h($label) . ' <span aria-hidden="true">×</span><span class="sr-only">(remove)</span></a>';
+  }
+  return '<div class="shop-chips">' . $chips . '</div>';
 }
 
 function shop_filters(array $idx, array $r, array $q, string $basePath): string {
@@ -254,27 +349,23 @@ function shop_filters(array $idx, array $r, array $q, string $basePath): string 
   }
   $condOpts = $opt('', 'Any condition', $q['cond'] ?? '');
   foreach ($r['facets']['conds'] as $c) $condOpts .= $opt($c, $c, $q['cond'] ?? '');
-  $sortOpts = '';
-  $sorts = ['name' => 'Name A–Z', 'price_asc' => 'Price: low to high', 'price_desc' => 'Price: high to low', 'newest' => 'Newest releases'];
-  if (trim((string)($q['q'] ?? '')) !== '') $sorts = ['relevance' => 'Best match'] + $sorts;
-  foreach ($sorts as $k => $label) $sortOpts .= $opt($k, $label, $r['sort']);
   // Category pages keep the game in the path; the search page carries it as a field.
   $action = $basePath === '/shop/search' ? '/shop/search' : $basePath;
   $typeField = $basePath === '/shop/search'
     ? '<label>Game &amp; type<select name="type" data-autosubmit>' . $typeOpts . '</select></label>'
     : '<p class="shop-filter-fixed"><a href="/shop/search' . (isset($q['q']) && $q['q'] !== '' ? '?q=' . h(rawurlencode((string)$q['q'])) : '') . '">All games</a> › ' . h($idx['types'][$type]['name'] ?? '') . '</p>';
   return '<details class="shop-filters" open>
-      <summary>Filters &amp; sort</summary>
+      <summary>Filters</summary>
       <form action="' . h($action) . '" method="get">
         ' . (isset($q['q']) && $q['q'] !== '' ? '<input type="hidden" name="q" value="' . h($q['q']) . '">' : '') . '
+        ' . (isset($q['sort']) && $q['sort'] !== '' ? '<input type="hidden" name="sort" value="' . h($q['sort']) . '">' : '') . '
         ' . $typeField . $setField . '
         <label>Condition<select name="cond" data-autosubmit>' . $condOpts . '</select></label>
         <fieldset class="shop-price-range"><legend>Price</legend>
-          <label><span class="sr-only">Minimum price</span><input type="number" name="min" min="0" step="1" inputmode="decimal" placeholder="Min" value="' . h($q['min'] ?? '') . '"></label>
+          <label><span class="sr-only">Minimum price</span><input type="number" name="min" min="0" step="1" inputmode="decimal" placeholder="Min $" value="' . h($q['min'] ?? '') . '"></label>
           <span aria-hidden="true">–</span>
-          <label><span class="sr-only">Maximum price</span><input type="number" name="max" min="0" step="1" inputmode="decimal" placeholder="Max" value="' . h($q['max'] ?? '') . '"></label>
+          <label><span class="sr-only">Maximum price</span><input type="number" name="max" min="0" step="1" inputmode="decimal" placeholder="Max $" value="' . h($q['max'] ?? '') . '"></label>
         </fieldset>
-        <label>Sort<select name="sort" data-autosubmit>' . $sortOpts . '</select></label>
         <div class="shop-filter-actions"><button class="button primary" type="submit">Apply</button><a class="button secondary" href="' . h($basePath) . '">Clear</a></div>
       </form>
     </details>';
