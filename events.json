@@ -1,26 +1,6 @@
 [
   {
     "id": 1,
-    "title": "Pokemon Locals",
-    "game": "pokemon",
-    "gameLabel": "Pokémon TCG",
-    "date": "2026-10-12",
-    "time": "6:00 PM",
-    "time24": "18:00",
-    "startISO": "2026-10-12T18:00:00-04:00",
-    "endISO": "2026-10-12T19:00:00-04:00",
-    "entry": "$5",
-    "format": "Standard",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": "Every Monday",
-    "prizing": "100% payout in store credit to top 4",
-    "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
-  },
-  {
-    "id": 2,
     "title": "YUGIOH",
     "game": "yugioh",
     "gameLabel": "Yu-Gi-Oh!",
@@ -38,6 +18,26 @@
     "recurring": null,
     "prizing": null,
     "description": "YUGIOH"
+  },
+  {
+    "id": 2,
+    "title": "BeyBlade Social Meet up",
+    "game": "other",
+    "gameLabel": "Other",
+    "date": "2026-10-13",
+    "time": "6:00 PM",
+    "time24": "18:00",
+    "startISO": "2026-10-13T18:00:00-04:00",
+    "endISO": "2026-10-13T19:00:00-04:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": null,
+    "prizing": null,
+    "description": "BeyBlade Social Meet up"
   },
   {
     "id": 3,
@@ -401,6 +401,26 @@
   },
   {
     "id": 21,
+    "title": "BeyBlade Social Meet up",
+    "game": "other",
+    "gameLabel": "Other",
+    "date": "2026-10-20",
+    "time": "6:00 PM",
+    "time24": "18:00",
+    "startISO": "2026-10-20T18:00:00-04:00",
+    "endISO": "2026-10-20T19:00:00-04:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": null,
+    "prizing": null,
+    "description": "BeyBlade Social Meet up"
+  },
+  {
+    "id": 22,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -420,7 +440,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 22,
+    "id": 23,
     "title": "Flesh & Blood Silver age",
     "game": "other",
     "gameLabel": "Other",
@@ -440,7 +460,7 @@
     "description": "Flesh & Blood Silver age"
   },
   {
-    "id": 23,
+    "id": 24,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -460,7 +480,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 24,
+    "id": 25,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -480,7 +500,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 25,
+    "id": 26,
     "title": "MTG Commander",
     "game": "magic",
     "gameLabel": "Magic: The Gathering",
@@ -500,7 +520,7 @@
     "description": "MTG Commander"
   },
   {
-    "id": 26,
+    "id": 27,
     "title": "Standard Pokemon",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -520,7 +540,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 27,
+    "id": 28,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -540,7 +560,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 28,
+    "id": 29,
     "title": "Riftbound Radiance Release",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -560,7 +580,7 @@
     "description": "Riftbound Radiance Release"
   },
   {
-    "id": 29,
+    "id": 30,
     "title": "MTG Draft",
     "game": "magic",
     "gameLabel": "Magic: The Gathering",
@@ -580,7 +600,7 @@
     "description": "MTG Draft"
   },
   {
-    "id": 30,
+    "id": 31,
     "title": "MTG Commander",
     "game": "magic",
     "gameLabel": "Magic: The Gathering",
@@ -600,7 +620,7 @@
     "description": "MTG Commander"
   },
   {
-    "id": 31,
+    "id": 32,
     "title": "Lorcana Locals",
     "game": "lorcana",
     "gameLabel": "Disney Lorcana",
@@ -620,7 +640,7 @@
     "description": "Casual + competitive Disney Lorcana locals every Friday Night.\nAll skill levels welcome!"
   },
   {
-    "id": 32,
+    "id": 33,
     "title": "Beyblades",
     "game": "other",
     "gameLabel": "Other",
@@ -640,7 +660,7 @@
     "description": "Beyblades"
   },
   {
-    "id": 33,
+    "id": 34,
     "title": "Gundam Assemble L2P",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -660,7 +680,7 @@
     "description": "Gundam Assemble L2P"
   },
   {
-    "id": 34,
+    "id": 35,
     "title": "PALWORLD TCG",
     "game": "other",
     "gameLabel": "Other",
@@ -680,7 +700,7 @@
     "description": "PALWORLD TCG"
   },
   {
-    "id": 35,
+    "id": 36,
     "title": "Board Game Night",
     "game": "other",
     "gameLabel": "Other",
@@ -700,7 +720,7 @@
     "description": "Board Game Night"
   },
   {
-    "id": 36,
+    "id": 37,
     "title": "Delta Regin Prerelease",
     "game": "other",
     "gameLabel": "Other",
@@ -720,7 +740,7 @@
     "description": "Delta Regin Prerelease"
   },
   {
-    "id": 37,
+    "id": 38,
     "title": "Digimon Locals",
     "game": "digimon",
     "gameLabel": "Digimon TCG",
@@ -740,7 +760,7 @@
     "description": "Casual + competitive Digimon TCG locals every Sunday afternoon.\nAll skill levels welcome!"
   },
   {
-    "id": 38,
+    "id": 39,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -760,7 +780,7 @@
     "description": "Casual Pokémon TCG locals every Sunday afternoon.\nMore beginner-friendly.\nAll skill levels welcome!"
   },
   {
-    "id": 39,
+    "id": 40,
     "title": "Pokemon Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -780,7 +800,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 40,
+    "id": 41,
     "title": "YUGIOH",
     "game": "yugioh",
     "gameLabel": "Yu-Gi-Oh!",
@@ -800,7 +820,27 @@
     "description": "YUGIOH"
   },
   {
-    "id": 41,
+    "id": 42,
+    "title": "BeyBlade Social Meet up",
+    "game": "other",
+    "gameLabel": "Other",
+    "date": "2026-10-27",
+    "time": "6:00 PM",
+    "time24": "18:00",
+    "startISO": "2026-10-27T18:00:00-04:00",
+    "endISO": "2026-10-27T19:00:00-04:00",
+    "entry": "TBA",
+    "format": "See description",
+    "capacity": null,
+    "registered": null,
+    "registerUrl": null,
+    "facebookUrl": null,
+    "recurring": null,
+    "prizing": null,
+    "description": "BeyBlade Social Meet up"
+  },
+  {
+    "id": 43,
     "title": "Riftbound locals",
     "game": "riftbound",
     "gameLabel": "Riftbound",
@@ -820,7 +860,7 @@
     "description": "Casual + competitive Riftbound locals every Friday night.\nAll skill levels welcome!"
   },
   {
-    "id": 42,
+    "id": 44,
     "title": "Flesh & Blood Silver age",
     "game": "other",
     "gameLabel": "Other",
@@ -840,7 +880,7 @@
     "description": "Flesh & Blood Silver age"
   },
   {
-    "id": 43,
+    "id": 45,
     "title": "Gundam Locals",
     "game": "gundam",
     "gameLabel": "Gundam Card Game",
@@ -860,7 +900,7 @@
     "description": "Casual + competitive Gundam Card Game locals every Sunday evening.\nAll skill levels welcome!"
   },
   {
-    "id": 44,
+    "id": 46,
     "title": "One Piece Locals",
     "game": "other",
     "gameLabel": "Other",
@@ -880,7 +920,7 @@
     "description": "Casual + competitive One Piece TCG locals every Monday night\nAll skill levels welcome!"
   },
   {
-    "id": 45,
+    "id": 47,
     "title": "MTG Commander",
     "game": "magic",
     "gameLabel": "Magic: The Gathering",
@@ -900,7 +940,7 @@
     "description": "MTG Commander"
   },
   {
-    "id": 46,
+    "id": 48,
     "title": "Standard Pokemon",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -920,7 +960,7 @@
     "description": "Casual + competitive Pokémon TCG locals every Monday night.\nAll skill levels welcome!"
   },
   {
-    "id": 47,
+    "id": 49,
     "title": "Pokemon GLC Locals",
     "game": "pokemon",
     "gameLabel": "Pokémon TCG",
@@ -940,7 +980,7 @@
     "description": "Casual + competitive Pokémon TCG Gym Leader Challenge locals every Thursday night.\nAll skill levels welcome!"
   },
   {
-    "id": 48,
+    "id": 50,
     "title": "MTG Draft",
     "game": "magic",
     "gameLabel": "Magic: The Gathering",
@@ -958,45 +998,5 @@
     "recurring": null,
     "prizing": null,
     "description": "MTG Draft"
-  },
-  {
-    "id": 49,
-    "title": "Cyberpunk Prerelease",
-    "game": "other",
-    "gameLabel": "Other",
-    "date": "2026-10-30",
-    "time": "6:00 PM",
-    "time24": "18:00",
-    "startISO": "2026-10-30T18:00:00-04:00",
-    "endISO": "2026-10-30T19:00:00-04:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "$30 entry"
-  },
-  {
-    "id": 50,
-    "title": "MTG Commander",
-    "game": "magic",
-    "gameLabel": "Magic: The Gathering",
-    "date": "2026-10-30",
-    "time": "6:00 PM",
-    "time24": "18:00",
-    "startISO": "2026-10-30T18:00:00-04:00",
-    "endISO": "2026-10-30T19:00:00-04:00",
-    "entry": "TBA",
-    "format": "See description",
-    "capacity": null,
-    "registered": null,
-    "registerUrl": null,
-    "facebookUrl": null,
-    "recurring": null,
-    "prizing": null,
-    "description": "MTG Commander"
   }
 ]
