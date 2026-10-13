@@ -2826,14 +2826,22 @@ function floorOdd(sale, condition, rhythm = null) {
     || (condition !== 'new' && SEALED_RE.test(t));
 }
 
+// eBay's item-condition filter for the sold-listings link: Loose and CIB are used copies (eBay's Used, Like
+// New, Very Good, Good and Acceptable grades: 3000, 2750, 4000, 5000, 6000), New is Brand New (1000).
+const EBAY_CONDITIONS = { loose: '3000|2750|4000|5000|6000', cib: '3000|2750|4000|5000|6000', new: '1000' };
+// Words that narrow eBay's search to the condition: loose leaves out boxed and sealed copies, CIB asks for
+// complete ones, New for sealed ones.
+const EBAY_WORDS = { loose: ' -sealed -cib -complete -"brand new"', cib: ' (complete,cib)', new: ' sealed' };
+
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
   const name = baseTitle(p['product-name']) || p['product-name'];
   const sys = p['console-name'] || '';
-  const extra = { cib: ' complete', new: ' sealed', loose: '' }[condition];
   const q = (s) => encodeURIComponent(s.replace(/\s+/g, ' ').trim());
   return {
-    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${extra}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`,
+    // Sold listings in this condition, highest price first.
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${EBAY_WORDS[condition] || ''}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
+      + `&LH_ItemCondition=${encodeURIComponent(EBAY_CONDITIONS[condition] || EBAY_CONDITIONS.loose)}`,
     gamestop: `https://www.gamestop.com/search/?q=${q(name)}`,
     amazon: `https://www.amazon.com/s?k=${q(`${name} ${sys}`)}`,
     pc: /^\d+$/.test(String(p.id)) ? pcUrl(p.id) : '',
