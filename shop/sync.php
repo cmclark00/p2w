@@ -41,6 +41,7 @@ const VARIANT_PAUSE_MS = 1000;       // pause between batches
 // A catalog read before this time (Unix seconds) is stale whatever its age, so raising it starts a new pass
 // on the next run (same pace). Oct 12 2026: forced once (owner's request) to pick up the store's set names.
 const CATALOG_NOT_BEFORE = 1791838977;
+const PHOTOS_PER_RUN = 25;           // store photos fetched per run (2 Admin API reads each)
 // Listing ids for stock that only the Admin API knows: this + the CrystalCommerce variant id, so they can
 // never clash with Core2 listing ids.
 const ADMIN_LISTING_BASE = 1000000000;
@@ -143,18 +144,33 @@ if ($need) {
 }
 $missing = (int)$db->query("SELECT COUNT(*) FROM ($needSql)")->fetchColumn();
 
+/* ---------------------------------------------------------------- 2b. the store's own photos */
+
+// For cards whose Core2 details are another product's or have no photo (queued by the index build), the
+// store's own product record has the photo its storefront shows. Fetched once per card, PHOTOS_PER_RUN per run.
+$photosFetched = 0;
+$photoError = null;
+if (shop_env('CC_API_PROXY_SECRET') !== '') {
+  try {
+    $photosFetched = sync_store_photos($db);
+  } catch (Throwable $e) {
+    $photoError = get_class($e) . ': ' . $e->getMessage();
+  }
+}
+$photosPending = (int)$db->query('SELECT COUNT(*) FROM store_photos WHERE ok = 0 AND tries < 3')->fetchColumn();
+
 /* ---------------------------------------------------------------- 3. build the index */
 
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
-$rebuild = !$fresh || $fetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 6;
+$rebuild = !$fresh || $fetched > 0 || $photosFetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 7;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 6;
+  $state['indexVersion'] = 7;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -175,7 +191,9 @@ if (shop_env('CC_API_PROXY_SECRET') !== '') {
 
 done([
   'status' => 'ok', 'listingsRefreshed' => !$fresh, 'indexRebuilt' => $rebuild, 'index' => $state['indexStats'] ?? null,
-  'detailsFetched' => $fetched, 'missing' => $missing, 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats,
+  // `missing` includes store photos still to fetch, so the GitHub job keeps calling until they're in.
+  'detailsFetched' => $fetched, 'missing' => $missing + $photosPending, 'photosFetched' => $photosFetched, 'photosPending' => $photosPending,
+  'photoError' => $photoError, 'raw' => $state['listingsRaw'] ?? null, 'variants' => $variantStats,
   'memoryMB' => round(memory_get_peak_usage() / 1048576), 'memoryLimit' => ini_get('memory_limit'),
   'seconds' => round(microtime(true) - $t0, 1),
 ]);
@@ -190,7 +208,55 @@ function sync_store(): PDO {
   $db->exec('CREATE TABLE IF NOT EXISTS details (pid INTEGER PRIMARY KEY, slug TEXT DEFAULT \'\', img TEXT DEFAULT \'\', thumb TEXT DEFAULT \'\', set_name TEXT DEFAULT \'\',
     set_slug TEXT DEFAULT \'\', type_slug TEXT DEFAULT \'\', type_name TEXT DEFAULT \'\', descr TEXT DEFAULT \'\', rel INTEGER DEFAULT 0, ok INTEGER DEFAULT 0, tries INTEGER DEFAULT 0)');
   sync_variants_table($db, 'variants');
+  // The store's own photo for cards Core2 has no good photo for (see sync_store_photos).
+  $db->exec('CREATE TABLE IF NOT EXISTS store_photos (pid INTEGER PRIMARY KEY, img TEXT DEFAULT \'\', thumb TEXT DEFAULT \'\', ok INTEGER DEFAULT 0, tries INTEGER DEFAULT 0)');
   return $db;
+}
+
+// Store photos for queued cards: a variant of the card (variants table) -> its store product id -> the product's
+// photos (default first). Read-only Admin API calls, 2 at a time, 2 per card, once per card (kept in
+// store_photos; a card with no photo in the store is kept as done with no photo).
+function sync_store_photos(PDO $db): int {
+  $pids = array_map('intval', $db->query('SELECT pid FROM store_photos WHERE ok = 0 AND tries < 3 LIMIT ' . PHOTOS_PER_RUN)->fetchAll(PDO::FETCH_COLUMN));
+  if (!$pids) return 0;
+  $base = shop_cc_base();
+  $headers = shop_cc_headers('admin:read-inventory');
+  $vidOf = $db->prepare('SELECT vid FROM variants WHERE pid = ? ORDER BY qty DESC LIMIT 1');
+  $vurls = [];
+  foreach ($pids as $pid) {
+    $vidOf->execute([$pid]);
+    $vid = $vidOf->fetchColumn();
+    if ($vid) $vurls[$pid] = "$base/variants/" . (int)$vid;
+  }
+  $vres = $vurls ? shop_fetch_json(array_values($vurls), 2, 20, $headers) : [];
+  $purls = [];
+  foreach ($vurls as $pid => $u) {
+    $v = $vres[$u] ?? null;
+    $v = is_array($v) ? ($v['variant'] ?? $v) : null;
+    if (!empty($v['product_id'])) $purls[$pid] = "$base/products/" . (int)$v['product_id'];
+  }
+  $pres = $purls ? shop_fetch_json(array_values($purls), 2, 20, $headers) : [];
+  $ok = $db->prepare('UPDATE store_photos SET img = ?, thumb = ?, ok = 1 WHERE pid = ?');
+  $miss = $db->prepare('UPDATE store_photos SET tries = tries + 1 WHERE pid = ?');
+  $done = 0;
+  $db->beginTransaction();
+  foreach ($pids as $pid) {
+    $p = isset($purls[$pid]) ? ($pres[$purls[$pid]] ?? null) : null;
+    $p = is_array($p) ? ($p['product'] ?? $p) : null;
+    if (!is_array($p) || empty($p['id'])) { $miss->execute([$pid]); continue; }
+    $img = $thumb = '';
+    foreach ($p['photos'] ?? [] as $ph) {
+      $ph = $ph['photo'] ?? $ph;
+      $orig = (string)($ph['urls']['original']['href'] ?? '');
+      if ($orig === '' || ($img !== '' && empty($ph['is_default']))) continue;
+      $img = $orig;
+      $thumb = (string)($ph['urls']['thumb']['href'] ?? '');
+    }
+    $ok->execute([$img, $thumb, $pid]);
+    $done++;
+  }
+  $db->commit();
+  return $done;
 }
 
 // The variants catalog: every Admin API variant (in stock or not), by Core2 product id. set_name is the
@@ -331,10 +397,13 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     $rows = $ix->query('SELECT g.pid, g.qty, g.fp, (SELECT name FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS name,
         (SELECT type FROM listings x WHERE x.pid = g.pid ORDER BY src, id LIMIT 1) AS ltype,
-        (SELECT s.set_name FROM st.variants s WHERE s.pid = g.pid AND s.set_name <> \'\' GROUP BY s.set_name ORDER BY COUNT(*) DESC LIMIT 1) AS store_set, d.slug, d.img, d.thumb, d.set_name, d.set_slug, d.type_slug, d.type_name, d.descr, d.rel
-      FROM (SELECT pid, SUM(q) AS qty, MIN(p) AS fp FROM listings GROUP BY pid) g LEFT JOIN st.details d ON d.pid = g.pid');
-    $count = $badDetails = 0;
+        (SELECT s.set_name FROM st.variants s WHERE s.pid = g.pid AND s.set_name <> \'\' GROUP BY s.set_name ORDER BY COUNT(*) DESC LIMIT 1) AS store_set, d.slug, d.img, d.thumb, d.set_name, d.set_slug, d.type_slug, d.type_name, d.descr, d.rel,
+        ph.img AS store_img, ph.thumb AS store_thumb, ph.ok AS store_ok
+      FROM (SELECT pid, SUM(q) AS qty, MIN(p) AS fp FROM listings GROUP BY pid) g LEFT JOIN st.details d ON d.pid = g.pid
+      LEFT JOIN st.store_photos ph ON ph.pid = g.pid');
+    $count = $badDetails = $storePhotos = 0;
     $badExamples = [];
+    $needPhotos = [];
     while ($r = $rows->fetch()) {
       $lt = (string)$r['ltype'];
       $dSlug = (string)($r['type_slug'] ?? '');
@@ -364,6 +433,16 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
         foreach (['img', 'thumb', 'descr', 'slug'] as $k) $r[$k] = '';
         if ((string)($r['store_set'] ?? '') === '') { $set = ''; $setSlug = ''; }
       }
+      // No good Core2 photo: the store's own, once fetched (sync_store_photos); else queue it for fetching.
+      if ((string)($r['img'] ?? '') === '') {
+        if ((string)($r['store_img'] ?? '') !== '') {
+          $r['img'] = $r['store_img'];
+          $r['thumb'] = $r['store_thumb'];
+          $storePhotos++;
+        } elseif ($r['store_ok'] === null) {
+          $needPhotos[] = (int)$r['pid'];
+        }
+      }
       $ins->execute([(int)$r['pid'], $name, $n, ' ' . trim("$n " . shop_norm($set) . ' ' . shop_norm($type)) . ' ',
         (string)($r['slug'] ?? '') !== '' ? $r['slug'] : shop_slug($name), (string)($r['img'] ?? ''), (string)($r['thumb'] ?? ''),
         $set, $setSlug, $type, $typeSlug, $game, $kind, (int)($r['rel'] ?? 0), (string)($r['descr'] ?? ''), (int)$r['qty'], (int)$r['fp']]);
@@ -386,8 +465,15 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
   $ix = $ins = $add = $rank = $rows = null;
   if (!@rename($tmp, $path)) { @unlink($tmp); throw new RuntimeException('Could not save the shop index'); }
 
+  if ($needPhotos) {
+    $q = $db->prepare('INSERT OR IGNORE INTO store_photos (pid) VALUES (?)');
+    $db->beginTransaction();
+    foreach ($needPhotos as $pid) $q->execute([$pid]);
+    $db->commit();
+  }
+
   $stats = ['at' => time(), 'catalogAt' => (int)sync_kv($db, 'catalogAt'), 'products' => $count, 'listings' => $listings, 'fromAdmin' => $fromAdmin,
-    'core2NotInStore' => $droppedCore2, 'detailsMismatch' => $badDetails,
+    'core2NotInStore' => $droppedCore2, 'detailsMismatch' => $badDetails, 'storePhotos' => $storePhotos, 'photosQueued' => count($needPhotos),
     'matched' => $orderable, 'loose' => $loose, 'unmatched' => $unmatched] + (json_decode((string)sync_kv($db, 'catalog'), true) ?: []);
   // For the kiosk status page.
   shop_write_json('variants.json', $stats + ['unmatchedExamples' => $examples, 'detailsMismatchExamples' => $badExamples]);

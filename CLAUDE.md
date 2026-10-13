@@ -1029,6 +1029,21 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   store's "Downers Grove Store Inventory", so they had no set; it also
   has a separate "Mega Evolution - 30th Celebration" catalog of the same
   cards that the store doesn't use (dropped as not in the store).
+  **Photos:** Core2's details (photo, description, Core2 set) are used only
+  when they describe the same card: `sync_details_match()` wants the card
+  number ("152/128", "DR3-EN059", "MEP094") or the name's first word in
+  Core2's name slug (Oct 12 2026: ~123 cards pointed at unrelated Core2
+  products, e.g. Mew ex 152/128 showed a Friends dice set; status
+  `detailsMismatch` + examples). Cards left without a photo (mismatch or
+  none in Core2) are queued in `store_photos` and get **the store's own
+  photo** (`sync_store_photos()`: variant → `product_id` →
+  `GET /products/{id}` → default `photos[].photo.urls.original`, on
+  CrystalCommerce's CDN under the catalog id, so `shop_img()` sizes work),
+  `PHOTOS_PER_RUN` (25) cards per run, 2 read-only calls each, once per
+  card; `missing` includes the queue so the GitHub job keeps going.
+  `?product=<store product id>` shows one store product's raw fields.
+  `CATALOG_NOT_BEFORE` (Unix time) forces a fresh catalog read: raise it
+  and deploy.
   `shop/admin-check.php?compare=1` (Core2 vs store counts, our data only)
   and `?pid=<Core2 product id>` (one product across our data + a live read
   of its variants) are the diagnostics. Those listings get id `ADMIN_LISTING_BASE`
