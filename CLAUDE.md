@@ -548,7 +548,21 @@ The site's **only server-side code**. Everything else is static.
     Premium CIB $17.99 → $20, Fallout 4 PS4 CIB $19.95 → $20, Dragon Age
     Xbox One loose $9.99 → $10 (second-highest was tried first and still
     gave Fallout 4 $15). Odd listings never count. Older systems keep the
-    PS2/GameCube-tuned 90th percentile. The **eBay sold
+    PS2/GameCube-tuned 90th percentile. **More odd sales** (in
+    `floorSales()`): another edition sold under the plain game
+    (`otherEdition()`, `EDITION_RES`: Steelbook, GOTY (not "Not GOTY"),
+    Collector's, Deluxe, Limited/Special/Launch/Gold/Ultimate/… Edition,
+    unless the product's own name has it; The Last Guardian's top CIB sales
+    were $40 Steelbooks) and home-console bundles (`HOME_CONSOLE_RE`: a
+    storage size like "1TB", "console bundle", "slim/pro console"; Fortnite
+    PS4's top CIB "sale" was a $134.99 PS4 Slim bundle, tool said $195,
+    shop $100). **Rounding slack:** a basis up to `FLOOR_STEP_SLACK` (50¢)
+    over a $5 step stays on it ($20.38 → $20). Checked Oct 13 2026 on 7 of
+    the shop's prices (Fortnite, Last Guardian, Fallout 4, GTA V Premium,
+    Dragon Age, Killzone ×2): 5 exact; Killzone: Shadow Fall (shop $10,
+    sales top out $16–18, typical $10–13) is priced below its own sales on
+    purpose, so it needs a per-game discount line, not a sales rule.
+    The **eBay sold
     link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
     filter eBay's used grades (3000/2750/4000/5000/6000), New = 1000; Loose
     excludes sealed/complete/CIB words, CIB asks for "complete" or "cib",

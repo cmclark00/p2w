@@ -2743,6 +2743,9 @@ const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500; // suggested prices round up to the next $5
+// ...except a basis at most this much over a $5 step stays on it: The Last Guardian's $20.38 sale is a $20 game
+// (the shop's price), not $25. Oct 2026.
+const FLOOR_STEP_SLACK = 50;
 // Older systems and Amazon (owner's rules, Oct 2026), for systems that don't take Amazon's price outright:
 //  - When Amazon's typical offer (the middle of the offers Amazon returns, shipping included) is above the
 //    eBay/GameStop price, go halfway toward it, but at most FLOOR_AMAZON_PULL above. Typical, not lowest: one
@@ -2809,7 +2812,7 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null }
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const full = Math.max(min, Math.ceil(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
+  const full = Math.max(min, Math.ceil(Math.max(0, premiumBasis - FLOOR_STEP_SLACK) / FLOOR_STEP) * FLOOR_STEP);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
   const price = Math.max(full - ded, gsFloor);
@@ -3003,11 +3006,24 @@ async function loadFloorSales(product) {
 
 // The condition's sales, highest first, each with its index into that list.
 function floorSales(cur = floorCur) {
-  const rhythm = rhythmKind(cur.product?.['product-name']);
+  const name = cur.product?.['product-name'] || '';
+  const rhythm = rhythmKind(name);
   const cap = rhythmDiscSaleCap(cur);
-  return (cur.sales?.[cur.condition] || []).map((s, i) => ({ ...s, i, odd: floorOdd(s, cur.condition, rhythm) || s.price > cap }))
-    .sort((a, b) => b.price - a.price);
+  return (cur.sales?.[cur.condition] || []).map((s, i) => ({
+    ...s, i, odd: floorOdd(s, cur.condition, rhythm) || s.price > cap || otherEdition(s.title, name) || HOME_CONSOLE_RE.test(s.title),
+  })).sort((a, b) => b.price - a.price);
 }
+
+// A sale of another edition filed under this game: PriceCharting lists those separately, but sellers' sales land on
+// the plain game too (The Last Guardian, PS4, CIB, Oct 2026: its top two sales were the Steelbook Edition at
+// $40 / $39.60; the game sells for ~$20). Odd when the title names an edition that this product's name doesn't.
+const EDITION_RES = [/\bsteel ?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game of the year)\b/i, /\bcollector'?s\b/i, /\blimited edition\b/i,
+  /\bdeluxe\b/i, /\bpremium( online)? edition\b/i, /\bspecial edition\b/i, /\blaunch edition\b/i, /\bday one\b/i, /\bgold edition\b/i,
+  /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i];
+const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || '') && !re.test(name));
+// A home console sold with the game (Fortnite, PS4, CIB, Oct 2026: "Sony PlayStation 4 PS4 Slim 1TB Fortnite Neo Versa
+// Console Bundle" at $134.99 topped its sales; the game sells for ~$100). BUNDLE_RE only knows handhelds.
+const HOME_CONSOLE_RE = /\b\d+ ?(tb|gb)\b|\b(slim|pro) (console|bundle|system)\b|\bconsole (bundle|system)\b|\bconsole\b.*\bbundle\b|\bbundle\b.*\bconsole\b/i;
 
 // Rhythm-game discs: a sale far above the disc's typical loose sale came with instruments, titled or not
 // (Guitar Hero Live, Wii U, Oct 2026: loose median $7.42; half its CIB sales were $31–$100 bundles, many titled
