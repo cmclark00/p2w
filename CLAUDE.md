@@ -519,54 +519,34 @@ The site's **only server-side code**. Everything else is static.
   games, per the sheet's **Game Pricing Guide** tab.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's
-    "eBay highest sold" at every price; there's no eBay step (eBay's
-    sold-data API is closed to new users and its sold pages need a
-    login as of Aug 2026; Amazon's API needs 10 affiliate sales/30 days,
-    so Amazon is links only).
-  - **Modern systems go by PriceCharting's retail sell price** (owner, Oct
-    13 2026; `tier.retailSell`, `PC_FIELDS['retail-sell']` =
-    `retail-{loose,cib,new}-sell`, from `'retailsell'`): the condition's
-    retail sell, never below GameStop, rounded like everything else.
-    **Backtest:** the shop's Fulcrum exports (stock + Sept 1 – Oct 13 2026
-    sales/intake; private, not in the repo) gave 2,002 intake shelf prices
-    with PriceCharting data; 421 of them (all 262 modern + 160 older) were
-    run through the real `floorResult()` with each game's PriceCharting
-    page. Modern: retail sell 88% within $5 (exact 45%, avg miss $4.08) vs
-    the top-eBay-sale rule's 66% (exact 31%, $8.74, too high 59%; God of
-    War PS4 CIB came out $160 off one stray sale, shop $15). Older systems
-    stayed on the sales rules (78% within $5; 1.35× retail sell was 82%
-    but ran high more often). The shop prices modern games at about 1.0×
-    retail sell and older ones at ~1.25–1.4×. Premium lines without a
-    system don't apply to the retail sell price (modern Pokemon: 33 of 35
-    within $5 at retail sell, 22 with +10%); system-named lines do
-    (Killzone). A clicked sale still sets the price (through the normal
-    sales rules); with no retail sell price the tool falls back to the
-    sales with a note. `pickFloorGame()` loads the full product when the
-    search result lacks the retail sell fields (`cur.fullLoading`, "Add
-    to list" waits). Amazon no longer affects modern automatic prices.
-    (The earlier same-day "highest normal sale on modern" rule is gone.)
-  - **Tiers** (`FLOOR_TIERS`, by PriceCharting console name; PAL/JP
-    prefixes ignored): modern **games** use retail sell as described above.
-    Older games and hardware use the sales rules. On modern systems the
-    sales fallback (no retail sell, clicked sale, or hardware) compares
-    GameStop, Amazon's lowest offer, the sale and PriceCharting's market
-    price. Other systems (`FLOOR_OTHER`) use the older sales rules with a
-    "double-check" note. A full-product lookup blocks all automatic prices
-    until it finishes, even when retail sell is already in the search result,
-    because GameStop's minimum may still be missing. Failed lookups show a
-    review warning. Retail-sell games don't wait for Amazon, which can't
-    affect them; the sales paths wait while Amazon is loading.
-    **PriceCharting's own price** for the condition (`PC_FIELDS.market`) is a
-    basis option on the sales paths, and the highest option wins (owner, Oct 13
-    2026: "when eBay or PriceCharting is higher than GameStop or Amazon, go
-    off the former"; from `'pricecharting'`). **Amazon outliers:** on modern
-    systems an Amazon lowest offer over `FLOOR_AMAZON_OUTLIER` (2×) the
-    higher of the eBay sale and PriceCharting doesn't count, with a
-    double-check note (Dragon Age: Inquisition, Xbox One: eBay ~$9.99,
-    PriceCharting $4.69, Amazon had set it to $60; now $10). **Modern
-    systems' earlier highest-sale experiment was superseded by retail sell**.
-    The sales fallback uses the same PS2/GameCube-tuned 90th percentile
-    and $80 second-highest rule as older systems. Odd listings never count.
+    "eBay highest sold" reference at every price. The tool reads actual
+    sold listings through PriceCharting and Amazon offers through the
+    shop's configured Selling Partner API; staff can open the source links.
+  - **Source priority (owner correction, Oct 14 2026): eBay sold prices
+    first, GameStop/Amazon checks, PriceCharting fallback.** This supersedes
+    the Oct 13 `c9d32c9` modern retail-sell rule and the older competing
+    PriceCharting maximum. Never restore those rules based on matching
+    historical stock prices: those prices are reference evidence, not policy.
+    All systems use the filtered p90/$80 second-highest sold selection.
+    GameStop is a minimum. Modern Amazon offers flag differences (> $5)
+    for review; they never replace usable sold evidence. An offer > 2x
+    eBay/GameStop is flagged as an outlier; PriceCharting cannot legitimize it.
+    Older systems keep the capped Amazon adjustment and scarcity rule below.
+    Without usable sales, prefer GameStop; with neither, a matched Amazon
+    offer, then the condition's `PC_FIELDS.market` price (`pricecharting`).
+    All fallbacks carry a review warning. Retail-sell stays reference-only.
+    Configured general and system-specific premiums apply to automatic
+    prices; typed overrides bypass them. The old retail-sell exception
+    suppressing general premiums is removed.
+  - **Tiers** (`FLOOR_TIERS`, PriceCharting console names, PAL/JP prefixes
+    ignored): modern has Amazon comparison checks; retro/other has the
+    capped adjustment. Hardware follows the same source priority but skips
+    game-only deductions/minimum exceptions. Full-product lookup, sold
+    evidence and configured Amazon checks must finish before Add is enabled.
+    A missing sales response cannot temporarily activate a PriceCharting
+    fallback. Failed full-product/Amazon checks and unavailable sold evidence
+    are visible. PriceCharting's product lookup carries GameStop and UPC;
+    it is distinct from using PriceCharting's own price as the basis.
     **More odd sales** (in
     `floorSales()`): another edition sold under the plain game
     (`otherEdition()`, `EDITION_RES`: Steelbook, GOTY (not "Not GOTY"),
@@ -627,7 +607,7 @@ The site's **only server-side code**. Everything else is static.
     about 30 per condition, cached 6 h in `cache/sales-<id>.json`, shares
     the PriceCharting throttle lock). **Fragile by nature:** if
     PriceCharting changes that markup, the route returns empty lists and
-    the tab asks for a typed price; fix the regexes in
+    the tab flags the fallback for review; fix the regexes in
     `pc_sales()`. Sales whose title matches `ODD_SALE_RE` (lot, bundle,
     graded, repro, box/manual only…), `BUNDLE_RE` (sold with a console or
     handheld: a charger/AC adapter, "with console", hardware joined by
@@ -746,9 +726,9 @@ The site's **only server-side code**. Everything else is static.
     headers must agree on status and timestamp. No-header and other lines
     are counted/excluded; returns are separate. Median is quantity-weighted
     after line discounts. Modern game stock groups differing by >$5 from
-    the snapshot retail-sell benchmark are listed for review; apply the
+    the historical retail-sell comparison are listed as secondary references; apply the
     existing rounding/manual/system-specific premium rules. This benchmark
-    has no GameStop and is not a live quote. Older/rhythm/hardware groups
+    has no sold evidence/GameStop/Amazon and is not a pricing rule or shelf-change recommendation. Older/rhythm/hardware groups
     have no export benchmark. Search action requires staff to choose the
     correct PriceCharting product; never silently fuzzy-match editions.
     No rule retuning from imported stock prices. Regressions and optional
@@ -797,8 +777,8 @@ The site's **only server-side code**. Everything else is static.
     lists more); the tab shows them all and "N lowest of M". Renewed
     copies are separate ASINs, so they never appear. Loose/CIB compare
     with **Used**, New with **New**. **Loaded automatically for every
-    game.** Modern games with a retail-sell price only display Amazon for
-    reference; their sales fallback and modern hardware take Amazon's lowest offer as a basis option;
+    game.** Modern systems use Amazon for comparison checks when sold evidence exists,
+    and as a fallback only without sold evidence or GameStop;
     older systems only go partway toward Amazon's typical offer (capped)
     and treat "no offers" as scarcity — see **Older systems and Amazon**
     above (retro Amazon listings are third-party asking prices, often far

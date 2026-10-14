@@ -724,19 +724,17 @@ Guide (the Google Sheet tab).
    tick **Manual missing** for a CIB game without its manual.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
-   - **Most systems:** it goes by the **high end of normal sales** (the
+   - **Every system:** it goes by the **high end of normal sales** (the
      90th percentile, about the 4th-highest of 30), so one lucky sale
      doesn't set the price. For games selling around **$80 and up** it
      uses the **second-highest** sale instead, since pricier games go on
      the shelf nearer the top. That sale is highlighted in the list.
-   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** PriceCharting's
-     **retail sell** price (the same number Fulcrum shows), rounded up,
-     never below GameStop's pre-owned price. That matched the shop's own
-     recent prices best (within $5 nearly 9 times in 10). The eBay sales
-     and Amazon offers still show underneath to check it against; click a
-     sale to use it instead.
-   - **PriceCharting's own price** counts on older systems: when it's
-     higher than the sale, GameStop or Amazon, the price goes by it.
+   - **Source priority:** eBay sold prices first, GameStop/Amazon checks,
+     **PriceCharting only as a fallback**. GameStop remains a minimum.
+     If no usable sold evidence exists, GameStop takes precedence; with
+     neither, use a matched Amazon offer, then PriceCharting's market
+     price for the condition. Fallback prices always say **Double-check**.
+     PriceCharting's retail-sell number is a reference, not a pricing rule.
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
      the plain game. They show dimmed.
@@ -744,7 +742,10 @@ Guide (the Google Sheet tab).
      (prices include shipping). On older systems, when Amazon's typical
      price is higher, the price moves partway toward it (at most 25%
      more); with no Amazon copies at all, it goes by the highest sale
-     plus 10%.
+     plus 10%. On **PS4, PS5, Xbox One / Series, Switch and Switch 2**,
+     Amazon offers flag differences for review and do not replace usable
+     sold evidence. The tool waits for sold evidence and reference checks
+     before enabling **Add to list**.
    - **Premiums:** some games get a set percentage on top (for example
      older Pokémon games). The badge and the math line show it. Managers
      set these under Settings → Floor price premiums.
@@ -806,17 +807,16 @@ stay separate. The sales median uses the line subtotal after discounts,
 weighted by units sold; trade intake, voids and zero-price lines don't
 count. Returns appear separately.
 
-The inventory review lists modern games whose stock price differs by
-more than $5 from the export's retail-sell price under our rounding and
-premium rules. Filter by title or system, then click a title to search
-PriceCharting and select the correct edition and condition. The export
-has no GameStop price, and older systems need their live sales/Amazon
-checks, so these flags are reasons to review, not instructions to change
-prices. No Fulcrum prices or calculator rules are changed by importing.
+The inventory review shows historical differences from PriceCharting's
+retail-sell reference. These are **not pricing exceptions or shelf-change
+recommendations**: the exports lack live eBay sold evidence and GameStop/
+Amazon checks. Filter by title or system, then click a title and verify
+the edition and condition using the live eBay-first rule. No Fulcrum
+prices or calculator rules are changed by importing.
 
 The recent sales are read from PriceCharting's website. If PriceCharting
-changes their site and the sales stop showing, the tool asks you to type
-a price; use the **PriceCharting ↗** link to see the sales.
+changes their site and the sales stop showing, the tool flags the fallback
+for review; use the links to verify it or type a price.
 
 **Extra info on game lines:**
 - **"Slow seller" badge:** fewer than 50 copies sell per year and it's worth
