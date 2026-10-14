@@ -667,7 +667,9 @@ The site's **only server-side code**. Everything else is static.
     Shown as a badge and a breakdown step. **Defaults (settings v7, + v8 below):**
     `Pokemon = 10`, `Pokemon @ GameBoy / Nintendo 64 / Gamecube = 25`,
     `Pokemon @ Nintendo DS / Nintendo 3DS = 0`, `Conker's Bad Fur Day =
-    15`. Fit Oct 7 2026 by running the **live** tool (Amazon included)
+    15` (**10 since settings v10**, Oct 14 2026: the same rules gave $290
+    vs the shop's $275 as the sales/Amazon moved; saved lists still at 15
+    migrate to 10). Fit Oct 7 2026 by running the **live** tool (Amazon included)
     on the shop's loose prices for 19 Pokemon games + Conker: 5 → 13 of
     20 within $10, avg miss $24 → $14. Older Pokemon sit ~1.4× the top
     sale; DS is priced at the sales and 3DS at GameStop, where the Amazon

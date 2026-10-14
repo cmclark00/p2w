@@ -67,7 +67,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 9,
+  version: 10,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -106,7 +106,9 @@ const DEFAULT_SETTINGS = {
     { phrase: 'Pokemon', system: 'Gamecube', pct: 25 },
     { phrase: 'Pokemon', system: 'Nintendo DS', pct: 0 },
     { phrase: 'Pokemon', system: 'Nintendo 3DS', pct: 0 },
-    { phrase: "Conker's Bad Fur Day", pct: 15 },
+    // Was 15 (Oct 7 fit); Oct 14 2026 the same rules gave $290 (top sale $199.99, +25% toward Amazon = $250, +15%)
+    // against the shop's $275, which +10% hits exactly.
+    { phrase: "Conker's Bad Fur Day", pct: 10 },
     { phrase: 'Pokemon Colosseum Bonus Disc', pct: 52 }, // $400
     { phrase: 'Pokemon Red', system: 'GameBoy', pct: -5 }, // $125
     { phrase: 'Pokemon LeafGreen', pct: 10 }, // $175
@@ -321,13 +323,19 @@ function mergeSettings(saved) {
   // Versions 7-8: per-system Pokemon premiums + Conker (v7), then per-game lines (v8), replace an untouched
   // earlier default list (v6: Pokemon = 10; v7: the first 7 lines of today's list).
   const premiumKey = (list) => JSON.stringify(list.map((p) => [p.phrase, p.system || '', Number(p.pct)]));
-  const oldDefaults = [[{ phrase: 'Pokemon', pct: 10 }], DEFAULT_SETTINGS.floorPremiums.slice(0, 7)].map(premiumKey);
+  // (The v7 list had Conker at 15, as it shipped.)
+  const v7List = DEFAULT_SETTINGS.floorPremiums.slice(0, 7).map((p) => (/conker/i.test(p.phrase) ? { ...p, pct: 15 } : p));
+  const oldDefaults = [[{ phrase: 'Pokemon', pct: 10 }], v7List].map(premiumKey);
   if (saved.version < 8 && oldDefaults.includes(premiumKey(s.floorPremiums))) {
     s.floorPremiums = clone(DEFAULT_SETTINGS.floorPremiums);
   }
   // Version 9: the Killzone: Shadow Fall discount line (owner request) joins saved premium lists.
   if (saved.version < 9 && !s.floorPremiums.some((p) => norm(p.phrase) === 'killzone shadow fall')) {
     s.floorPremiums.push(clone(DEFAULT_SETTINGS.floorPremiums.find((p) => norm(p.phrase) === 'killzone shadow fall')));
+  }
+  // Version 10: Conker's premium 15% -> 10% (owner's $275), unless a manager had already changed it.
+  if (saved.version < 10) {
+    for (const p of s.floorPremiums) if (norm(p.phrase) === 'conker s bad fur day' && !p.system && Number(p.pct) === 15) p.pct = 10;
   }
   return s;
 }
