@@ -2840,13 +2840,193 @@ function showBulk() {
   else renderBulk();
 }
 
+/* ================================================================== Fulcrum reference data */
+
+// These exports stay in memory in this tab: no upload, localStorage, or saved-session payload.
+const fulcrum = { stock: null, sales: null, transactions: null, files: {}, seq: 0 };
+const FULCRUM_CONDITIONS = {
+  loose: ['loose', false], completeInBox: ['cib', false], new: ['new', false], cartWithBox: ['cib', true],
+};
+const fulcrumKey = (name, system, condition, manual = false) => JSON.stringify([norm(name), norm(system), condition, !!manual]);
+const fulcrumNumber = (s) => String(s ?? '').trim() !== '' && Number.isFinite(Number(s)) ? Number(s) : null;
+const fulcrumMoney = (s) => { const n = fulcrumNumber(s); return n == null ? null : Math.round(n * 100); };
+
+// Quoted commas, escaped quotes, embedded newlines, UTF-8 BOM and CRLF are valid CSV.
+function fulcrumCsv(text) {
+  const rows = []; let row = [], cell = '', quoted = false, closed = false;
+  const input = String(text).replace(/^\uFEFF/, '');
+  const finishCell = () => { row.push(cell); cell = ''; closed = false; };
+  const finishRow = () => { finishCell(); if (row.some((v) => v !== '')) rows.push(row); row = []; };
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (quoted) {
+      if (c === '"' && input[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') { quoted = false; closed = true; }
+      else cell += c;
+    } else if (c === ',') finishCell();
+    else if (c === '\r' || c === '\n') { finishRow(); if (c === '\r' && input[i + 1] === '\n') i++; }
+    else if (c === '"' && !cell && !closed) quoted = true;
+    else { if (closed || c === '"') throw new Error('Malformed CSV quoting. Export the file again from Fulcrum.'); cell += c; }
+  }
+  if (quoted) throw new Error('CSV ends inside a quoted field. Export the complete file again.');
+  if (cell || row.length || closed) finishRow();
+  const headers = rows.shift();
+  if (!headers || new Set(headers).size !== headers.length) throw new Error('CSV needs unique column headers.');
+  return { headers, rows: rows.map((r, i) => {
+    if (r.length !== headers.length) throw new Error(`CSV record ${i + 2} has ${r.length} fields; expected ${headers.length}.`);
+    return Object.fromEntries(headers.map((h, j) => [h, r[j]]));
+  }) };
+}
+
+function fulcrumImport(text) {
+  const data = fulcrumCsv(text);
+  const schemas = {
+    stock: ['stock_code', 'item_name', 'category', 'item_type', 'condition', 'sub_condition', 'quantity', 'sell_price', 'pc_retail_loose_sell', 'pc_retail_cib_sell', 'pc_retail_new_sell'],
+    sales: ['transaction_number', 'date_local', 'transaction_type', 'line_mode', 'item_name', 'category', 'item_type', 'condition', 'sub_condition', 'quantity', 'line_subtotal'],
+    transactions: ['transaction_number', 'date_local', 'transaction_type', 'purchases_total', 'line_count'],
+  };
+  const kind = Object.keys(schemas).find((k) => schemas[k].every((h) => data.headers.includes(h)));
+  if (!kind) throw new Error('Choose a Fulcrum stock pricing, sales line items, or transactions CSV with the original columns.');
+  // A transaction is one header; inventory_id is a product, not an individual stock lot.
+  const id = kind === 'transactions' ? 'transaction_number' : kind === 'stock' ? 'stock_code' : null;
+  if (id) {
+    const keys = data.rows.map((r) => r[id]);
+    if (keys.some((k) => !k) || new Set(keys).size !== keys.length) throw new Error(`Duplicate or missing ${id}: import one complete export, without repeated rows.`);
+  }
+  // Keep only fields used by the comparison (transaction exports can contain customer names).
+  return { kind, rows: data.rows.map((r) => Object.fromEntries(schemas[kind].map((h) => [h, r[h]]))) };
+}
+
+function fulcrumGroupKey(row) {
+  const c = FULCRUM_CONDITIONS[row.condition];
+  if (row.item_type !== 'game' || row.sub_condition || !c) return null;
+  return fulcrumKey(row.item_name, row.category, c[0], c[1]);
+}
+
+function fulcrumEvidence(data = fulcrum) {
+  const groups = new Map();
+  const get = (r) => {
+    const key = fulcrumGroupKey(r);
+    if (!key) return null;
+    if (!groups.has(key)) groups.set(key, { key, name: r.item_name, system: r.category, condition: FULCRUM_CONDITIONS[r.condition][0], manual: FULCRUM_CONDITIONS[r.condition][1], stock: [], sales: [], returns: 0 });
+    return groups.get(key);
+  };
+  for (const r of data.stock || []) {
+    const qty = fulcrumNumber(r.quantity), price = fulcrumMoney(r.sell_price);
+    if (!(qty > 0)) continue;
+    const g = get(r);
+    if (g) g.stock.push({ qty, price: price >= 0 ? price : null, row: r });
+  }
+  const tx = data.transactions == null ? null : new Map(data.transactions.map((r) => [r.transaction_number, r]));
+  let excluded = 0, unmatched = 0;
+  const dates = [];
+  for (const r of data.sales || []) {
+    const header = tx?.get(r.transaction_number);
+    if (tx && !header) { unmatched++; continue; }
+    // Unknown/void headers and trade intake shelf prices are not completed retail sales.
+    if (!['Sale', 'Sale Return', 'Return'].includes(r.transaction_type)
+      || (tx && (header.transaction_type !== r.transaction_type || header.date_local !== r.date_local))) { excluded++; continue; }
+    const qty = fulcrumNumber(r.quantity), subtotal = fulcrumMoney(r.line_subtotal);
+    if (r.line_mode === 'return' && qty && subtotal < 0) { const g = get(r); if (g) g.returns += Math.abs(qty); continue; }
+    if (r.line_mode !== 'sale' || !(qty > 0) || !(subtotal > 0)) { excluded++; continue; }
+    const g = get(r);
+    if (g) {
+      g.sales.push({ qty, price: Math.round(subtotal / qty), date: r.date_local.slice(0, 10) });
+      dates.push(r.date_local.slice(0, 10));
+    }
+  }
+  dates.sort();
+  return { groups, excluded, unmatched, from: dates[0], to: dates.at(-1) };
+}
+
+// Quantity-weighted lower median: a multi-unit line counts as that many sales, not one observation.
+function fulcrumMedian(sales) {
+  const sorted = [...sales].sort((a, b) => a.price - b.price);
+  const target = sorted.reduce((n, s) => n + s.qty, 0) / 2;
+  let count = 0;
+  for (const s of sorted) { count += s.qty; if (count >= target) return s.price; }
+  return null;
+}
+
+let fulcrumData = null;
+async function importFulcrumFiles(event) {
+  const seq = ++fulcrum.seq;
+  const files = [...event.target.files];
+  $('#fulcrumStatus').textContent = 'Reading exports…';
+  try {
+    const parsed = [];
+    for (const f of files) {
+      if (f.size > 30 * 1024 * 1024) throw new Error(`${f.name}: the export exceeds 30 MB.`);
+      parsed.push({ ...fulcrumImport(await f.text()), name: f.name });
+    }
+    if (seq !== fulcrum.seq) return;
+    if (new Set(parsed.map((p) => p.kind)).size !== parsed.length) throw new Error('Choose only one export of each type. A new file replaces that type.');
+    for (const p of parsed) { fulcrum[p.kind] = p.rows; fulcrum.files[p.kind] = p.name; }
+    fulcrumData = fulcrumEvidence();
+    renderFulcrum();
+    renderFloorPricer();
+  } catch (err) { if (seq === fulcrum.seq) $('#fulcrumStatus').textContent = err.message; }
+  finally { event.target.value = ''; }
+}
+
+function fulcrumReference(cur, price) {
+  if (!fulcrumData) return '';
+  const key = fulcrumKey(cur.product['product-name'], cur.product['console-name'], cur.condition, cur.condition === 'cib' && cur.manualMissing);
+  const g = fulcrumData.groups.get(key);
+  if (!g) return '<p class="muted small-print">Fulcrum: no exact title, system and condition match. Editions and regions must match too.</p>';
+  const prices = g.stock.map((s) => s.price).filter((v) => v != null);
+  const units = g.stock.reduce((n, s) => n + s.qty, 0);
+  const sold = g.sales.reduce((n, s) => n + s.qty, 0);
+  const range = prices.length ? `${money(Math.min(...prices))}${Math.min(...prices) !== Math.max(...prices) ? `–${money(Math.max(...prices))}` : ''}` : 'price missing';
+  const differs = price != null && prices.some((v) => Math.abs(v - price) > FLOOR_STEP);
+  return `<div class="fulcrum-reference"><strong>Fulcrum reference</strong>
+    <p>${fulcrum.stock == null ? 'Stock export not loaded.' : `${units} in stock${units ? ` at ${range}` : ''}.`}</p>
+    <p>${fulcrum.sales == null ? 'Sales line items not loaded.' : sold ? `${sold} sold at a median ${money(fulcrumMedian(g.sales))} after line discounts (${esc(fulcrumData.from)}–${esc(fulcrumData.to)}).` : 'No verified positive-price sales for this match in the imported lines.'}${g.returns ? ` ${g.returns} returned, shown separately.` : ''}</p>
+    ${differs ? '<p class="floor-need">Exception: the suggestion differs from a stock price by more than $5. Check before labeling.</p>' : ''}
+    <p class="muted small-print">${fulcrum.transactions ? 'Transaction headers checked.' : 'Transaction headers not loaded; line status only.'} Imported prices are historical reference.</p></div>`;
+}
+
+function renderFulcrum() {
+  const el = $('#fulcrumStatus');
+  $('#fulcrumSources').textContent = Object.values(fulcrum.files).join(' · ');
+  if (!fulcrumData) { el.textContent = 'No exports loaded.'; $('#fulcrumReview').innerHTML = ''; return; }
+  el.textContent = `${fulcrum.stock?.length || 0} stock rows · ${fulcrum.sales?.length || 0} line items · ${fulcrum.transactions?.length || 0} transaction headers. ${fulcrumData.unmatched} lines without a matching header; ${fulcrumData.excluded} non-sale or unverified lines excluded. ${fulcrum.transactions ? 'Headers checked.' : 'Load transactions to verify headers.'}`;
+  const query = norm($('#fulcrumFilter').value);
+  const groups = [...fulcrumData.groups.values()].filter((g) => g.stock.length && (!query || norm(`${g.name} ${g.system}`).includes(query)));
+  // This is a snapshot benchmark, not the live suggestion: exports have no GameStop or Amazon reference.
+  const flagged = groups.map((g) => {
+    if (!floorTier(g.system).retailSell || floorIsHardware({ 'product-name': g.name })) return null;
+    const suggested = g.stock.map((s) => {
+      const basis = fulcrumMoney(s.row[`pc_retail_${g.condition}_sell`]);
+      if (!(basis > 0) || rhythmKind(g.name)) return null;
+      const premium = floorPremium(g.name, g.system);
+      return floorPrice(basis, { shitbox: !!autoShitboxReason({ name: g.name }), manualMissing: g.manual, premium: premium?.system ? premium : null }).price;
+    });
+    const different = g.stock.filter((s, i) => s.price != null && suggested[i] != null && Math.abs(s.price - suggested[i]) > FLOOR_STEP);
+    return different.length ? { g, different, suggested: [...new Set(suggested.filter((v) => v != null))] } : null;
+  }).filter(Boolean);
+  $('#fulcrumReview').innerHTML = `<p class="muted small-print">${flagged.length} modern title/system/condition groups differ by more than $5 from the export's retail-sell benchmark. GameStop is unavailable in these exports, so these are review flags, not replacement prices. Older systems need their live sales and Amazon checks.</p>
+    ${flagged.length ? `<div class="table-wrap"><table class="lines"><thead><tr><th>Review item</th><th>Stock price</th><th>Export benchmark</th><th>Sold units</th></tr></thead><tbody>${flagged.slice(0, 30).map(({ g, different, suggested }) => `<tr><td><button type="button" class="link" data-fulcrum-key="${esc(g.key)}">${esc(g.name)}</button><div class="sub">${esc(g.system)} · ${esc(GAME_CONDITIONS[g.condition])}${g.manual ? ' (no manual)' : ''}</div></td><td>${[...new Set(different.map((s) => money(s.price)))].join(', ')}</td><td>${suggested.map(money).join(', ')}</td><td>${fulcrum.sales == null ? 'Not loaded' : g.sales.reduce((n, s) => n + s.qty, 0)}</td></tr>`).join('')}</tbody></table></div><p class="muted small-print">Showing ${Math.min(30, flagged.length)} groups. Filter by title or system, then click a title to search PriceCharting and verify the edition.</p>` : ''}`;
+}
+
+function clearFulcrum() {
+  fulcrum.seq++;
+  Object.assign(fulcrum, { stock: null, sales: null, transactions: null, files: {} });
+  fulcrumData = null;
+  $('#fulcrumFiles').value = '';
+  $('#fulcrumFilter').value = '';
+  renderFulcrum();
+  renderFloorPricer();
+}
+
 /* ================================================================== floor pricing */
 
 // Game Pricing Guide (the Google Sheet tab), made hands-free: the sales PriceCharting lists are eBay
 // sold listings, so they stand in for "eBay highest sold" at any price. PriceCharting's own price for the
 // condition counts too, and the highest number wins (owner, Oct 2026: when eBay or PriceCharting is higher than
-// GameStop or Amazon, go by them). Modern systems also take GameStop's pre-owned price and Amazon's lowest offer
-// (owner's choice), unless that Amazon offer is far above eBay and PriceCharting (FLOOR_AMAZON_OUTLIER).
+// GameStop or Amazon, go by them). Modern games normally use retail sell, with GameStop as the minimum. On the
+// sales fallback and for modern hardware, Amazon's lowest offer counts unless it is far above eBay and
+// PriceCharting (FLOOR_AMAZON_OUTLIER).
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
@@ -3012,6 +3192,7 @@ function showFloor() {
   $('#floorStaff').value = floor.staff;
   renderFloorList();
   renderFloorPricer();
+  renderFulcrum();
   loadFloorSessions();
   $('#floorScan').focus();
 }
@@ -3077,25 +3258,27 @@ function pickFloorGame(product) {
   loadFloorSales(product);
   const tier = floorTier(product['console-name']);
   const sellKeys = Object.values(PC_FIELDS['retail-sell']);
-  const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc) || (tier.retailSell && !sellKeys.some((k) => k in product));
+  const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc) || (tier.retailSell && !sellKeys.every((k) => k in product));
   if (needsFull && tokenSet) {
     floorCur.fullLoading = true;
+    renderFloorPricer();
     PC.byId(product.id).then((full) => {
-      if (floorCur?.product !== product || !full) return;
+      if (floorCur?.product !== product) return;
+      if (!full?.id) throw new Error('PriceCharting returned no full product.');
       product['gamestop-price'] = full['gamestop-price'];
       for (const k of sellKeys) if (k in full) product[k] = full[k];
       product.upc = product.upc || full.upc || '';
       floorCur.fullLoading = false;
       renderFloorPricer();
       loadFloorAmazon();
-    }).catch(() => { if (floorCur?.product === product) { floorCur.fullLoading = false; renderFloorPricer(); } });
+    }).catch(() => { if (floorCur?.product === product) { floorCur.fullLoading = false; floorCur.fullError = true; renderFloorPricer(); loadFloorAmazon(); } });
   } else {
     loadFloorAmazon();
   }
 }
 
-// Amazon's offers for the game being priced, loaded for every game. Modern systems (tier.amazon) take
-// Amazon's lowest offer outright; older systems go partway toward it, and treat "no offers" as scarcity
+// Amazon's offers, loaded for every product. Modern games at retail sell only display them for reference;
+// modern sales fallbacks/hardware compare with the lowest offer. Older systems go partway toward it, and treat "no offers" as scarcity
 // (see FLOOR_AMAZON_PULL). Retro Amazon listings are third-party asking prices, often well above what
 // copies actually sell for, hence only partway.
 async function loadFloorAmazon() {
@@ -3234,6 +3417,10 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
+  // A search result may already contain retail sell, but still lack GameStop's required minimum.
+  // Wait for the full lookup on every automatic path so staff cannot add a price before that check.
+  if (cur.fullLoading) return { basis: null, sale, checks, waiting: true };
+  if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop or retail sell may be missing. Retry the search before labeling');
   // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
   // disc-only copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
   // [Band Kit], Oct 2026: 27 of 30 were "game only"; the other 3 sold for $7, $0.99 and $0.07). When what's left
@@ -3246,9 +3433,8 @@ function floorBasis(cur = floorCur) {
   const rhythmCap = rhythmDiscSaleCap(cur);
   // Modern systems: PriceCharting's retail sell price, never below GameStop (see FLOOR_TIERS). Automatic price only;
   // a clicked sale goes through the rules below. Waits while the full product (which carries it) is loading.
-  if (tier.retailSell && cur.pick == null) {
+  if (tier.retailSell && !floorIsHardware(cur.product) && cur.pick == null) {
     const rs = Number(cur.product[PC_FIELDS['retail-sell'][cur.condition]]) || null;
-    if (cur.fullLoading && rs == null) return { basis: null, sale, checks, waiting: true };
     if (rs > 0 && rs <= rhythmCap) {
       const [basis, from] = gs > rs ? [gs, 'gamestop'] : [rs, 'retailsell'];
       return { basis, from, sale, checks }; // Amazon doesn't change it, so no waiting for Amazon
@@ -3306,7 +3492,7 @@ function floorResult(cur) {
   let premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
   // The retail sell price already matches the shop's modern prices (Pokemon on Switch included: 33 of 35 within $5,
   // 22 with +10%), so only premium lines that name the system apply to it (e.g. Killzone Shadow Fall @ Playstation 4).
-  if (premium && !premium.system && (b.from === 'retailsell' || (b.from === 'gamestop' && floorTier(p['console-name']).retailSell))) premium = null;
+  if (premium && !premium.system && !hw && (b.from === 'retailsell' || (b.from === 'gamestop' && floorTier(p['console-name']).retailSell))) premium = null;
   const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: !hw && cur.condition === 'cib' && cur.manualMissing, gs: typed ? null : floorGsFor(cur), premium });
   return { b, r, shitbox, premium, hw };
 }
@@ -3339,7 +3525,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">${tier.retailSell && b.from !== 'sale'
+      <p class="muted small-print">${!hw && tier.retailSell && (b.from === 'retailsell' || b.from === 'gamestop')
         ? "This system's price goes by PriceCharting's retail sell price; these sales are here to check it against. Click any sale to use it instead."
         : 'The price goes by the highlighted sale: the high end of normal sales (90th percentile; the second-highest sale for games selling around $80 and up), so one lucky sale doesn\'t set it. Click any sale to use it instead.'} Lots, sealed copies, and other odd listings never count.</p>`;
   }
@@ -3350,7 +3536,7 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${esc(tier.rule)}</div>
+        <div class="floor-rule">${esc(hw ? "Hardware: recent sales or PriceCharting's price, never below GameStop's pre-owned price" : tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
         ${rhythm === 'disc' ? '<span class="badge info">Disc only: sales that came with instruments don\'t count</span>' : ''}
@@ -3387,6 +3573,7 @@ function renderFloorPricer() {
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
+        ${fulcrumReference(cur, result?.price)}
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Loading PriceCharting\'s prices…' : 'Checking Amazon…'}</p>` : ''}
         <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
       </div>
@@ -3436,7 +3623,7 @@ function addFloorItem() {
   const cur = floorCur;
   const p = cur.product;
   const { b, r, hw } = floorResult(cur);
-  if (!r) return;
+  if (!r || b.waiting) return;
   const manualMissing = !hw && cur.condition === 'cib' && !!cur.manualMissing;
   const same = floor.items.find((x) => x.pcId === String(p.id) && x.condition === cur.condition && !!x.manualMissing === manualMissing);
   if (same && !confirm(`${p['product-name']} (${GAME_CONDITIONS[cur.condition]}${manualMissing ? ', no manual' : ''}) is already on this list at ${money(same.price)}. Add it again?`)) return;
@@ -3761,6 +3948,18 @@ async function deleteFloorSession() {
 }
 
 function wireFloor() {
+  $('#fulcrumFiles').addEventListener('change', importFulcrumFiles);
+  $('#fulcrumClear').addEventListener('click', clearFulcrum);
+  $('#fulcrumFilter').addEventListener('input', renderFulcrum);
+  $('#fulcrumReview').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-fulcrum-key]');
+    const group = button && fulcrumData?.groups.get(button.dataset.fulcrumKey);
+    if (!group) return;
+    $('#floorScan').value = `${group.name} ${group.system}`;
+    runFloorSearch($('#floorScan').value);
+    $('#floorScan').focus();
+    $('#floorScan').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
   const scan = $('#floorScan');
   const go = () => {
     const q = scan.value.trim();
@@ -4045,6 +4244,7 @@ function wireEvents() {
 /* ================================================================== login (website only) */
 
 function showAuth(mode) {
+  clearFulcrum();
   auth.mode = mode;
   currentView = 'auth';
   for (const v of VIEWS) $(`#view-${v}`).hidden = true;

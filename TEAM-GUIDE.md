@@ -795,6 +795,25 @@ Amazon keys**, then **Test connection**. Never email or text them. If
 Amazon ever says the keys stopped working, make a new refresh token in
 Amazon's Solution Provider Portal (Authorize app) and paste it there.
 
+**Compare with Fulcrum:** open **Fulcrum stock and sales reference** on
+the Floor Pricing tab and choose the stock pricing, sales line items,
+and transactions CSV exports. Files stay in that browser tab; refresh,
+log out, or **Clear exports** removes them. Load all three from the same
+export period so transaction headers can be checked. When you price a
+game, its exact title, system, condition and missing-manual state are
+matched to your stock prices and completed sales. Editions and regions
+stay separate. The sales median uses the line subtotal after discounts,
+weighted by units sold; trade intake, voids and zero-price lines don't
+count. Returns appear separately.
+
+The inventory review lists modern games whose stock price differs by
+more than $5 from the export's retail-sell price under our rounding and
+premium rules. Filter by title or system, then click a title to search
+PriceCharting and select the correct edition and condition. The export
+has no GameStop price, and older systems need their live sales/Amazon
+checks, so these flags are reasons to review, not instructions to change
+prices. No Fulcrum prices or calculator rules are changed by importing.
+
 The recent sales are read from PriceCharting's website. If PriceCharting
 changes their site and the sales stop showing, the tool asks you to type
 a price; use the **PriceCharting ↗** link to see the sales.

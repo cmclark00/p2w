@@ -477,3 +477,11 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-amz-head a { color: var(--paper); text-transform: none; letter-spacing: 0; font-weight: 400; }
 .floor-amz-check { display: inline-block; margin-top: 14px; padding: 0; }
 .amazon-keys { margin-bottom: 12px; }
+.fulcrum-panel summary { cursor: pointer; font-weight: 700; color: var(--gold); }
+.fulcrum-panel .toolbar { align-items: end; flex-wrap: wrap; }
+.fulcrum-panel input[type="file"] { width: 320px; max-width: 100%; }
+.fulcrum-panel .status { margin: 12px 0; overflow-wrap: anywhere; }
+.fulcrum-panel .small-print { overflow-wrap: anywhere; }
+.fulcrum-panel td .link { text-align: left; }
+.fulcrum-reference { border-top: 1px solid var(--line); padding-top: 12px; font-size: 0.88rem; }
+.fulcrum-reference p { margin: 6px 0; }
