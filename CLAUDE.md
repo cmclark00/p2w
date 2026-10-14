@@ -523,6 +523,28 @@ The site's **only server-side code**. Everything else is static.
     sold-data API is closed to new users and its sold pages need a
     login as of Aug 2026; Amazon's API needs 10 affiliate sales/30 days,
     so Amazon is links only).
+  - **Modern systems go by PriceCharting's retail sell price** (owner, Oct
+    13 2026; `tier.retailSell`, `PC_FIELDS['retail-sell']` =
+    `retail-{loose,cib,new}-sell`, from `'retailsell'`): the condition's
+    retail sell, never below GameStop, rounded like everything else.
+    **Backtest:** the shop's Fulcrum exports (stock + Sept 1 – Oct 13 2026
+    sales/intake; private, not in the repo) gave 2,002 intake shelf prices
+    with PriceCharting data; 421 of them (all 262 modern + 160 older) were
+    run through the real `floorResult()` with each game's PriceCharting
+    page. Modern: retail sell 88% within $5 (exact 45%, avg miss $4.08) vs
+    the top-eBay-sale rule's 66% (exact 31%, $8.74, too high 59%; God of
+    War PS4 CIB came out $160 off one stray sale, shop $15). Older systems
+    stayed on the sales rules (78% within $5; 1.35× retail sell was 82%
+    but ran high more often). The shop prices modern games at about 1.0×
+    retail sell and older ones at ~1.25–1.4×. Premium lines without a
+    system don't apply to the retail sell price (modern Pokemon: 33 of 35
+    within $5 at retail sell, 22 with +10%); system-named lines do
+    (Killzone). A clicked sale still sets the price (through the normal
+    sales rules); with no retail sell price the tool falls back to the
+    sales with a note. `pickFloorGame()` loads the full product when the
+    search result lacks the retail sell fields (`cur.fullLoading`, "Add
+    to list" waits). Amazon no longer affects modern automatic prices.
+    (The earlier same-day "highest normal sale on modern" rule is gone.)
   - **Tiers** (`FLOOR_TIERS`, by PriceCharting console name; PAL/JP
     prefixes ignored): every guide system prices from the sales; modern
     systems (PS4/PS5/Xbox One/Series/Switch/Switch 2, `gamestop: true`,

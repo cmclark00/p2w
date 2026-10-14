@@ -729,12 +729,13 @@ Guide (the Google Sheet tab).
      doesn't set the price. For games selling around **$80 and up** it
      uses the **second-highest** sale instead, since pricier games go on
      the shelf nearer the top. That sale is highlighted in the list.
-   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** the **highest
-     normal sale** (the guide's "eBay highest sold"), or GameStop's
-     pre-owned price or Amazon's lowest offer (used, or new for New) when
-     one of those is higher. An Amazon offer more than twice eBay and
-     PriceCharting is ignored (a note says so).
-   - **PriceCharting's own price** counts on every system: when it's
+   - **PS4, PS5, Xbox One / Series, Switch, Switch 2:** PriceCharting's
+     **retail sell** price (the same number Fulcrum shows), rounded up,
+     never below GameStop's pre-owned price. That matched the shop's own
+     recent prices best (within $5 nearly 9 times in 10). The eBay sales
+     and Amazon offers still show underneath to check it against; click a
+     sale to use it instead.
+   - **PriceCharting's own price** counts on older systems: when it's
      higher than the sale, GameStop or Amazon, the price goes by it.
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
