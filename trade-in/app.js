@@ -3477,6 +3477,10 @@ function floorResult(cur) {
   return { b, r, shitbox, premium, hw };
 }
 
+// Keep GameStop's comparison price visually distinct from our shelf price.
+const floorReferenceText = (text) => esc(text).replace(/GameStop(?:&#39;s)?(?: pre-owned(?: price)?)?(?: \(\$[\d,.]+\)| \$[\d,.]+)?/g,
+  (label) => `<span class="gamestop-reference">${label}</span>`);
+
 function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
@@ -3490,7 +3494,7 @@ function renderFloorPricer() {
   const belowGs = b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
     + (tier.id === 'modern' ? ` · Retail sell reference ${Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS['retail-sell'][c]]) || null)}`).join(' · ')}` : '');
-  const gs = Number(p['gamestop-price']) > 0 ? ` · GameStop pre-owned ${money(Number(p['gamestop-price']))}` : '';
+  const gs = Number(p['gamestop-price']) > 0 ? ` · ${floorReferenceText(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
 
   const condBtns = Object.entries(GAME_CONDITIONS).map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
@@ -3514,7 +3518,7 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${esc(hw ? "Hardware: eBay sold first, GameStop/Amazon checks, PriceCharting fallback" : tier.rule)}</div>
+        <div class="floor-rule">${floorReferenceText(hw ? "Hardware: eBay sold first, GameStop/Amazon checks, PriceCharting fallback" : tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
         ${rhythm === 'disc' ? '<span class="badge info">Disc only: sales that came with instruments don\'t count</span>' : ''}
@@ -3528,7 +3532,7 @@ function renderFloorPricer() {
       ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
-        ${tier.id !== 'retro' ? `<a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
+        ${tier.id !== 'retro' ? `<a class="gamestop-reference" href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
         <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>` : ''}
         ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
       </span>
@@ -3541,15 +3545,15 @@ function renderFloorPricer() {
       </div>
       <div class="floor-result">
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
-        ${b.checks.map((c) => `<p class="floor-need">Double-check: ${esc(c)}</p>`).join('')}
+        ${b.checks.map((c) => `<p class="floor-need">Double-check: ${floorReferenceText(c)}</p>`).join('')}
         ${result && result.price >= FLOOR_REVIEW ? `<p class="floor-need">Double-check: $${FLOOR_REVIEW / 100} or more. Look over the sales and links before it goes on the shelf.</p>` : ''}
         ${b.scarce ? `<p class="muted small-print">No ${amazonCond(cur.condition)} copies on Amazon right now, so this goes by the highest normal sale plus ${Math.round(FLOOR_SCARCE_MARKUP * 100)}%.</p>` : ''}
-        ${belowGs ? `<p class="floor-need">Below GameStop's pre-owned price (${money(floorGsFor(cur))}). Our price shouldn't be under GameStop's.</p>` : ''}
+        ${belowGs ? `<p class="floor-need">${floorReferenceText(`Below GameStop's pre-owned price (${money(floorGsFor(cur))}). Our price shouldn't be under GameStop's.`)}</p>` : ''}
         <label${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
-        ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
+        ${result ? `<div class="floor-math muted">${floorReferenceText(floorMath(b, result))}</div>` : ''}
         <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
         ${fulcrumReference(cur, result?.price)}
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking the full product and GameStop price…' : !cur.sales && !cur.salesError ? 'Reading eBay sold evidence…' : 'Checking Amazon…'}</p>` : ''}

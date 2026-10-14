@@ -448,6 +448,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .seg.on { background: var(--red); color: #fff; }
 .floor-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; }
 .floor-links a { color: var(--paper); }
+.gamestop-reference, .floor-links a.gamestop-reference { color: #ff374a; font-weight: 700; }
 .floor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
 .floor-sales { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .floor-sales td { padding: 6px 8px; border-top: 1px solid var(--line); }
