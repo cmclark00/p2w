@@ -8,12 +8,13 @@ const assert = require('node:assert/strict');
 const source = fs.readFileSync(path.join(__dirname, '../trade-in/app.js'), 'utf8');
 const elements = new Map();
 const element = (selector) => {
-  if (!elements.has(selector)) elements.set(selector, { value: '', innerHTML: '', textContent: '', hidden: false });
+  if (!elements.has(selector)) elements.set(selector, { value: '', innerHTML: '', textContent: '', hidden: false,
+    listeners: {}, addEventListener(type, handler) { this.listeners[type] = handler; }, focus() {}, scrollIntoView() {} });
   return elements.get(selector);
 };
 const context = vm.createContext({ console, Date, setTimeout, clearTimeout,
   localStorage: { getItem: () => null, setItem: () => {} },
-  document: { querySelector: element },
+  document: { querySelector: element, listeners: [], addEventListener(type, handler) { this.listeners.push({ type, handler }); } },
 });
 vm.runInContext(source.replace(/\binit\(\);\s*$/, ''), context);
 const run = (js) => vm.runInContext(js, context);
@@ -109,6 +110,24 @@ test('unloaded sales remain missing instead of appearing as zero sales', () => {
   assert.ok(invoke('fulcrumReference', cur(), 2000).includes('Sales line items not loaded'));
   run('clearFulcrum();');
   assert.equal(run('fulcrumData'), null);
+});
+test('review-title click keeps search open through document event bubbling', () => {
+  run('Object.assign(fulcrum, { stock: stockOnly }); fulcrumData = fulcrumEvidence(); wireFloor();');
+  const key = invoke('fulcrumKey', 'Example Game', 'Playstation 4', 'cib', false);
+  const button = { dataset: { fulcrumKey: key } };
+  const event = { target: { closest(selector) { return selector.includes('[data-fulcrum-key]') ? button : null; } } };
+  run('const originalPcSearch = PC.search; PC.search = () => new Promise(() => {});');
+  element('#fulcrumReview').listeners.click(event);
+  const startedSeq = run('floorSearch.seq');
+  for (const entry of context.document.listeners) if (entry.type === 'click') entry.handler(event);
+  assert.equal(element('#floorScan').value, 'Example Game Playstation 4');
+  assert.equal(element('#floorResults').hidden, false);
+  assert.equal(run('floorSearch.loading'), true);
+  assert.equal(run('floorSearch.seq'), startedSeq);
+  // Ordinary outside clicks must still dismiss the search results.
+  for (const entry of context.document.listeners) if (entry.type === 'click') entry.handler({ target: { closest: () => null } });
+  assert.equal(element('#floorResults').hidden, true);
+  run('PC.search = originalPcSearch; clearFulcrum();');
 });
 
 const exportPaths = process.argv.slice(2);

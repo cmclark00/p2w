@@ -3979,7 +3979,7 @@ function wireFloor() {
     const r = e.target.closest('.result');
     if (r) pickFloorGame(floorSearch.results[Number(r.dataset.i)]);
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.floor-scan') && !$('#floorResults').hidden) closeFloorResults(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.floor-scan, [data-fulcrum-key]') && !$('#floorResults').hidden) closeFloorResults(); });
 
   const pricer = $('#floorPricer');
   pricer.addEventListener('click', onFloorPricerClick);
