@@ -3026,24 +3026,24 @@ function clearFulcrum() {
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
-    id: 'retro', rule: "Highest of eBay sold, lowest Amazon offer, and GameStop. PriceCharting only as a fallback",
+    id: 'retro', rule: "Baseline: highest of eBay sold, lowest Amazon offer, and GameStop. Specific rules take priority; PriceCharting is a fallback",
     systems: ['playstation', 'playstation 2', 'xbox', 'nes', 'super nintendo', 'nintendo 64', 'wii', 'wii u', 'gameboy',
       'gameboy color', 'gameboy advance', 'nintendo ds', 'nintendo 3ds', 'sega genesis', 'sega dreamcast', 'gamecube',
       'playstation 3', 'xbox 360'],
   },
   {
     id: 'modern', gamestop: true, amazon: true,
-    rule: "Highest of eBay sold, lowest Amazon offer, and GameStop. PriceCharting only as a fallback",
+    rule: "Baseline: highest of eBay sold, lowest Amazon offer, and GameStop. Specific rules take priority; PriceCharting is a fallback",
     systems: ['playstation 4', 'playstation 5', 'xbox one', 'xbox series x', 'nintendo switch', 'nintendo switch 2'],
   },
 ];
-const FLOOR_OTHER = { id: 'other', rule: "Highest of eBay sold, lowest Amazon offer, and GameStop. PriceCharting fallback. Double-check this system" };
+const FLOOR_OTHER = { id: 'other', rule: "Baseline: highest of eBay sold, lowest Amazon offer, and GameStop. Specific rules take priority; PriceCharting is a fallback. Double-check this system" };
 const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
 const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
-const FLOOR_STEP = 500; // automatic prices may never round below the winning market reference
+const FLOOR_STEP = 500; // baseline rounds up; specific adjustments retain nearest-$5 rounding
 // Flag an unusually high lowest Amazon offer for review, without silently dropping a required minimum.
 const FLOOR_AMAZON_OUTLIER = 2;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
@@ -3092,9 +3092,9 @@ function manualDeduction(price) {
 
 // Basis (cents) -> shelf price: round up to $5 with market references, nearest $5 otherwise,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
-// Automatic prices stay at or above every market reference, even after deductions and discounts.
-// The winning reference rounds up to $5. Typed prices bypass the market minimums.
-// Historical comparisons may supply a premium; live floorResult and typed prices pass none.
+// Ordinary prices stay at or above the market baseline. Specific premiums/discounts and manual
+// deductions take priority: floorResult omits the market minimums for those exceptions.
+// Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
 function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
@@ -3430,10 +3430,13 @@ function floorResult(cur) {
   const shitbox = hw ? null : autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const b = floorBasis(cur);
   const typed = b.from === 'typed';
-  // Saved premiums remain available for historical references; automatic shelf prices use the three-source rule.
-  const premium = null;
-  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing: !hw && cur.condition === 'cib' && cur.manualMissing,
-    gs: typed ? null : floorGsFor(cur), premium, referenceMin: typed ? null : b.referenceMin });
+  const premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
+  const manualMissing = !hw && cur.condition === 'cib' && cur.manualMissing;
+  // Owner clarification: specific adjustments outrank the general three-reference baseline,
+  // including discounts below it. A 0% premium only exempts a title from a broader premium.
+  const specific = !!(premium?.pct || manualMissing);
+  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
+    gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin });
   return { b, r, shitbox, premium, hw };
 }
 
@@ -3469,7 +3472,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The starting price is the highest of the highest normal eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Automatic prices never round below those references. Click a sale to include it in the comparison; use a typed price for a manual override. PriceCharting's own price is only a fallback. Lots, wrong editions, and other odd listings never count automatically.</p>`;
+      <p class="muted small-print">The baseline is the highest of the highest normal eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Specific premiums, discounts, and missing-manual rules take priority over that baseline. Click a sale to include it in the comparison; use a typed price for a manual override. PriceCharting's own price is only a fallback. Lots, wrong editions, and other odd listings never count automatically.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;

@@ -424,11 +424,11 @@
           </label>
         </div>
 
-        <h2>Saved floor price premiums (inactive)</h2>
-        <p class="muted">These saved percentages are retained for reference. Automatic shelf prices now use the highest of the highest valid eBay sale, lowest matching Amazon offer, and GameStop. These premiums and discounts no longer change the shelf price.</p>
+        <h2>Floor price premiums</h2>
+        <p class="muted">Specific premiums and discounts take priority over the general baseline (the highest of eBay sold, lowest Amazon offer, and GameStop). One <em>phrase = percent</em> per line, like <code>Pokemon = 10</code>. The longest matching phrase wins; <code>Pokemon X = 0</code> exempts a game from a broader premium. Add <em>@ system</em> to limit a rule, like <code>Pokemon @ Nintendo DS = 0</code>; it beats the same phrase without a system. Negative percentages can lower the price below the baseline. These adjustments apply before rounding; typed prices never get a premium.</p>
         <div class="grid-3 guide-lists">
           <label>Phrase = percent
-            <textarea name="floorPremiums" rows="14" readonly></textarea>
+            <textarea name="floorPremiums" rows="14"></textarea>
           </label>
         </div>
 

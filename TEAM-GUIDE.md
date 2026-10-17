@@ -726,7 +726,8 @@ Guide (the Google Sheet tab).
    ones PriceCharting lists for that condition), highest first:
    - **Every system:** compare the **highest valid eBay sale**, the
      **lowest matching Amazon offer including shipping**, and **GameStop**.
-     The highest of those three numbers wins. For example, eBay $150,
+     The highest of those three numbers sets the baseline. Specific rules
+     and premiums take priority afterward. For example, eBay $150,
      Amazon $134, and GameStop below $150 gives a $150 shelf price.
    - **PriceCharting's own market price is only a fallback** when none
      of those three references is available. Fallback prices always say **Double-check**.
@@ -738,8 +739,12 @@ Guide (the Google Sheet tab).
      (prices include shipping). Only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
      The tool waits for sold evidence and reference checks before enabling **Add to list**.
-   - **Saved premiums and discounts are inactive.** Their settings are
-     kept for reference; automatic prices follow the three-price rule.
+   - **Specific rules take priority:** configured premiums and discounts
+     apply to the baseline, and missing-manual deductions still apply.
+     A specific discount can lower the price below the market references.
+     Managers can edit premiums under Settings → Floor price premiums.
+     The longest matching phrase wins; a system-specific rule beats the
+     same phrase without a system. A 0% rule exempts a title from a broader premium.
    - **Consoles and controllers** can be priced here too. They go by
      their sales without the game rules (a badge says so).
    - **Instrument games** (Guitar Hero, Rock Band, DJ Hero…): pick the
@@ -759,10 +764,12 @@ Guide (the Google Sheet tab).
    For a manual override, choose **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
-5. Automatic prices round **up to $5** ($150 stays $150; $152 → $155), never go under
-   **$10** ($5 only for shitbox games), and **never fall below any of the
-   three market references**, even with a missing manual. Typed overrides
-   and fallback-only prices round to the nearest $5. If you type
+5. Without a specific adjustment, prices round **up to $5** ($150 stays $150;
+   $152 → $155) and stay at or above all three market references. Specific
+   premiums/discounts round to the **nearest $5**, then missing-manual
+   deductions apply; these rules can override the baseline. The $10 minimum
+   ($5 for shitbox games) still applies before deductions. Typed overrides
+   and fallback-only prices also round to the nearest $5. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)

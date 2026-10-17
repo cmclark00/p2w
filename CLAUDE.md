@@ -524,7 +524,8 @@ The site's **only server-side code**. Everything else is static.
     shop's configured Selling Partner API; staff can open the source links.
   - **Source priority (owner correction, Oct 17 2026): the maximum of
     the highest valid eBay sale, lowest matching Amazon offer including
-    shipping, and GameStop.** Apply the same rule on every system.
+    shipping, and GameStop.** This is the baseline on every system;
+    specific premiums, discounts and condition rules take priority afterward.
     Operation Darkness Xbox 360: eBay $150, lowest Amazon $134, GameStop
     below $150 gives $150, regardless of expensive higher Amazon offers.
     This supersedes the p90/second-highest sale selection, older-system
@@ -550,8 +551,8 @@ The site's **only server-side code**. Everything else is static.
     were $40 Steelbooks) and home-console bundles (`HOME_CONSOLE_RE`: a
     storage size like "1TB", "console bundle", "slim/pro console"; Fortnite
     PS4's top CIB "sale" was a $134.99 PS4 Slim bundle, tool said $195,
-    shop $100). Automatic prices must never fall below the winning
-    reference, including after rounding, discounts or manual deductions.
+    shop $100). Ordinary prices stay at or above the winning reference;
+    specific adjustments may override that baseline.
     The **eBay sold
     link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
     filter eBay's used grades (3000/2750/4000/5000/6000), New = 1000; Loose
@@ -590,24 +591,29 @@ The site's **only server-side code**. Everything else is static.
     loose sales). **Loose only:** sales with the accessory the game
     shipped with (`LOOSE_EXTRAS_RE`: VRU/mic, Pokewalker, N64 paks) are
     odd, since a loose shelf copy doesn't have it (Hey You Pikachu).
-  - **Never below GameStop** (owner's rule, every system): GameStop's
+  - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and
-    `floorPrice()` also holds the final price at GameStop rounded up to
-    $5 *after* the missing-manual deduction ("raised to GameStop's $X").
+    `floorPrice()` holds ordinary prices at GameStop rounded up to $5.
+    Specific premiums/discounts and missing-manual rules outrank this floor
+    along with the other baseline references (owner clarification, Oct 17).
     Typed prices aren't forced up, but show a "Below GameStop's
     pre-owned price" warning.
-  - **Saved premiums are inactive** for automatic shelf pricing.
-    `settings.floorPremiums`, migrations and `floorPremium()` remain for
-    saved configuration and the historical Fulcrum retail-sell comparison.
-    Settings shows them read-only. `floorResult()` applies no premium or
-    discount; the owner requested the maximum of the three references.
-  - **Price math** (`floorPrice()`): automatic market-based prices round
+  - **Specific premiums and discounts are active and take priority.**
+    `floorResult()` applies `floorPremium()` from `settings.floorPremiums`
+    to the three-reference basis. The longest phrase wins, with a system
+    rule winning over the same phrase without a system. A 0% match exempts
+    the game from broader premiums and leaves the ordinary baseline rule.
+    Settings remains editable and saved configuration/migrations are preserved.
+    Negative percentages can lower the result below all market references.
+  - **Price math** (`floorPrice()`): ordinary market-based prices round
     **up to $5**, with the existing $10 minimum ($5 for shitbox games).
-    `referenceMin` holds the final price at or above the winning reference
-    after any missing-manual deduction. Thus $150 stays $150, while a
-    $152 reference gives $155. This supersedes the earlier nearest-$5
-    rule and Halo $52 -> $50 expectation: a $52 reference now gives $55.
+    `referenceMin` holds ordinary prices at or above the winning reference.
+    When a nonzero premium/discount or CIB missing-manual rule applies,
+    `floorResult()` omits both `referenceMin` and the GameStop clamp:
+    apply the premium to the basis, round to the nearest $5, then deduct
+    the manual amount. Specific rules therefore outrank the baseline.
+    Without a specific rule, $150 stays $150 and $152 becomes $155.
     Typed overrides and fallback-only prices retain nearest-$5 rounding;
     typed overrides bypass market minimums. `floorResult()` serves the
     pricer, Add to list and re-check. Existing saved list prices remain
