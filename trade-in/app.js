@@ -67,7 +67,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 10,
+  version: 11,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -116,9 +116,6 @@ const DEFAULT_SETTINGS = {
     { phrase: 'Pokemon Black Version 2', pct: 0 },
     { phrase: 'Pokemon SoulSilver', pct: 13 }, // $200
     { phrase: 'Hey You Pikachu', pct: 80 }, // $35
-    // Owner, Oct 13 2026: the shop sells Killzone: Shadow Fall at $10, below its own sales ($16–18 top, $10–13
-    // typical), so no sales rule fits it; -45% puts both loose and CIB on $10.
-    { phrase: 'Killzone Shadow Fall', system: 'Playstation 4', pct: -45 },
   ],
   // Case only game lines: names containing one of these phrases are first-party games (Nintendo, Sony,
   // Microsoft), whose cases pay PriceCharting's box-only price (credit) / ÷ 1.5 (cash); every other case pays
@@ -329,13 +326,15 @@ function mergeSettings(saved) {
   if (saved.version < 8 && oldDefaults.includes(premiumKey(s.floorPremiums))) {
     s.floorPremiums = clone(DEFAULT_SETTINGS.floorPremiums);
   }
-  // Version 9: the Killzone: Shadow Fall discount line (owner request) joins saved premium lists.
-  if (saved.version < 9 && !s.floorPremiums.some((p) => norm(p.phrase) === 'killzone shadow fall')) {
-    s.floorPremiums.push(clone(DEFAULT_SETTINGS.floorPremiums.find((p) => norm(p.phrase) === 'killzone shadow fall')));
-  }
   // Version 10: Conker's premium 15% -> 10% (owner's $275), unless a manager had already changed it.
   if (saved.version < 10) {
     for (const p of s.floorPremiums) if (norm(p.phrase) === 'conker s bad fur day' && !p.system && Number(p.pct) === 15) p.pct = 10;
+  }
+  // Version 11: outlier detection makes the old Killzone -45% default redundant (owner, Oct 17).
+  // Retire it from older saved settings; preserve other rules and deliberately changed percentages.
+  if ((Number(saved.version) || 0) < 11) {
+    s.floorPremiums = s.floorPremiums.filter((p) => !(norm(p.phrase) === 'killzone shadow fall'
+      && norm(p.system) === 'playstation 4' && Number(p.pct) === -45));
   }
   return s;
 }

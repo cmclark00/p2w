@@ -619,6 +619,9 @@ The site's **only server-side code**. Everything else is static.
     the game from broader premiums and leaves the ordinary baseline rule.
     Settings remains editable and saved configuration/migrations are preserved.
     Negative percentages can lower the result below all market references.
+    Settings v11 removes the redundant `Killzone Shadow Fall @ Playstation 4 = -45`
+    default and migrates it out of older saved settings. Other rules and
+    customized percentages remain intact; Killzone now uses the filtered baseline.
   - **Price math** (`floorPrice()`): ordinary market-based prices round
     **up to $5**, with the existing $10 minimum ($5 for shitbox games).
     `referenceMin` holds ordinary prices at or above the winning reference.
@@ -1004,9 +1007,8 @@ The site's **only server-side code**. Everything else is static.
     PS4 box $6.40 vs a CIB offer from a much lower retail buy. Everything
     else, or a first-party case missing its box or CIB price, pays
     `settings.cases.amount` ($0.25) flat. No deductions on case lines. Handled first in
-    `priceWith()`, before the guide rules. Settings v9 also adds the
-    `Killzone Shadow Fall @ Playstation 4 = -45` floor premium (shop $10)
-    to saved lists.
+    `priceWith()`, before the guide rules. The former v9 Killzone floor
+    discount was retired in settings v11 after outlier detection was added.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

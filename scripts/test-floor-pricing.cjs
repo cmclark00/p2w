@@ -46,10 +46,10 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
 });
 
-test('Killzone-style outlier uses the supported baseline and keeps specific discounts and premiums', () => {
+test('Killzone uses the supported baseline without a special discount while other premiums stay active', () => {
   const amazon = { found: true, lowest: 1000, offers: [{ price: 1000 }] };
   const killzone = invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'product-name': 'Killzone: Shadow Fall' }, { amazon }));
-  assert.equal(killzone.b.basis, 1000); assert.equal(killzone.premium.pct, -45); assert.equal(killzone.r.price, 1000);
+  assert.equal(killzone.b.basis, 1000); assert.equal(killzone.premium, null); assert.equal(killzone.r.price, 1000);
   const pokemon = invoke('floorResult', highSaleCur([10000, 5000, 4999, 4500], { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }));
   assert.equal(pokemon.b.basis, 5000); assert.equal(pokemon.premium.pct, 10); assert.equal(pokemon.r.price, 5500);
 });
@@ -245,12 +245,27 @@ test('configured premiums apply on top of the winning market baseline', () => {
   assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 6600); assert.equal(r.r.price, 6500);
 });
 test('specific discounts outrank all three market references and saved settings remain intact', () => {
-  const r = invoke('floorResult', cur({ ...item, 'product-name': 'Killzone: Shadow Fall', 'gamestop-price': 1850 },
-    { sales: { cib: [{ title: 'Killzone Shadow Fall complete', price: 1799 }] },
-      amazon: { found: true, lowest: 1900, offers: [{ price: 1900 }] } }));
-  assert.equal(r.b.basis, 1900); assert.equal(r.premium.pct, -45); assert.equal(r.r.price, 1000);
+  const r = invoke('floorResult', cur({ ...item, 'product-name': 'Pokemon Black', 'console-name': 'Nintendo DS', 'gamestop-price': 14500 },
+    { sales: { cib: [{ title: 'Pokemon Black complete', price: 14000 }] },
+      amazon: { found: true, lowest: 15000, offers: [{ price: 15000 }] } }));
+  assert.equal(r.b.basis, 15000); assert.equal(r.premium.pct, -14); assert.equal(r.r.price, 13000);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 15 }] }).floorPremiums[0].pct, 10);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 22 }] }).floorPremiums[0].pct, 22);
+});
+test('settings migration retires the Killzone -45% rule without deleting other custom rules', () => {
+  const retired = { phrase: 'Killzone: Shadow Fall', system: 'Playstation 4', pct: -45 };
+  const custom = { phrase: 'Killzone Shadow Fall', system: 'Playstation 4', pct: -20 };
+  const pokemon = { phrase: 'Pokemon', pct: 12 };
+  assert.equal(invoke('floorPremium', retired.phrase, retired.system), null);
+  for (const version of [7, 8, 9, 10]) {
+    const saved = { version, floorPremiums: [retired, custom, pokemon] };
+    const migrated = JSON.parse(JSON.stringify(invoke('mergeSettings', saved)));
+    assert.equal(migrated.version, 11);
+    assert.deepEqual(migrated.floorPremiums, [custom, pokemon]);
+    assert.equal(JSON.stringify(invoke('mergeSettings', migrated).floorPremiums), JSON.stringify([custom, pokemon]));
+  }
+  assert.equal(JSON.stringify(invoke('mergeSettings', { version: 8, floorPremiums: [pokemon] }).floorPremiums), JSON.stringify([pokemon]));
+  assert.equal(invoke('mergeSettings', null).floorPremiums.length, 14);
 });
 test('longest and system-specific rules win, while zero-percent exemptions retain the baseline', () => {
   const overrides = { floorPremiums: [
