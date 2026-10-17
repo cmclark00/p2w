@@ -560,7 +560,20 @@ The site's **only server-side code**. Everything else is static.
     New adds "sealed".
   - **Which sale: the highest normal sale** for the selected condition
     (`floorAutoSale()`). Existing odd-listing, edition and instrument
-    filters still apply; high price alone does not exclude a sale.
+    filters still apply. `floorSales()` flags an isolated highest sale when
+    at least four comparable sales remain and it is at least 50% AND $5
+    above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
+    single highest sale is excluded; no recursive removal or median cap.
+    Nearby high sales support one another, and fewer than four comparables
+    keep the ordinary sparse-data behavior. This is a review heuristic,
+    not verification that a listing did or did not sell.
+    The flagged row stays visible with a badge and a review explanation.
+    Staff can click it to include it explicitly; the warning remains.
+    Back to the automatic price clears both the selected sale and typed override.
+    `floorBasisInfo()` keeps review notes on saved list items and re-check
+    results, including unchanged prices; accepting suggestions preserves them.
+    The filtered baseline still precedes specific premiums, discounts and
+    manual rules, whose priority is unchanged.
     Clicking another listing can include it in the comparison, but cannot
     lower the automatic price below the highest valid sale. Typed prices
     remain explicit manual overrides. `floorBasis()` adds review notes for

@@ -3046,6 +3046,10 @@ const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500; // baseline rounds up; specific adjustments retain nearest-$5 rounding
 // Flag an unusually high lowest Amazon offer for review, without silently dropping a required minimum.
 const FLOOR_AMAZON_OUTLIER = 2;
+// A single isolated high sale needs at least three lower comparables before we exclude it automatically.
+const FLOOR_SALE_OUTLIER_MIN = 4;
+const FLOOR_SALE_OUTLIER_RATIO = 1.5;
+const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph|\d+ (more )?games)\b/i;
 // "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
@@ -3311,9 +3315,17 @@ function floorSales(cur = floorCur) {
   const name = cur.product?.['product-name'] || '';
   const rhythm = rhythmKind(name);
   const cap = rhythmDiscSaleCap(cur);
-  return (cur.sales?.[cur.condition] || []).map((s, i) => ({
+  const sales = (cur.sales?.[cur.condition] || []).map((s, i) => ({
     ...s, i, odd: floorOdd(s, cur.condition, rhythm) || s.price > cap || otherEdition(s.title, name) || HOME_CONSOLE_RE.test(s.title),
   })).sort((a, b) => b.price - a.price);
+  const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
+  if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
+    const [top, next] = normal;
+    if (top.price >= next.price * FLOOR_SALE_OUTLIER_RATIO && top.price - next.price >= FLOOR_SALE_OUTLIER_GAP) {
+      top.outlier = { nextPrice: next.price, lowerCount: normal.length - 1 };
+    }
+  }
+  return sales;
 }
 
 // A sale of another edition filed under this game: PriceCharting lists those separately, but sellers' sales land on
@@ -3358,10 +3370,10 @@ function floorGsFor(cur) {
   return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
 
-// The highest normal sale. sales are
-// highest first; odd listings never count.
+// The highest comparable sale after title/condition filters and isolated-high-sale detection.
+// sales are highest first; staff may explicitly include a flagged sale after reviewing it.
 function floorAutoSale(sales) {
-  const normal = sales.filter((s) => !s.odd);
+  const normal = sales.filter((s) => !s.odd && !s.outlier);
   if (!normal.length) return { sale: null, count: 0 };
   return { sale: normal[0], count: normal.length };
 }
@@ -3382,6 +3394,9 @@ function floorBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
   const checks = [];
+  for (const s of sales.filter((s) => s.outlier)) {
+    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales. Open the listing and verify it actually sold before using it`);
+  }
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
     const newest = sales.reduce((d, s) => (s.date > d ? s.date : d), '');
@@ -3475,12 +3490,12 @@ function renderFloorPricer() {
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
   else {
     const shown = cur.showAll ? sales : sales.slice(0, 8);
-    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd ? ' odd' : ''}">
+    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
-        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
+        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The baseline is the highest of the highest normal eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Specific premiums, discounts, and missing-manual rules take priority over that baseline. Final prices over $80 round up to a multiple of $10 or $25. Click a sale to include it in the comparison; use a typed price for a manual override. PriceCharting's own price is only a fallback. Lots, wrong editions, and other odd listings never count automatically.</p>`;
+      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Final prices over $80 round up to a multiple of $10 or $25. PriceCharting's own price is only a fallback.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3523,6 +3538,7 @@ function renderFloorPricer() {
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
+        ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>' : ''}
         ${result ? `<div class="floor-math muted">${floorReferenceText(floorMath(b, result))}</div>` : ''}
         <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
         ${fulcrumReference(cur, result?.price)}
@@ -3567,6 +3583,7 @@ function floorMath(b, r) {
 const floorBasisInfo = (b) => ({
   basis: b.basis, from: b.from,
   saleDate: b.from === 'sale' ? b.sale?.date || '' : '',
+  reviewNotes: b.checks || [],
 });
 
 function addFloorItem() {
@@ -3604,7 +3621,7 @@ function onFloorPricerClick(e) {
   if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
-  if (act === 'auto') { floorCur.typed = null; renderFloorPricer(); return; }
+  if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
@@ -3638,15 +3655,17 @@ const FROM_LABELS = { sale: 'eBay sale', pricecharting: 'PriceCharting', retails
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => it.recheck?.price != null && it.recheck.price !== it.price;
+const floorReviewHtml = (it) => (it.reviewNotes || []).map((note) => `<div class="sub warn-text">Review: ${esc(note)}</div>`).join('');
 
 function recheckHtml(it) {
   const rc = it.recheck;
   if (!rc) return '';
   if (rc.error) return `<div class="sub warn-text" title="${esc(rc.error)}">Couldn't re-check</div>`;
-  if (!recheckChanged(it)) return '<div class="sub">✓ Still this price</div>';
+  const review = floorReviewHtml(rc);
+  if (!recheckChanged(it)) return `<div class="sub">✓ Still this price</div>${review}`;
   const up = rc.price > it.price;
   return `<div class="sub recheck ${up ? 'up' : 'down'}">Now ${money(rc.price)} ${up ? '▲' : '▼'}
-    <button type="button" class="link" data-floor-use>Use</button><button type="button" class="link" data-floor-keep>Keep</button></div>`;
+    <button type="button" class="link" data-floor-use>Use</button><button type="button" class="link" data-floor-keep>Keep</button></div>${review}`;
 }
 
 function renderFloorList() {
@@ -3655,7 +3674,7 @@ function renderFloorList() {
       <td class="item"><div class="item-name">${pcLink(it.pcId, it.name)}</div></td>
       <td>${esc(it.platform)}</td>
       <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td>
-      <td class="muted">${it.basis != null ? `${esc(FROM_LABELS[it.from] || '')} ${money(it.basis)}` : '—'}${it.saleDate ? `<div class="sub">${esc(it.saleDate)}</div>` : ''}</td>
+      <td class="muted">${it.basis != null ? `${esc(FROM_LABELS[it.from] || '')} ${money(it.basis)}` : '—'}${it.saleDate ? `<div class="sub">${esc(it.saleDate)}</div>` : ''}${floorReviewHtml(it)}</td>
       <td class="num"><span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-price value="${esc(plain(it.price))}"${it.edited ? ' class="overridden" title="Edited by hand"' : ''} aria-label="Shelf price"></span>${recheckHtml(it)}</td>
       <td><button type="button" class="icon-btn" data-floor-remove title="Remove" aria-label="Remove">×</button></td>
     </tr>`).join('');
@@ -3712,8 +3731,8 @@ async function recheckFloorPrices() {
 
 function useRecheck(it) {
   if (!recheckChanged(it)) return;
-  const { price, basis, from, saleDate } = it.recheck;
-  Object.assign(it, { price, basis, from, saleDate, edited: false });
+  const { price, basis, from, saleDate, reviewNotes = [] } = it.recheck;
+  Object.assign(it, { price, basis, from, saleDate, reviewNotes, edited: false });
   delete it.recheck;
 }
 

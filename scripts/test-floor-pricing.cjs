@@ -34,10 +34,82 @@ test('sold evidence leads on modern, retro and hardware even when PriceCharting 
     assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 2000);
   }
 });
-test('highest valid sale wins while odd editions remain excluded', () => {
+test('a single high outlier cannot drive the price and odd editions do not support it', () => {
   const sales = { cib: Array.from({ length: 30 }, (_, i) => ({ title: 'Example Game complete', price: i === 0 ? 16000 : 1999, date: '2026-10-01' })) };
   sales.cib.push({ title: 'Example Game Steelbook', price: 20000, date: '2026-10-01' });
-  assert.equal(invoke('floorResult', cur(item, { sales })).r.price, 16000);
+  const r = invoke('floorResult', cur(item, { sales }));
+  assert.equal(r.b.basis, 1999); assert.equal(r.r.price, 2000);
+  assert.ok(r.b.checks.some((s) => s.includes('Excluded from automatic pricing possible high sale outlier $160.00')));
+});
+
+const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
+  sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
+});
+
+test('Killzone-style outlier uses the supported baseline and keeps specific discounts and premiums', () => {
+  const amazon = { found: true, lowest: 1000, offers: [{ price: 1000 }] };
+  const killzone = invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'product-name': 'Killzone: Shadow Fall' }, { amazon }));
+  assert.equal(killzone.b.basis, 1000); assert.equal(killzone.premium.pct, -45); assert.equal(killzone.r.price, 1000);
+  const pokemon = invoke('floorResult', highSaleCur([10000, 5000, 4999, 4500], { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }));
+  assert.equal(pokemon.b.basis, 5000); assert.equal(pokemon.premium.pct, 10); assert.equal(pokemon.r.price, 5500);
+});
+
+test('outlier thresholds require both a large relative gap and a $5 gap with three lower comparables', () => {
+  for (const [prices, expected] of [
+    [[1500, 1000, 999, 950], 1000], [[1499, 1000, 999, 950], 1499],
+    [[1200, 800, 799, 750], 1200], [[1600, 1000, 999], 1600],
+    [[1600, 1600, 1000, 999], 1600], [[1600, 1400, 1200, 1000], 1600],
+    [[3000, 1600, 1000, 999, 950], 1600],
+  ]) assert.equal(invoke('floorResult', highSaleCur(prices)).b.basis, expected);
+  const example = highSaleCur([1600, 1000, 999, 950]);
+  example.sales.cib[2].title = 'Example Game Steelbook';
+  example.sales.cib[3].title = 'Example Game sealed';
+  assert.equal(invoke('floorResult', example).b.basis, 1600);
+});
+
+test('outliers are condition-specific, keep original indices, and do not mutate cached sales', () => {
+  const example = highSaleCur([1000, 999, 1600, 950]);
+  example.sales.loose = [{ price: 10000, title: 'Example Game disc only' }];
+  const before = JSON.stringify(example);
+  context.cachedExample = example;
+  const sales = json('floorSales(cachedExample)');
+  assert.equal(sales[0].i, 2); assert.ok(sales[0].outlier);
+  assert.equal(invoke('floorResult', example).b.basis, 1000);
+  assert.equal(run('JSON.stringify(cachedExample)'), before);
+});
+
+test('Amazon and GameStop remain baseline candidates after excluding an eBay outlier', () => {
+  const amazon = { found: true, lowest: 1200, offers: [{ price: 1200 }] };
+  assert.equal(invoke('floorResult', highSaleCur([1600, 1000, 999, 950], item, { amazon })).b.basis, 1200);
+  assert.equal(invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'gamestop-price': 1300 }, { amazon })).b.basis, 1300);
+});
+
+test('reviewed outliers can be selected explicitly and returning to automatic excludes them again', () => {
+  const example = highSaleCur([1600, 1000, 999, 950], item, { pick: 0 });
+  const selected = invoke('floorResult', example);
+  assert.equal(selected.b.basis, 1600);
+  assert.ok(selected.b.checks.some((s) => s.includes('Manually included possible high sale outlier')));
+  run(`floorCur = ${JSON.stringify(example)}; renderFloorPricer();`);
+  assert.ok(element('#floorPricer').innerHTML.includes('Possible high outlier'));
+  assert.ok(element('#floorPricer').innerHTML.includes('Back to the automatic price'));
+  context.autoEvent = { target: { closest: (selector) => selector === '[data-floor-act]' ? { dataset: { floorAct: 'auto' } } : null } };
+  run('onFloorPricerClick(autoEvent);');
+  assert.equal(run('floorCur.pick'), null); assert.equal(json('floorResult(floorCur)').b.basis, 1000);
+  assert.ok(element('#floorPricer').innerHTML.includes('Excluded from automatic pricing'));
+  run('floorCur = null;');
+});
+
+test('review warnings survive list metadata, unchanged rechecks and accepting a new price', () => {
+  const result = invoke('floorResult', highSaleCur([1600, 1000, 999, 950]));
+  const info = invoke('floorBasisInfo', result.b);
+  assert.ok(info.reviewNotes.some((s) => s.includes('high sale outlier')));
+  for (const price of [1000, 2000]) {
+    assert.ok(invoke('recheckHtml', { price, recheck: { price: 1000, ...info } }).includes('high sale outlier'));
+  }
+  context.reviewItem = { price: 2000, recheck: { price: 1000, ...info } };
+  run('useRecheck(reviewItem);');
+  assert.ok(json('reviewItem').reviewNotes.some((s) => s.includes('high sale outlier')));
+  assert.ok(invoke('floorReviewHtml', { reviewNotes: ['<script>unsafe</script>'] }).includes('&lt;script&gt;'));
 });
 
 test('Halo MCC follows the new never-below-highest-sale rule across systems', () => {

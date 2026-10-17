@@ -735,6 +735,14 @@ Guide (the Google Sheet tab).
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
      the plain game. They show dimmed.
+   - **Possible high outliers:** one isolated high sale is flagged and left
+     out of the automatic price when at least three lower comparable sales
+     support a lower value. The top sale must be at least 50% and $5 above
+     the next highest. The row stays visible for review. Open its link and
+     check that it actually sold and matches the item; click the row to
+     include it if warranted. **Back to the automatic price** excludes it
+     again. The flag is a pricing warning, not proof that a listing was unsold.
+     Review notes remain visible on saved lists and price re-checks.
    - **Amazon's offers show on every game**, listed under the sales
      (prices include shipping). Only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
@@ -758,7 +766,7 @@ Guide (the Google Sheet tab).
      has the instruments, or type a price.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
-4. Only look closer when it says **Double-check** (very few sales, no
+4. Only look closer when it says **Double-check** (a possible outlier, very few sales, no
    sale in the last 6 months, or a price of $100 or more). Clicking a sale
    includes it in the comparison but cannot undercut the highest valid sale.
    For a manual override, choose **Type a different price**. **Back to the automatic
