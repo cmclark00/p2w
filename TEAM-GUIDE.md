@@ -725,31 +725,48 @@ Guide (the Google Sheet tab).
    tick **Manual missing** for a CIB game without its manual.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
-   - **Every system:** it goes by the **high end of normal sales** (the
-     90th percentile, about the 4th-highest of 30), so one lucky sale
-     doesn't set the price. For games selling around **$80 and up** it
-     uses the **second-highest** sale instead, since pricier games go on
-     the shelf nearer the top. That sale is highlighted in the list.
-   - **Source priority:** eBay sold prices first, GameStop/Amazon checks,
-     **PriceCharting only as a fallback**. GameStop remains a minimum.
-     If no usable sold evidence exists, GameStop takes precedence; with
-     neither, use a matched Amazon offer, then PriceCharting's market
-     price for the condition. Fallback prices always say **Double-check**.
+   - **Every system:** compare the **highest valid eBay sale**, the
+     **lowest matching Amazon offer including shipping**, and **GameStop**.
+     The highest of those three numbers sets the baseline. Specific rules
+     and premiums take priority afterward. For example, eBay $150,
+     Amazon $134, and GameStop below $150 gives a $150 shelf price.
+   - **PriceCharting's own market price is only a fallback** when none
+     of those three references is available. Fallback prices always say **Double-check**.
      PriceCharting's retail-sell number is a reference, not a pricing rule.
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
      the plain game. They show dimmed.
+   - **Read the listing titles:** both eBay and Amazon are checked for
+     different language/packaging versions (French, Spanish, etc.),
+     regions/imports, special editions/reprints, bundled extras/bonus discs,
+     and clearly different platforms. The reason appears beside excluded
+     listings and remains in saved-list review notes. Matching selected
+     variants can still qualify. Missing titles need review too. An Amazon
+     barcode match does not bypass these checks: a mismatched catalog title
+     excludes its offers from pricing. Amazon provides a shared product
+     title, not every seller's description, so open the listing when unsure.
+   - **Possible high outliers:** one isolated high sale is flagged and left
+     out of the automatic price when at least three lower comparable sales
+     support a lower value. The top sale must be at least 50% and $5 above
+     the next highest. With at least eight comparable sales, it can also
+     be flagged when it is at least 20% above the next sale and at least
+     50% and $5 above the upper quartile of the remaining sales. This
+     catches an isolated high sale even when a few other sales sit above
+     the main cluster. The row stays visible for review. Open its link and
+     check that it actually sold and matches the item; click the row to
+     include it if warranted. **Back to the automatic price** excludes it
+     again. The flag is a pricing warning, not proof that a listing was unsold.
+     Review notes remain visible on saved lists and price re-checks.
    - **Amazon's offers show on every game**, listed under the sales
-     (prices include shipping). On older systems, when Amazon's typical
-     price is higher, the price moves partway toward it (at most 25%
-     more); with no Amazon copies at all, it goes by the highest sale
-     plus 10%. On **PS4, PS5, Xbox One / Series, Switch and Switch 2**,
-     Amazon offers flag differences for review and do not replace usable
-     sold evidence. The tool waits for sold evidence and reference checks
-     before enabling **Add to list**.
-   - **Premiums:** some games get a set percentage on top (for example
-     older Pokémon games). The badge and the math line show it. Managers
-     set these under Settings → Floor price premiums.
+     (prices include shipping). Only the lowest matching offer affects
+     the price. Expensive higher offers and having no offers add no markup.
+     The tool waits for sold evidence and reference checks before enabling **Add to list**.
+   - **Specific rules take priority:** configured premiums and discounts
+     apply to the baseline, and missing-manual deductions still apply.
+     A specific discount can lower the price below the market references.
+     Managers can edit premiums under Settings → Floor price premiums.
+     The longest matching phrase wins; a system-specific rule beats the
+     same phrase without a system. A 0% rule exempts a title from a broader premium.
    - **Consoles and controllers** can be priced here too. They go by
      their sales without the game rules (a badge says so).
    - **Instrument games** (Guitar Hero, Rock Band, DJ Hero…): pick the
@@ -763,15 +780,28 @@ Guide (the Google Sheet tab).
      has the instruments, or type a price.
    - Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.
-4. Only look closer when it says **Double-check** (very few sales, no
-   sale in the last 6 months, or a price of $100 or more). To use a different number, click any sale
-   in the list, or **Type a different price**. **Back to the automatic
+4. Only look closer when it says **Double-check** (a possible outlier, very few sales, no
+   sale in the last 6 months, or a price of $100 or more). Clicking a sale
+   includes it in the comparison but cannot undercut the highest valid sale.
+   For a manual override, choose **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
-5. The shelf price rounds **up to the next $5**, never goes under
-   **$10** ($5 only for shitbox games), and takes the guide's
-   missing-manual amount off. It's **never below GameStop's pre-owned
-   price** (on any system), even after the manual deduction. If you type
+   A separate **Sales history comparison** page at `trade-in/history-audit.html`
+   can run a prepared history review against live recommendations. It uses
+   the current pricing rules and only reads market data. History stays in
+   the browser. Download results before closing; the download can also be
+   loaded as a checkpoint to resume unfinished comparisons.
+5. **Through $80**, prices whose whole-dollar amount ends in **7, 8 or 9**
+   round up to the next $10. Otherwise they round **down to a multiple of $5**:
+   $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the
+   winning baseline after any premium or discount, including GameStop and
+   Amazon references. The $10 minimum ($5 for shitbox games) still applies
+   before missing-manual deductions. Specific adjustments take priority.
+   Above $80, prices first round up to $5 (nearest $5 for specific rules,
+   typed overrides and fallback-only prices). Finally, any result
+   **over $80 rounds up to the next multiple of $10 or $25**: $145 → $150,
+   $165 → $170, while $125 and $175 stay as they are. This happens after
+   premiums and missing-manual deductions. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)
