@@ -560,7 +560,18 @@ The site's **only server-side code**. Everything else is static.
     New adds "sealed".
   - **Which sale: the highest normal sale** for the selected condition
     (`floorAutoSale()`). Existing odd-listing, edition and instrument
-    filters still apply. `floorSales()` flags an isolated highest sale when
+    filters still apply. `floorListingMismatch()` checks the returned title
+    for language/packaging variants, regions/imports, editions/reprints,
+    bundled extras/bonus discs and explicit platform conflicts. Ordinary
+    unmarked products use English/North American variant assumptions;
+    explicitly selected variants must agree with the listing. Edition
+    and language markers use contextual matching ("French Revolution"
+    alone is not a French-language variant). Missing titles are excluded.
+    Rows display the reason, and saved/re-check review notes retain the
+    mismatch warning. Staff can deliberately include a marked eBay row;
+    the warning records that override. Rhythm-game cap calculations also
+    exclude title mismatches before taking their loose-sales median.
+    `floorSales()` flags an isolated highest sale when
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
     single highest sale is excluded; no recursive removal or median cap.
@@ -755,8 +766,14 @@ The site's **only server-side code**. Everything else is static.
     shipping**, sub-condition, Prime/FBA), sorted low→high, plus the
     total offer count; cached 6 h as `cache/amz-<upc>-<cond>.json`.
     **Amazon only returns its ~20 lowest offers per condition** (no API
-    lists more); the tab shows them all and "N lowest of M". Renewed
-    copies are separate ASINs, so they never appear. Loose/CIB compare
+    lists more); the tab shows them all and "N lowest of M". The frontend
+    validates the returned catalog title with the same variant checks as
+    eBay before using any offers, including cached responses. Missing or
+    mismatched titles, renewed and digital versions are excluded with a
+    visible review reason. A UPC match alone is not sufficient. If the
+    returned ASIN is excluded, this lookup does not search alternate ASINs.
+    The API supplies a shared catalog title, not each seller's description;
+    hidden or mislabeled variants still require staff review. Loose/CIB compare
     with **Used**, New with **New**. **Loaded automatically for every game.** Only the lowest matching
     offer enters the three-reference maximum, for every system. Higher
     offers and missing offers add no markup. The game

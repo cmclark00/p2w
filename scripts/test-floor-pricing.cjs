@@ -26,7 +26,82 @@ const stockHeader = 'stock_code,item_name,category,item_type,condition,sub_condi
 const lineHeader = 'transaction_number,date_local,transaction_type,line_mode,item_name,category,item_type,condition,sub_condition,quantity,line_subtotal';
 const txHeader = 'transaction_number,date_local,transaction_type,purchases_total,line_count';
 const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': 1500, 'gamestop-price': 0 };
-const cur = (product = item, extra = {}) => ({ product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: 'Example Game complete', price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra });
+const cur = (product = item, extra = {}) => {
+  const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: 'Example Game complete', price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
+  // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
+  if (result.amazon?.found) result.amazon = { title: product['product-name'], ...result.amazon };
+  return result;
+};
+
+test('eBay and Amazon exclude language, region, edition, extras and platform mismatches before pricing', () => {
+  const titles = ['Example Game (French Version) PS4', 'Example Game - Version Française',
+    'Example Game [Spanish]', 'Example Game Edición Española PS4', 'Example Game - French - PS4', 'Example Game French PS4',
+    'Example Game German Edition', 'Example Game (Italian Version)', 'Example Game Japanese Import',
+    'Example Game PAL UK', 'Example Game PEGI', 'Example Game NTSC-J',
+    'Example Game Special Edition', 'Example Game Collectors Edition', 'Example Game Greatest Hits',
+    'Example Game with bonus disc', 'Example Game + figurine', 'Example Game with soundtrack',
+    'Example Game with art book', 'Example Game Bonus Disc', 'Example Game + Another Game', 'Example Game PS5'];
+  for (const title of titles) {
+    const example = cur(item, { sales: { cib: [{ title, price: 6000 }, { title: 'Example Game PS4 CIB', price: 1000 }] },
+      amazon: { found: true, title, lowest: 7000, offers: [{ price: 7000 }] } });
+    const result = invoke('floorResult', example);
+    assert.equal(result.b.basis, 1000, title); assert.equal(result.r.price, 1000, title);
+    assert.equal(invoke('floorAmazonLowest', example), null, title);
+    assert.ok(result.b.checks.some((s) => s.includes('Amazon excluded')), title);
+    assert.ok(result.b.checks.some((s) => s.includes('title/variant mismatch')), title);
+  }
+});
+
+test('matching variants and ordinary packaging remain eligible while unconfirmed special editions do not', () => {
+  for (const title of ['Example Game PS4 CIB with manual', 'Example Game with original case and inserts',
+    'Example Game (English Version) PS4', 'Example Game USA NTSC-U ESRB', 'Example Game PS4 / PS5 compatible']) {
+    assert.equal(invoke('floorListingMismatch', title, item), null, title);
+  }
+  assert.equal(invoke('floorListingMismatch', 'Assassins Creed Unity French Revolution PS4', { ...item, 'product-name': 'Assassins Creed Unity' }), null);
+  for (const [name, system, title] of [
+    ['Example Game [French Version]', 'Playstation 4', 'Example Game PS4 Version Française'],
+    ['Example Game [Spanish]', 'Playstation 4', 'Example Game Spanish Version PS4'],
+    ['Example Game [Special Edition]', 'Playstation 4', 'Example Game Special Edition PS4'],
+    ['Example Game', 'PAL Playstation 4', 'Example Game PS4 PAL'],
+    ['Example Game', 'JP Playstation 4', 'Example Game PS4 Japanese Import'],
+    ['Guitar Hero Live [Bundle]', 'Wii U', 'Guitar Hero Live Wii U Bundle with guitar'],
+  ]) assert.equal(invoke('floorListingMismatch', title, { ...item, 'product-name': name, 'console-name': system }), null, title);
+  assert.ok(invoke('floorListingMismatch', 'Example Game PS4', { ...item, 'product-name': 'Example Game [Special Edition]' }));
+});
+
+test('Amazon missing-title and renewed/digital matches are excluded and visibly explained', () => {
+  run('amazonSet = true;');
+  for (const title of ['', null, 'Example Game (Renewed)', 'Example Game Digital Download Code']) {
+    const example = cur(item, { amazon: { found: true, title, lowest: 7000, offers: [{ price: 7000 }], url: 'https://www.amazon.com/dp/example' } });
+    const result = invoke('floorResult', example);
+    assert.equal(result.b.from, 'sale'); assert.equal(result.r.price, 2000);
+    const html = invoke('floorAmazonHtml', example, result.b);
+    assert.ok(html.includes('Excluded from pricing')); assert.ok(!html.includes('class="picked"'));
+    assert.ok(invoke('floorBasisInfo', result.b).reviewNotes.some((s) => s.includes('Amazon excluded')));
+  }
+  const example = cur(item, { amazon: { found: true, title: 'Example Game [French Version] <script>unsafe</script>', offers: [{ price: 1000 }] } });
+  assert.ok(invoke('floorAmazonHtml', example, {}).includes('&lt;script&gt;'));
+  run('amazonSet = false;');
+});
+
+test('variant exclusions precede premiums and leave matching Amazon offers eligible', () => {
+  const product = { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
+  const example = cur(product, { sales: { cib: [{ title: 'Pokemon Shield Nintendo Switch', price: 5000 },
+    { title: 'Pokemon Shield (French Version) Nintendo Switch', price: 9000 }] },
+    amazon: { found: true, title: 'Pokemon Shield - Nintendo Switch', offers: [{ price: 6000 }, { price: 10000 }] } });
+  const result = invoke('floorResult', example);
+  assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 6500);
+  example.amazon.title = 'Pokemon Shield (French Version) - Nintendo Switch';
+  const excluded = invoke('floorResult', example);
+  assert.equal(excluded.b.basis, 5000); assert.equal(excluded.r.price, 5500);
+});
+
+test('mismatched rhythm-game sales cannot distort the disc-only safety cap', () => {
+  const product = { ...item, 'product-name': 'Guitar Hero Live', 'console-name': 'Wii U' };
+  const example = cur(product, { sales: { loose: [700, 800, 900].map((price) => ({ price, title: 'Guitar Hero Live Wii U disc only' }))
+    .concat([10, 20, 30, 40, 50].map((price) => ({ price, title: 'Guitar Hero Live Wii U French Version disc only' }))), cib: [] } });
+  assert.equal(invoke('rhythmDiscSaleCap', example), 2400);
+});
 
 test('sold evidence leads on modern, retro and hardware even when PriceCharting is higher', () => {
   for (const product of [{ ...item }, { ...item, 'console-name': 'Playstation 2' }, { ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories' }]) {

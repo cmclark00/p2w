@@ -3324,9 +3324,11 @@ function floorSales(cur = floorCur) {
   const name = cur.product?.['product-name'] || '';
   const rhythm = rhythmKind(name);
   const cap = rhythmDiscSaleCap(cur);
-  const sales = (cur.sales?.[cur.condition] || []).map((s, i) => ({
-    ...s, i, odd: floorOdd(s, cur.condition, rhythm) || s.price > cap || otherEdition(s.title, name) || HOME_CONSOLE_RE.test(s.title),
-  })).sort((a, b) => b.price - a.price);
+  const sales = (cur.sales?.[cur.condition] || []).map((s, i) => {
+    const mismatch = floorListingMismatch(s.title, cur.product);
+    return { ...s, i, mismatch,
+      odd: !!mismatch || floorOdd(s, cur.condition, rhythm) || s.price > cap || HOME_CONSOLE_RE.test(s.title) };
+  }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
@@ -3351,8 +3353,82 @@ function floorSales(cur = floorCur) {
 // $40 / $39.60; the game sells for ~$20). Odd when the title names an edition that this product's name doesn't.
 const EDITION_RES = [/\bsteel ?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game of the year)\b/i, /\bcollector'?s\b/i, /\blimited edition\b/i,
   /\bdeluxe\b/i, /\bpremium( online)? edition\b/i, /\bspecial edition\b/i, /\blaunch edition\b/i, /\bday one\b/i, /\bgold edition\b/i,
-  /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i];
+  /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i,
+  /\bdefinitive edition\b/i, /\b(?:greatest|playstation) hits\b/i, /\bplayer'?s choice\b/i, /\bnintendo selects\b/i,
+  /\bplatinum hits\b/i, /\b(?:collector'?s|limited|special|deluxe|gold|ultimate) (?:edition|version)\b/i];
 const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || '') && !re.test(name));
+// A barcode or PriceCharting category is not enough: inspect the actual listing title too.
+// Language words need variant context so "French Revolution" is not mistaken for French packaging.
+const FLOOR_LANGUAGES = [
+  ['French', 'french|francais|francaise|francophone|fr'], ['Spanish', 'spanish|espanol|espanola|espagnol|castellano|es'],
+  ['German', 'german|deutsch|deutsche|de'], ['Italian', 'italian|italiano|italiana|it'],
+  ['Japanese', 'japanese|japonais|japones|jp'], ['Chinese', 'chinese|mandarin|cantonese'],
+  ['Korean', 'korean|koreano'], ['Portuguese', 'portuguese|portugues|portuguesa'],
+  ['Russian', 'russian'], ['Dutch', 'dutch|nederlands'], ['Polish', 'polish|polski'], ['Arabic', 'arabic'],
+  ['English', 'english|anglais|ingles|en'],
+];
+function floorListingLanguages(title) {
+  const text = norm(title);
+  return FLOOR_LANGUAGES.filter(([, words]) => {
+    const long = words.split('|').filter((w) => w.length > 2).join('|');
+    return new RegExp(`\\b(?:${words}) (?:version|edition|language|import|release|packaging|cover)\\b|\\b(?:version|edition|edicion|language|langue|idioma|sprache|lingua) (?:in |en )?(?:${words})\\b|\\b(?:${long})$|\\b(?:${long}) (?:(?:sony|nintendo|microsoft) )?(?:ps[1-5]|playstation [1-5]|switch|xbox)\\b`, 'i').test(text)
+      || new RegExp(`[\\[(][^\\])]*\\b(?:${words})\\b[^\\])]*[\\])]|(?:^|[-:|])\\s*(?:${long})\\s*(?:$|[-:|])`, 'i').test(String(title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  }).map(([language]) => language);
+}
+const FLOOR_REGIONS = [
+  ['Japan', /\b(?:ntsc j|japan|jp|jpn|japanese import)\b/],
+  ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|eur)\b/],
+  ['Asia', /\b(?:asia|asian|hong kong|korea|china|taiwan)\b/],
+  ['North America', /\b(?:ntsc u|ntsc uc|usa|us version|us edition|north america|north american|esrb)\b/],
+];
+const FLOOR_EXTRAS = /(?:\bwith\b|\bw\/|\+|\bplus\b|\bincludes?\b|\band\b|&)\s*(?:(?:a|an|the|bonus|extra|exclusive|collectible|limited|art|mini)\s+)*(?:figurines?|figures?|statues?|soundtracks?|art ?books?|steel ?books?|bonus discs?|demo discs?|amiibo|controllers?|memory cards?|another game|extra games?)\b/i;
+const FLOOR_PLATFORMS = [
+  /\b(?:ps1|psx|playstation 1)\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
+  /\b(?:ps4|playstation 4)\b/, /\b(?:ps5|playstation 5)\b/, /\b(?:psp|playstation portable)\b/,
+  /\b(?:vita)\b/, /\bxbox 360\b/, /\bxbox one\b/, /\bxbox series\b/,
+  /\b(?:nintendo )?switch 2\b/, /\b(?:nintendo )?switch\b(?! 2)/,
+  /\b3ds\b/, /\b(?:nintendo )?ds\b/, /\bwii u\b/, /\bwii\b(?! u)/,
+  /\bgamecube\b/, /\b(?:n64|nintendo 64)\b/,
+];
+function floorListingMismatch(title, product) {
+  if (!String(title || '').trim()) return 'Missing listing title; match needs review';
+  const name = product?.['product-name'] || '';
+  const expected = `${name} ${product?.['console-name'] || ''}`;
+  const wantedRegions = FLOOR_REGIONS.filter(([, re]) => re.test(norm(expected))).map(([region]) => region);
+  const languages = floorListingLanguages(title);
+  const wantedLanguages = [...new Set([...floorListingLanguages(name), ...floorListingLanguages(product?.['console-name'])])];
+  const unexpectedLanguage = languages.find((l) => !wantedLanguages.includes(l)
+    && !(l === 'English' && !wantedLanguages.length) && !(l === 'Japanese' && wantedRegions.includes('Japan') && !wantedLanguages.length));
+  if (unexpectedLanguage) return `${unexpectedLanguage} language/packaging variant`;
+  if (wantedLanguages.some((l) => !languages.includes(l))) return 'Listing does not confirm the selected language variant';
+  const regions = FLOOR_REGIONS.filter(([, re]) => re.test(norm(title))).map(([region]) => region);
+  if (regions.some((region) => !(wantedRegions.length ? wantedRegions : ['North America']).includes(region))) return 'Different region/import variant';
+  if (wantedRegions.length && !regions.some((region) => wantedRegions.includes(region))) return 'Listing does not confirm the selected region variant';
+  if (/\bimport(?:ed)?\b/i.test(title) && !/\bimport(?:ed)?\b/i.test(expected) && !wantedRegions.length) return 'Import variant needs review';
+  if (otherEdition(title, name)) return 'Different special edition or reprint';
+  if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
+  if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
+  if (FLOOR_EXTRAS.test(title) && !FLOOR_EXTRAS.test(name) && rhythmKind(name) !== 'bundle') return 'Bundled extra item';
+  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(title))
+    && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
+  const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
+  const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
+  if (wantedPlatforms.length && listedPlatforms.length && !wantedPlatforms.some((re) => re.test(norm(title)))) return 'Different platform';
+  return null;
+}
+
+function floorAmazonMismatch(cur) {
+  if (!cur.amazon?.found) return null;
+  const mismatch = floorListingMismatch(cur.amazon.title, cur.product);
+  if (mismatch) return mismatch;
+  const rhythm = rhythmKind(cur.product?.['product-name']);
+  // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
+  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm)
+    || HOME_CONSOLE_RE.test(cur.amazon.title))) return 'Non-comparable item, bundle, or condition';
+  if (/\b(?:renewed|refurbished|digital code|download code|digital download)\b/i.test(cur.amazon.title)
+    && !/\b(?:renewed|refurbished|digital)\b/i.test(cur.product?.['product-name'] || '')) return 'Renewed or digital variant';
+  return null;
+}
 // A home console sold with the game (Fortnite, PS4, CIB, Oct 2026: "Sony PlayStation 4 PS4 Slim 1TB Fortnite Neo Versa
 // Console Bundle" at $134.99 topped its sales; the game sells for ~$100). BUNDLE_RE only knows handhelds.
 const HOME_CONSOLE_RE = /\b\d+ ?(tb|gb)\b|\b(slim|pro) (console|bundle|system)\b|\bconsole (bundle|system)\b|\bconsole\b.*\bbundle\b|\bbundle\b.*\bconsole\b/i;
@@ -3365,7 +3441,7 @@ const RHYTHM_DISC_SALE_CAP = { loose: 3, cib: 3, new: 5 };
 function rhythmDiscSaleCap(cur) {
   const rhythm = rhythmKind(cur.product?.['product-name']);
   if (rhythm !== 'disc') return Infinity;
-  const loose = (cur.sales?.loose || []).filter((s) => !floorOdd(s, 'loose', rhythm)).map((s) => s.price).sort((a, b) => a - b);
+  const loose = (cur.sales?.loose || []).filter((s) => !floorOdd(s, 'loose', rhythm) && !floorListingMismatch(s.title, cur.product)).map((s) => s.price).sort((a, b) => a - b);
   if (loose.length < 3) return Infinity;
   return loose[Math.floor((loose.length - 1) / 2)] * RHYTHM_DISC_SALE_CAP[cur.condition];
 }
@@ -3374,7 +3450,7 @@ function rhythmDiscSaleCap(cur) {
 // their median is under a quarter of the boxed (CIB) sales' median: they're discs nobody titled "game only".
 function looseBundleUnreliable(cur) {
   const median = (cond) => {
-    const a = (cur.sales?.[cond] || []).filter((s) => !floorOdd(s, cond, 'bundle')).map((s) => s.price).sort((x, y) => x - y);
+    const a = (cur.sales?.[cond] || []).filter((s) => !floorOdd(s, cond, 'bundle') && !floorListingMismatch(s.title, cur.product)).map((s) => s.price).sort((x, y) => x - y);
     return a.length >= 3 ? a[Math.floor((a.length - 1) / 2)] : null;
   };
   const loose = median('loose');
@@ -3398,7 +3474,7 @@ function floorAutoSale(sales) {
 
 // Offers include shipping. Never use the median or a higher offer; tolerate unsorted responses.
 function floorAmazonLowest(cur) {
-  if (!cur.amazon?.found) return null;
+  if (!cur.amazon?.found || floorAmazonMismatch(cur)) return null;
   const prices = (cur.amazon.offers || []).map((o) => Number(o.price)).filter((p) => Number.isFinite(p) && p > 0);
   const lowest = prices.length ? Math.min(...prices) : Number(cur.amazon.lowest);
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
@@ -3412,6 +3488,10 @@ function floorBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
   const checks = [];
+  const mismatches = sales.filter((s) => s.mismatch);
+  if (mismatches.length) checks.push(`${mismatches.length} eBay listing${mismatches.length === 1 ? '' : 's'} excluded from automatic pricing for title/variant mismatch; review the marked rows${picked?.mismatch ? `. Manually included listing: ${picked.mismatch}` : ''}`);
+  const amazonMismatch = floorAmazonMismatch(cur);
+  if (amazonMismatch) checks.push(`Amazon excluded from pricing: ${amazonMismatch}. Review the linked listing`);
   for (const s of sales.filter((s) => s.outlier)) {
     checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales${s.outlier.clusterPrice != null ? `; at least 75% of those are ${money(s.outlier.clusterPrice)} or less` : ''}. Open the listing and verify it actually sold before using it`);
   }
@@ -3510,7 +3590,7 @@ function renderFloorPricer() {
     const shown = cur.showAll ? sales : sales.slice(0, 8);
     salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
-        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
+        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ` <span class="badge info">${esc(s.mismatch || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
       <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Final prices over $80 round up to a multiple of $10 or $25. PriceCharting's own price is only a fallback.</p>`;
@@ -3579,6 +3659,8 @@ function floorAmazonHtml(cur, b) {
   const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
   const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>`;
+  const mismatch = floorAmazonMismatch(cur);
+  if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">

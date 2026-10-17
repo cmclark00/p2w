@@ -735,6 +735,15 @@ Guide (the Google Sheet tab).
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
      the plain game. They show dimmed.
+   - **Read the listing titles:** both eBay and Amazon are checked for
+     different language/packaging versions (French, Spanish, etc.),
+     regions/imports, special editions/reprints, bundled extras/bonus discs,
+     and clearly different platforms. The reason appears beside excluded
+     listings and remains in saved-list review notes. Matching selected
+     variants can still qualify. Missing titles need review too. An Amazon
+     barcode match does not bypass these checks: a mismatched catalog title
+     excludes its offers from pricing. Amazon provides a shared product
+     title, not every seller's description, so open the listing when unsure.
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
