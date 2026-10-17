@@ -424,11 +424,11 @@
           </label>
         </div>
 
-        <h2>Floor price premiums</h2>
-        <p class="muted">Floor Pricing adds this percentage on top of the automatic shelf price for games whose name contains the phrase. One <em>phrase = percent</em> per line, like <code>Pokemon = 10</code>. When several match, the longest phrase wins, so <code>Pokemon Yellow = 50</code> raises one game and <code>Pokemon X = 0</code> exempts one. Add <em>@ system</em> to limit a line to one system (as PriceCharting names it), like <code>Pokemon @ Nintendo DS = 0</code>; it beats the same phrase without a system. A negative percent lowers the price, like <code>Pokemon Red @ GameBoy = -5</code>. Typed prices never get a premium.</p>
+        <h2>Saved floor price premiums (inactive)</h2>
+        <p class="muted">These saved percentages are retained for reference. Automatic shelf prices now use the highest of the highest valid eBay sale, lowest matching Amazon offer, and GameStop. These premiums and discounts no longer change the shelf price.</p>
         <div class="grid-3 guide-lists">
           <label>Phrase = percent
-            <textarea name="floorPremiums" rows="14"></textarea>
+            <textarea name="floorPremiums" rows="14" readonly></textarea>
           </label>
         </div>
 

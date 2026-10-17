@@ -34,13 +34,13 @@ test('sold evidence leads on modern, retro and hardware even when PriceCharting 
     assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 2000);
   }
 });
-test('one high sale and odd editions do not replace the normal sold basis', () => {
+test('highest valid sale wins while odd editions remain excluded', () => {
   const sales = { cib: Array.from({ length: 30 }, (_, i) => ({ title: 'Example Game complete', price: i === 0 ? 16000 : 1999, date: '2026-10-01' })) };
   sales.cib.push({ title: 'Example Game Steelbook', price: 20000, date: '2026-10-01' });
-  assert.equal(invoke('floorResult', cur(item, { sales })).r.price, 2000);
+  assert.equal(invoke('floorResult', cur(item, { sales })).r.price, 16000);
 });
 
-test('Halo MCC sold evidence produces $50 across systems, without a title override', () => {
+test('Halo MCC follows the new never-below-highest-sale rule across systems', () => {
   // PriceCharting product 35300 CIB prices fetched Oct 17, 2026. Previously p90 selected $36.99 -> $40.
   const prices = [5200, 4999, 4499, 3699, 3499, 3385, 3299, 3199, 3099, 3000, 2999, 2999, 2999,
     2997, 2997, 2995, 2995, 2989, 2956, 2900, 2800, 2799, 2775, 2700, 2599, 2500, 2299, 2000, 2000, 2000];
@@ -48,13 +48,13 @@ test('Halo MCC sold evidence produces $50 across systems, without a title overri
     const product = { ...item, 'product-name': 'Halo: The Master Chief Collection', 'console-name': system, 'gamestop-price': 3499 };
     const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection CIB' })) };
     const r = invoke('floorResult', cur(product, { sales }));
-    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 4999); assert.equal(r.r.price, 5000);
-    // Selecting the $52 sale also gives $50 with nearest-$5 rounding.
-    assert.equal(invoke('floorResult', cur(product, { sales, pick: 0 })).r.price, 5000);
+    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5500);
+    // Clicking a lower sale cannot undercut the highest valid sale; typed prices are explicit overrides.
+    assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5500);
   }
 });
 
-test('second-highest selection filters odd listings before ranking and handles sparse sales', () => {
+test('highest-sale selection filters odd listings before ranking and handles sparse sales', () => {
   const sales = { cib: [
     { price: 20000, title: 'Example Game Steelbook' },
     { price: 16000, title: 'Example Game bundle' },
@@ -63,10 +63,10 @@ test('second-highest selection filters odd listings before ranking and handles s
     { price: 4999, title: 'Example Game complete' },
     { price: 3699, title: 'Example Game complete' },
   ] };
-  assert.equal(invoke('floorResult', cur(item, { sales })).b.basis, 4999);
+  assert.equal(invoke('floorResult', cur(item, { sales })).b.basis, 5200);
   const one = invoke('floorResult', cur(item, { sales: { cib: [sales.cib[3]] } }));
-  assert.equal(one.r.price, 5000); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
-  assert.equal(invoke('floorAutoSale', [{ price: 5200 }, { price: 4999 }], true).sale.price, 5200);
+  assert.equal(one.r.price, 5500); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
+  assert.equal(invoke('floorAutoSale', [{ price: 5200 }, { price: 4999 }]).sale.price, 5200);
   assert.equal(invoke('floorAutoSale', []).sale, null);
 });
 test('fallback waits for sold evidence and Amazon before using PriceCharting', () => {
@@ -83,7 +83,7 @@ test('GameStop and Amazon precede PriceCharting when no sold evidence exists', (
   const r = invoke('floorResult', cur({ ...item, 'cib-price': 9900 }, { sales: { cib: [] }, amazon }));
   assert.equal(r.b.from, 'amazon'); assert.equal(r.r.price, 3000);
   const gs = invoke('floorResult', cur({ ...item, 'gamestop-price': 2499, 'cib-price': 9900 }, { sales: { cib: [] }, amazon }));
-  assert.equal(gs.b.from, 'gamestop'); assert.equal(gs.r.price, 2500);
+  assert.equal(gs.b.from, 'amazon'); assert.equal(gs.r.price, 3000);
 });
 test('missing references require a typed price and failed sales are visibly flagged', () => {
   const empty = { ...item, 'cib-price': 0, 'retail-cib-sell': 9900 };
@@ -92,16 +92,53 @@ test('missing references require a typed price and failed sales are visibly flag
   const fallback = invoke('floorResult', cur(item, { sales: null, salesError: 'Service unavailable' }));
   assert.equal(fallback.b.from, 'pricecharting'); assert.ok(fallback.b.checks.some((s) => s.includes('fallback')));
 });
-test('modern Amazon checks do not displace sold prices, even when PriceCharting would hide an outlier', () => {
+test('lowest Amazon offer can win and unusually high minimums are flagged instead of discarded', () => {
   for (const price of [3500, 6000]) {
     const r = invoke('floorResult', cur({ ...item, 'cib-price': 9900 }, { amazon: { found: true, lowest: price, offers: [{ price }] } }));
-    assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 2000);
+    assert.equal(r.b.from, 'amazon'); assert.equal(r.r.price, price);
     assert.ok(r.b.checks.some((s) => s.includes('Amazon')));
   }
 });
-test('older Amazon adjustment remains capped at 25 percent above sold evidence', () => {
+test('older systems use the same maximum rule without an Amazon midpoint adjustment', () => {
   const r = invoke('floorResult', cur({ ...item, 'console-name': 'Playstation 2', 'cib-price': 9900 }, { amazon: { found: true, lowest: 6000, offers: [{ price: 6000 }] } }));
-  assert.equal(r.b.from, 'amazonMid'); assert.equal(r.b.basis, 2499); assert.equal(r.r.price, 2500);
+  assert.equal(r.b.from, 'amazon'); assert.equal(r.b.basis, 6000); assert.equal(r.r.price, 6000);
+});
+
+test('Operation Darkness stays $150 despite expensive higher Amazon offers', () => {
+  const product = { ...item, 'product-name': 'Operation Darkness', 'console-name': 'Xbox 360', 'gamestop-price': 9999 };
+  const sales = { cib: [15000, 14000, 12000].map((price) => ({ price, title: 'Operation Darkness complete' })) };
+  const amazon = { found: true, lowest: 13400, offers: [13400, 20000, 50000, 90000].map((price) => ({ price })) };
+  const r = invoke('floorResult', cur(product, { sales, amazon }));
+  assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 15000); assert.equal(r.r.price, 15000);
+  assert.equal(invoke('floorResult', cur(product, { sales, amazon: { found: true, offers: [] } })).r.price, 15000);
+});
+
+test('each of the three references can win, across tiers, conditions and missing-manual state', () => {
+  for (const system of ['Xbox 360', 'Playstation 5', 'Unlisted System']) {
+    for (const condition of ['loose', 'cib', 'new']) {
+      for (const manualMissing of [false, true]) {
+        for (const [ebay, amazonLow, gs, from] of [[15000, 13400, 10000, 'sale'], [15000, 16400, 10000, 'amazon'], [15000, 13400, 17999, 'gamestop']]) {
+          const product = { ...item, 'console-name': system, 'gamestop-price': gs };
+          const sales = { [condition]: [{ price: ebay, title: 'Example Game complete' }] };
+          const amazon = { found: true, lowest: amazonLow, offers: [{ price: 90000 }, { price: amazonLow }, { price: 50000 }] };
+          const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
+          assert.equal(r.b.from, from);
+          assert.equal(r.r.price, Math.ceil(Math.max(ebay, amazonLow, gs) / 500) * 500);
+        }
+      }
+    }
+  }
+});
+
+test('pricer displays the lowest Amazon offer and the winning price without midpoint language', () => {
+  const amazon = { found: true, lowest: 16400, offers: [{ price: 90000 }, { price: 16400 }, { price: 50000 }] };
+  run(`amazonSet = true; floorCur = ${JSON.stringify(cur({ ...item, 'console-name': 'Xbox 360' }, { amazon }))}; renderFloorPricer();`);
+  const html = element('#floorPricer').innerHTML;
+  assert.ok(html.includes('<strong>$165.00</strong>'));
+  assert.ok(html.includes('<tr class="picked">\n      <td class="num">$164.00'));
+  assert.ok(!html.includes('typical'));
+  assert.ok(!html.includes('halfway'));
+  run('amazonSet = false; floorCur = null;');
 });
 test('GameStop remains the floor after a missing-manual deduction', () => {
   assert.equal(invoke('floorResult', cur({ ...item, 'gamestop-price': 4799 }, { manualMissing: true, sales: { cib: [{ title: 'Example Game complete', price: 4999 }] } })).r.price, 5000);
@@ -112,6 +149,7 @@ test('full lookup blocks adding an automatic price even if retail sell is known'
 });
 test('add action also waits for Amazon on a sales-based price', () => {
   run(`amazonSet = true; floorCur = ${JSON.stringify(cur({ ...item, 'console-name': 'Playstation 2' }, { amazon: { loading: true } }))};`);
+  assert.equal(json('floorResult(floorCur)').r, null);
   run('addFloorItem();');
   assert.equal(run('floor.items.length'), 0); assert.equal(run('floorCur != null'), true);
   run('amazonSet = false; floorCur = null;');
@@ -124,12 +162,12 @@ test('modern hardware uses sales instead of the game retail-sell rule', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock controller complete', date: '2026-10-01' }] } }));
   assert.equal(r.hw, true); assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 4000);
 });
-test('configured premiums apply to sold evidence on modern systems', () => {
+test('saved premiums do not add a markup to the three-source shelf price', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch', 'retail-cib-sell': 4599 }));
-  assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 2199); assert.equal(r.r.price, 2000);
+  assert.equal(r.premium, null); assert.equal(r.r.premiumBasis, 1999); assert.equal(r.r.price, 2000);
 });
-test('Killzone system discount and Conker migration are preserved', () => {
-  assert.equal(invoke('floorResult', cur({ ...item, 'product-name': 'Killzone: Shadow Fall' }, { sales: { cib: [{ title: 'Killzone Shadow Fall complete', price: 1799 }] } })).r.price, 1000);
+test('saved discounts cannot undercut the market and settings migrations remain intact', () => {
+  assert.equal(invoke('floorResult', cur({ ...item, 'product-name': 'Killzone: Shadow Fall' }, { sales: { cib: [{ title: 'Killzone Shadow Fall complete', price: 1799 }] } })).r.price, 2000);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 15 }] }).floorPremiums[0].pct, 10);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 22 }] }).floorPremiums[0].pct, 22);
 });

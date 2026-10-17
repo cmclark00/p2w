@@ -832,30 +832,22 @@ Guide (the Google Sheet tab).</p>
    tick <strong>Manual missing</strong> for a CIB game without its manual.</li>
 <li>The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:</li>
-<li><strong>Every system:</strong> it goes by the <strong>second-highest normal sale</strong>, so
-     prices stay near the top without one unusually high sale setting
-     the price. If there's only one usable sale, it uses that sale and
-     asks you to double-check. That sale is highlighted in the list.</li>
-<li><strong>Source priority:</strong> eBay sold prices first, GameStop/Amazon checks,
-     <strong>PriceCharting only as a fallback</strong>. GameStop remains a minimum.
-     If no usable sold evidence exists, GameStop takes precedence; with
-     neither, use a matched Amazon offer, then PriceCharting's market
-     price for the condition. Fallback prices always say <strong>Double-check</strong>.
+<li><strong>Every system:</strong> compare the <strong>highest valid eBay sale</strong>, the
+     <strong>lowest matching Amazon offer including shipping</strong>, and <strong>GameStop</strong>.
+     The highest of those three numbers wins. For example, eBay $150,
+     Amazon $134, and GameStop below $150 gives a $150 shelf price.</li>
+<li><strong>PriceCharting's own market price is only a fallback</strong> when none
+     of those three references is available. Fallback prices always say <strong>Double-check</strong>.
      PriceCharting's retail-sell number is a reference, not a pricing rule.</li>
 <li><strong>Never counted:</strong> lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
      the plain game. They show dimmed.</li>
 <li><strong>Amazon's offers show on every game</strong>, listed under the sales
-     (prices include shipping). On older systems, when Amazon's typical
-     price is higher, the price moves partway toward it (at most 25%
-     more); with no Amazon copies at all, it goes by the highest sale
-     plus 10%. On <strong>PS4, PS5, Xbox One / Series, Switch and Switch 2</strong>,
-     Amazon offers flag differences for review and do not replace usable
-     sold evidence. The tool waits for sold evidence and reference checks
-     before enabling <strong>Add to list</strong>.</li>
-<li><strong>Premiums:</strong> some games get a set percentage on top (for example
-     older Pokémon games). The badge and the math line show it. Managers
-     set these under Settings → Floor price premiums.</li>
+     (prices include shipping). Only the lowest matching offer affects
+     the price. Expensive higher offers and having no offers add no markup.
+     The tool waits for sold evidence and reference checks before enabling <strong>Add to list</strong>.</li>
+<li><strong>Saved premiums and discounts are inactive.</strong> Their settings are
+     kept for reference; automatic prices follow the three-price rule.</li>
 <li><strong>Consoles and controllers</strong> can be priced here too. They go by
      their sales without the game rules (a badge says so).</li>
 <li><strong>Instrument games</strong> (Guitar Hero, Rock Band, DJ Hero…): pick the
@@ -870,15 +862,15 @@ Guide (the Google Sheet tab).</p>
 <li>Lots, sealed copies, and other odd listings are marked "odd
      listing" and never count.</li>
 <li>Only look closer when it says <strong>Double-check</strong> (very few sales, no
-   sale in the last 6 months, or a price of $100 or more). To use a different number, click any sale
-   in the list, or <strong>Type a different price</strong>. <strong>Back to the automatic
+   sale in the last 6 months, or a price of $100 or more). Clicking a sale
+   includes it in the comparison but cannot undercut the highest valid sale.
+   For a manual override, choose <strong>Type a different price</strong>. <strong>Back to the automatic
    price</strong> undoes that. The <strong>eBay sold ↗</strong>, <strong>GameStop ↗</strong>, <strong>Amazon ↗</strong>,
    and <strong>PriceCharting ↗</strong> links are there if you want to check.</li>
-<li>The shelf price rounds <strong>to the nearest $5</strong> ($52 → $50; $52.50 → $55), never goes under
-   <strong>$10</strong> ($5 only for shitbox games), and takes the guide's
-   missing-manual amount off. It's <strong>never below GameStop's pre-owned
-   price</strong> (on any system), even after the manual deduction; that minimum
-   still rounds <strong>up</strong> to $5. If you type
+<li>Automatic prices round <strong>up to $5</strong> ($150 stays $150; $152 → $155), never go under
+   <strong>$10</strong> ($5 only for shitbox games), and <strong>never fall below any of the
+   three market references</strong>, even with a missing manual. Typed overrides
+   and fallback-only prices round to the nearest $5. If you type
    a price below GameStop's, you'll see a warning. Click <strong>Add to list</strong>.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)</li>

@@ -522,31 +522,26 @@ The site's **only server-side code**. Everything else is static.
     "eBay highest sold" reference at every price. The tool reads actual
     sold listings through PriceCharting and Amazon offers through the
     shop's configured Selling Partner API; staff can open the source links.
-  - **Source priority (owner correction, Oct 14 2026): eBay sold prices
-    first, GameStop/Amazon checks, PriceCharting fallback.** This supersedes
-    the Oct 13 `c9d32c9` modern retail-sell rule and the older competing
-    PriceCharting maximum. Never restore those rules based on matching
-    historical stock prices: those prices are reference evidence, not policy.
-    All systems use the filtered second-highest sold selection (Oct 17 correction).
-    GameStop is a minimum. Modern Amazon offers flag differences (> $5)
-    for review; they never replace usable sold evidence. An offer > 2x
-    eBay/GameStop is flagged as an outlier; PriceCharting cannot legitimize it.
-    Older systems keep the capped Amazon adjustment and scarcity rule below.
-    Without usable sales, prefer GameStop; with neither, a matched Amazon
-    offer, then the condition's `PC_FIELDS.market` price (`pricecharting`).
-    All fallbacks carry a review warning. Retail-sell stays reference-only.
-    Configured general and system-specific premiums apply to automatic
-    prices; typed overrides bypass them. The old retail-sell exception
-    suppressing general premiums is removed.
+  - **Source priority (owner correction, Oct 17 2026): the maximum of
+    the highest valid eBay sale, lowest matching Amazon offer including
+    shipping, and GameStop.** Apply the same rule on every system.
+    Operation Darkness Xbox 360: eBay $150, lowest Amazon $134, GameStop
+    below $150 gives $150, regardless of expensive higher Amazon offers.
+    This supersedes the p90/second-highest sale selection, older-system
+    Amazon midpoint adjustment, scarcity markup, and modern Amazon
+    comparison-only rule. Never use Amazon's median or higher offers.
+    An unusually high lowest Amazon offer (>2x eBay/GameStop) is flagged
+    for review but remains a minimum. Wrong-product rhythm bundles are
+    still excluded. PriceCharting's condition market price is a fallback
+    only when all three references are missing; retail-sell is reference-only.
+    Missing references and failed lookups remain visibly flagged.
   - **Tiers** (`FLOOR_TIERS`, PriceCharting console names, PAL/JP prefixes
-    ignored): modern has Amazon comparison checks; retro/other has the
-    capped adjustment. Hardware follows the same source priority but skips
-    game-only deductions/minimum exceptions. Full-product lookup, sold
+    ignored) label systems; they no longer change the source calculation.
+    Hardware follows the same maximum rule. Full-product lookup, sold
     evidence and configured Amazon checks must finish before Add is enabled.
-    A missing sales response cannot temporarily activate a PriceCharting
-    fallback. Failed full-product/Amazon checks and unavailable sold evidence
-    are visible. PriceCharting's product lookup carries GameStop and UPC;
-    it is distinct from using PriceCharting's own price as the basis.
+    A pending lookup must not produce a premature fallback or shelf price.
+    PriceCharting's product lookup carries GameStop and UPC; its own price
+    is separate from the three-reference comparison.
     **More odd sales** (in
     `floorSales()`): another edition sold under the plain game
     (`otherEdition()`, `EDITION_RES`: Steelbook, GOTY (not "Not GOTY"),
@@ -555,49 +550,22 @@ The site's **only server-side code**. Everything else is static.
     were $40 Steelbooks) and home-console bundles (`HOME_CONSOLE_RE`: a
     storage size like "1TB", "console bundle", "slim/pro console"; Fortnite
     PS4's top CIB "sale" was a $134.99 PS4 Slim bundle, tool said $195,
-    shop $100). **Rounding:** nearest $5 as of Oct 17 2026, replacing the
-    old round-up rule with 50¢ slack ($20.38 still → $20; $52 now → $50).
-    Killzone: Shadow Fall (shop $10,
-    sales top out $16–18, typical $10–13) is priced below its own sales on
-    purpose, so it needs a per-game discount line, not a sales rule.
+    shop $100). Automatic prices must never fall below the winning
+    reference, including after rounding, discounts or manual deductions.
     The **eBay sold
     link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
     filter eBay's used grades (3000/2750/4000/5000/6000), New = 1000; Loose
     excludes sealed/complete/CIB words, CIB asks for "complete" or "cib",
     New adds "sealed".
-  - **Older systems and Amazon** (retro + other tiers, owner's rules Oct
-    2026; automatic price only, not a clicked sale or a typed price):
-    when Amazon's **typical** offer (the lower middle of the up-to-20
-    offers Amazon returns, not the lowest) is above the eBay/GameStop
-    basis, go **halfway toward it, capped at +`FLOOR_AMAZON_PULL` (25%)**
-    (from `amazonMid`, "Toward Amazon"). Typical because a lone cheap
-    "Acceptable" copy is common: Pokemon Diamond loose had lowest $54.01
-    but typical $84.80; GameStop $64.99 → $75, the shop's price (with the
-    lowest offer it stayed at $65). Diddy Kong Racing loose: GameStop
-    $39.99 → shop $45. When Amazon matched the
-    game but has **no offers in that condition**, copies are scarce: use
-    the **highest** normal sale instead of second-highest, **plus
-    `FLOOR_SCARCE_MARKUP` (10%)** (Pokemon Emerald loose: $275 → highest
-    sale $314.95 + 10% → $350, the shop's price; owner's choice). "Add to list"
-    waits for Amazon on every tier now. The cap is there because retro
-    Amazon listings are often inflated third-party asking prices.
-  - **Which sale: the second-highest normal sale** for the condition
-    (`floorAutoSale()`), or the only usable sale when there's just one.
-    Owner correction, Oct 17 2026: use the general rule to price closer
-    to the highest valid sales. Halo MCC CIB had sales at $52, $49.99,
-    $44.99 and $36.99; the previous 90th-percentile rule picked $36.99
-    and priced it at $40. The second-highest basis gives the requested
-    $50 without a Halo-specific override. A single unusually high sale
-    still doesn't set the price. This replaces the old p90/$80 threshold;
-    no broad inventory backtest was performed for this owner correction.
-    Sold data can't explain
-    prices above every recent sale (e.g. Conker loose $275 vs NTSC sales
-    ≤ $190): those come from current eBay asking prices, which need the
-    eBay Browse API (active listings). `floorBasis()` adds "Double-check"
-    notes for under `FLOOR_FEW_SALES` sales or a newest sale older than
-    `FLOOR_STALE_DAYS`, and the pricer shows one for any shelf price of
-    `FLOOR_REVIEW` ($100) or more, typed prices included (owner request).
-    Staff can click any sale or type a price.
+  - **Which sale: the highest normal sale** for the selected condition
+    (`floorAutoSale()`). Existing odd-listing, edition and instrument
+    filters still apply; high price alone does not exclude a sale.
+    Clicking another listing can include it in the comparison, but cannot
+    lower the automatic price below the highest valid sale. Typed prices
+    remain explicit manual overrides. `floorBasis()` adds review notes for
+    fewer than `FLOOR_FEW_SALES` sales or a newest sale older than
+    `FLOOR_STALE_DAYS`. Shelf prices at or above `FLOOR_REVIEW` ($100)
+    also request review.
   - **Sales source.** The API has no
     sales data ("historic sales are not supported"), so **`GET
     api.php?route=pc/sales&id=…` reads the sold-listings tables off the
@@ -629,46 +597,21 @@ The site's **only server-side code**. Everything else is static.
     $5 *after* the missing-manual deduction ("raised to GameStop's $X").
     Typed prices aren't forced up, but show a "Below GameStop's
     pre-owned price" warning.
-  - **Premiums on certain games** (`settings.floorPremiums`, managers edit
-    them under **Settings → Floor price premiums** as `phrase = percent`
-    lines; owner, Oct 2026: "real eBay sold listings, as well as premiums
-    on certain games, like Pokemon"). `floorPremium()` finds the
-    **longest** phrase in the game's name (accents folded), so
-    `Pokemon Yellow = 50` beats `Pokemon = 10` and `Pokemon X = 0`
-    exempts one game. A line can name a system, `phrase @ system = %`
-    (matched as a phrase in PriceCharting's console name, so `GameBoy`
-    covers GameBoy Color/Advance and PAL), and beats the same phrase
-    without one. `floorPrice()` adds it to the basis **before**
-    rounding, after the eBay/GameStop/Amazon steps; typed prices get none.
-    Shown as a badge and a breakdown step. **Defaults (settings v7, + v8 below):**
-    `Pokemon = 10`, `Pokemon @ GameBoy / Nintendo 64 / Gamecube = 25`,
-    `Pokemon @ Nintendo DS / Nintendo 3DS = 0`, `Conker's Bad Fur Day =
-    15` (**10 since settings v10**, Oct 14 2026: the same rules gave $290
-    vs the shop's $275 as the sales/Amazon moved; saved lists still at 15
-    migrate to 10). Fit Oct 7 2026 by running the **live** tool (Amazon included)
-    on the shop's loose prices for 19 Pokemon games + Conker: 5 → 13 of
-    20 within $10, avg miss $24 → $14. Older Pokemon sit ~1.4× the top
-    sale; DS is priced at the sales and 3DS at GameStop, where the Amazon
-    nudge already runs high. The other 6 got **per-game lines (v8)**
-    that hit the shop's price exactly on Oct 7 data: Colosseum Bonus Disc
-    52, `Pokemon Red @ GameBoy = -5`, LeafGreen 10, `Pokemon Black @
-    Nintendo DS = -14` (plus `Pokemon Black Version 2 = 0` so Black 2
-    isn't caught), SoulSilver 13, Hey You Pikachu 80. **Negative
-    percents lower the price** (shown as a "discount"; must be > −100).
-    Per-game lines go stale as the market moves: re-check them with the
-    rest. Switch etc. keep +10% (no data). **Re-run this comparison on the live
-    tool before retuning** — a local copy can't see Amazon, which moves
-    older systems by up to +25%.
-  - **Price math** (`floorPrice()`): basis → round to the **nearest** $5
-    (`FLOOR_STEP`, owner's choice) → at least $10 (`FLOOR_MIN`), or $5
-    for shitbox games (`autoShitboxReason()`) → minus the guide's
-    missing-manual amount (`manualDeduction()`: CIB $10–$20 $0, $25–$50
-    $5, $55–$100 $10, $105–$200 $20, $205+ 10% to the nearest $5).
-    Half steps round up ($52 → $50; $52.50 → $55). GameStop's minimum
-    still rounds up to $5, even after the manual deduction.
-    Prices in the list are editable (`edited` flag). `floorResult()` is
-    the one place that turns a priced game into `{ b, r }` (pricer, Add to
-    list, and re-check all use it).
+  - **Saved premiums are inactive** for automatic shelf pricing.
+    `settings.floorPremiums`, migrations and `floorPremium()` remain for
+    saved configuration and the historical Fulcrum retail-sell comparison.
+    Settings shows them read-only. `floorResult()` applies no premium or
+    discount; the owner requested the maximum of the three references.
+  - **Price math** (`floorPrice()`): automatic market-based prices round
+    **up to $5**, with the existing $10 minimum ($5 for shitbox games).
+    `referenceMin` holds the final price at or above the winning reference
+    after any missing-manual deduction. Thus $150 stays $150, while a
+    $152 reference gives $155. This supersedes the earlier nearest-$5
+    rule and Halo $52 -> $50 expectation: a $52 reference now gives $55.
+    Typed overrides and fallback-only prices retain nearest-$5 rounding;
+    typed overrides bypass market minimums. `floorResult()` serves the
+    pricer, Add to list and re-check. Existing saved list prices remain
+    unchanged until staff re-check and accept the suggestions.
   - **Hardware on the floor** (`floorIsHardware()`: `guessCategory()` of
     the name isn't a game, or PriceCharting's genre says systems/
     accessories): priced from sales the same way, but **no game rules**
@@ -777,13 +720,9 @@ The site's **only server-side code**. Everything else is static.
     **Amazon only returns its ~20 lowest offers per condition** (no API
     lists more); the tab shows them all and "N lowest of M". Renewed
     copies are separate ASINs, so they never appear. Loose/CIB compare
-    with **Used**, New with **New**. **Loaded automatically for every
-    game.** Modern systems use Amazon for comparison checks when sold evidence exists,
-    and as a fallback only without sold evidence or GameStop;
-    older systems only go partway toward Amazon's typical offer (capped)
-    and treat "no offers" as scarcity — see **Older systems and Amazon**
-    above (retro Amazon listings are third-party asking prices, often far
-    above actual sales, hence the cap). The game
+    with **Used**, New with **New**. **Loaded automatically for every game.** Only the lowest matching
+    offer enters the three-reference maximum, for every system. Higher
+    offers and missing offers add no markup. The game
     needs a UPC on PriceCharting to match. `GET amazon/test` checks the
     keys (token exchange only). For local testing, `P2W_AMAZON_LWA` /
     `P2W_AMAZON_HOST` env vars point the server at a fake Amazon.
