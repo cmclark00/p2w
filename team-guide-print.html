@@ -872,12 +872,16 @@ Guide (the Google Sheet tab).</p>
    For a manual override, choose <strong>Type a different price</strong>. <strong>Back to the automatic
    price</strong> undoes that. The <strong>eBay sold ↗</strong>, <strong>GameStop ↗</strong>, <strong>Amazon ↗</strong>,
    and <strong>PriceCharting ↗</strong> links are there if you want to check.</li>
-<li>Without a specific adjustment, prices round <strong>up to $5</strong> ($150 stays $150;
-   $152 → $155) and stay at or above all three market references. Specific
+<li>Without a specific adjustment, prices first round <strong>up to $5</strong>
+   and stay at or above all three market references. Specific
    premiums/discounts round to the <strong>nearest $5</strong>, then missing-manual
    deductions apply; these rules can override the baseline. The $10 minimum
    ($5 for shitbox games) still applies before deductions. Typed overrides
-   and fallback-only prices also round to the nearest $5. If you type
+   and fallback-only prices also round to the nearest $5. Finally, any result
+   <strong>over $80 rounds up to the next multiple of $10 or $25</strong>: $145 → $150,
+   $165 → $170, while $125 and $175 stay as they are. This happens after
+   premiums and missing-manual deductions. Prices of $80 or less keep their
+   existing rounding. If you type
    a price below GameStop's, you'll see a warning. Click <strong>Add to list</strong>.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)</li>

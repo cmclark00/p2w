@@ -124,8 +124,8 @@ test('three-reference baseline applies across tiers and conditions before specif
           const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
           assert.equal(r.b.from, from);
           const expected = manualMissing && condition === 'cib'
-            ? { sale: 13000, amazon: 14500, gamestop: 16000 }[from]
-            : { sale: 15000, amazon: 16500, gamestop: 18000 }[from];
+            ? { sale: 13000, amazon: 15000, gamestop: 16000 }[from]
+            : { sale: 15000, amazon: 17000, gamestop: 18000 }[from];
           assert.equal(r.r.price, expected);
         }
       }
@@ -137,7 +137,7 @@ test('pricer displays the lowest Amazon offer and the winning price without midp
   const amazon = { found: true, lowest: 16400, offers: [{ price: 90000 }, { price: 16400 }, { price: 50000 }] };
   run(`amazonSet = true; floorCur = ${JSON.stringify(cur({ ...item, 'console-name': 'Xbox 360' }, { amazon }))}; renderFloorPricer();`);
   const html = element('#floorPricer').innerHTML;
-  assert.ok(html.includes('<strong>$165.00</strong>'));
+  assert.ok(html.includes('<strong>$170.00</strong>'));
   assert.ok(html.includes('<tr class="picked">\n      <td class="num">$164.00'));
   assert.ok(!html.includes('typical'));
   assert.ok(!html.includes('halfway'));
@@ -203,6 +203,28 @@ test('nearest-$5 rounding respects boundaries, minimums, GameStop and manual ded
   const rounded = invoke('floorPrice', 5200, {});
   assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('rounded to nearest $5: $50.00'));
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
+});
+
+test('final shelf prices over $80 round up to the next $10 or $25 multiple', () => {
+  for (const [price, expected] of [[7500, 7500], [8000, 8000], [8001, 9000], [8500, 9000],
+    [9500, 10000], [10500, 11000], [12000, 12000], [12500, 12500], [12501, 13000],
+    [13500, 14000], [14500, 15000], [15000, 15000], [16500, 17000], [17500, 17500],
+    [19500, 20000], [22500, 22500], [24500, 25000], [102500, 102500]]) {
+    assert.equal(invoke('floorShelfRound', price), expected);
+  }
+  const r = invoke('floorPrice', 14500, { referenceMin: 14500 });
+  assert.equal(r.beforeShelfRound, 14500); assert.equal(r.price, 15000);
+  assert.ok(invoke('floorMath', { from: 'sale', basis: 14500 }, r).includes('rounded up to a $10 or $25 multiple: $150.00'));
+});
+
+test('clean shelf rounding follows premiums and manual deductions without replacing their rules', () => {
+  const premium = invoke('floorPrice', 15000, { premium: { phrase: 'Example', pct: 10 } });
+  assert.equal(premium.premiumBasis, 16500); assert.equal(premium.price, 17000);
+  const manual = invoke('floorPrice', 16500, { manualMissing: true });
+  assert.equal(manual.ded, 2000); assert.equal(manual.beforeShelfRound, 14500); assert.equal(manual.price, 15000);
+  assert.equal(invoke('floorPrice', 14500, { manualMissing: true }).price, 12500);
+  const discount = invoke('floorPrice', 15000, { premium: { phrase: 'Example', pct: -20 } });
+  assert.equal(discount.price, 12000);
 });
 test('CSV handles BOM, CRLF, embedded commas/newlines and escaped quotes', () => {
   const r = invoke('fulcrumCsv', '\uFEFFa,b\r\n"Game, \"\"Deluxe\"\"\nEdition",00123\r\n');

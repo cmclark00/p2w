@@ -613,7 +613,13 @@ The site's **only server-side code**. Everything else is static.
     `floorResult()` omits both `referenceMin` and the GameStop clamp:
     apply the premium to the basis, round to the nearest $5, then deduct
     the manual amount. Specific rules therefore outrank the baseline.
-    Without a specific rule, $150 stays $150 and $152 becomes $155.
+    Finally, `floorShelfRound()` rounds results over $80 upward to the next
+    multiple of either $10 or $25, whichever is smaller. $145 -> $150,
+    $165 -> $170; $125/$175 stay unchanged. This runs after premiums,
+    deductions and minimums, including for typed/fallback calculations.
+    Results at or below $80 keep their existing rounding. `floorMath()`
+    shows the final rounding step when it changes the price.
+    Without a specific rule, $150 stays $150 and $152 becomes $160.
     Typed overrides and fallback-only prices retain nearest-$5 rounding;
     typed overrides bypass market minimums. `floorResult()` serves the
     pricer, Add to list and re-check. Existing saved list prices remain

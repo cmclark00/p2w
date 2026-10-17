@@ -3090,6 +3090,13 @@ function manualDeduction(price) {
   return Math.round((price * 0.1) / 500) * 500; // $205+: 10%, to the nearest $5
 }
 
+// Final shelf presentation (owner, Oct 17): over $80, round up to the next multiple of $10 or $25.
+// Keep quarter-hundred prices such as $125/$175; $145 -> $150, $165 -> $170.
+// Apply after specific adjustments so a manual deduction cannot leave an awkward final price.
+function floorShelfRound(price) {
+  return price > 8000 ? Math.min(Math.ceil(price / 1000) * 1000, Math.ceil(price / 2500) * 2500) : price;
+}
+
 // Basis (cents) -> shelf price: round up to $5 with market references, nearest $5 otherwise,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
 // Ordinary prices stay at or above the market baseline. Specific premiums/discounts and manual
@@ -3104,8 +3111,9 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
   const ded = manualMissing ? manualDeduction(full) : 0;
   const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
   const marketFloor = referenceMin > 0 ? Math.ceil(referenceMin / FLOOR_STEP) * FLOOR_STEP : 0;
-  const price = Math.max(full - ded, gsFloor, marketFloor);
-  return { full, ded, price, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
+  const beforeShelfRound = Math.max(full - ded, gsFloor, marketFloor);
+  const price = floorShelfRound(beforeShelfRound);
+  return { full, ded, price, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
     roundUp: referenceMin > 0, premium, premiumBasis };
 }
@@ -3472,7 +3480,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The baseline is the highest of the highest normal eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Specific premiums, discounts, and missing-manual rules take priority over that baseline. Click a sale to include it in the comparison; use a typed price for a manual override. PriceCharting's own price is only a fallback. Lots, wrong editions, and other odd listings never count automatically.</p>`;
+      <p class="muted small-print">The baseline is the highest of the highest normal eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Specific premiums, discounts, and missing-manual rules take priority over that baseline. Final prices over $80 round up to a multiple of $10 or $25. Click a sale to include it in the comparison; use a typed price for a manual override. PriceCharting's own price is only a fallback. Lots, wrong editions, and other odd listings never count automatically.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3551,6 +3559,7 @@ function floorMath(b, r) {
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   if (r.marketRaised) parts.push(`held at market minimum ${money(r.marketRaised)}`);
+  if (r.price !== r.beforeShelfRound) parts.push(`rounded up to a $10 or $25 multiple: ${money(r.price)}`);
   return parts.join(' → ');
 }
 
