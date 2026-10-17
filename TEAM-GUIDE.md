@@ -738,7 +738,11 @@ Guide (the Google Sheet tab).
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
-     the next highest. The row stays visible for review. Open its link and
+     the next highest. With at least eight comparable sales, it can also
+     be flagged when it is at least 20% above the next sale and at least
+     50% and $5 above the upper quartile of the remaining sales. This
+     catches an isolated high sale even when a few other sales sit above
+     the main cluster. The row stays visible for review. Open its link and
      check that it actually sold and matches the item; click the row to
      include it if warranted. **Back to the automatic price** excludes it
      again. The flag is a pricing warning, not proof that a listing was unsold.
@@ -772,16 +776,17 @@ Guide (the Google Sheet tab).
    For a manual override, choose **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
-5. Without a specific adjustment, prices first round **up to $5**
-   and stay at or above all three market references. Specific
-   premiums/discounts round to the **nearest $5**, then missing-manual
-   deductions apply; these rules can override the baseline. The $10 minimum
-   ($5 for shitbox games) still applies before deductions. Typed overrides
-   and fallback-only prices also round to the nearest $5. Finally, any result
+5. **Through $80**, prices whose whole-dollar amount ends in **7, 8 or 9**
+   round up to the next $10. Otherwise they round **down to a multiple of $5**:
+   $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the
+   winning baseline after any premium or discount, including GameStop and
+   Amazon references. The $10 minimum ($5 for shitbox games) still applies
+   before missing-manual deductions. Specific adjustments take priority.
+   Above $80, prices first round up to $5 (nearest $5 for specific rules,
+   typed overrides and fallback-only prices). Finally, any result
    **over $80 rounds up to the next multiple of $10 or $25**: $145 → $150,
    $165 → $170, while $125 and $175 stay as they are. This happens after
-   premiums and missing-manual deductions. Prices of $80 or less keep their
-   existing rounding. If you type
+   premiums and missing-manual deductions. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)

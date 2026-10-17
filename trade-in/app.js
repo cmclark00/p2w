@@ -3042,13 +3042,15 @@ const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to 
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
-const FLOOR_STEP = 500; // baseline rounds up; specific adjustments retain nearest-$5 rounding
+const FLOOR_STEP = 500;
 // Flag an unusually high lowest Amazon offer for review, without silently dropping a required minimum.
 const FLOOR_AMAZON_OUTLIER = 2;
 // A single isolated high sale needs at least three lower comparables before we exclude it automatically.
 const FLOOR_SALE_OUTLIER_MIN = 4;
 const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
+const FLOOR_SALE_CLUSTER_MIN = 8; // broader distribution needs more evidence than the single-gap check
+const FLOOR_SALE_CLUSTER_SEPARATION = 1.2; // nearby high sales still support one another
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph|\d+ (more )?games)\b/i;
 // "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
@@ -3100,9 +3102,16 @@ function floorShelfRound(price) {
   return price > 8000 ? Math.min(Math.ceil(price / 1000) * 1000, Math.ceil(price / 2500) * 2500) : price;
 }
 
-// Basis (cents) -> shelf price: round up to $5 with market references, nearest $5 otherwise,
+// Through $80, dollar endings 7/8/9 round up to the next $10; otherwise round down to $5.
+// Ignore cents for the ending: $16.99 -> $15, $17 -> $20, $26 -> $25.
+function floorLowRound(price) {
+  return price % 1000 >= 700 ? Math.ceil(price / 1000) * 1000 : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
+}
+
+// Basis (cents) -> shelf price: use the low-price rule through $80; above it,
+// round up to $5 with market references, nearest $5 otherwise,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
-// Ordinary prices stay at or above the market baseline. Specific premiums/discounts and manual
+// Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
 function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null }) {
@@ -3110,10 +3119,11 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
   const round = referenceMin > 0 ? Math.ceil : Math.round;
-  const full = Math.max(min, round(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
+  const full = Math.max(min, premiumBasis <= 8000 ? floorLowRound(premiumBasis) : round(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
   const ded = manualMissing ? manualDeduction(full) : 0;
-  const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
-  const marketFloor = referenceMin > 0 ? Math.ceil(referenceMin / FLOOR_STEP) * FLOOR_STEP : 0;
+  const roundedReference = (value) => value > 0 ? (value <= 8000 ? floorLowRound(value) : Math.ceil(value / FLOOR_STEP) * FLOOR_STEP) : 0;
+  const gsFloor = roundedReference(gs);
+  const marketFloor = roundedReference(referenceMin);
   const beforeShelfRound = Math.max(full - ded, gsFloor, marketFloor);
   const price = floorShelfRound(beforeShelfRound);
   return { full, ded, price, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
@@ -3320,8 +3330,17 @@ function floorSales(cur = floorCur) {
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
-    if (top.price >= next.price * FLOOR_SALE_OUTLIER_RATIO && top.price - next.price >= FLOOR_SALE_OUTLIER_GAP) {
-      top.outlier = { nextPrice: next.price, lowerCount: normal.length - 1 };
+    const isolatedGap = top.price >= next.price * FLOOR_SALE_OUTLIER_RATIO && top.price - next.price >= FLOOR_SALE_OUTLIER_GAP;
+    // Compare with the upper quartile of the remaining sales, not their median or cheapest copy.
+    // This catches a lone $16 among mostly $7-$10 sales even with a few $12-$13 sales.
+    const lower = normal.slice(1).map((s) => s.price).sort((a, b) => a - b);
+    const upperQuartile = lower[Math.ceil(lower.length * 0.75) - 1];
+    const isolatedCluster = normal.length >= FLOOR_SALE_CLUSTER_MIN
+      && top.price >= next.price * FLOOR_SALE_CLUSTER_SEPARATION
+      && top.price >= upperQuartile * FLOOR_SALE_OUTLIER_RATIO
+      && top.price - upperQuartile >= FLOOR_SALE_OUTLIER_GAP;
+    if (isolatedGap || isolatedCluster) {
+      top.outlier = { nextPrice: next.price, lowerCount: lower.length, clusterPrice: isolatedGap ? null : upperQuartile };
     }
   }
   return sales;
@@ -3394,7 +3413,7 @@ function floorBasis(cur = floorCur) {
   const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
   const checks = [];
   for (const s of sales.filter((s) => s.outlier)) {
-    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales. Open the listing and verify it actually sold before using it`);
+    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales${s.outlier.clusterPrice != null ? `; at least 75% of those are ${money(s.outlier.clusterPrice)} or less` : ''}. Open the listing and verify it actually sold before using it`);
   }
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
@@ -3494,7 +3513,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Final prices over $80 round up to a multiple of $10 or $25. PriceCharting's own price is only a fallback.</p>`;
+      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Final prices over $80 round up to a multiple of $10 or $25. PriceCharting's own price is only a fallback.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3570,7 +3589,7 @@ function floorAmazonHtml(cur, b) {
 function floorMath(b, r) {
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
-  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${r.roundUp ? 'rounded up to $5' : 'rounded to nearest $5'}: ${money(r.full)}`);
+  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${r.premiumBasis <= 8000 ? 'low-price rounding' : r.roundUp ? 'rounded up to $5' : 'rounded to nearest $5'}: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   if (r.marketRaised) parts.push(`held at market minimum ${money(r.marketRaised)}`);

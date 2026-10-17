@@ -551,7 +551,7 @@ The site's **only server-side code**. Everything else is static.
     were $40 Steelbooks) and home-console bundles (`HOME_CONSOLE_RE`: a
     storage size like "1TB", "console bundle", "slim/pro console"; Fortnite
     PS4's top CIB "sale" was a $134.99 PS4 Slim bundle, tool said $195,
-    shop $100). Ordinary prices stay at or above the winning reference;
+    shop $100). The winning reference sets the baseline before shelf rounding;
     specific adjustments may override that baseline.
     The **eBay sold
     link** is per condition (`EBAY_CONDITIONS`/`EBAY_WORDS`): Loose and CIB
@@ -564,6 +564,11 @@ The site's **only server-side code**. Everything else is static.
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
     single highest sale is excluded; no recursive removal or median cap.
+    A second distribution check needs at least eight comparables: the top
+    must be at least 20% above the next sale AND at least 50% and $5 above
+    the upper quartile of the remaining sales (nearest-rank percentile).
+    This catches Killzone's isolated $16 even with a few $12-$13 sales
+    above the main cluster. The review note explains that distribution.
     Nearby high sales support one another, and fewer than four comparables
     keep the ordinary sparse-data behavior. This is a review heuristic,
     not verification that a listing did or did not sell.
@@ -607,7 +612,7 @@ The site's **only server-side code**. Everything else is static.
   - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and
-    `floorPrice()` holds ordinary prices at GameStop rounded up to $5.
+    `floorPrice()` applies the same shelf rounding to GameStop as other references.
     Specific premiums/discounts and missing-manual rules outrank this floor
     along with the other baseline references (owner clarification, Oct 17).
     Typed prices aren't forced up, but show a "Below GameStop's
@@ -622,22 +627,26 @@ The site's **only server-side code**. Everything else is static.
     Settings v11 removes the redundant `Killzone Shadow Fall @ Playstation 4 = -45`
     default and migrates it out of older saved settings. Other rules and
     customized percentages remain intact; Killzone now uses the filtered baseline.
-  - **Price math** (`floorPrice()`): ordinary market-based prices round
-    **up to $5**, with the existing $10 minimum ($5 for shitbox games).
-    `referenceMin` holds ordinary prices at or above the winning reference.
+  - **Price math** (`floorPrice()`): through $80, `floorLowRound()` rounds
+    dollar endings 7/8/9 up to the next $10; other endings round down to $5.
+    Cents do not affect the ending: $16.99 -> $15, $17 -> $20, $26 -> $25,
+    $52 -> $50. The existing $10 minimum ($5 for shitbox games) remains.
+    This rounding also applies to GameStop and `referenceMin`, so an
+    unrounded market reference cannot undo the owner's low-price rule.
+    Above $80, ordinary prices initially round up to $5, while specific
+    adjustments, typed overrides and fallback-only prices use nearest $5.
     When a nonzero premium/discount or CIB missing-manual rule applies,
     `floorResult()` omits both `referenceMin` and the GameStop clamp:
-    apply the premium to the basis, round to the nearest $5, then deduct
+    apply the premium to the basis, round by the applicable price tier, then deduct
     the manual amount. Specific rules therefore outrank the baseline.
     Finally, `floorShelfRound()` rounds results over $80 upward to the next
     multiple of either $10 or $25, whichever is smaller. $145 -> $150,
     $165 -> $170; $125/$175 stay unchanged. This runs after premiums,
     deductions and minimums, including for typed/fallback calculations.
-    Results at or below $80 keep their existing rounding. `floorMath()`
+    Results at or below $80 use the dollar-ending rule above. `floorMath()`
     shows the final rounding step when it changes the price.
     Without a specific rule, $150 stays $150 and $152 becomes $160.
-    Typed overrides and fallback-only prices retain nearest-$5 rounding;
-    typed overrides bypass market minimums. `floorResult()` serves the
+    Typed overrides bypass market minimums. `floorResult()` serves the
     pricer, Add to list and re-check. Existing saved list prices remain
     unchanged until staff re-check and accept the suggestions.
   - **Hardware on the floor** (`floorIsHardware()`: `guessCategory()` of
