@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Sales history comparison · Play2Win</title>
+  <link rel="icon" href="../favicon-32.png"><link rel="stylesheet" href="styles.css">
+  <style>main{max-width:1180px;margin:2rem auto;padding:0 1rem}section{margin:1.5rem 0}button,input{margin:.3rem}#engine{display:none}td,th{padding:.5rem;text-align:left}pre{white-space:pre-wrap}progress{width:100%;height:1.5rem}.audit-controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}</style>
+</head>
+<body><main>
+  <h1>Sales history comparison</h1>
+  <p>Compare recorded sale prices with the current Floor Pricing recommendation for the same item and condition. History stays in this browser; the check only looks up product identifiers and titles.</p>
+  <p><a href="index.html" target="_blank" rel="noopener">Staff login / pricing tool</a></p>
+  <section class="audit-controls">
+    <label>Prepared history <input id="historyFile" type="file" accept=".json,application/json"></label>
+    <label>Resume results <input id="resumeFile" type="file" accept=".json,application/json"></label>
+    <button id="start" type="button" disabled>Start comparison</button><button id="pause" type="button" disabled>Pause</button>
+    <button id="download" type="button" disabled>Download results</button>
+  </section>
+  <p id="status" role="status">Checking staff login…</p><progress id="progress" value="0" max="1"></progress>
+  <p id="counts"></p><p id="current"></p>
+  <p>Large gap: at least $10 and 30% from the recorded sale-price median. Uses the last 180 days when there are at least three units sold, otherwise the full history. Older prices, sparse sales, ambiguous matches and incomplete market checks need review.</p>
+  <section><h2>Largest gaps found so far</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th>Recorded median</th><th>Tool today</th><th>Difference</th><th>Units</th><th>Review notes</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+  <details><summary>Recent matching issues</summary><pre id="issues"></pre></details>
+  <iframe id="engine" src="index.html" title="Pricing engine"></iframe>
+</main><script src="history-audit.js"></script></body></html>

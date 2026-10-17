@@ -785,6 +785,11 @@ Guide (the Google Sheet tab).
    For a manual override, choose **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
+   A separate **Sales history comparison** page at `trade-in/history-audit.html`
+   can run a prepared history review against live recommendations. It uses
+   the current pricing rules and only reads market data. History stays in
+   the browser. Download results before closing; the download can also be
+   loaded as a checkpoint to resume unfinished comparisons.
 5. **Through $80**, prices whose whole-dollar amount ends in **7, 8 or 9**
    round up to the next $10. Otherwise they round **down to a multiple of $5**:
    $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the

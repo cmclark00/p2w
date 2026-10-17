@@ -708,6 +708,16 @@ The site's **only server-side code**. Everything else is static.
     transaction-header CSVs with `fulcrumImport()`. Data stays in memory
     only; never send it to an API, localStorage or session payload.
     Clear/refresh/login removes it. Customer/payment columns are discarded.
+    `trade-in/history-audit.html` is a separate read-only batch review for
+    prepared, de-identified history JSON (schema 1). It loads the real
+    calculator in a same-origin iframe, waits for saved settings to load,
+    and uses its `floorResult()` with live catalog, sold-listing and Amazon
+    responses. Three workers respect the API's existing server throttles.
+    Exact normalized title/system matches are required; ambiguous variants
+    remain unmatched. No price/settings/session writes and no history upload.
+    Download results/checkpoints before closing; history is memory-only.
+    Gaps need both $10 and 30%. Incomplete checks/fallbacks stay identified.
+    `node scripts/test-history-audit.cjs` verifies matching and batch behavior.
     `fulcrumEvidence()` matches full normalized title + system + condition
     + missing-manual flag, preserving edition and PAL/JP text. Only
     standard-condition `item_type=game` rows match; `cartWithBox` means
