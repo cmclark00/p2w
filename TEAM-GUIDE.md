@@ -724,11 +724,10 @@ Guide (the Google Sheet tab).
    tick **Manual missing** for a CIB game without its manual.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
-   - **Every system:** it goes by the **high end of normal sales** (the
-     90th percentile, about the 4th-highest of 30), so one lucky sale
-     doesn't set the price. For games selling around **$80 and up** it
-     uses the **second-highest** sale instead, since pricier games go on
-     the shelf nearer the top. That sale is highlighted in the list.
+   - **Every system:** it goes by the **second-highest normal sale**, so
+     prices stay near the top without one unusually high sale setting
+     the price. If there's only one usable sale, it uses that sale and
+     asks you to double-check. That sale is highlighted in the list.
    - **Source priority:** eBay sold prices first, GameStop/Amazon checks,
      **PriceCharting only as a fallback**. GameStop remains a minimum.
      If no usable sold evidence exists, GameStop takes precedence; with
@@ -767,10 +766,11 @@ Guide (the Google Sheet tab).
    in the list, or **Type a different price**. **Back to the automatic
    price** undoes that. The **eBay sold ↗**, **GameStop ↗**, **Amazon ↗**,
    and **PriceCharting ↗** links are there if you want to check.
-5. The shelf price rounds **up to the next $5**, never goes under
+5. The shelf price rounds **to the nearest $5** ($52 → $50; $52.50 → $55), never goes under
    **$10** ($5 only for shitbox games), and takes the guide's
    missing-manual amount off. It's **never below GameStop's pre-owned
-   price** (on any system), even after the manual deduction. If you type
+   price** (on any system), even after the manual deduction; that minimum
+   still rounds **up** to $5. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)

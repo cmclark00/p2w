@@ -39,6 +39,36 @@ test('one high sale and odd editions do not replace the normal sold basis', () =
   sales.cib.push({ title: 'Example Game Steelbook', price: 20000, date: '2026-10-01' });
   assert.equal(invoke('floorResult', cur(item, { sales })).r.price, 2000);
 });
+
+test('Halo MCC sold evidence produces $50 across systems, without a title override', () => {
+  // PriceCharting product 35300 CIB prices fetched Oct 17, 2026. Previously p90 selected $36.99 -> $40.
+  const prices = [5200, 4999, 4499, 3699, 3499, 3385, 3299, 3199, 3099, 3000, 2999, 2999, 2999,
+    2997, 2997, 2995, 2995, 2989, 2956, 2900, 2800, 2799, 2775, 2700, 2599, 2500, 2299, 2000, 2000, 2000];
+  for (const system of ['Xbox One', 'Playstation 2', 'Unlisted System']) {
+    const product = { ...item, 'product-name': 'Halo: The Master Chief Collection', 'console-name': system, 'gamestop-price': 3499 };
+    const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection CIB' })) };
+    const r = invoke('floorResult', cur(product, { sales }));
+    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 4999); assert.equal(r.r.price, 5000);
+    // Selecting the $52 sale also gives $50 with nearest-$5 rounding.
+    assert.equal(invoke('floorResult', cur(product, { sales, pick: 0 })).r.price, 5000);
+  }
+});
+
+test('second-highest selection filters odd listings before ranking and handles sparse sales', () => {
+  const sales = { cib: [
+    { price: 20000, title: 'Example Game Steelbook' },
+    { price: 16000, title: 'Example Game bundle' },
+    { price: 12000, title: 'Example Game sealed' },
+    { price: 5200, title: 'Example Game complete' },
+    { price: 4999, title: 'Example Game complete' },
+    { price: 3699, title: 'Example Game complete' },
+  ] };
+  assert.equal(invoke('floorResult', cur(item, { sales })).b.basis, 4999);
+  const one = invoke('floorResult', cur(item, { sales: { cib: [sales.cib[3]] } }));
+  assert.equal(one.r.price, 5000); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
+  assert.equal(invoke('floorAutoSale', [{ price: 5200 }, { price: 4999 }], true).sale.price, 5200);
+  assert.equal(invoke('floorAutoSale', []).sale, null);
+});
 test('fallback waits for sold evidence and Amazon before using PriceCharting', () => {
   assert.equal(invoke('floorResult', cur(item, { sales: null })).b.waiting, true);
   run('amazonSet = true;');
@@ -96,16 +126,23 @@ test('modern hardware uses sales instead of the game retail-sell rule', () => {
 });
 test('configured premiums apply to sold evidence on modern systems', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch', 'retail-cib-sell': 4599 }));
-  assert.equal(r.premium.pct, 10); assert.equal(r.r.price, 2500);
+  assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 2199); assert.equal(r.r.price, 2000);
 });
 test('Killzone system discount and Conker migration are preserved', () => {
   assert.equal(invoke('floorResult', cur({ ...item, 'product-name': 'Killzone: Shadow Fall' }, { sales: { cib: [{ title: 'Killzone Shadow Fall complete', price: 1799 }] } })).r.price, 1000);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 15 }] }).floorPremiums[0].pct, 10);
   assert.equal(invoke('mergeSettings', { version: 9, floorPremiums: [{ phrase: "Conker's Bad Fur Day", pct: 22 }] }).floorPremiums[0].pct, 22);
 });
-test('rounding slack and manual deduction boundaries stay unchanged', () => {
-  assert.equal(invoke('floorPrice', 2050, {}).price, 2000);
-  assert.equal(invoke('floorPrice', 2051, {}).price, 2500);
+test('nearest-$5 rounding respects boundaries, minimums, GameStop and manual deductions', () => {
+  for (const [basis, expected] of [[2038, 2000], [2051, 2000], [2249, 2000], [2250, 2500], [5200, 5000], [5249, 5000], [5250, 5500]]) {
+    assert.equal(invoke('floorPrice', basis, {}).price, expected);
+  }
+  assert.equal(invoke('floorPrice', 200, {}).price, 1000);
+  assert.equal(invoke('floorPrice', 200, { shitbox: true }).price, 500);
+  assert.equal(invoke('floorPrice', 5200, { gs: 5200 }).price, 5500);
+  assert.equal(invoke('floorPrice', 5200, { manualMissing: true }).price, 4500);
+  const rounded = invoke('floorPrice', 5200, {});
+  assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('rounded to nearest $5: $50.00'));
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
 });
 test('CSV handles BOM, CRLF, embedded commas/newlines and escaped quotes', () => {

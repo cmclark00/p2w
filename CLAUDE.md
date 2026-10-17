@@ -527,7 +527,7 @@ The site's **only server-side code**. Everything else is static.
     the Oct 13 `c9d32c9` modern retail-sell rule and the older competing
     PriceCharting maximum. Never restore those rules based on matching
     historical stock prices: those prices are reference evidence, not policy.
-    All systems use the filtered p90/$80 second-highest sold selection.
+    All systems use the filtered second-highest sold selection (Oct 17 correction).
     GameStop is a minimum. Modern Amazon offers flag differences (> $5)
     for review; they never replace usable sold evidence. An offer > 2x
     eBay/GameStop is flagged as an outlier; PriceCharting cannot legitimize it.
@@ -555,10 +555,9 @@ The site's **only server-side code**. Everything else is static.
     were $40 Steelbooks) and home-console bundles (`HOME_CONSOLE_RE`: a
     storage size like "1TB", "console bundle", "slim/pro console"; Fortnite
     PS4's top CIB "sale" was a $134.99 PS4 Slim bundle, tool said $195,
-    shop $100). **Rounding slack:** a basis up to `FLOOR_STEP_SLACK` (50¢)
-    over a $5 step stays on it ($20.38 → $20). Checked Oct 13 2026 on 7 of
-    the shop's prices (Fortnite, Last Guardian, Fallout 4, GTA V Premium,
-    Dragon Age, Killzone ×2): 5 exact; Killzone: Shadow Fall (shop $10,
+    shop $100). **Rounding:** nearest $5 as of Oct 17 2026, replacing the
+    old round-up rule with 50¢ slack ($20.38 still → $20; $52 now → $50).
+    Killzone: Shadow Fall (shop $10,
     sales top out $16–18, typical $10–13) is priced below its own sales on
     purpose, so it needs a per-game discount line, not a sales rule.
     The **eBay sold
@@ -577,21 +576,21 @@ The site's **only server-side code**. Everything else is static.
     lowest offer it stayed at $65). Diddy Kong Racing loose: GameStop
     $39.99 → shop $45. When Amazon matched the
     game but has **no offers in that condition**, copies are scarce: use
-    the **highest** normal sale instead of p90/second-highest, **plus
+    the **highest** normal sale instead of second-highest, **plus
     `FLOOR_SCARCE_MARKUP` (10%)** (Pokemon Emerald loose: $275 → highest
     sale $314.95 + 10% → $350, the shop's price; owner's choice). "Add to list"
     waits for Amazon on every tier now. The cap is there because retro
     Amazon listings are often inflated third-party asking prices.
-  - **Which sale: the 90th percentile** of the condition's normal sales
-    (`FLOOR_PCT`, `floorAutoSale()`), not the single highest. Backtested
-    on the shop's own Sept 2026 sold list (140 PS2/GameCube games): max
-    sale was ~$12 high on average and within $5 only 40% of the time;
-    p90 was within $5 65% (within 10% 68%) with no bias. Outlier-skipping
-    did worse. **Expensive games use the second-highest normal sale**
-    once the p90 sale reaches `FLOOR_HIGH` ($80): the shop prices them
-    nearer the top (games priced $60+: 46% → 71% within 10%; all games
-    68% → 72%, avg miss $8.05 → $7.76). **Re-run that comparison
-    before changing `FLOOR_PCT`/`FLOOR_HIGH`.** Sold data can't explain
+  - **Which sale: the second-highest normal sale** for the condition
+    (`floorAutoSale()`), or the only usable sale when there's just one.
+    Owner correction, Oct 17 2026: use the general rule to price closer
+    to the highest valid sales. Halo MCC CIB had sales at $52, $49.99,
+    $44.99 and $36.99; the previous 90th-percentile rule picked $36.99
+    and priced it at $40. The second-highest basis gives the requested
+    $50 without a Halo-specific override. A single unusually high sale
+    still doesn't set the price. This replaces the old p90/$80 threshold;
+    no broad inventory backtest was performed for this owner correction.
+    Sold data can't explain
     prices above every recent sale (e.g. Conker loose $275 vs NTSC sales
     ≤ $190): those come from current eBay asking prices, which need the
     eBay Browse API (active listings). `floorBasis()` adds "Double-check"
@@ -660,11 +659,13 @@ The site's **only server-side code**. Everything else is static.
     rest. Switch etc. keep +10% (no data). **Re-run this comparison on the live
     tool before retuning** — a local copy can't see Amazon, which moves
     older systems by up to +25%.
-  - **Price math** (`floorPrice()`): basis → round **up** to the next $5
+  - **Price math** (`floorPrice()`): basis → round to the **nearest** $5
     (`FLOOR_STEP`, owner's choice) → at least $10 (`FLOOR_MIN`), or $5
     for shitbox games (`autoShitboxReason()`) → minus the guide's
     missing-manual amount (`manualDeduction()`: CIB $10–$20 $0, $25–$50
     $5, $55–$100 $10, $105–$200 $20, $205+ 10% to the nearest $5).
+    Half steps round up ($52 → $50; $52.50 → $55). GameStop's minimum
+    still rounds up to $5, even after the manual deduction.
     Prices in the list are editable (`edited` flag). `floorResult()` is
     the one place that turns a priced game into `{ b, r }` (pricer, Add to
     list, and re-check all use it).

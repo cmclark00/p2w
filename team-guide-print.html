@@ -832,11 +832,10 @@ Guide (the Google Sheet tab).</p>
    tick <strong>Manual missing</strong> for a CIB game without its manual.</li>
 <li>The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:</li>
-<li><strong>Every system:</strong> it goes by the <strong>high end of normal sales</strong> (the
-     90th percentile, about the 4th-highest of 30), so one lucky sale
-     doesn't set the price. For games selling around <strong>$80 and up</strong> it
-     uses the <strong>second-highest</strong> sale instead, since pricier games go on
-     the shelf nearer the top. That sale is highlighted in the list.</li>
+<li><strong>Every system:</strong> it goes by the <strong>second-highest normal sale</strong>, so
+     prices stay near the top without one unusually high sale setting
+     the price. If there's only one usable sale, it uses that sale and
+     asks you to double-check. That sale is highlighted in the list.</li>
 <li><strong>Source priority:</strong> eBay sold prices first, GameStop/Amazon checks,
      <strong>PriceCharting only as a fallback</strong>. GameStop remains a minimum.
      If no usable sold evidence exists, GameStop takes precedence; with
@@ -875,10 +874,11 @@ Guide (the Google Sheet tab).</p>
    in the list, or <strong>Type a different price</strong>. <strong>Back to the automatic
    price</strong> undoes that. The <strong>eBay sold ↗</strong>, <strong>GameStop ↗</strong>, <strong>Amazon ↗</strong>,
    and <strong>PriceCharting ↗</strong> links are there if you want to check.</li>
-<li>The shelf price rounds <strong>up to the next $5</strong>, never goes under
+<li>The shelf price rounds <strong>to the nearest $5</strong> ($52 → $50; $52.50 → $55), never goes under
    <strong>$10</strong> ($5 only for shitbox games), and takes the guide's
    missing-manual amount off. It's <strong>never below GameStop's pre-owned
-   price</strong> (on any system), even after the manual deduction. If you type
+   price</strong> (on any system), even after the manual deduction; that minimum
+   still rounds <strong>up</strong> to $5. If you type
    a price below GameStop's, you'll see a warning. Click <strong>Add to list</strong>.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)</li>

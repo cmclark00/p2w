@@ -3040,24 +3040,15 @@ const FLOOR_TIERS = [
   },
 ];
 const FLOOR_OTHER = { id: 'other', rule: "Not in the Game Pricing Guide: eBay sold first, GameStop minimum, capped Amazon adjustment; PriceCharting fallback. Double-check it" };
-// The sale the price comes from: the 90th percentile of the condition's normal recent sales (about the
-// 4th highest of 30). Checked against a month of the shop's own shelf prices (140 PS2/GameCube games,
-// Sept 2026): the single highest sale ran ~$12 high on average and was within $5 only 40% of the time;
-// the 90th percentile was within $5 65% of the time with no overall bias. Skipping one-off highs did worse.
-// Expensive games are priced nearer the top, though: once the 90th-percentile sale reaches FLOOR_HIGH, the
-// second-highest normal sale is used instead. Same backtest: games the shop priced at $60+ went from 46% to
-// 71% within 10%, and all games from 68% to 72% within 10% (avg miss $8.05 -> $7.76).
-const FLOOR_PCT = 0.9;
-const FLOOR_HIGH = 8000;
+// Owner correction, Oct 17 2026: price nearer the highest valid sold listings on every system.
+// Use the second-highest normal sale (or the only sale), so a single unusually high sale doesn't set it.
+// Halo MCC CIB: $52, $49.99, $44.99, $36.99 -> $49.99 basis / $50 shelf, formerly p90 / $40.
 const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
 const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
-const FLOOR_STEP = 500; // suggested prices round up to the next $5
-// ...except a basis at most this much over a $5 step stays on it: The Last Guardian's $20.38 sale is a $20 game
-// (the shop's price), not $25. Oct 2026.
-const FLOOR_STEP_SLACK = 50;
+const FLOOR_STEP = 500; // nearest $5, with half steps rounding up: $52 -> $50, $52.50 -> $55
 // Older systems and Amazon (owner's rules, Oct 2026), for systems that don't take Amazon's price outright:
 //  - When Amazon's typical offer (the middle of the offers Amazon returns, shipping included) is above the
 //    eBay/GameStop price, go halfway toward it, but at most FLOOR_AMAZON_PULL above. Typical, not lowest: one
@@ -3115,16 +3106,16 @@ function manualDeduction(price) {
   return Math.round((price * 0.1) / 500) * 500; // $205+: 10%, to the nearest $5
 }
 
-// Basis (cents) -> shelf price: round up to the next $5, the $10 floor ($5 for shitbox games),
+// Basis (cents) -> shelf price: round to the nearest $5, the $10 floor ($5 for shitbox games),
 // then the missing-manual deduction.
 // Never below GameStop's pre-owned price (gs, owner's rule), even after the missing-manual deduction;
-// rounded up to the next $5 like everything else. Typed prices pass gs = null (staff get a warning instead).
+// GameStop's minimum still rounds up to the next $5. Typed prices pass gs = null (staff get a warning instead).
 // premium ({ phrase, pct } from floorPremium) goes on the basis before rounding; typed prices pass none.
 function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const full = Math.max(min, Math.ceil(Math.max(0, premiumBasis - FLOOR_STEP_SLACK) / FLOOR_STEP) * FLOOR_STEP);
+  const full = Math.max(min, Math.round(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const gsFloor = gs > 0 ? Math.ceil(gs / FLOOR_STEP) * FLOOR_STEP : 0;
   const price = Math.max(full - ded, gsFloor);
@@ -3374,16 +3365,13 @@ function floorGsFor(cur) {
   return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
 
-// The sale the tool goes by (see FLOOR_PCT and FLOOR_HIGH; the highest when copies are scarce). sales are
+// The second-highest normal sale (the highest when copies are scarce). sales are
 // highest first; odd listings never count.
 function floorAutoSale(sales, scarce = false) {
   const normal = sales.filter((s) => !s.odd);
   if (!normal.length) return { sale: null, count: 0 };
   if (scarce) return { sale: normal[0], count: normal.length, high: true };
-  const asc = [...normal].reverse();
-  const p90 = asc[Math.min(asc.length - 1, Math.round(FLOOR_PCT * (asc.length - 1)))];
-  const sale = p90.price >= FLOOR_HIGH && normal.length > 1 ? normal[1] : p90;
-  return { sale, count: normal.length, high: sale !== p90 };
+  return { sale: normal[Math.min(1, normal.length - 1)], count: normal.length, high: true };
 }
 
 // What sets the price: { basis (cents) | null, from: 'sale'|'gamestop'|'amazon'|'amazonMid'|'typed', sale, checks,
@@ -3509,7 +3497,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ' <span class="badge info">odd listing</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">eBay sold evidence sets the starting price: the high end of normal sales (90th percentile; second-highest for games selling around $80 and up). GameStop remains a minimum. Click any sale to select it; PriceCharting's own price is only a fallback. Lots, sealed copies, and other odd listings never count.</p>`;
+      <p class="muted small-print">eBay sold evidence sets the starting price: the second-highest normal sale, or the only sale when there's just one. Shelf prices round to the nearest $5. GameStop remains a minimum. Click any sale to select it; PriceCharting's own price is only a fallback. Lots, sealed copies, and other odd listings never count.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3589,7 +3577,7 @@ function floorMath(b, r) {
       ? [`${FROM_LABELS[b.from] || ''} ${money(b.scarce.base)}`, `+${Math.round(FLOOR_SCARCE_MARKUP * 100)}% (scarce): ${money(b.basis)}`]
       : [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
-  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `rounded up ${money(r.full)}`);
+  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `rounded to nearest $5: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   return parts.join(' → ');
