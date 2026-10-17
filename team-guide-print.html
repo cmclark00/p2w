@@ -151,6 +151,7 @@ is nothing here you can permanently break.</p>
 <li><a href="#update-contact-info">Update contact info — phone, email, address</a></li>
 <li><a href="#update-the-tcg-inventory-link">Update the TCG inventory link</a></li>
 <li><a href="#when-something-is-wrong">When something is wrong</a></li>
+<li><a href="#shop-preview-and-order-recovery">Shop preview and order recovery</a></li>
 <li><a href="#external-services">External services — what depends on what</a></li>
 <li><a href="#things-you-should-not-touch">Things you should NOT touch</a></li>
 <li><a href="#using-claude">Using Claude when this guide isn't enough</a></li>
@@ -1145,6 +1146,53 @@ a workflow that talks to Google Calendar.</p>
 <p>Don't guess. <strong>Use the <a href="#emergency-contact">Emergency contact</a>
 section</strong> at the bottom of this guide.</p>
 <hr>
+<h2 id="shop-preview-and-order-recovery">Shop preview and order recovery</h2>
+<p>The new shop at <code>/shop</code> is still a <strong>password-protected preview</strong>. Public site
+links continue to use CrystalCommerce. Do not remove the preview password or
+turn on public payments as part of normal content editing.</p>
+<p><strong>Testing:</strong> use PayPal sandbox and test inventory together. Sandbox payments
+can reserve <strong>real cards</strong> only when a manager deliberately enables the test
+variant allowlist. A sandbox receipt is not real payment. Cancel real inventory
+test reservations in CrystalCommerce after checking them.</p>
+<p><strong>Website orders:</strong> use the existing kiosk staff sign-in link (the private
+<code>KIOSK_STAFF_KEY</code>; never paste it into public docs), then open <code>/shop/manage</code>.
+This page shows open website orders, payment/capture references, CC order IDs,
+and receipt failures. Use Check status to reconcile a result. Enable receipt
+retry, then Check status, to resend a failed receipt. Email retries may send a
+second receipt; they do not take a second payment.</p>
+<p>If a payment or inventory create is <strong>unknown</strong>, do not ask the customer to
+pay again and do not create a second CC order. Look in PayPal by order/capture
+ID and in CC by website reference plus capture ID. If you find the CC order,
+link its ID on the staff page; the site verifies its comments match. A failed
+CC readback does not mean the CC order is absent. Old checkouts without the
+new recovery format need manual review in both services.</p>
+<p>Only refund in PayPal after establishing what happened to the CC order.
+For a manually refunded order, cancel/void it in CC so stock is released and
+it cannot be handed out as paid. The staff page can verify PayPal REFUNDED
+and CC Void. Unknown creates without an ID must first be located in CC; keep
+the exception open until both systems agree. Escalate unresolved outcomes to
+a manager; do not blindly retry.</p>
+<p><strong>Pickup:</strong> shoppers are told to wait for the store to confirm their cards
+are ready. Contact them after pulling the order. Website orders marked paid
+have already been paid online: <strong>do not charge again</strong>. After pickup, move the
+CC order through the established Payment Received → Shipped steps and mark
+picked up on the website list. That button updates our list only.</p>
+<p><strong>Kiosk orders:</strong> these are different: KIOSK - NOT PAID, payable at the register
+in Fulcrum as TCG singles. Complete their CC status after payment. If a kiosk
+asks for staff verification, use its reference in CC before retrying. The kiosk staff page lists interrupted attempts. Locate the CC order by
+reference; enter its ID and use <strong>Verify closed in CC</strong> after staff have
+completed it as Shipped or cancelled it as Void. Reset the kiosk cart after
+resolving the exception. Private <code>kiosk-attempt-*.json</code> records preserve
+the attempt for a manager’s review. Cancel unclaimed orders in CC to
+release inventory; closing our local list does not cancel CC.</p>
+<p><strong>Hosting managers:</strong> set matching <code>SHOP_SYNC_KEY</code> in the private server <code>.env</code>
+and GitHub Actions secrets. Schedule <code>shop/sync.php</code> every ten minutes and
+<code>shop/reconcile.php</code> every minute with cPanel cron. Check full-catalog age and
+open exceptions daily. Preserve private order records and signing keys in
+backups; restore-test to a separate private test location. Confirm the FTPS
+hostname matches the hosting certificate; deployment now requires encrypted
+control and data connections. Never disable certificate checks to clear a
+failed deploy.</p>
 <h2 id="external-services">External services</h2>
 <p>The website depends on these outside services. <strong>The shop's owners
 should have credentials for each in a shared password manager</strong> (1Password,
@@ -1209,7 +1257,7 @@ Bitwarden, Apple Passwords shared with family, etc.).</p>
 </tr>
 <tr>
 <td><strong>CrystalCommerce</strong></td>
-<td>External TCG inventory site (NOT part of this codebase)</td>
+<td>TCG inventory authority; native shop preview creates CC orders</td>
 <td>playtowingames.crystalcommerce.com admin login</td>
 <td><em>{{ FILL IN }}</em></td>
 </tr>

@@ -100,19 +100,22 @@ function kiosk_cart(): array {
   $cart = [];
   $data = kiosk_unsign($_COOKIE[KIOSK_CART_COOKIE] ?? null, kiosk_cfg()['key']);
   $rows = $data !== null ? json_decode((string)base64_decode(strtr($data, '-_', '+/')), true) : null;
+  if (is_array($rows) && isset($rows['rows'])) $rows = $rows['rows'];
   foreach (is_array($rows) ? $rows : [] as $r) {
     if (is_array($r) && isset($r[0], $r[1]) && (int)$r[1] > 0) $cart[(int)$r[0]] = ['q' => min(KIOSK_MAX_QTY, (int)$r[1]), 'p' => isset($r[2]) ? (int)$r[2] : null];
   }
   return $GLOBALS['kiosk_cart'] = $cart;
 }
 
-function kiosk_cart_save(array $cart): void {
+function kiosk_cart_save(array $cart, bool $forceRevision = true): void {
   $cart = array_slice($cart, 0, KIOSK_MAX_LINES, true);
+  if (!$forceRevision && $cart === ($GLOBALS['kiosk_cart'] ?? null)) return;
   $GLOBALS['kiosk_cart'] = $cart;
   if (!$cart) { kiosk_set_cookie(KIOSK_CART_COOKIE, '', 0); return; }
   $rows = [];
   foreach ($cart as $lid => $c) $rows[] = $c['p'] === null ? [$lid, $c['q']] : [$lid, $c['q'], $c['p']];
-  kiosk_set_cookie(KIOSK_CART_COOKIE, kiosk_sign(rtrim(strtr(base64_encode(json_encode($rows)), '+/', '-_'), '='), kiosk_cfg()['key']), 86400);
+  $payload = ['rows' => $rows, 'revision' => bin2hex(random_bytes(8))];
+  kiosk_set_cookie(KIOSK_CART_COOKIE, kiosk_sign(rtrim(strtr(base64_encode(json_encode($payload)), '+/', '-_'), '='), kiosk_cfg()['key']), 86400);
 }
 
 function kiosk_cart_count(): int {
@@ -185,6 +188,25 @@ function kiosk_find_order(string $num): ?array {
  * Returns ['order' => record] or ['problems' => [messages]] (the cart is updated to match what's available).
  */
 function kiosk_place_order(string $name, string $token): array {
+  $lock = shop_lock('kiosk-order', $token);
+  if (!$lock) return ['problems' => ['This order is already being processed. Please wait; do not place another order.']];
+  $cartToken = hash('sha256', (string)($_COOKIE[KIOSK_CART_COOKIE] ?? ''));
+  $cartLock = shop_lock('kiosk-cart-order', $cartToken);
+  if (!$cartLock) { shop_unlock($lock); return ['problems' => ['This cart is already being processed. Please wait; do not submit it again.']]; }
+  try {
+    foreach (kiosk_orders() as $o) if (($o['token'] ?? '') === $token) return ['order' => $o];
+    $previous = shop_read_json('kiosk-cart-attempt-' . $cartToken . '.json');
+    if ($previous) {
+      foreach (kiosk_orders() as $o) if (($o['token'] ?? '') === ($previous['token'] ?? null)) return ['order' => $o];
+      return ['problems' => ['This cart has an interrupted order. Ask staff to verify reference ' . substr(hash('sha256', (string)$previous['token']), 0, 12) . ' before retrying.']];
+    }
+    $attempt = shop_read_json('kiosk-attempt-' . hash('sha256', $token) . '.json');
+    if ($attempt) return ['problems' => ['This order needs staff verification before retrying. Reference ' . substr(hash('sha256', $token), 0, 12) . '. Please ask at the register.']];
+    return kiosk_place_order_locked($name, $token, $cartToken);
+  } finally { shop_unlock($cartLock); shop_unlock($lock); }
+}
+
+function kiosk_place_order_locked(string $name, string $token, string $cartToken): array {
   // A double tap on "Place order" sends the same token twice: show the first order again.
   foreach (kiosk_orders() as $o) if (($o['token'] ?? '') === $token) return ['order' => $o];
 
@@ -204,11 +226,19 @@ function kiosk_place_order(string $name, string $token): array {
   $current = $checks ? shop_fetch_json(array_values($checks), 6, 20, shop_cc_headers('admin:read-inventory')) : [];
 
   $items = [];
+  $seenVariants = [];
   foreach ($lines as $ln) {
     if (!isset($checks[$ln['lid']])) continue;
     $r = $current[$checks[$ln['lid']]] ?? null;
     $v = is_array($r) ? ($r['variant'] ?? $r) : null;
     if (!is_array($v) || empty($v['id'])) return ['problems' => ['We couldn’t reach our inventory system to check stock. Please try again in a moment, or ask at the register.']];
+    if (isset($seenVariants[(int)$v['id']])) { $problems[] = 'A duplicate inventory entry was removed; please review your quantity.'; unset($cart[$ln['lid']]); continue; }
+    $seenVariants[(int)$v['id']] = true;
+    [$condition, $descriptors] = shop_variant_identity($v);
+    if ($condition !== $ln['listing']['c'] || $descriptors !== shop_descriptor_key($ln['listing']['v'])) {
+      $problems[] = 'An item’s condition or edition changed. Please choose it again.';
+      unset($cart[$ln['lid']]); continue;
+    }
     $label = $ln['product']['name'] . ' (' . $ln['listing']['c'] . ')';
     $avail = !empty($v['is_infinite_qty']) ? KIOSK_MAX_QTY : (int)($v['available_qty'] ?? $v['qty'] ?? 0);
     $cents = (int)($v['sell_price']['money']['cents'] ?? 0);
@@ -220,14 +250,18 @@ function kiosk_place_order(string $name, string $token): array {
     $items[] = ['lid' => $ln['lid'], 'variant' => (int)$v['id'], 'pid' => (int)$ln['product']['id'], 'name' => $ln['product']['name'],
       'cond' => $ln['listing']['c'], 'detail' => $ln['listing']['v'], 'qty' => $q, 'cents' => $cents];
   }
-  kiosk_cart_save($cart);
+  kiosk_cart_save($cart, false);
   if ($problems) return ['problems' => $problems];
 
   $total = array_sum(array_map(function ($i) { return $i['qty'] * $i['cents']; }, $items));
   $live = kiosk_cfg()['live'];
   $ccId = null;
+  // Preserve both cookies: the caller may lose the response that confirms current prices.
+  $confirmedToken = hash('sha256', (string)($_COOKIE[KIOSK_CART_COOKIE] ?? ''));
+  foreach (array_unique([$cartToken, $confirmedToken]) as $hash) shop_write_json('kiosk-cart-attempt-' . $hash . '.json', ['token' => $token, 'at' => time()]);
   if ($live) {
-    [$ccId, $err] = kiosk_cc_order($items, $name, $total);
+    shop_write_json('kiosk-attempt-' . hash('sha256', $token) . '.json', ['at' => time(), 'name' => $name, 'total' => $total, 'status' => 'creating']);
+    [$ccId, $err] = kiosk_cc_order($items, $name, $total, $token);
     if (!$ccId) return ['problems' => ['We couldn’t send your order to the register. Please ask a staff member for help. (' . $err . ')']];
   }
   $order = kiosk_orders_update(function (array &$data) use ($items, $name, $token, $total, $live, $ccId) {
@@ -237,16 +271,18 @@ function kiosk_place_order(string $name, string $token): array {
     $data['orders'][] = $o;
     return $o;
   });
+  if ($live) shop_write_json('kiosk-attempt-' . hash('sha256', $token) . '.json', ['status' => 'recorded', 'ccId' => $ccId, 'at' => time()]);
   kiosk_cart_save([]);
   return ['order' => $order];
 }
 
 // Creates the CrystalCommerce order (the shape proven by test orders #277127/#277128). Returns [id, error].
-function kiosk_cc_order(array $items, string $name, int $total): array {
+function kiosk_cc_order(array $items, string $name, int $total, string $token = ''): array {
   $money = function (int $cents) { return number_format($cents / 100, 2, '.', ''); };
   $lineItems = [];
   foreach (array_values($items) as $i => $it) $lineItems[(string)$i] = ['qty' => $it['qty'], 'variant_id' => (string)$it['variant'], 'price' => $money($it['cents'])];
-  $note = "KIOSK ORDER - NOT PAID. Customer: $name. Pay at the register: ring up in Fulcrum (TCG singles), then move this order to Payment Received, then Shipped. If nobody picks it up, cancel it so the cards go back in stock.";
+  $reference = $token !== '' ? substr(hash('sha256', $token), 0, 12) : 'legacy';
+  $note = "KIOSK ORDER $reference - NOT PAID. Customer: $name. Pay at the register: ring up in Fulcrum (TCG singles), then move this order to Payment Received, then Shipped. If nobody picks it up, cancel it so the cards go back in stock.";
   $address = ['firstname' => $name, 'lastname' => 'Kiosk order', 'address2' => 'In-store pickup'] + KIOSK_STORE_ADDRESS;
   $order = [
     // Preorder: the one unpaid-looking status CrystalCommerce accepts on create, and it holds the stock.
@@ -266,6 +302,7 @@ function kiosk_cc_order(array $items, string $name, int $total): array {
     // Read it back: CrystalCommerce once answered "success" with an order number for an order it never saved
     // (test #5). Only a saved Preorder holds the cards, so anything else is a failure the customer must hear about.
     $id = (int)$o['id'];
+    if ($token !== '') shop_write_json('kiosk-attempt-' . hash('sha256', $token) . '.json', ['at' => time(), 'name' => $name, 'total' => $total, 'status' => 'verifying', 'ccId' => $id]);
     [$s2, $j2] = shop_cc('GET', "/orders/$id", 'admin:read-orders');
     $r = is_array($j2) ? ($j2['order'] ?? $j2) : [];
     if ($s2 === 200 && (int)($r['id'] ?? 0) === $id && ($r['status'] ?? '') === KIOSK_CC_STATUS) return [$id, null];
@@ -383,6 +420,26 @@ function kiosk_cart_post(): void {
 }
 
 function kiosk_close_order(): void {
+  if (!hash_equals(web_staff_token(), (string)($_POST['token'] ?? ''))) kiosk_404();
+  if (preg_match('/^[a-f0-9]{64}$/', (string)($_POST['attempt'] ?? ''))) {
+    $file = 'kiosk-attempt-' . $_POST['attempt'] . '.json';
+    $attempt = shop_read_json($file);
+    if (!$attempt) kiosk_404();
+    $id = (int)($attempt['ccId'] ?? $_POST['ccId'] ?? 0);
+    [$s, $j] = shop_cc('GET', '/orders/' . $id, 'admin:read-orders');
+    $remote = is_array($j) ? ($j['order'] ?? $j) : [];
+    $comments = (string)($remote['vendor_comments'] ?? '') . ' ' . (string)($remote['customer_comments'] ?? '');
+    $matched = !empty($attempt['ccId']) || strpos($comments, substr((string)$_POST['attempt'], 0, 12)) !== false;
+    if ($s === 200 && (int)($remote['id'] ?? 0) === $id && $matched) {
+      $attempt['ccId'] = $id;
+      if (in_array($remote['status'] ?? '', ['Void', 'Shipped'], true)) {
+        $attempt['status'] = 'recorded'; $attempt['resolvedAt'] = time(); $attempt['remoteStatus'] = $remote['status'];
+      }
+      shop_write_json($file, $attempt);
+      if ($attempt['status'] === 'recorded') kiosk_redirect('/shop/kiosk/orders');
+    }
+    kiosk_redirect('/shop/kiosk/orders?verify=waiting');
+  }
   $num = (string)($_POST['num'] ?? '');
   $as = ($_POST['as'] ?? '') === 'cancelled' ? 'cancelled' : 'paid';
   kiosk_orders_update(function (array &$data) use ($num, $as) {
@@ -529,6 +586,19 @@ function kiosk_status_page(): void {
   shop_page('Kiosk status', 'Kiosk status', $body, ['crumbs' => [], 'idle' => 0]);
 }
 
+function kiosk_pending_attempts_html(): string {
+  $rows = '';
+  foreach (glob(shop_data_dir() . '/kiosk-attempt-*.json') ?: [] as $path) {
+    $a = json_decode((string)file_get_contents($path), true);
+    if (!$a || ($a['status'] ?? '') === 'recorded') continue;
+    $reference = substr(str_replace(['kiosk-attempt-', '.json'], '', basename($path)), 0, 12);
+    $hash = str_replace(['kiosk-attempt-', '.json'], '', basename($path));
+    $rows .= '<li>' . h($reference) . ' · ' . h($a['name'] ?? '') . ' · CC ' . h($a['ccId'] ?? 'unknown') . ' · ' . h($a['status'] ?? 'unknown')
+      . '<form action="/shop/kiosk/orders" method="post"><input type="hidden" name="token" value="' . h(web_staff_token()) . '"><input type="hidden" name="attempt" value="' . h($hash) . '"><label>CC order ID <input name="ccId" inputmode="numeric" value="' . h($a['ccId'] ?? '') . '" required></label><button class="button secondary" type="submit">Verify closed in CC</button></form></li>';
+  }
+  return $rows !== '' ? '<div class="kiosk-problems"><h2>Kiosk attempts needing verification</h2><p>Locate these in CrystalCommerce by reference before retrying or charging. A missing local order does not prove the CC create failed.</p><ul>' . $rows . '</ul></div>' : '';
+}
+
 function kiosk_orders_page(): void {
   $all = kiosk_orders();
   $open = array_values(array_filter($all, function ($o) { return $o['status'] === 'open'; }));
@@ -541,7 +611,7 @@ function kiosk_orders_page(): void {
     foreach ($o['items'] as $it) $items .= '<li>' . $it['qty'] . ' × ' . h($it['name']) . ' <span class="muted">' . h(implode(' · ', array_filter([$it['cond'] !== 'Standard' ? $it['cond'] : '', $it['detail']]))) . '</span> <span class="kiosk-ord-price">' . shop_money($it['qty'] * $it['cents']) . '</span></li>';
     $when = date('D g:i a', (int)$o['at']) . ' · ' . ($age < 3600 ? max(1, (int)floor($age / 60)) . ' min ago' : floor($age / 3600) . ' h ' . floor($age % 3600 / 60) . ' min ago');
     $link = $o['ccId'] ? '<a href="' . h($admin . '/orders/' . $o['ccId']) . '" target="_blank" rel="noopener">Open in CrystalCommerce</a>' : '<span class="muted">Test order: not in CrystalCommerce</span>';
-    $actions = $isOpen ? '<form action="/shop/kiosk/orders" method="post" class="kiosk-ord-actions"><input type="hidden" name="num" value="' . h($o['num']) . '">
+    $actions = $isOpen ? '<form action="/shop/kiosk/orders" method="post" class="kiosk-ord-actions"><input type="hidden" name="token" value="' . h(web_staff_token()) . '"><input type="hidden" name="num" value="' . h($o['num']) . '">
         <button class="button primary" name="as" value="paid" type="submit">Paid &amp; picked up</button>
         <button class="button secondary" name="as" value="cancelled" type="submit">Cancelled</button></form>'
       : '<p class="kiosk-ord-closed">' . ($o['status'] === 'paid' ? 'Paid &amp; picked up' : 'Cancelled') . ' · ' . h(date('D g:i a', (int)($o['closedAt'] ?? $o['at']))) . '</p>';
@@ -552,9 +622,12 @@ function kiosk_orders_page(): void {
   };
   $body = '<section class="shop-section kiosk-orders">
       <p class="eyebrow">Staff</p><h1>Kiosk orders</h1>
+      ' . (isset($_GET['verify']) ? '<p class="kiosk-problems">The attempt is still unresolved. Verify its CC order ID and finish or cancel it in CC before closing this exception. Reset the kiosk cart after resolving it.</p>' : '') . '
+      <p><a class="button secondary" href="/shop/manage">Website orders and payment recovery</a></p>
       <div class="kiosk-howto"><p><strong>At the register:</strong> ring the cards up in Fulcrum as TCG singles and take payment. Then open the order in CrystalCommerce, change it from Preorder to Payment Received and then Shipped, and tap <em>Paid &amp; picked up</em> here.</p>
       <p><strong>Never picked up?</strong> Cancel the order in CrystalCommerce so the cards go back in stock, then tap <em>Cancelled</em> here.</p>
       <p class="muted">In CrystalCommerce, kiosk orders show as “Preorder” with the employee name KIOSK - NOT PAID until staff move them on. This page is the list of what’s still unpaid.</p></div>
+      ' . kiosk_pending_attempts_html() . '
       <h2>Waiting at the register (' . count($open) . ')</h2>
       ' . ($open ? '<div class="kiosk-ord-list">' . implode('', array_map(function ($o) use ($card) { return $card($o, true); }, $open)) . '</div>' : '<p class="muted">No open kiosk orders.</p>') . '
       <h2>Recently closed</h2>

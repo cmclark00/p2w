@@ -22,13 +22,19 @@ $idx = shop_index();
 register_shutdown_function(function () use ($idx) {
   if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
   shop_kick_sync($idx);
+  web_kick_reconcile();
 });
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
-if (SHOP_PREVIEW) header('X-Robots-Tag: noindex, nofollow');
+$private = in_array($parts[0] ?? '', ['cart', 'checkout', 'order', 'manage', 'login', 'kiosk'], true);
+if (SHOP_PREVIEW || $private) header('X-Robots-Tag: noindex, nofollow');
 
 // While SHOP_PASSWORD is set, the shop asks for it first (kiosks and their /shop/kiosk/... links skip it).
+if (SHOP_PREVIEW && !web_gate_on() && ($parts[0] ?? '') !== 'kiosk' && !kiosk_active() && !kiosk_staff()) {
+  http_response_code(503);
+  shop_page('Shop preview', 'The shop preview is unavailable.', '<section class="shop-section shop-state"><h1>The online shop is being tested.</h1><p>The preview is not available right now. Please check back later.</p></section>', ['crumbs' => []]);
+}
 if (($parts[0] ?? '') !== 'kiosk' && web_gate_on() && !kiosk_active()) {
   if (($parts[0] ?? '') === 'login') web_gate_page();
   if (!web_gate_passed()) kiosk_redirect('/shop/login?next=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? '/shop')));
@@ -36,7 +42,7 @@ if (($parts[0] ?? '') !== 'kiosk' && web_gate_on() && !kiosk_active()) {
 
 if (($parts[0] ?? '') === 'kiosk') {
   kiosk_route(array_slice($parts, 1));
-} elseif (in_array($parts[0] ?? '', ['cart', 'checkout', 'order'], true) && !kiosk_active()) {
+} elseif (in_array($parts[0] ?? '', ['cart', 'checkout', 'order', 'manage'], true) && (!kiosk_active() || ($parts[0] ?? '') === 'manage')) {
   web_route($parts);   // online cart + PayPal checkout (checkout.php)
 } elseif (!$idx) {
   shop_page('Shop', 'Play2Win Games inventory.', shop_unavailable(), ['crumbs' => []]);
@@ -390,8 +396,11 @@ function shop_pager(array $r, array $q, string $basePath): string {
 }
 
 function shop_fresh_text(array $idx): string {
-  $mins = (int)floor((time() - (int)($idx['listingsAt'] ?? $idx['built'])) / 60);
-  return $mins < 2 ? 'stock updated just now' : ($mins < 120 ? "stock updated $mins min ago" : 'stock updated ' . floor($mins / 60) . ' hours ago');
+  $at = (int)($idx['catalogAt'] ?? 0);
+  if (!$at) return 'Catalog freshness unconfirmed; stock checked at checkout';
+  $mins = max(0, (int)floor((time() - $at) / 60));
+  $age = $mins < 2 ? 'just now' : ($mins < 120 ? "$mins min ago" : floor($mins / 60) . ' hours ago');
+  return 'Full catalog snapshot completed ' . $age . '; stock checked at checkout';
 }
 
 /* ================================================================== layout */
@@ -409,7 +418,7 @@ function shop_page(string $title, string $description, string $body, array $opt)
     foreach ($crumbs as [$label, $href]) $bits[] = $href ? '<a href="' . h($href) . '">' . h($label) . '</a>' : '<span aria-current="page">' . h($label) . '</span>';
     $crumbHtml = '<nav class="shop-crumbs" aria-label="Breadcrumb">' . implode(' <span aria-hidden="true">›</span> ', $bits) . '</nav>';
   }
-  $ld = isset($opt['ld']) ? '<script type="application/ld+json">' . json_encode($opt['ld'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' : '';
+  $ld = isset($opt['ld']) ? '<script type="application/ld+json">' . json_encode($opt['ld'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . '</script>' : '';
   // Kiosks go back to the start after a quiet spell (seconds; 0 = never), asking "Still shopping?" first.
   // Nothing to reset on the shop's front page with an empty cart; without a cart there's nothing to ask about.
   $cartCount = $kiosk ? kiosk_cart_count() : 0;
@@ -424,7 +433,7 @@ function shop_page(string $title, string $description, string $body, array $opt)
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <base href="/">
     <meta name="theme-color" content="#111217">
-    <?php if (SHOP_PREVIEW || $kiosk || !empty($opt['refresh'])): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+    <?php if (SHOP_PREVIEW || $kiosk || !empty($opt['refresh']) || !empty($opt['private']) || preg_match('#^/shop/(cart|checkout|order|manage|login)(/|$)#', $self)): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
     <?php if (!empty($opt['refresh'])): ?><meta http-equiv="refresh" content="<?= (int)$opt['refresh'] ?>"><?php endif; ?>
     <meta name="description" content="<?= h($description) ?>">
     <title><?= h($title) ?> | Play2Win Games</title>

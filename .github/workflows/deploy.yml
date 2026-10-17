@@ -38,8 +38,15 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  checks:
+    uses: ./.github/workflows/site-checks.yml
   deploy:
+    needs: checks
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -77,8 +84,22 @@ jobs:
           FTP_HOST: ${{ secrets.GODADDY_FTP_HOST }}
           FTP_USER: ${{ secrets.GODADDY_FTP_USER }}
           FTP_PASS: ${{ secrets.GODADDY_FTP_PASSWORD }}
+          # GoDaddy's FTP certificate covers this provider name, not the account IP.
+          FTP_TLS_NAME: prod.phx3.secureserver.net
         run: |
           sudo apt-get update -qq && sudo apt-get install -y lftp
+          # Connect to the configured account address while verifying the actual
+          # provider certificate name. The provider name has no public A record;
+          # scope this address mapping to the disposable deployment runner.
+          sudo env FTP_HOST="$FTP_HOST" FTP_TLS_NAME="$FTP_TLS_NAME" python3 - <<'PY'
+          import ipaddress, os, socket
+          from urllib.parse import urlparse
+          configured = os.environ['FTP_HOST'].strip()
+          host = urlparse(configured).hostname if '://' in configured else configured
+          address = ipaddress.IPv4Address(socket.gethostbyname(host))
+          with open('/etc/hosts', 'a') as hosts:
+              hosts.write(f"\n{address} {os.environ['FTP_TLS_NAME']}\n")
+          PY
           # --reverse: upload (local -> remote); --delete: prune remote files
           # not present locally so the host stays in sync with the repo.
           #
@@ -93,10 +114,13 @@ jobs:
           # host-managed dirs from --delete: SSL/ACME challenges
           # (.well-known) and cgi-bin.
           lftp -c "
-          set ftp:ssl-allow no;
+          set ftp:ssl-allow yes;
+          set ftp:ssl-force yes;
+          set ftp:ssl-protect-data yes;
+          set ssl:verify-certificate yes;
           set net:max-retries 3;
           set net:timeout 25;
-          open -u '$FTP_USER','$FTP_PASS' '$FTP_HOST';
+          open -u '$FTP_USER','$FTP_PASS' '$FTP_TLS_NAME';
           set cmd:fail-exit yes;
           mirror --reverse --delete --verbose --parallel=2 \
                  -x '^\.well-known/' -x '^cgi-bin/' \

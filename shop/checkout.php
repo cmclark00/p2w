@@ -12,14 +12,15 @@
  *    CrystalCommerce **Preorder** (the one status the API accepts that holds the cards; see kiosk.php)
  *    under SHOP_CC_CUSTOMER_ID, in-store pickup, with the PayPal capture id in its payment line.
  *  - Order of operations, so nobody pays for cards we don't have: stock and price are re-checked live in
- *    CrystalCommerce when the PayPal order is created and again just before the payment is captured. If
- *    CrystalCommerce then refuses the order anyway, the payment is refunded on the spot.
+ *    CrystalCommerce when the PayPal order is created and again just before capture. Ambiguous payment
+ *    and CC outcomes are persisted for reconciliation; only explicit CC validation rejection triggers a refund.
  *  - Tax: SHOP_TAX_RATE (9.25% by default, Knoxville) on everything, since every order is picked up here.
  *  - Emails go to the customer's address (SMTP settings if given, else PHP's mail()), with an optional
  *    copy to SHOP_ORDER_BCC.
  */
 
 declare(strict_types=1);
+require_once __DIR__ . '/orders.php';
 
 const WEB_GATE_COOKIE = 'p2w_shopgate';
 const WEB_CART_COOKIE = 'p2w_cart';
@@ -51,21 +52,23 @@ function web_cfg(): array {
 // Online checkout is available (PayPal keys for the current mode are set).
 function web_checkout_on(): bool {
   $c = web_cfg();
-  return $c['ppClient'] !== '' && $c['ppSecret'] !== '';
+  return $c['ppClient'] !== '' && $c['ppSecret'] !== '' && web_config_problem() === null;
+}
+
+function web_config_problem(): ?string {
+  $c = web_cfg();
+  if (defined('SHOP_PREVIEW') && SHOP_PREVIEW && $c['password'] === '') return 'Preview checkout requires SHOP_PASSWORD.';
+  if ($c['ppLive'] && !$c['ordersLive']) return 'Live payments require live inventory orders.';
+  if (!$c['ppLive'] && $c['ordersLive'] && (!web_gate_on() || shop_env('SHOP_SANDBOX_CC_TEST') !== '1' || shop_env('SHOP_TEST_VARIANTS') === '')) {
+    return 'Sandbox inventory writes require a password, SHOP_SANDBOX_CC_TEST=1, and SHOP_TEST_VARIANTS.';
+  }
+  return null;
 }
 
 // Signs the shop's own cookies (cart, password gate, order links). Made once, kept in the private data folder.
 function web_secret(): string {
   static $s = null;
-  if ($s !== null) return $s;
-  $path = shop_data_dir() . '/shop-secret.key';
-  $s = is_file($path) ? trim((string)file_get_contents($path)) : '';
-  if (strlen($s) < 32) {
-    $s = bin2hex(random_bytes(32));
-    file_put_contents($path, $s);
-    @chmod($path, 0600);
-  }
-  return $s;
+  return $s ?? ($s = shop_private_key('shop-secret'));
 }
 
 /* ================================================================== password gate */
@@ -118,20 +121,25 @@ function web_cart(): array {
   $cart = [];
   $data = kiosk_unsign($_COOKIE[WEB_CART_COOKIE] ?? null, web_secret());
   $rows = $data !== null ? json_decode((string)base64_decode(strtr($data, '-_', '+/')), true) : null;
+  if (is_array($rows) && isset($rows['rows'])) $rows = $rows['rows']; // versioned cart; old cookies remain readable
   foreach (is_array($rows) ? $rows : [] as $r) {
     if (is_array($r) && isset($r[0], $r[1]) && (int)$r[1] > 0) $cart[(int)$r[0]] = ['q' => min(KIOSK_MAX_QTY, (int)$r[1]), 'p' => isset($r[2]) ? (int)$r[2] : null];
   }
   return $GLOBALS['web_cart'] = $cart;
 }
 
-function web_cart_save(array $cart): void {
+function web_cart_save(array $cart, bool $forceRevision = true): void {
   $cart = array_slice($cart, 0, KIOSK_MAX_LINES, true);
+  if (!$forceRevision && $cart === ($GLOBALS['web_cart'] ?? null)) return;
   $GLOBALS['web_cart'] = $cart;
   if (!$cart) { kiosk_set_cookie(WEB_CART_COOKIE, '', 0); return; }
   $rows = [];
   foreach ($cart as $lid => $c) $rows[] = $c['p'] === null ? [$lid, $c['q']] : [$lid, $c['q'], $c['p']];
-  kiosk_set_cookie(WEB_CART_COOKIE, kiosk_sign(rtrim(strtr(base64_encode(json_encode($rows)), '+/', '-_'), '='), web_secret()), 14 * 86400);
+  $payload = ['rows' => $rows, 'revision' => bin2hex(random_bytes(8))];
+  kiosk_set_cookie(WEB_CART_COOKIE, kiosk_sign(rtrim(strtr(base64_encode(json_encode($payload)), '+/', '-_'), '='), web_secret()), 14 * 86400);
 }
+
+function web_cart_token(): string { return hash('sha256', (string)($_COOKIE[WEB_CART_COOKIE] ?? '')); }
 
 function web_cart_count(): int {
   return array_sum(array_column(web_cart(), 'q'));
@@ -173,11 +181,25 @@ function web_check_cart(): array {
   }
   $current = $checks ? shop_fetch_json(array_values($checks), 6, 20, shop_cc_headers('admin:read-inventory')) : [];
   $items = [];
+  $seenVariants = [];
   foreach ($lines as $ln) {
     if (!isset($checks[$ln['lid']])) continue;
     $r = $current[$checks[$ln['lid']]] ?? null;
     $v = is_array($r) ? ($r['variant'] ?? $r) : null;
     if (!is_array($v) || empty($v['id'])) return ['problems' => ['We couldn’t reach our inventory system to check stock. Please try again in a minute.']];
+    if (isset($seenVariants[(int)$v['id']])) {
+      $problems[] = 'A duplicate inventory entry was removed. Please review the remaining quantity.';
+      unset($cart[$ln['lid']]); continue;
+    }
+    $seenVariants[(int)$v['id']] = true;
+    [$condition, $descriptors] = shop_variant_identity($v);
+    if ($condition !== $ln['listing']['c'] || $descriptors !== shop_descriptor_key($ln['listing']['v'])) {
+      $problems[] = 'An item’s condition or edition changed. It was removed; please choose it again.';
+      unset($cart[$ln['lid']]); continue;
+    }
+    if (!web_cfg()['ppLive'] && web_cfg()['ordersLive'] && !in_array((string)$v['id'], array_map('trim', explode(',', shop_env('SHOP_TEST_VARIANTS'))), true)) {
+      return ['problems' => ['This preview is limited to the store’s designated test items.']];
+    }
     $label = $ln['product']['name'] . ' (' . $ln['listing']['c'] . ')';
     $avail = !empty($v['is_infinite_qty']) ? KIOSK_MAX_QTY : (int)($v['available_qty'] ?? $v['qty'] ?? 0);
     $cents = (int)($v['sell_price']['money']['cents'] ?? 0);
@@ -189,7 +211,7 @@ function web_check_cart(): array {
     $items[] = ['lid' => $ln['lid'], 'variant' => (int)$v['id'], 'pid' => (int)$ln['product']['id'], 'name' => $ln['product']['name'],
       'cond' => $ln['listing']['c'], 'detail' => $ln['listing']['v'], 'qty' => $q, 'cents' => $cents];
   }
-  web_cart_save($cart);
+  web_cart_save($cart, false);
   return $problems ? ['problems' => $problems] : ['items' => $items];
 }
 
@@ -200,9 +222,9 @@ function web_orders_update(callable $fn) {
   $lock = fopen(shop_data_dir() . '/shop-orders.lock', 'c');
   if (!$lock || !flock($lock, LOCK_EX)) throw new RuntimeException('Could not lock the order list');
   try {
-    $data = shop_read_json('shop-orders.json') ?: ['seq' => 1000, 'orders' => []];
+    $data = web_order_data();
     $result = $fn($data);
-    $data['orders'] = array_slice($data['orders'], -2000); // plenty; CrystalCommerce keeps the real record
+    // Never discard pending payments or customer receipts because newer checkouts were started.
     shop_write_json('shop-orders.json', $data);
     return $result;
   } finally {
@@ -212,7 +234,7 @@ function web_orders_update(callable $fn) {
 }
 
 function web_find_order(callable $match): ?array {
-  foreach ((shop_read_json('shop-orders.json') ?: [])['orders'] ?? [] as $o) if ($match($o)) return $o;
+  foreach (web_order_data()['orders'] as $o) if ($match($o)) return $o;
   return null;
 }
 
@@ -285,6 +307,14 @@ function web_json_body(): array {
 
 // Step 1 (PayPal's createOrder): check the details and the cart, then open a PayPal order for the total.
 function web_checkout_create(): void {
+  $owner = web_checkout_owner();
+  $ownerLock = shop_lock('checkout-owner', $owner);
+  if (!$ownerLock) web_json(['problems' => ['A checkout is already being processed. Please wait.']], 409);
+  register_shutdown_function(function () use ($ownerLock) { shop_unlock($ownerLock); });
+  $active = web_find_order(function ($o) use ($owner) {
+    return ($o['owner'] ?? '') === $owner && !in_array($o['status'], ['paid', 'fulfilled', 'abandoned', 'refunded', 'payment-failed'], true);
+  });
+  if ($active && ($active['status'] !== 'pending' || !empty($active['captureAttemptAt']))) web_json(['problems' => ['You already have a checkout in progress. Check its status before starting another payment.'], 'resume' => $active['pp'] ?? '']);
   $in = web_json_body();
   $clean = function ($v, int $max): string { return mb_substr(trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', is_scalar($v) ? (string)$v : '')), 0, $max); };
   $name = $clean($in['name'] ?? '', 60);
@@ -299,6 +329,20 @@ function web_checkout_create(): void {
   $check = web_check_cart();
   if (isset($check['problems'])) web_json(['problems' => $check['problems'], 'reload' => true]);
   $items = $check['items'];
+  if ($active) {
+    $lock = shop_lock('web-order', $active['ref']);
+    if (!$lock) web_json(['problems' => ['Checkout is already being processed. Please wait.']], 409);
+    try {
+      $active = web_order_get($active['ref']);
+      $canReplace = $active['status'] === 'pending' && empty($active['captureAttemptAt']);
+      $shape = function ($rows) { return array_map(function ($i) { return [$i['variant'], $i['qty'], $i['cents']]; }, $rows); };
+      $same = $canReplace && $shape($active['items']) === $shape($items) && $active['name'] === $name && $active['email'] === $email && $active['phone'] === $phone;
+      if ($canReplace && !$same) web_order_set($active['ref'], ['status' => 'abandoned']);
+    } finally { shop_unlock($lock); }
+    if ($same) web_json(['id' => $active['pp']]);
+    if (!$canReplace) web_json(['problems' => ['This checkout needs verification before another payment.'], 'resume' => $active['pp']]);
+  }
+  if (!web_create_allowed($owner)) web_json(['problems' => ['Too many checkout attempts. Please wait a few minutes.']], 429);
   $subtotal = array_sum(array_map(function ($i) { return $i['qty'] * $i['cents']; }, $items));
   $tax = web_tax($subtotal);
   $total = $subtotal + $tax;
@@ -324,10 +368,10 @@ function web_checkout_create(): void {
   }
   if ($s < 200 || $s >= 300 || empty($j['id'])) web_json(['problems' => ['PayPal couldn’t start the payment (HTTP ' . $s . '). Please try again.']]);
 
-  web_orders_update(function (array &$d) use ($ref, $j, $items, $name, $email, $phone, $subtotal, $tax, $total) {
+  web_orders_update(function (array &$d) use ($ref, $j, $items, $name, $email, $phone, $subtotal, $tax, $total, $owner) {
     $d['orders'][] = ['ref' => $ref, 'num' => $ref, 'pp' => $j['id'], 'items' => $items, 'name' => $name, 'email' => $email, 'phone' => $phone,
       'subtotal' => $subtotal, 'tax' => $tax, 'total' => $total, 'at' => time(), 'status' => 'pending', 'test' => !web_cfg()['ordersLive'],
-      'paypal' => web_cfg()['ppLive'] ? 'live' : 'sandbox'];
+      'paypal' => web_cfg()['ppLive'] ? 'live' : 'sandbox', 'owner' => $owner, 'version' => 2, 'cartToken' => web_cart_token()];
   });
   web_json(['id' => $j['id']]);
 }
@@ -335,54 +379,18 @@ function web_checkout_create(): void {
 // Step 2 (PayPal's onApprove): check the stock once more, take the payment, then make the CrystalCommerce
 // order (refunding at once if CrystalCommerce refuses), email the customer, and send them to the confirmation.
 function web_checkout_capture(): void {
+  ignore_user_abort(true);
+  @set_time_limit(180);
   $in = web_json_body();
-  $ppId = is_string($in['id'] ?? null) ? $in['id'] : '';
-  $o = $ppId !== '' ? web_find_order(function ($o) use ($ppId) { return ($o['pp'] ?? '') === $ppId; }) : null;
-  if (!$o) web_json(['problems' => ['We couldn’t find that payment. Nothing was charged.']]);
-  if ($o['status'] === 'paid') web_json(['redirect' => web_order_url($o)]); // a repeated click: show the order again
-  if ($o['status'] !== 'pending') web_json(['problems' => ['This checkout was already closed. Please start again from your cart.']]);
-
-  // Nothing is charged until the cards are confirmed still here at the same price.
-  $check = web_check_cart();
-  $same = isset($check['items']) && array_map(function ($i) { return [$i['variant'], $i['qty'], $i['cents']]; }, $check['items'])
-    === array_map(function ($i) { return [$i['variant'], $i['qty'], $i['cents']]; }, $o['items']);
-  if (!$same) {
-    web_order_set($o['ref'], ['status' => 'abandoned']);
-    web_json(['problems' => array_merge($check['problems'] ?? [], ['Your cart changed while you were paying, so nothing was charged. Please review your order and pay again.']), 'reload' => true]);
+  $id = is_string($in['id'] ?? null) ? $in['id'] : '';
+  $o = web_find_order(function ($o) use ($id) { return ($o['pp'] ?? '') === $id; });
+  if (!$o || !isset($o['owner']) || !hash_equals($o['owner'], web_checkout_owner())) {
+    web_json(['problems' => ['This payment could not be verified in this browser. Contact the store before paying again.']], 403);
   }
-
-  [$s, $j] = pp_api('POST', '/v2/checkout/orders/' . rawurlencode($ppId) . '/capture', new stdClass(), ['PayPal-Request-Id: capture-' . $o['ref'], 'Prefer: return=representation']);
-  $cap = $j['purchase_units'][0]['payments']['captures'][0] ?? null;
-  $paid = $s >= 200 && $s < 300 && ($j['status'] ?? '') === 'COMPLETED' && is_array($cap) && ($cap['status'] ?? '') === 'COMPLETED'
-    && (int)round(((float)($cap['amount']['value'] ?? 0)) * 100) === (int)$o['total'];
-  if (!$paid) {
-    $declined = ($j['details'][0]['issue'] ?? '') === 'INSTRUMENT_DECLINED';
-    if (is_array($cap) && in_array($cap['status'] ?? '', ['COMPLETED', 'PENDING'], true)) {
-      // Money moved but not as expected (pending, or a different amount): never leave it hanging.
-      web_pp_refund((string)$cap['id']);
-      web_order_set($o['ref'], ['status' => 'refunded', 'capture' => $cap['id'], 'why' => 'capture ' . ($cap['status'] ?? '?')]);
-      web_json(['problems' => ['PayPal didn’t complete the payment normally, so it was refunded. Please try again or use a different payment method.']]);
-    }
-    web_json(['problems' => [$declined ? 'Your payment method was declined. Please try another one.' : 'PayPal couldn’t complete the payment (HTTP ' . $s . '). You weren’t charged.'], 'retry' => $declined]);
-  }
-
-  $ccId = null;
-  if (web_cfg()['ordersLive']) {
-    [$ccId, $err] = web_cc_order($o, (string)$cap['id']);
-    if (!$ccId) {
-      $refunded = web_pp_refund((string)$cap['id']);
-      web_order_set($o['ref'], ['status' => $refunded ? 'refunded' : 'refund-failed', 'capture' => $cap['id'], 'why' => $err]);
-      web_mail_staff_problem($o, (string)$cap['id'], $err, $refunded);
-      web_json(['problems' => [$refunded
-        ? 'We took your payment but couldn’t place the order in our system, so the payment was refunded. Please call us at 865-910-8357 and we’ll sort it out.'
-        : 'We took your payment but couldn’t place the order in our system. We’re refunding it; please call us at 865-910-8357.']]);
-    }
-  }
-  $num = $ccId ? (string)$ccId : $o['ref'];
-  $o = web_order_set($o['ref'], ['status' => 'paid', 'capture' => $cap['id'], 'ccId' => $ccId, 'num' => $num, 'paidAt' => time()]);
-  web_cart_save([]);
-  try { web_mail_confirmation($o); } catch (Throwable $t) { /* the order stands; the page shows everything the email would */ }
-  web_json(['redirect' => web_order_url($o)]);
+  $result = web_process_order($o['ref'], true);
+  $o = web_order_get($o['ref']);
+  if (isset($result['redirect']) && !empty($o['cartToken']) && hash_equals($o['cartToken'], web_cart_token())) web_cart_save([]);
+  web_json($result);
 }
 
 function web_order_set(string $ref, array $fields): array {
@@ -392,17 +400,8 @@ function web_order_set(string $ref, array $fields): array {
   });
 }
 
-function web_pp_refund(string $captureId): bool {
-  try {
-    [$s] = pp_api('POST', '/v2/payments/captures/' . rawurlencode($captureId) . '/refund', new stdClass(), ['PayPal-Request-Id: refund-' . $captureId]);
-    return $s >= 200 && $s < 300;
-  } catch (Throwable $t) {
-    return false;
-  }
-}
-
 // The CrystalCommerce order: a Preorder (holds the cards; staff move it on at pickup) in the shape the kiosk
-// proved, but paid: the payment line carries the PayPal capture id. Returns [id, error].
+// proved, but paid: the payment line carries the capture id. Returns [id, error, outcome].
 function web_cc_order(array $o, string $captureId): array {
   $money = function (int $cents) { return number_format($cents / 100, 2, '.', ''); };
   $lineItems = [];
@@ -423,16 +422,9 @@ function web_cc_order(array $o, string $captureId): array {
   ];
   [$s, $j, $raw] = shop_cc('POST', '/orders', 'admin:read-orders', ['order' => $order]);
   $r = is_array($j) ? ($j['order'] ?? $j) : [];
-  if ($s >= 200 && $s < 300 && !empty($r['id'])) {
-    // Read it back: CrystalCommerce once answered "success" for an order it never saved (see kiosk_cc_order).
-    $id = (int)$r['id'];
-    [$s2, $j2] = shop_cc('GET', "/orders/$id", 'admin:read-orders');
-    $back = is_array($j2) ? ($j2['order'] ?? $j2) : [];
-    if ($s2 === 200 && (int)($back['id'] ?? 0) === $id && ($back['status'] ?? '') === KIOSK_CC_STATUS) return [$id, null];
-    return [null, "order $id could not be confirmed (HTTP $s2, status " . (($back['status'] ?? '') !== '' ? $back['status'] : 'missing') . ')'];
-  }
-  $err = is_array($j) ? json_encode($j, JSON_UNESCAPED_SLASHES) : trim(preg_replace('/\s+/', ' ', strip_tags($raw)));
-  return [null, "HTTP $s " . substr($err, 0, 200)];
+  if ($s >= 200 && $s < 300 && !empty($r['id'])) return [(int)$r['id'], null, 'created'];
+  // Only explicit validation rejection proves the create did not succeed. Never retry an uncertain POST.
+  return [null, "CrystalCommerce create HTTP $s", in_array($s, [400, 422], true) ? 'rejected' : 'unknown'];
 }
 
 /* ================================================================== email */
@@ -479,7 +471,7 @@ function web_smtp(string $host, int $port, string $user, string $pass, string $f
   }
 }
 
-function web_mail_confirmation(array $o): void {
+function web_mail_confirmation(array $o): bool {
   $rows = '';
   $textRows = '';
   foreach ($o['items'] as $it) {
@@ -491,26 +483,17 @@ function web_mail_confirmation(array $o): void {
   $test = $o['test'] ? '<p style="background:#fff3cd;padding:8px 12px;border-radius:6px"><strong>TEST ORDER:</strong> this order was not sent to our inventory system.</p>' : '';
   $html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#111">
     <h1 style="font-size:22px">Thanks for your order, ' . h($o['name']) . '!</h1>' . $test . '
-    <p>Order <strong>#' . h($o['num']) . '</strong> is paid and we’re pulling your cards. Pick it up at the store whenever we’re open; just give us your name or this order number.</p>
+    <p>Order <strong>#' . h($o['num']) . '</strong> is paid and we’re pulling your cards. Please wait for the store to confirm your cards are ready before travelling. Bring your order number when you pick up.</p>
     <table style="width:100%;border-collapse:collapse;font-size:14px">' . $rows . '
       <tr><td style="padding:6px 8px">Subtotal</td><td style="padding:6px 8px;text-align:right">' . shop_money($o['subtotal']) . '</td></tr>
       <tr><td style="padding:6px 8px">Sales tax</td><td style="padding:6px 8px;text-align:right">' . shop_money($o['tax']) . '</td></tr>
       <tr><td style="padding:6px 8px"><strong>Total paid</strong></td><td style="padding:6px 8px;text-align:right"><strong>' . shop_money($o['total']) . '</strong></td></tr></table>
     <p><strong>Pickup:</strong> Play2Win Games, 3903 Western Avenue, Knoxville, TN 37921<br>Sun 11–7 · Mon–Thu 11–9 · Fri–Sat 11–11 · 865-910-8357</p>
     <p style="color:#666;font-size:13px">Questions? Reply to this email or call us. Whenever you play, Play 2 Win!</p></div>';
-  $text = "Thanks for your order, {$o['name']}!\n" . ($o['test'] ? "TEST ORDER: not sent to our inventory system.\n" : '') . "\nOrder #{$o['num']} is paid. Pick it up at the store whenever we're open.\n\n"
+  $text = "Thanks for your order, {$o['name']}!\n" . ($o['test'] ? "TEST ORDER: not sent to our inventory system.\n" : '') . "\nOrder #{$o['num']} is paid. Please wait for the store to confirm your cards are ready before travelling.\n\n"
     . $textRows . "\nSubtotal " . shop_money($o['subtotal']) . "\nSales tax " . shop_money($o['tax']) . "\nTotal paid " . shop_money($o['total'])
     . "\n\nPlay2Win Games, 3903 Western Avenue, Knoxville, TN 37921\nSun 11-7, Mon-Thu 11-9, Fri-Sat 11-11, 865-910-8357\n";
-  web_send_mail($o['email'], ($o['test'] ? '[TEST] ' : '') . 'Your Play2Win order #' . $o['num'] . ' (in-store pickup)', $html, $text, web_cfg()['bcc']);
-}
-
-// When a paid order couldn't go into CrystalCommerce: tell the shop (SHOP_ORDER_BCC) so someone follows up.
-function web_mail_staff_problem(array $o, string $captureId, ?string $err, bool $refunded): void {
-  $to = web_cfg()['bcc'];
-  if ($to === '') return;
-  $text = "Website order {$o['ref']} for {$o['name']} ({$o['email']} {$o['phone']}), " . shop_money($o['total']) . ", PayPal capture $captureId, couldn't be created in CrystalCommerce: $err\n"
-    . ($refunded ? "The payment was refunded automatically.\n" : "THE REFUND FAILED: refund it by hand in PayPal.\n");
-  try { web_send_mail($to, 'Website order problem: ' . $o['ref'], '<pre>' . h($text) . '</pre>', $text); } catch (Throwable $t) { /* nothing more to do */ }
+  return web_send_mail($o['email'], ($o['test'] ? '[TEST] ' : '') . 'Your Play2Win order #' . $o['num'] . ' (in-store pickup)', $html, $text, web_cfg()['bcc']);
 }
 
 /* ================================================================== routes: /shop/cart, /shop/checkout, /shop/order */
@@ -520,19 +503,23 @@ function web_route(array $parts): void {
   header('Cache-Control: no-store');
   if ($post && ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'cross-site') kiosk_404();
   switch ($parts[0]) {
+    case 'manage':
+      web_manage_page($post);
     case 'cart':
       if (!web_checkout_on()) kiosk_404();
       if ($post) web_cart_post();
       web_cart_page();
     case 'checkout':
-      if (!web_checkout_on()) kiosk_404();
-      if (($parts[1] ?? '') === 'create' && $post) web_checkout_create();
       if (($parts[1] ?? '') === 'capture' && $post) web_checkout_capture();
+      if (($parts[1] ?? '') === 'create' && $post) {
+        if (!web_checkout_on()) web_json(['problems' => ['Checkout setup needs staff attention. Please contact the store.']], 503);
+        web_checkout_create();
+      }
       if (count($parts) !== 1) kiosk_404();
       web_checkout_page();
     case 'order':
       $num = (string)($parts[1] ?? '');
-      $o = web_find_order(function ($o) use ($num) { return $o['num'] === $num && $o['status'] === 'paid'; });
+      $o = web_find_order(function ($o) use ($num) { return $o['num'] === $num && in_array($o['status'], ['paid', 'fulfilled'], true); });
       if (!$o || !hash_equals(substr(hash_hmac('sha256', 'order:' . $o['num'], web_secret()), 0, 24), (string)($_GET['k'] ?? ''))) kiosk_404();
       web_done_page($o);
   }
@@ -597,8 +584,10 @@ function web_totals_html(int $subtotal): string {
 function web_test_notice(): string {
   $c = web_cfg();
   $bits = [];
+  if (web_config_problem() !== null) return '<p class="kiosk-test-banner">Checkout setup needs staff attention. Browsing remains available.</p>';
   if (!$c['ppLive']) $bits[] = 'payments use PayPal’s sandbox (test money)';
   if (!$c['ordersLive']) $bits[] = 'orders are not sent to CrystalCommerce';
+  elseif (!$c['ppLive']) $bits[] = 'approved test orders reserve REAL inventory (designated test items only)';
   return $bits ? '<p class="kiosk-test-banner web-test-banner">TEST MODE: ' . h(implode(', and ', $bits)) . '.</p>' : '';
 }
 
@@ -615,7 +604,7 @@ function web_cart_page(): void {
       <div class="kiosk-cart-head"><h1>Your cart</h1><form action="/shop/cart" method="post"><input type="hidden" name="do" value="clear"><button class="text-link kiosk-clear" type="submit">Empty cart</button></form></div>
       <ul class="kiosk-lines">' . implode('', array_map(function ($ln) { return web_line_html($ln, true); }, $lines)) . '</ul>
       <div class="kiosk-summary">' . web_totals_html(kiosk_total($lines)) . '
-        <p class="muted">Free in-store pickup at 3903 Western Avenue, Knoxville. Pay online now, pick up any time we’re open.</p>
+        <p class="muted">Free in-store pickup at 3903 Western Avenue, Knoxville. Pay online now. Wait for the store to confirm your order is ready before travelling.</p>
         <div class="kiosk-actions"><a class="button secondary" href="/shop">Keep shopping</a><a class="button primary" href="/shop/checkout">Check out</a></div>
       </div>
     </section>';
@@ -624,6 +613,18 @@ function web_cart_page(): void {
 
 function web_checkout_page(): void {
   $lines = web_cart_lines();
+  $owner = web_checkout_owner();
+  $recover = null;
+  foreach (array_reverse(web_order_data()['orders']) as $o) {
+    if (($o['owner'] ?? '') === $owner && !empty($o['captureAttemptAt']) && !in_array($o['status'], ['abandoned', 'payment-failed', 'fulfilled', 'refunded'], true) && ($o['status'] !== 'paid' || (!$lines && ($o['at'] ?? 0) > time() - 86400))) { $recover = $o; break; }
+  }
+  if ($recover) {
+    shop_page('Check payment status', 'Check payment status', '<section class="shop-section"><h1>Check your payment</h1><p>Reference ' . h($recover['ref']) . '. We are checking your payment and inventory order. Please do not pay again.</p><div data-payment-recovery data-id="' . h($recover['pp']) . '" role="status"></div><p><a href="tel:+18659108357">Call the store: 865-910-8357</a></p></section>', ['crumbs' => [], 'private' => true]);
+  }
+  if (!web_checkout_on()) {
+    http_response_code(503);
+    shop_page('Checkout unavailable', 'Checkout unavailable', web_test_notice() . '<section class="shop-section"><h1>Checkout is unavailable right now.</h1><p>Please contact the store before starting a payment.</p></section>', ['crumbs' => [], 'private' => true]);
+  }
   if (!$lines) kiosk_redirect('/shop/cart');
   $c = web_cfg();
   $body = web_test_notice() . '<section class="shop-section kiosk-checkout web-checkout">
@@ -641,6 +642,7 @@ function web_checkout_page(): void {
           <label for="web-phone">Phone <span class="muted">(optional)</span></label>
           <input id="web-phone" name="phone" type="tel" maxlength="30" autocomplete="tel">
         </form>
+        <p class="muted">Please wait for the store to confirm your cards are ready before travelling. For cancellations, refunds, a wrong item, or a condition concern, contact <a href="mailto:inquiries@play2wingames.com">inquiries@play2wingames.com</a> or 865-910-8357 with your order number. This preview offers pickup only; see our <a href="privacy.html">privacy policy</a> for order data.</p>
         <div id="paypal-buttons" class="web-paypal" data-client="' . h($c['ppClient']) . '"><p class="muted">Loading PayPal…</p></div>
         <noscript><p class="kiosk-problems">Checkout needs JavaScript turned on (it runs PayPal’s secure payment window).</p></noscript>
         <p><a class="text-link" href="/shop/cart">← Back to cart</a></p>
@@ -657,7 +659,7 @@ function web_done_page(array $o): void {
       <h1>Thanks, ' . h($o['name']) . '!</h1>
       <p class="kiosk-done-label">Your order number</p>
       <p class="kiosk-done-num">' . h($o['num']) . '</p>
-      <p class="lead">You’re paid up. We sent a receipt to ' . h($o['email']) . '. Pick your order up at the store whenever we’re open; just give us your name or this number.</p>
+      <p class="lead">Your payment is complete. ' . (($o['mailStatus'] ?? '') === 'sent' ? 'Your receipt was accepted for delivery to ' . h($o['email']) . '.' : 'Keep this page as your receipt; email delivery is still being checked.') . ' Please wait for the store to confirm your cards are ready before travelling.</p>
       ' . ($o['test'] ? '<p class="kiosk-done-test">Test order: it was not sent to CrystalCommerce.</p>' : '') . '
       <ul class="kiosk-done-items">' . $items . '
         <li><span>Sales tax</span><span>' . shop_money($o['tax']) . '</span></li>

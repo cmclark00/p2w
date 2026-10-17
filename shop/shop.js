@@ -72,6 +72,20 @@
   // Online checkout (checkout.php): PayPal's buttons. The server re-checks stock and price when PayPal opens
   // (create) and again before taking the money (capture), and answers { problems } when something changed.
   var pp = document.getElementById('paypal-buttons');
+  var recovery = document.querySelector('[data-payment-recovery]');
+  if (recovery) {
+    var attempts = 0;
+    var checkPayment = function () {
+      recovery.textContent = 'Checking payment and inventory…';
+      return fetch('/shop/checkout/capture', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: recovery.dataset.id }) })
+        .then(function (r) { return r.json(); }).then(function (d) {
+          if (d.redirect) { location.href = d.redirect; return; }
+          recovery.textContent = (d.problems || ['The result still needs verification. Do not pay again; contact the store.']).join(' ');
+          if (d.pending && ++attempts < 5) setTimeout(checkPayment, 10000);
+        }).catch(function () { recovery.textContent = 'We could not check the result. Do not pay again; contact the store or reload this page to check again.'; });
+    };
+    checkPayment();
+  }
   if (pp && pp.dataset.client) {
     var form = document.querySelector('[data-checkout-form]');
     var box = document.querySelector('[data-checkout-problems]');
@@ -104,6 +118,7 @@
         },
         createOrder: function () {
           return post('/shop/checkout/create', details()).then(function (d) {
+            if (d.resume) { location.href = '/shop/checkout'; throw new Error('checkout-problems'); }
             if (d.problems) { show(d.problems, d.reload); throw new Error('checkout-problems'); }
             return d.id;
           });
@@ -114,12 +129,16 @@
             if (d.redirect) { location.href = d.redirect; return; }
             pp.classList.remove('is-busy');
             if (d.retry && actions.restart) return actions.restart(); // declined: let them pick another way to pay
-            show(d.problems || ['Something went wrong. You weren’t charged; please try again.'], d.reload);
+            if (d.pending) { location.href = '/shop/checkout'; return; }
+            show(d.problems || ['The payment result needs verification. Do not pay again; contact the store.'], d.reload);
+          }).catch(function () {
+            location.href = '/shop/checkout';
           });
         },
         onError: function (err) {
           if (err && String(err.message || err).indexOf('checkout-problems') !== -1) return;
-          show(['PayPal ran into a problem. You weren’t charged; please try again.']);
+          pp.classList.remove('is-busy');
+          show(['The payment result could not be confirmed. Reload checkout to check its status before paying again, or contact the store.']);
         }
       }).render('#paypal-buttons');
     };

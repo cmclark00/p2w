@@ -1,6 +1,7 @@
 name: Site checks
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main]
@@ -23,3 +24,11 @@ jobs:
         run: python .github/scripts/check_site.py
       - name: Check JavaScript syntax
         run: node .github/scripts/check_javascript.mjs
+      - name: Install PHP test runtime
+        run: sudo apt-get update -qq && sudo apt-get install -y php-cli php-curl php-mbstring php-sqlite3
+      - name: Check PHP syntax
+        run: find shop trade-in scripts -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Check checkout recovery and inventory mappings (offline)
+        run: php scripts/test-shop-checkout.php
+      - name: Check preview routes and staff access (offline)
+        run: python scripts/test-shop-http.py

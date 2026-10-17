@@ -9,10 +9,12 @@
 
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/kiosk.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
+if (!kiosk_staff()) { http_response_code(403); echo '{"ok":false,"error":"Staff sign-in required"}'; exit; }
 
 $cache = shop_data_dir() . '/admin-check-v6.json';
 if (!isset($_GET['stock']) && !isset($_GET['pid']) && !isset($_GET['compare']) && !isset($_GET['find']) && !isset($_GET['product']) && is_file($cache) && time() - filemtime($cache) < 600) { readfile($cache); exit; }

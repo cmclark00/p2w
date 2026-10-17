@@ -61,8 +61,57 @@ function shop_read_json(string $name) {
 function shop_write_json(string $name, $data): void {
   $path = shop_data_dir() . '/' . $name;
   $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
-  file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+  $encoded = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+  if (file_put_contents($tmp, $encoded) !== strlen($encoded)) { @unlink($tmp); throw new RuntimeException("Could not write $name"); }
   if (!@rename($tmp, $path)) { @unlink($tmp); throw new RuntimeException("Could not save $name"); }
+}
+
+// Locks are independent of JSON saves: callers hold these across external side effects.
+function shop_lock(string $purpose, string $id, bool $wait = false) {
+  $fp = fopen(shop_data_dir() . '/' . $purpose . '-' . hash('sha256', $id) . '.lock', 'c');
+  if (!$fp || !flock($fp, LOCK_EX | ($wait ? 0 : LOCK_NB))) { if ($fp) fclose($fp); return null; }
+  return $fp;
+}
+
+function shop_unlock($fp): void { if ($fp) { flock($fp, LOCK_UN); fclose($fp); } }
+
+function shop_private_key(string $name): string {
+  $lock = shop_lock('key', $name, true);
+  if (!$lock) throw new RuntimeException('Could not lock private key');
+  try {
+    $path = shop_data_dir() . '/' . $name . '.key';
+    $key = is_file($path) ? trim((string)file_get_contents($path)) : '';
+    if (strlen($key) < 32) {
+      $key = bin2hex(random_bytes(32));
+      if (file_put_contents($path, $key) !== strlen($key)) throw new RuntimeException('Could not save private key');
+      @chmod($path, 0600);
+    }
+    return $key;
+  } finally { shop_unlock($lock); }
+}
+
+function shop_service_key(): string { return shop_env('SHOP_SYNC_KEY') ?: shop_private_key('service-secret'); }
+function shop_service_allowed(): bool {
+  return PHP_SAPI === 'cli' || hash_equals(shop_service_key(), (string)($_SERVER['HTTP_X_SHOP_SYNC_KEY'] ?? ''));
+}
+
+// The authoritative variant attributes used by both online and kiosk checkout.
+function shop_variant_identity(array $v): array {
+  $condition = ''; $other = []; $shown = [];
+  foreach ($v['descriptors'] ?? [] as $d) {
+    $d = is_array($d) ? ($d['variant_descriptor'] ?? $d) : [];
+    $value = is_scalar($d['value'] ?? null) ? (string)$d['value'] : '';
+    if (strcasecmp((string)($d['name'] ?? ''), 'condition') === 0) $condition = shop_condition_label($value);
+    elseif ($value !== '') { $other[] = shop_norm($value); $shown[] = $value; }
+  }
+  sort($other);
+  return [$condition !== '' ? $condition : 'Standard', implode(' ', $other), implode(' · ', $shown)];
+}
+
+function shop_descriptor_key(string $v): string {
+  $parts = array_values(array_filter(array_map('shop_norm', explode(' · ', $v))));
+  sort($parts);
+  return implode(' ', $parts);
 }
 
 /* ------------------------------------------------------------------ HTTP */
@@ -142,6 +191,7 @@ const SYNC_STALE_MINUTES = 12;
 const SYNC_KICK_MINUTES = 5;
 
 function shop_kick_sync(?array $idx): void {
+  if (PHP_SAPI === 'cli-server' && shop_env('SHOP_SYNC_URL') === '') return;
   $age = time() - (int)($idx['listingsAt'] ?? $idx['built'] ?? 0);
   if ($age < SYNC_STALE_MINUTES * 60) return;
   $kick = shop_data_dir() . '/sync-kick.txt';
@@ -152,6 +202,7 @@ function shop_kick_sync(?array $idx): void {
   $ch = curl_init($url);
   // Long enough to connect and send the request; then hang up and let sync.php work on its own.
   curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT_MS => 1500, CURLOPT_NOSIGNAL => true,
+    CURLOPT_HTTPHEADER => ['X-Shop-Sync-Key: ' . shop_service_key()],
     CURLOPT_USERAGENT => 'Play2WinGames-Shop/1.0 (sync kick)']);
   @curl_exec($ch);
   curl_close($ch);
@@ -195,7 +246,7 @@ function shop_index(): ?array {
         foreach ($db->query('SELECT slug, name, game, kind, count FROM types ORDER BY slug') as $r) {
           $types[$r['slug']] = ['name' => $r['name'], 'game' => $r['game'], 'kind' => $r['kind'], 'count' => (int)$r['count']];
         }
-        $idx = ['built' => (int)($meta['built'] ?? 0), 'listingsAt' => (int)($meta['listingsAt'] ?? 0), 'count' => (int)($meta['products'] ?? 0), 'types' => $types];
+        $idx = ['built' => (int)($meta['built'] ?? 0), 'listingsAt' => (int)($meta['listingsAt'] ?? 0), 'catalogAt' => (int)($meta['catalogAt'] ?? 0), 'count' => (int)($meta['products'] ?? 0), 'types' => $types];
       }
     } catch (Throwable $e) {
       $idx = null;

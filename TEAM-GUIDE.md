@@ -31,6 +31,7 @@ is nothing here you can permanently break.
   - [Update contact info — phone, email, address](#update-contact-info)
   - [Update the TCG inventory link](#update-the-tcg-inventory-link)
 - [When something is wrong](#when-something-is-wrong)
+- [Shop preview and order recovery](#shop-preview-and-order-recovery)
 - [External services — what depends on what](#external-services)
 - [Things you should NOT touch](#things-you-should-not-touch)
 - [Using Claude when this guide isn't enough](#using-claude)
@@ -1051,6 +1052,62 @@ section** at the bottom of this guide.
 
 ---
 
+## Shop preview and order recovery
+
+The new shop at `/shop` is still a **password-protected preview**. Public site
+links continue to use CrystalCommerce. Do not remove the preview password or
+turn on public payments as part of normal content editing.
+
+**Testing:** use PayPal sandbox and test inventory together. Sandbox payments
+can reserve **real cards** only when a manager deliberately enables the test
+variant allowlist. A sandbox receipt is not real payment. Cancel real inventory
+test reservations in CrystalCommerce after checking them.
+
+**Website orders:** use the existing kiosk staff sign-in link (the private
+`KIOSK_STAFF_KEY`; never paste it into public docs), then open `/shop/manage`.
+This page shows open website orders, payment/capture references, CC order IDs,
+and receipt failures. Use Check status to reconcile a result. Enable receipt
+retry, then Check status, to resend a failed receipt. Email retries may send a
+second receipt; they do not take a second payment.
+
+If a payment or inventory create is **unknown**, do not ask the customer to
+pay again and do not create a second CC order. Look in PayPal by order/capture
+ID and in CC by website reference plus capture ID. If you find the CC order,
+link its ID on the staff page; the site verifies its comments match. A failed
+CC readback does not mean the CC order is absent. Old checkouts without the
+new recovery format need manual review in both services.
+
+Only refund in PayPal after establishing what happened to the CC order.
+For a manually refunded order, cancel/void it in CC so stock is released and
+it cannot be handed out as paid. The staff page can verify PayPal REFUNDED
+and CC Void. Unknown creates without an ID must first be located in CC; keep
+the exception open until both systems agree. Escalate unresolved outcomes to
+a manager; do not blindly retry.
+
+**Pickup:** shoppers are told to wait for the store to confirm their cards
+are ready. Contact them after pulling the order. Website orders marked paid
+have already been paid online: **do not charge again**. After pickup, move the
+CC order through the established Payment Received → Shipped steps and mark
+picked up on the website list. That button updates our list only.
+
+**Kiosk orders:** these are different: KIOSK - NOT PAID, payable at the register
+in Fulcrum as TCG singles. Complete their CC status after payment. If a kiosk
+asks for staff verification, use its reference in CC before retrying. The kiosk staff page lists interrupted attempts. Locate the CC order by
+reference; enter its ID and use **Verify closed in CC** after staff have
+completed it as Shipped or cancelled it as Void. Reset the kiosk cart after
+resolving the exception. Private `kiosk-attempt-*.json` records preserve
+the attempt for a manager’s review. Cancel unclaimed orders in CC to
+release inventory; closing our local list does not cancel CC.
+
+**Hosting managers:** set matching `SHOP_SYNC_KEY` in the private server `.env`
+and GitHub Actions secrets. Schedule `shop/sync.php` every ten minutes and
+`shop/reconcile.php` every minute with cPanel cron. Check full-catalog age and
+open exceptions daily. Preserve private order records and signing keys in
+backups; restore-test to a separate private test location. Confirm the FTPS
+hostname matches the hosting certificate; deployment now requires encrypted
+control and data connections. Never disable certificate checks to clear a
+failed deploy.
+
 ## External services
 
 The website depends on these outside services. **The shop's owners
@@ -1067,7 +1124,7 @@ Bitwarden, Apple Passwords shared with family, etc.).
 | **Firebase** | Powers the leaderboard for the hidden Konami easter-egg game | firebase.google.com → "p2w-leaderboard" project | _{{ FILL IN — currently Corey, must transfer at handoff }}_ |
 | **Formspree** | Receives the two contact forms and emails them to you | formspree.io | _{{ FILL IN — currently Corey, must move at handoff }}_ |
 | **Google Business Profile** | Your "Play2Win Games" listing on Google Maps; where reviews live | business.google.com | _{{ FILL IN }}_ |
-| **CrystalCommerce** | External TCG inventory site (NOT part of this codebase) | playtowingames.crystalcommerce.com admin login | _{{ FILL IN }}_ |
+| **CrystalCommerce** | TCG inventory authority; native shop preview creates CC orders | playtowingames.crystalcommerce.com admin login | _{{ FILL IN }}_ |
 
 > **Action item — owners:** schedule a 30-minute session to (a) make
 > sure all the above accounts are in a shared password vault Mark and

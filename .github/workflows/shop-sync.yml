@@ -27,17 +27,23 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Run the shop sync until product details and variant ids are complete
+        env:
+          SHOP_SYNC_KEY: ${{ secrets.SHOP_SYNC_KEY }}
         run: |
+          if [ -z "$SHOP_SYNC_KEY" ]; then echo "Set SHOP_SYNC_KEY in GitHub and the private server .env; HTTP sync now requires authentication."; exit 1; fi
+          curl --fail --silent --show-error --max-time 180 -H "X-Shop-Sync-Key: $SHOP_SYNC_KEY" https://play2wingames.com/shop/reconcile.php
           for i in $(seq 1 25); do
-            out=$(curl -sS --max-time 120 https://play2wingames.com/shop/sync.php || echo '{"status":"error","error":"request failed"}')
+            out=$(curl --fail -sS --max-time 120 -H "X-Shop-Sync-Key: $SHOP_SYNC_KEY" https://play2wingames.com/shop/sync.php || echo '{"status":"error","error":"request failed"}')
             echo "$out"
             # A non-JSON answer (an error page during a blip) counts as an error and is retried, instead of
             # jq's parse error ending the whole run (exit code 5, Oct 9 2026).
             status=$(echo "$out" | jq -r '.status // "error"' 2>/dev/null || echo error)
             missing=$(echo "$out" | jq -r '.missing // 1' 2>/dev/null || echo 1)
             pending=$(echo "$out" | jq -r '.variants.pending // 0' 2>/dev/null || echo 0)
-            if [ "$status" = "ok" ] && [ "$missing" = "0" ] && [ "$pending" = "0" ]; then exit 0; fi
+            variant_error=$(echo "$out" | jq -r '.variants.error // .photoError // empty' 2>/dev/null || echo invalid)
+            if [ "$status" = "ok" ] && [ "$missing" = "0" ] && [ "$pending" = "0" ] && [ -z "$variant_error" ]; then exit 0; fi
             if [ "$status" = "error" ] && [ "$i" -ge 3 ]; then exit 1; fi
             # Product details come 400 per call; a short pause keeps Core2's load gentle while thousands fill in.
             if [ "$pending" != "0" ]; then sleep 60; else sleep 20; fi
           done
+          echo "Sync did not finish within its bounded attempts."; exit 1

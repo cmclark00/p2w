@@ -21,7 +21,7 @@
  * JSON, because the whole store doesn't fit in PHP's 128 MB as arrays.
  *
  * Run it from cron (php sync.php) or over HTTP (GitHub Actions and the shop pages call /shop/sync.php).
- * Anyone may call it: it only reads public data, refuses to re-read listings more often than
+ * HTTP callers need X-Shop-Sync-Key; CLI cron is supported. It refuses to re-read listings more often than
  * SYNC_MIN_MINUTES, and only one run happens at a time. Prints a JSON status line.
  */
 
@@ -51,6 +51,7 @@ const STORE_DB = 'shop.sqlite';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex');
+if (!shop_service_allowed()) { http_response_code(403); echo '{"status":"error","error":"Sync authentication required"}'; exit; }
 
 $cli = PHP_SAPI === 'cli';
 @set_time_limit($cli ? 0 : 90);
@@ -164,13 +165,13 @@ $photosPending = (int)$db->query('SELECT COUNT(*) FROM store_photos WHERE ok = 0
 $catalogAt = (int)sync_kv($db, 'catalogAt');
 $indexPath = shop_data_dir() . '/' . SHOP_INDEX_DB;
 $rebuild = !$fresh || $fetched > 0 || $photosFetched > 0 || !is_file($indexPath) || (int)($state['indexCatalogAt'] ?? -1) !== $catalogAt
-  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 7;
+  || (bool)($state['indexAdmin'] ?? null) !== ADMIN_STOCK || ($state['indexVersion'] ?? 0) !== 8;
 $built = null;
 if ($rebuild) {
   $built = sync_build_index($db, $indexPath, (int)$state['listingsAt']);
   $state['indexCatalogAt'] = $catalogAt;
   $state['indexAdmin'] = ADMIN_STOCK;
-  $state['indexVersion'] = 7;
+  $state['indexVersion'] = 8;
   $state['indexStats'] = $built;
 }
 $state['missingDetails'] = $missing;
@@ -205,6 +206,7 @@ function sync_store(): PDO {
   $db->exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000');
   $db->exec('CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)');
   $db->exec('CREATE TABLE IF NOT EXISTS core2 (id INTEGER PRIMARY KEY, pid INTEGER, name TEXT, type TEXT, c TEXT, v TEXT, dkey TEXT, q INTEGER, p INTEGER, live INTEGER, vid INTEGER)');
+  $db->exec('CREATE INDEX IF NOT EXISTS core2_variant_live ON core2 (vid, live, id)');
   $db->exec('CREATE TABLE IF NOT EXISTS details (pid INTEGER PRIMARY KEY, slug TEXT DEFAULT \'\', img TEXT DEFAULT \'\', thumb TEXT DEFAULT \'\', set_name TEXT DEFAULT \'\',
     set_slug TEXT DEFAULT \'\', type_slug TEXT DEFAULT \'\', type_name TEXT DEFAULT \'\', descr TEXT DEFAULT \'\', rel INTEGER DEFAULT 0, ok INTEGER DEFAULT 0, tries INTEGER DEFAULT 0)');
   sync_variants_table($db, 'variants');
@@ -371,7 +373,7 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
     // Core2 alone showed sold-out cards; the store's catalog is what its storefront and checkout use.
     $ix->exec('INSERT INTO listings (id, pid, c, v, q, p, vid, crank, src, name, type)
       SELECT c.id, c.pid, c.c, c.v, MIN(c.q, s.qty), c.p, c.vid, 9, 0, c.name, c.type FROM st.core2 c JOIN st.variants s ON s.vid = c.vid
-      WHERE c.live = 1 AND s.qty > 0');
+      WHERE c.live = 1 AND s.qty > 0 AND c.id = (SELECT MIN(c2.id) FROM st.core2 c2 WHERE c2.vid = c.vid AND c2.live = 1)');
     $droppedCore2 = (int)$ix->query('SELECT COUNT(*) FROM st.core2 WHERE live = 1')->fetchColumn() - (int)$ix->query('SELECT COUNT(*) FROM listings')->fetchColumn();
     $fromAdmin = 0;
     if (ADMIN_STOCK) {
@@ -450,7 +452,7 @@ function sync_build_index(PDO $db, string $path, int $listingsAt): array {
     }
     $rows->closeCursor();
     $ix->exec('INSERT INTO types (slug, name, game, kind, count) SELECT type_slug, MIN(type), MIN(game), MIN(kind), COUNT(*) FROM products GROUP BY type_slug');
-    foreach (['built' => time(), 'listingsAt' => $listingsAt, 'products' => $count] as $k => $v) $ix->prepare('INSERT INTO meta (k, v) VALUES (?, ?)')->execute([$k, (string)$v]);
+    foreach (['built' => time(), 'listingsAt' => $listingsAt, 'catalogAt' => (int)sync_kv($db, 'catalogAt'), 'products' => $count] as $k => $v) $ix->prepare('INSERT INTO meta (k, v) VALUES (?, ?)')->execute([$k, (string)$v]);
     $ix->exec('CREATE INDEX products_type ON products (type_slug); CREATE INDEX products_set ON products (set_slug); CREATE INDEX products_rel ON products (rel)');
     $listings = (int)$ix->query('SELECT COUNT(*) FROM listings')->fetchColumn();
     $orderable = (int)$ix->query('SELECT COUNT(*) FROM listings WHERE vid IS NOT NULL')->fetchColumn();
@@ -490,8 +492,7 @@ function sync_match(array $l, array $cands): ?array {
     $samePrice = array_values(array_filter($same, function ($c) use ($l) { return (int)$c[3] === (int)$l['p']; }));
     if ($samePrice) $same = $samePrice;
   }
-  if ($same) return [(int)$same[0][0], false];
-  if (count($cands) === 1) return [(int)$cands[0][0], true];
+  if (count($same) === 1) return [(int)$same[0][0], false];
   return null;
 }
 

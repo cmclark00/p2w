@@ -36,6 +36,11 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
   FTP account chrooted to `public_html`), `GODADDY_FTP_PASSWORD`. The
   mirror target is `./` (login lands in the docroot); `--delete` prunes
   stale files but excludes the host-managed `.well-known/` and `cgi-bin/`.
+  Deployment requires encrypted FTP control/data connections and verifies the
+  provider certificate for `prod.phx3.secureserver.net`. The workflow maps that
+  certificate name to the configured account address on its disposable runner;
+  the certificate does not cover the account IP, and that provider name has no
+  public A record. TLS 1.3 and certificate validation were checked on Oct. 17.
   See [[ftp-deploy-wrong-docroot]] for the war story (old creds hit a
   different non-serving account).
 - **`.htaccess` is tracked in the repo** and deploys like any other file —
@@ -1070,7 +1075,7 @@ The site's **only server-side code**. Everything else is static.
 ## Shop (CrystalCommerce) — `shop/`, PREVIEW
 
 Native browsing on play2wingames.com for the CrystalCommerce inventory;
-**CrystalCommerce stays the source of truth and handles cart/checkout.**
+**CrystalCommerce stays the inventory authority. Native PayPal checkout is password-protected and remains in preview.**
 
 - **Data source today: CrystalCommerce's Core2 API**
   (`https://core2-api.crystalcommerce.com`). Play2Win is marketplace
@@ -1159,7 +1164,7 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
     `index.json`/`listings*.json` became `*.old`), so no details were
     re-fetched and no extra pass ran.
   - `variants.json` is now just the stats for the kiosk status page.
-- **`shop/sync.php`** (public URL; only reads public data, one run at a
+- **`shop/sync.php`** (authenticated HTTP or CLI, one run at a
   time via `sync.lock`, listings re-read at most every 10 min) keeps the
   data above in `<home>/p2w-shop-data/` (outside the docroot, like the
   trade-in data; override with `P2W_SHOP_DATA`) plus `state.json`. Core2
@@ -1203,7 +1208,7 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
   "from $X", one row per condition (`.shop-cond`) with the cart button,
   and a perks line. Game/type comes from
   Core2's product type ("Pokemon Singles" → game Pokemon, kind Singles).
-- **Buying:** each product's **Buy on our online store** opens the
+- **Fallback buying (native checkout disabled):** each product's **Buy on our online store** opens the
   CrystalCommerce storefront search for that exact product name
   (`shop_buy_url()`), where it's listed with its add-to-cart button.
   Core2 ids don't match the storefront's own product/variant ids (Core2
@@ -1385,63 +1390,57 @@ Native browsing on play2wingames.com for the CrystalCommerce inventory;
       under it. First live pass (Oct 3 2026): 3,957 of 4,346 matched
       (322 via the only-variant fallback), 389 unmatched → "Ask at the
       register".
-- **Online checkout — `shop/checkout.php` (built Oct 2026, testing).**
-  A cart for everyone (not just kiosks), **free in-store pickup only**,
-  paid online with **PayPal**, a **CrystalCommerce Preorder** under the
-  owner's test customer, and an email to the shopper. All switches live
-  in the private `.env` (see `.env.example`), so nothing changes on the
-  live site until they're set:
-  - **Password gate** (`SHOP_PASSWORD`): every `/shop` page redirects to
-    `/shop/login` first; signed `p2w_shopgate` cookie (30 days, tied to
-    the password, so changing it signs everyone out). Kiosks and
-    `/shop/kiosk/...` skip it. `sync.php` / `admin-check.php` aren't
-    routed through `index.php`, so they're unaffected.
-  - **On when PayPal keys exist** for `PAYPAL_MODE` (`sandbox` default /
-    `live`): `PAYPAL_{SANDBOX,LIVE}_{CLIENT_ID,SECRET}`. Off = the old
-    "Buy on our online store" hand-off. Product pages then get **Add to
-    cart** (`web_add_form()`; "In store only" without a variant id), the
-    header a cart button, and routes `/shop/cart`, `/shop/checkout`,
-    `/shop/checkout/create|capture` (JSON, from `shop.js`), and
-    `/shop/order/<num>?k=<hmac>` (confirmation; the HMAC keeps strangers
-    out). Cart = signed `p2w_cart` cookie, same shape/limits as the
-    kiosk's. Cookies/links are signed with `shop-secret.key`, made on
-    first use in the private folder.
-  - **Flow:** PayPal JS SDK buttons. `onClick` requires name + email.
-    **create** re-checks every line live (`web_check_cart()`, same as the
-    kiosk: stock + price per variant, cart updated, problems returned)
-    and opens a PayPal Orders v2 order (`intent CAPTURE`, item + tax
-    breakdown, `NO_SHIPPING`, `PayPal-Request-Id` per step). **capture**
-    re-checks again and only captures when items/qty/prices are
-    identical; requires `COMPLETED` and the exact amount (anything else
-    that moved money is refunded). Then, with **`SHOP_ORDERS=live`**,
-    `web_cc_order()` creates the CrystalCommerce order in the kiosk's
-    proven shape but **paid**: status **Preorder** (holds the cards),
-    `employee_name` "WEBSITE - PAID ONLINE", tax filled in, payment
-    Received for the total with the PayPal capture id, In Store method 1,
-    customer **`SHOP_CC_CUSTOMER_ID` (default 202607, the owner's test
-    account)**, store address with the shopper's name, comments with
-    their email/phone; read back to confirm it saved as Preorder. **If
-    CrystalCommerce refuses after payment, the capture is refunded at
-    once** (and `SHOP_ORDER_BCC` gets a problem email). `SHOP_ORDERS=test`
-    (default) stops before CrystalCommerce (order numbers `W1001…`,
-    marked TEST). Our record of every checkout is `shop-orders.json`
-    (flock'd; status pending/paid/abandoned/refunded).
-  - **Tax** `SHOP_TAX_RATE` (9.25% default) on everything (all pickup).
-  - **Email** to the shopper (`web_mail_confirmation()`), optional copy
-    to `SHOP_ORDER_BCC`: SMTP when `SHOP_SMTP_HOST` is set (465 SSL, else
-    STARTTLS; minimal client `web_smtp()`), else PHP `mail()`.
-  - **Testing:** `P2W_PAYPAL_API_BASE` (a real environment variable,
-    never the `.env`) points PayPal calls at a fake. It was tested end to
-    end on PHP 8.3's built-in server with a fake PayPal + CrystalCommerce
-    (23 checks: gate, cart, totals, create/capture, Preorder payload,
-    refund on CC failure, price change / sold out / decline, no double
-    charge, link key). A portable PHP lives in the session scratchpad
-    only; see [[local-php-testing]]. Real PayPal (the JS SDK popup)
-    needs sandbox keys.
-  - **Rollout:** sandbox + `SHOP_ORDERS=test` → sandbox + `live` on 15¢
-    cards (cancel after) → `PAYPAL_MODE=live` with one real purchase,
-    refunded → remove `SHOP_PASSWORD`. Shipping and the policy pages
-    (refunds, shipping, privacy update) come later.
+- **Online checkout — `shop/checkout.php` + `shop/orders.php` (preview, hardened Oct 17 2026).**
+  Free in-store pickup, PayPal, CC Preorder. Keep `SHOP_PREVIEW = true`, the
+  password gate, existing public CC navigation, and the shop out of the sitemap.
+  Preview now fails closed without `SHOP_PASSWORD` (authorized kiosk/staff access
+  remains available). Cart/checkout/order/manage pages stay noindex after any later launch.
+  - **Safe modes:** sandbox + `SHOP_ORDERS=test` by default. Live PayPal with
+    test inventory is refused. Deliberate sandbox + real CC requires a preview
+    password, `SHOP_SANDBOX_CC_TEST=1`, and comma-separated `SHOP_TEST_VARIANTS`.
+    Only those variants may be ordered. This really reserves stock; cancel tests in CC.
+  - **Recovery:** signed browser owner cookie, per-checkout lock spanning external
+    actions, and durable stages before capture/create/refund. Capture timeouts are
+    unknown, recovered with PayPal GET using the original order (never a second
+    automatic capture). Recovery uses saved items, not the browser's changed cart.
+    CC create is never repeated after an uncertain result. Known CC IDs survive
+    readback failures; those are rechecked without a refund. Only explicit CC
+    validation rejection permits automatic refund. Refund IDs and pending/failed/
+    unknown states persist; only verified completion is labelled refunded.
+  - **Worker:** `shop/reconcile.php`, CLI or HTTP with `X-Shop-Sync-Key` equal to
+    `SHOP_SYNC_KEY`. Traffic kicks it at most once a minute; GitHub sync also calls
+    it. Set a reliable cPanel cron: `* * * * * php ~/public_html/shop/reconcile.php`.
+    It checks up to five due orders per run and retries receipts (five attempts,
+    five-minute spacing). JSON orders are no longer pruned at 2,000 records.
+    Back up the private data directory and monitor its growth; do not delete
+    unresolved records or signing keys. Keep hosting backups of `.env`, keys,
+    order JSON, and SQLite; test a restore into a separate private test directory.
+  - **Staff recovery:** sign in with the existing `KIOSK_STAFF_KEY` link, then open
+    `/shop/manage` (staff cookie required, CSRF-protected POSTs). It shows payment,
+    capture, CC, and email status; supports status checks, receipt retries, pickup
+    completion, linking a verified CC order by reference/capture, and verifying
+    manual PayPal refund + CC Void. No blind retry of unknown CC creates.
+    Unknown creates with no ID require staff to locate the order in CC first.
+    Kiosk attempts are tied to signed cart revisions as well as form tokens;
+    refreshes cannot create another order. Staff can verify an interrupted
+    kiosk order is Void/Shipped before clearing its exception and resetting
+    that cart. Legacy records without version 2 need manual reconciliation.
+  - **Inventory:** exact normalized condition + descriptors required; no only-variant
+    fallback. Ambiguous matches fail closed; Admin-only catalog rows remain available.
+    Index version 8 deduplicates Core2 rows by CC variant. Both checkout paths
+    recheck live variant identity and reject duplicate variant cart entries.
+  - **Emails:** accepted/failed delivery is recorded. Confirmation does not promise
+    delivery if SMTP failed. Shoppers wait for staff to confirm pickup readiness.
+    Staff still update CC manually; the local pickup button does not change CC.
+  - **Regression tests:** `php scripts/test-shop-checkout.php` runs offline against
+    fake adapters with real persistence/locks and extracted production functions.
+    CI runs PHP lint, these cases, and `python scripts/test-shop-http.py`
+    (full PHP routes with localhost fake APIs); deploy depends on checks. No real CC API
+    tests from the shop PC (preserve gentle upstream pacing).
+  - **Hosting follow-up:** configure the server and GitHub `SHOP_SYNC_KEY` to match,
+    install both host cron jobs, verify SMTP, confirm FTPS certificate hostname in
+    `GODADDY_FTP_HOST`, rotate FTP credentials after switching encrypted transport,
+    and do owner-controlled PayPal/CC smoke tests before any eventual public launch.
 - **Secrets:** `.env.example` lists the settings; real values go in
   `<home>/p2w-shop-data/.env` (never in the repo — `.env*` is
   git-ignored and excluded from the deploy): `CC_API_PROXY_SECRET`,
