@@ -657,6 +657,30 @@ The site's **only server-side code**. Everything else is static.
     Settings v11 removes the redundant `Killzone Shadow Fall @ Playstation 4 = -45`
     default and migrates it out of older saved settings. Other rules and
     customized percentages remain intact; Killzone now uses the filtered baseline.
+  - **Toys-to-life pricing:** `floorToyFamily()` recognizes the Amiibo,
+    Skylanders, Disney Infinity, Lego Dimensions and Starlink catalogs, not
+    console games with those names. Figures start on Loose and do not use the
+    game minimum or missing-manual deduction. `floorToyRound()` uses nearest
+    $2 steps below $15 (including the $15 transition), then $5 steps; Amiibo
+    always uses $5 steps, including above $80. Ties round up. Common
+    Skylanders/Infinity use the condition's PriceCharting market value;
+    uncommon figures and rare Skylanders use the highest eligible sale with
+    existing variant/outlier checks. Those sources replace Amazon/GameStop
+    clamps. Other toy lines retain the general baseline with toy rounding.
+    Classification uses the unrounded selected-condition market value:
+    below $15 is common; $15 or more is uncommon. This cutoff outranks
+    secondary named-variant classification, which is used when the market
+    value is missing. No value and no recognized variant needs review.
+    Legendary/chase Skylanders and recognized rare finish suffixes (metallic,
+    glitter, flocked, chrome, clear, glow-in-the-dark, gold/silver) automatically
+    have a $25 minimum, overriding the cutoff. Staff can select Rare variant
+    for another special Skylander. Character names such as Golden Queen are
+    not rare-finish evidence. Figure variant matching remains enforced.
+    `toyGroup` persists on list items; `auto` recomputes classification during
+    rechecks, while explicit staff choices persist. History inputs can carry
+    it too. Existing percentage premiums
+    still apply before toy rounding; the rare minimum applies afterward.
+
   - **Price math** (`floorPrice()`): through $80, `floorLowRound()` rounds
     dollar endings 7/8/9 up to the next $10; other endings round down to $5.
     Cents do not affect the ending: $16.99 -> $15, $17 -> $20, $26 -> $25,

@@ -804,6 +804,20 @@ Guide (the Google Sheet tab).
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks
    before adding it twice.)
+   **Toys to life:** figures use $2 steps below $15, then $5 steps. Amiibo
+   always uses $5 steps. Rounding chooses the nearest step, with ties up.
+   Skylanders/Disney Infinity automatically use the PriceCharting market
+   average **below $15**, or the highest eligible sale **at $15 or more**.
+   The unrounded value for the selected condition sets this group. It takes
+   priority over named variants; known variants help when that value is missing.
+   You can select **Common** or **Uncommon** to override the automatic group.
+   **Rare variant** Skylanders use that sale with a **$25 minimum**;
+   Legendary/chase figures and recognized rare finishes get this minimum
+   automatically, even below the cutoff. Mark other rare variants explicitly.
+   Automatic groups are recalculated on recheck; staff overrides stay saved.
+   Figures do not use game minimums or manual
+   deductions. Existing percentage premiums still apply. Other toy lines
+   keep the usual market baseline with the toy rounding rules.
 6. Prices in the list can be changed by hand. **Save session** keeps the
    list on the website under its name, so anyone can open it later from
    **Saved sessions**. If someone else saved the same session after you

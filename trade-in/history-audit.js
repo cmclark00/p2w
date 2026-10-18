@@ -59,7 +59,7 @@ async function auditOne(item) {
     cached(`sales|${product.id}`,()=>auditRequest('pc/sales',{id:product.id}).then(d=>({sales:d.sales})).catch(e=>({sales:null,salesError:e.message}))),
     audit.config.amazonSet ? audit.engine.fetchFloorAmazon(product,item.condition,auditRequest).catch(e=>({error:e.message})) : Promise.resolve(null),
   ]);
-  const cur={product,condition:item.condition,manualMissing:item.manualMissing,pick:null,typed:null,...sold,amazon};
+  const cur={product,condition:item.condition,manualMissing:item.manualMissing,toyGroup:item.toyGroup,pick:null,typed:null,...sold,amazon};
   const result=audit.engine.floorResult(cur), price=result.r?.price??null;
   const notes=[...(result.b.checks || [])];
   if(item.allUnits<3) notes.push('Fewer than three historical units sold');

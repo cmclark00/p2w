@@ -12,7 +12,7 @@ const element = (selector) => {
     listeners: {}, addEventListener(type, handler) { this.listeners[type] = handler; }, focus() {}, scrollIntoView() {} });
   return elements.get(selector);
 };
-const context = vm.createContext({ console, Date, setTimeout, clearTimeout,
+const context = vm.createContext({ console, Date, setTimeout, clearTimeout, crypto: require('node:crypto').webcrypto,
   localStorage: { getItem: () => null, setItem: () => {} },
   document: { querySelector: element, listeners: [], addEventListener(type, handler) { this.listeners.push({ type, handler }); } },
 });
@@ -544,6 +544,134 @@ test('Terminator rounds its raw amount once, including market clamps and manual 
   assert.equal(manual.ded, 4000); assert.equal(manual.beforeShelfRound, 36217); assert.equal(manual.price, 36000);
   assert.equal(invoke('floorPrice', 8100, { manualMissing: true }).price, 7000);
 });
+test('toy category detection uses figure catalogs and leaves same-named games alone', () => {
+  for (const [system, family] of [['Skylanders', 'skylanders'], ['Disney Infinity', 'infinity'], ['Amiibo', 'amiibo'], ['Lego Dimensions', 'dimensions'], ['Starlink', 'starlink']]) {
+    assert.equal(invoke('floorToyFamily', { 'console-name': system }), family);
+  }
+  for (const name of ['Skylanders Giants', 'Disney Infinity', 'Animal Crossing Amiibo Festival', 'Lego Dimensions', 'Starlink Battle for Atlas']) {
+    assert.equal(invoke('floorToyFamily', { 'product-name': name, 'console-name': 'Wii U' }), null);
+  }
+});
+
+test('toy rounding uses the 2-to-15-to-5 ladder and amiibo always uses 5s', () => {
+  for (const [price, expected] of [[50, 200], [299, 200], [300, 400], [799, 800], [1200, 1200], [1399, 1400],
+    [1449, 1400], [1450, 1500], [1499, 1500], [1500, 1500], [1699, 1500], [1750, 2000], [8500, 8500], [40217, 40000]]) {
+    assert.equal(invoke('floorToyRound', price, 'skylanders'), expected, String(price));
+  }
+  for (const [price, expected] of [[200, 500], [600, 500], [750, 1000], [1200, 1000], [1250, 1500], [8500, 8500]]) {
+    assert.equal(invoke('floorToyRound', price, 'amiibo'), expected);
+  }
+});
+
+test('common Skylanders and Infinity use condition-specific PriceCharting average without market clamps', () => {
+  for (const system of ['Skylanders', 'Disney Infinity']) {
+    const product = { ...item, 'product-name': 'Bash', 'console-name': system, 'loose-price': 320, 'cib-price': 1250, 'new-price': 1800, 'gamestop-price': 3000 };
+    for (const [condition, expected] of [['loose', 400], ['cib', 1200], ['new', 2000]]) {
+      const r = invoke('floorResult', cur(product, { condition, toyGroup: 'common', manualMissing: true,
+        sales: { [condition]: [{ title: 'Bash', price: 4000 }] }, amazon: { found: true, title: 'Bash', offers: [{ price: 5000 }] } }));
+      assert.equal(r.b.from, 'toyaverage'); assert.equal(r.r.price, expected); assert.equal(r.r.ded, 0); assert.equal(r.shitbox, null);
+    }
+  }
+});
+
+test('uncommon figures use highest eligible sold evidence, preserving variant and outlier checks', () => {
+  const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 300, 'gamestop-price': 8000 };
+  const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'uncommon',
+    sales: { loose: [{ title: 'Bash', price: 5000 }, { title: 'Bash Legendary', price: 9000 },
+      ...[700, 800, 900, 1000].map((price) => ({ title: 'Bash', price }))] },
+    amazon: { found: true, title: 'Bash', offers: [{ price: 8000 }] } }));
+  assert.equal(r.b.basis, 1000); assert.equal(r.r.price, 1000); assert.equal(r.b.from, 'sale');
+  assert.ok(r.b.checks.some((s) => s.includes('outlier')));
+});
+
+test('Legendary and staff-classified rare Skylanders cannot fall below 25', () => {
+  for (const [name, toyGroup] of [['Trigger Happy - Legendary', undefined], ['Bash', 'rare']]) {
+    const product = { ...item, 'product-name': name, 'console-name': 'Skylanders' };
+    for (const price of [700, 2400, 8500]) {
+      const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup, sales: { loose: [{ title: name, price }] } }));
+      assert.equal(r.r.price, Math.max(2500, price)); assert.equal(r.r.ded, 0);
+    }
+    assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup, typed: 1000 })).r.price, 2500);
+  }
+  const product = { ...item, 'product-name': 'Trigger Happy - Legendary', 'console-name': 'Skylanders' };
+  assert.equal(invoke('floorToyGroup', { product, toyGroup: 'common' }), 'rare');
+});
+
+test('unknown toy rarity and missing required sources ask for review instead of a made-up baseline', () => {
+  const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'cib-price': 0 };
+  const unknown = invoke('floorResult', cur(product));
+  assert.equal(unknown.r, null); assert.ok(unknown.b.need.includes('Choose Common'));
+  assert.equal(invoke('floorResult', cur({ ...product, 'loose-price': 0 }, { condition: 'loose', toyGroup: 'common' })).r, null);
+  assert.equal(invoke('floorResult', cur(product, { toyGroup: 'uncommon', sales: { cib: [] } })).r, null);
+});
+
+test('the 15 dollar cutoff takes priority over secondary variant classification', () => {
+  for (const system of ['Skylanders', 'Disney Infinity']) {
+    for (const name of ['Bash', 'Bash - Crystal']) {
+      for (const [market, group, price] of [[1499, 'common', 1500], [1500, 'uncommon', 3000], [1501, 'uncommon', 3000]]) {
+        const product = { ...item, 'product-name': name, 'console-name': system, 'loose-price': market };
+        const example = cur(product, { condition: 'loose', toyGroup: 'auto', sales: { loose: [{ title: `${name} figure`, price: 3000 }] } });
+        assert.equal(invoke('floorToyGroup', example), group);
+        assert.equal(invoke('floorResult', example).r.price, price);
+      }
+    }
+  }
+  const product = { ...item, 'product-name': 'Bash - Crystal', 'console-name': 'Skylanders', 'loose-price': 0, 'new-price': 2000 };
+  assert.equal(invoke('floorToyGroup', { product, condition: 'loose' }), 'uncommon');
+  assert.equal(invoke('floorToyGroup', { product: { ...product, 'product-name': 'Bash' }, condition: 'loose' }), 'review');
+  assert.equal(invoke('floorToyGroup', { product, condition: 'new' }), 'uncommon');
+  assert.equal(invoke('floorToyGroup', { product, condition: 'new', toyGroup: 'common' }), 'common');
+});
+
+test('rare finishes keep the 25 minimum and named figure variants do not mix', () => {
+  for (const name of ['Trigger Happy - Legendary', 'Eye Brawl - Giants, Purple, Metallic', 'Bash - Gold', 'Bash - Chase']) {
+    const product = { ...item, 'product-name': name, 'console-name': 'Skylanders', 'loose-price': 500 };
+    const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'auto', sales: { loose: [{ title: `${name} Skylanders figure`, price: 700 }] } }));
+    assert.equal(r.toyGroup, 'rare'); assert.equal(r.r.price, 2500);
+  }
+  const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders' };
+  for (const title of ['Skylanders Bash Legendary', 'Bash Skylanders Metallic', 'Bash Series 2 Skylanders']) {
+    assert.ok(invoke('floorListingMismatch', title, product));
+  }
+  assert.equal(invoke('floorListingMismatch', 'Bash Skylanders Figure', product), null);
+  assert.equal(invoke('floorListingMismatch', 'Bash Legendary Skylanders Legendary figure', { ...product, 'product-name': 'Bash - Legendary' }), null);
+  assert.equal(invoke('floorToyVariant', { ...product, 'product-name': 'Golden Queen - Imaginators' }).rare, false);
+});
+
+test('amiibo preserves configured premiums but uses its own rounding and no manual deductions', () => {
+  const product = { ...item, 'product-name': 'Pokemon Pikachu', 'console-name': 'Amiibo', 'gamestop-price': 0 };
+  const r = invoke('floorResult', cur(product, { manualMissing: true, sales: { cib: [{ title: 'Pokemon Pikachu', price: 1500 }] } }));
+  assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 1650); assert.equal(r.r.price, 1500); assert.equal(r.r.ded, 0);
+  assert.ok(invoke('floorMath', r.b, r.r).includes('toys-to-life $5 step'));
+});
+
+test('figure group controls show the actual rule and carry the chosen group into the saved item', () => {
+  const product = { ...item, id: '123', 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 320 };
+  context.toyControlCur = cur(product, { condition: 'loose', sales: { loose: [{ title: 'Bash', price: 900 }] } });
+  run('floorCur = toyControlCur; renderFloorPricer();');
+  assert.ok(element('#floorPricer').innerHTML.includes('Figure pricing group'));
+  assert.ok(!element('#floorPricer').innerHTML.includes('Manual missing'));
+  assert.ok(!element('#floorPricer').innerHTML.includes('The baseline is the highest'));
+  invoke('onFloorPricerChange', { target: { dataset: { floorField: 'toyGroup' }, value: 'common' } });
+  assert.equal(run('floorResult(floorCur).r.price'), 400);
+  const oldItems = run('floor.items'), oldDirty = run('floor.dirty');
+  run('floor.items = []; var toySavedRender = renderFloorList; renderFloorList = () => {};');
+  try {
+    run('addFloorItem();');
+    const saved = json('floor.items[0]');
+    assert.equal(saved.toyGroup, 'common'); assert.equal(saved.manualMissing, false); assert.equal(saved.price, 400);
+    // This is the same persisted group supplied by the saved-list recheck.
+    assert.equal(invoke('floorResult', { ...context.toyControlCur, toyGroup: saved.toyGroup }).r.price, 400);
+    run('floor.items = []; floorCur = toyControlCur; floorCur.toyGroup = "auto"; addFloorItem();');
+    const automatic = json('floor.items[0]');
+    assert.equal(automatic.toyGroup, 'auto');
+    assert.equal(invoke('floorToyGroup', { product: { ...product, 'loose-price': 1500 }, condition: 'loose', toyGroup: automatic.toyGroup }), 'uncommon');
+  } finally {
+    context.toyOldItems = oldItems; context.toyOldDirty = oldDirty;
+    run('floor.items = toyOldItems; floor.dirty = toyOldDirty; renderFloorList = toySavedRender; floorCur = null;');
+  }
+});
+
 test('CSV handles BOM, CRLF, embedded commas/newlines and escaped quotes', () => {
   const r = invoke('fulcrumCsv', '\uFEFFa,b\r\n"Game, \"\"Deluxe\"\"\nEdition",00123\r\n');
   assert.equal(r.rows[0].a, 'Game, "Deluxe"\nEdition'); assert.equal(r.rows[0].b, '00123');

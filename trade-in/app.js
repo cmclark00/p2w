@@ -3043,6 +3043,63 @@ const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500;
+// Use the catalog's figure line, not a game's title (Skylanders on Wii is a game).
+function floorToyFamily(product) {
+  const system = norm(product?.['console-name']).replace(/^(?:pal|jp) /, '');
+  if (/^amiibo(?: figures)?$/.test(system)) return 'amiibo';
+  return ({ skylanders: 'skylanders', 'disney infinity': 'infinity', 'lego dimensions': 'dimensions', starlink: 'starlink' })[system] || null;
+}
+const FLOOR_TOY_UNCOMMON = 1500;
+function floorToyVariant(product) {
+  const name = product?.['product-name'] || '';
+  const suffix = name.split(/\s+-\s+|\[/).slice(1).join(' ');
+  // Restrict color names to variant suffixes: Golden Queen and Silver the
+  // Hedgehog are character names, not evidence of a rare finish.
+  const rare = floorToyFamily(product) === 'skylanders' && (/\b(?:legendary|chase)\b/i.test(name)
+    || /\b(?:metallic|glitter|flocked|chrome|clear|glow[ -]in[ -]the[ -]dark|gold|silver)\b/i.test(suffix));
+  const named = rare || /\b(?:lightcore|dark|nitro|jade|enchanted|crystal|exclusive|variant)\b/i.test(suffix)
+    || /^(?:dark|nitro|jade|enchanted|crystal)\s/i.test(name);
+  return { rare, named };
+}
+function floorToyListingMismatch(title, product) {
+  if (!floorToyFamily(product)) return null;
+  const name = product['product-name'] || '';
+  const variants = /\b(?:legendary|lightcore|dark|nitro|jade|enchanted|crystal|chase|metallic|glitter|flocked|chrome|clear|gold|silver|glow[ -]in[ -]the[ -]dark|series [2-9])\b/gi;
+  const words = (s) => [...new Set([...String(s).matchAll(variants)].map((m) => norm(m[0])))].sort().join('|');
+  if (words(title) !== words(name)) return 'Different or unconfirmed figure variant';
+  return null;
+}
+function floorToyGroup(cur, automatic = false) {
+  const family = floorToyFamily(cur.product);
+  if (!family) return null;
+  const variant = floorToyVariant(cur.product);
+  // The rare-variant floor is a specific exception to the general cutoff.
+  if (variant.rare) return 'rare';
+  if (['skylanders', 'infinity'].includes(family)) {
+    if (!automatic && ['common', 'uncommon'].includes(cur.toyGroup)) return cur.toyGroup;
+    if (!automatic && family === 'skylanders' && cur.toyGroup === 'rare') return 'rare';
+    const market = Number(cur.product[PC_FIELDS.market[cur.condition]]);
+    if (Number.isFinite(market) && market > 0) return market >= FLOOR_TOY_UNCOMMON ? 'uncommon' : 'common';
+    // Named variants are secondary evidence when the market value is absent.
+    if (variant.named) return 'uncommon';
+    return 'review';
+  }
+  return 'market';
+}
+function floorToyRound(price, family) {
+  if (family === 'amiibo' || price >= 1500) return Math.max(500, Math.round(price / 500) * 500);
+  // The allowed ladder is $2, $4, ... $14, $15, $20 ...; there is no $16 rung.
+  const candidates = [200, 400, 600, 800, 1000, 1200, 1400, 1500];
+  return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
+}
+function floorToyPrice(basis, { family, group, premium }) {
+  if (basis == null) return null;
+  const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
+  const min = group === 'rare' ? 2500 : family === 'amiibo' ? 500 : 200;
+  const beforeShelfRound = Math.max(min, premiumBasis);
+  return { full: beforeShelfRound, ded: 0, price: floorToyRound(beforeShelfRound, family), beforeShelfRound,
+    min, premium, premiumBasis, toy: family, rareMinimum: group === 'rare' };
+}
 // Flag an unusually high lowest Amazon offer for review, without silently dropping a required minimum.
 const FLOOR_AMAZON_OUTLIER = 2;
 // A single isolated high sale needs at least three lower comparables before we exclude it automatically.
@@ -3246,7 +3303,7 @@ function renderFloorResults() {
 function pickFloorGame(product) {
   $('#floorScan').value = '';
   closeFloorResults();
-  floorCur = { product, condition: 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
+  floorCur = { product, condition: floorToyFamily(product) ? 'loose' : 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
   renderFloorPricer();
   loadFloorSales(product);
   const sellKeys = Object.values(PC_FIELDS['retail-sell']);
@@ -3258,7 +3315,7 @@ function pickFloorGame(product) {
       if (floorCur?.product !== product) return;
       if (!full?.id) throw new Error('PriceCharting returned no full product.');
       product['gamestop-price'] = full['gamestop-price'];
-      for (const k of sellKeys) if (k in full) product[k] = full[k];
+      for (const k of [...sellKeys, ...Object.values(PC_FIELDS.market)]) if (k in full) product[k] = full[k];
       product.upc = product.upc || full.upc || '';
       floorCur.fullLoading = false;
       renderFloorPricer();
@@ -3465,7 +3522,7 @@ function floorTitleIdentityMismatch(title, product) {
   const core = floorTitleWords(name.replace(/\[[^\]]*\]|\([^)]*\)/g, ' '));
   const listed = floorTitleWords(title);
   if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
-  const hardware = floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
+  const hardware = !!floorToyFamily(product) || floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
   if (!hardware) {
     const text = ` ${floorTitleWords(floorBundleTitle(title)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
@@ -3499,6 +3556,8 @@ function floorAmazonPlatformConfirmed(candidate, product) {
 }
 function floorListingMismatch(title, product) {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
+  const toyMismatch = floorToyListingMismatch(title, product);
+  if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
   const expected = `${name} ${product?.['console-name'] || ''}`;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
@@ -3628,6 +3687,17 @@ function floorBasis(cur = floorCur) {
   if (cur.fullLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
   if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop may be missing. Retry the search before labeling');
   if (cur.amazon?.error) checks.push(`Amazon check unavailable: ${cur.amazon.error}`);
+  const toyGroup = floorToyGroup(cur);
+  if (['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
+    if (toyGroup === 'review') return { basis: null, sale, checks, need: 'Choose Common or Uncommon for this figure; choose Rare variant for a special Skylander with the $25 minimum.' };
+    if (toyGroup === 'common') {
+      const basis = Number(cur.product[PC_FIELDS.market[cur.condition]]);
+      return basis > 0 ? { basis, from: 'toyaverage', sale: null, checks, toyGroup }
+        : { basis: null, sale: null, checks, need: 'No PriceCharting market price for this condition. Check the product and type a price.' };
+    }
+    if (sale) return { basis: sale.price, from: 'sale', sale, checks, toyGroup };
+    return { basis: null, sale: null, checks, need: 'No usable sold evidence for this figure and condition. Review the listings or type a price.' };
+  }
   // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
   // disc-only copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
   // [Band Kit], Oct 2026: 27 of 30 were "game only"; the other 3 sold for $7, $0.99 and $0.07). When what's left
@@ -3669,7 +3739,8 @@ const floorIsHardware = (p) => !isGameCat(guessCategory(p['product-name'] || '')
 // The shelf price for a game being priced (or re-checked): { b: floorBasis, r: floorPrice, shitbox, premium, hw }.
 function floorResult(cur) {
   const p = cur.product;
-  const hw = floorIsHardware(p);
+  const toy = floorToyFamily(p), toyGroup = floorToyGroup(cur);
+  const hw = !!toy || floorIsHardware(p);
   const shitbox = hw ? null : autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const b = floorBasis(cur);
   const typed = b.from === 'typed';
@@ -3678,9 +3749,9 @@ function floorResult(cur) {
   // Owner clarification: specific adjustments outrank the general three-reference baseline,
   // including discounts below it. A 0% premium only exempts a title from a broader premium.
   const specific = !!(premium?.pct || manualMissing);
-  const r = floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
+  const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
     gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin });
-  return { b, r, shitbox, premium, hw };
+  return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
 
 // Keep GameStop's comparison price visually distinct from our shelf price.
@@ -3695,9 +3766,9 @@ function renderFloorPricer() {
   const p = cur.product;
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
-  const { b, r: result, shitbox, premium, hw } = floorResult(cur);
+  const { b, r: result, shitbox, premium, hw, toy, toyGroup } = floorResult(cur);
   const rhythm = rhythmKind(p['product-name']);
-  const belowGs = b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
+  const belowGs = !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
     + (tier.id === 'modern' ? ` · Retail sell reference ${Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS['retail-sell'][c]]) || null)}`).join(' · ')}` : '');
   const gs = Number(p['gamestop-price']) > 0 ? ` · ${floorReferenceText(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
@@ -3715,7 +3786,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ` <span class="badge info">${esc(s.mismatch || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>`;
+      ${!toy ? `<p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>` : ''}`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3724,9 +3795,10 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${floorReferenceText(tier.rule)}</div>
+        <div class="floor-rule">${toy ? 'Toys to life: Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. The cutoff takes priority over named variants; known rare Skylanders keep a $25 minimum. Review unrecognized rare variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
-        ${hw ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
+        ${hw && !toy ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
+        ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $25 minimum</span>' : ''}
         ${rhythm === 'disc' ? '<span class="badge info">Disc only: sales that came with instruments don\'t count</span>' : ''}
         ${rhythm === 'bundle' ? `<span class="badge guide">With instruments: disc-only sales don't count${cur.condition === 'loose' ? '. PriceCharting files many disc-only sales under a bundle\'s Loose price, so check what\'s left' : ''}</span>` : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
@@ -3735,6 +3807,12 @@ function renderFloorPricer() {
     </div>
     <div class="floor-controls">
       <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
+      ${['skylanders', 'infinity'].includes(toy) ? `<label>Figure pricing group<select data-floor-field="toyGroup"${floorToyVariant(p).rare ? ' disabled' : ''}>
+        <option value="auto"${!['common', 'uncommon', 'rare'].includes(cur.toyGroup) ? ' selected' : ''}>Automatic — ${esc(floorToyGroup(cur, true))}</option>
+        <option value="common"${cur.toyGroup === 'common' ? ' selected' : ''}>Common — PriceCharting average</option>
+        <option value="uncommon"${cur.toyGroup === 'uncommon' ? ' selected' : ''}>Uncommon — highest eligible sale</option>
+        ${toy === 'skylanders' ? `<option value="rare"${cur.toyGroup === 'rare' ? ' selected' : ''}>Rare variant — highest sale, $25 minimum</option>` : ''}
+      </select></label>` : ''}
       ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
@@ -3794,6 +3872,11 @@ function floorAmazonHtml(cur, b) {
 function floorMath(b, r) {
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
+  if (r.toy) {
+    if (r.full !== r.premiumBasis) parts.push(`${r.rareMinimum ? 'rare Skylander minimum' : 'minimum'} ${money(r.min)}`);
+    if (r.price !== r.beforeShelfRound) parts.push(`rounded to toys-to-life ${r.toy === 'amiibo' || r.beforeShelfRound >= 1500 ? '$5' : '$2 / $15'} step: ${money(r.price)}`);
+    return parts.join(' → ');
+  }
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `low-price rounding: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
@@ -3819,7 +3902,7 @@ function addFloorItem() {
   if (same && !confirm(`${p['product-name']} (${GAME_CONDITIONS[cur.condition]}${manualMissing ? ', no manual' : ''}) is already on this list at ${money(same.price)}. Add it again?`)) return;
   floor.items.unshift({
     id: uid(), pcId: String(p.id), name: p['product-name'], platform: p['console-name'] || '', condition: cur.condition,
-    manualMissing, ...floorBasisInfo(b), price: r.price, edited: false,
+    manualMissing, toyGroup: cur.toyGroup || 'auto', ...floorBasisInfo(b), price: r.price, edited: false,
   });
   floor.dirty = true;
   saveFloorLocal();
@@ -3864,6 +3947,7 @@ function onFloorPricerChange(e) {
   if (!floorCur) return;
   const field = e.target.dataset.floorField;
   if (field === 'manual') floorCur.manualMissing = e.target.checked;
+  if (field === 'toyGroup') { floorCur.toyGroup = e.target.value; floorCur.pick = null; floorCur.typed = null; }
   if (field === 'typed') {
     const cents = parseMoney(e.target.value);
     if (Number.isNaN(cents)) { toast('Enter a price like 24.99', 'error'); return; }
@@ -3874,7 +3958,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'eBay sale', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => it.recheck?.price != null && it.recheck.price !== it.price;
@@ -3934,7 +4018,7 @@ async function recheckFloorPrices() {
       const sales = await fetchFloorSales(it.pcId);
       let amazon = null;
       if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
-      const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, sales, pick: null, typed: null, amazon });
+      const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, sales, pick: null, typed: null, amazon });
       it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: 'no sales to go by' };
     } catch (err) {
       it.recheck = { error: err.message };
