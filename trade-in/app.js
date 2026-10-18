@@ -3052,7 +3052,7 @@ const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differe
 const FLOOR_SALE_CLUSTER_MIN = 8; // broader distribution needs more evidence than the single-gap check
 const FLOOR_SALE_CLUSTER_SEPARATION = 1.2; // nearby high sales still support one another
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
-const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph|\d+ (more )?games)\b/i;
+const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph)\b/i;
 // "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
 // odd everywhere, which threw out 26 of Pokemon Colosseum's 30 loose sales).
 const NOT_COMPLETE_RE = /\b(disc only|disk only|cart only|cartridge only|game only)\b/i;
@@ -3377,11 +3377,52 @@ function floorListingLanguages(title) {
 }
 const FLOOR_REGIONS = [
   ['Japan', /\b(?:ntsc j|japan|jp|jpn|japanese import)\b/],
-  ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|eur)\b/],
+  ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|eu version|eu edition|eur)\b/],
   ['Asia', /\b(?:asia|asian|hong kong|korea|china|taiwan)\b/],
   ['North America', /\b(?:ntsc u|ntsc uc|usa|us version|us edition|north america|north american|esrb)\b/],
 ];
-const FLOOR_EXTRAS = /(?:\bwith\b|\bw\/|\+|\bplus\b|\bincludes?\b|\band\b|&)\s*(?:(?:a|an|the|bonus|extra|exclusive|collectible|limited|art|mini)\s+)*(?:figurines?|figures?|statues?|soundtracks?|art ?books?|steel ?books?|bonus discs?|demo discs?|amiibo|controllers?|memory cards?|another game|extra games?)\b/i;
+const FLOOR_EXTRA_ITEMS = ['figurines?|figures?|statues?', 'soundtracks?|music cds?', 'art ?books?', 'steel ?books?',
+  'bonus discs?', 'demo discs?', 'amiibo', 'controllers?', 'memory cards?', '(?:light )?guns?|guncons?', 'sensors?', 'another game|extra games?'];
+function floorExtraMismatch(title, name) {
+  return FLOOR_EXTRA_ITEMS.some((item) => {
+    const bundled = new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\bincludes?\\b|\\band\\b|&)\\s*(?:(?:a|an|the|bonus|extra|exclusive|collectible|limited|art|mini)\\s+)*(?:${item})\\b`, 'i');
+    const selected = new RegExp(`\\b(?:${item})\\b`, 'i').test(name);
+    return bundled.test(title) && !selected && !(item === 'controllers?' && rhythmKind(name) === 'bundle');
+  });
+}
+const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreordered\b/i;
+// Counts may have a platform between the quantity and "games". A collection's own
+// advertised count is allowed, but unrelated games in a seller's lot are not.
+const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)\s+){0,4}(?:games|titles)\b/gi;
+const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT)].map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
+const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/g, '').replace(/['’]/g, '').replace(/\b([IVX]+)\b/g, (v) => ({ I: '1', II: '2', III: '3', IV: '4', V: '5', VI: '6', VII: '7', VIII: '8', IX: '9', X: '10', XI: '11', XII: '12', XIII: '13', XIV: '14', XV: '15', XVI: '16' }[v] || v)))
+  .replace(/\bgame boy\b/g, 'gameboy').replace(/\bstar fox\b/g, 'starfox').replace(/\bspider man\b/g, 'spiderman')
+  .replace(/\bworld wide\b/g, 'worldwide').replace(/\bdragon ball\b/g, 'dragonball').replace(/\bu s\b/g, 'us')
+  .replace(/\b(two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[w]))
+  .replace(/\bbrothers\b/g, 'bros').replace(/\bsystems?\b/g, 'console')
+  .split(' ').filter((w) => w && !['a', 'an', 'the', 'of', 'for', 'and'].includes(w));
+// A title must identify the selected product, not merely share its franchise.
+// Unknown extensions directly after a game's name are held for review: "Final
+// Fight Guy" and "Halo 3 ODST" cannot price Final Fight and Halo 3 respectively.
+const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|instructions|inserts|registration|reg|card|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
+function floorTitleIdentityMismatch(title, product) {
+  const name = product?.['product-name'] || '';
+  const core = floorTitleWords(name.replace(/\[[^\]]*\]|\([^)]*\)/g, ' '));
+  const listed = floorTitleWords(title);
+  if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
+  const hardware = floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
+  if (!hardware) {
+    const text = ` ${listed.join(' ')} `, phrase = ` ${core.join(' ')} `;
+    const start = text.indexOf(phrase);
+    // Sellers may reorder a platform or descriptive subtitle. Missing identity
+    // words are still rejected above; do not confuse ordering with another game.
+    const next = start < 0 ? '' : text.slice(start + phrase.length).trim().split(' ')[0];
+    const variantWords = floorTitleWords(name);
+    if (next && (core.length <= 2 || /^\d{1,2}$/.test(next)) && !FLOOR_TITLE_DETAILS.test(next)
+      && !['standard', 'regular', 'base'].includes(next) && !variantWords.includes(next)) return 'Different game, sequel, or unconfirmed title extension';
+  }
+  return null;
+}
 const FLOOR_PLATFORMS = [
   /\b(?:ps1|psx|playstation 1)\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
   /\b(?:ps4|playstation 4)\b/, /\b(?:ps5|playstation 5)\b/, /\b(?:psp|playstation portable)\b/,
@@ -3394,6 +3435,11 @@ function floorListingMismatch(title, product) {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   const name = product?.['product-name'] || '';
   const expected = `${name} ${product?.['console-name'] || ''}`;
+  if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
+  const wantedCounts = floorGameCounts(name);
+  if (/\btrilogy\b/i.test(name)) wantedCounts.push('3');
+  const collection = /\b(?:collection|compilation|anthology)\b/i.test(name);
+  if (!collection && floorGameCounts(title).some((count) => !wantedCounts.includes(count))) return 'Multiple-game lot or bundle';
   const wantedRegions = FLOOR_REGIONS.filter(([, re]) => re.test(norm(expected))).map(([region]) => region);
   const languages = floorListingLanguages(title);
   const wantedLanguages = [...new Set([...floorListingLanguages(name), ...floorListingLanguages(product?.['console-name'])])];
@@ -3406,15 +3452,23 @@ function floorListingMismatch(title, product) {
   if (wantedRegions.length && !regions.some((region) => wantedRegions.includes(region))) return 'Listing does not confirm the selected region variant';
   if (/\bimport(?:ed)?\b/i.test(title) && !/\bimport(?:ed)?\b/i.test(expected) && !wantedRegions.length) return 'Import variant needs review';
   if (otherEdition(title, name)) return 'Different special edition or reprint';
+  let editionTitle = norm(title).replace(/\b(?:standard|regular|base) edition\b/g, '');
+  for (const platform of FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])))) {
+    editionTitle = editionTitle.replace(new RegExp(`(?:${platform.source})\\s+edition\\b`, 'g'), '');
+  }
+  if (/\bedition\b/i.test(editionTitle) && !/\bedition\b/i.test(name)
+    && !EDITION_RES.some((re) => re.test(name) && re.test(title))) return 'Unconfirmed named or numbered edition';
+  const selectedEdition = name.match(/\[[^\]]*\bedition\b[^\]]*\]|\([^)]*\bedition\b[^)]*\)/gi) || [];
+  if (selectedEdition.some((edition) => floorTitleWords(edition).some((word) => !floorTitleWords(title).includes(word)))) return 'Different named edition';
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
-  if (FLOOR_EXTRAS.test(title) && !FLOOR_EXTRAS.test(name) && rhythmKind(name) !== 'bundle') return 'Bundled extra item';
+  if (floorExtraMismatch(title, name)) return 'Bundled extra item';
   if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(title))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
   if (wantedPlatforms.length && listedPlatforms.length && !wantedPlatforms.some((re) => re.test(norm(title)))) return 'Different platform';
-  return null;
+  return floorTitleIdentityMismatch(title, product);
 }
 
 function floorAmazonMismatch(cur) {

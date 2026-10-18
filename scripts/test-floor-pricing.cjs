@@ -27,7 +27,7 @@ const lineHeader = 'transaction_number,date_local,transaction_type,line_mode,ite
 const txHeader = 'transaction_number,date_local,transaction_type,purchases_total,line_count';
 const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': 1500, 'gamestop-price': 0 };
 const cur = (product = item, extra = {}) => {
-  const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: 'Example Game complete', price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
+  const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: `${product['product-name']} complete`, price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
   // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
   if (result.amazon?.found) result.amazon = { title: product['product-name'], ...result.amazon };
   return result;
@@ -67,6 +67,64 @@ test('matching variants and ordinary packaging remain eligible while unconfirmed
     ['Guitar Hero Live [Bundle]', 'Wii U', 'Guitar Hero Live Wii U Bundle with guitar'],
   ]) assert.equal(invoke('floorListingMismatch', title, { ...item, 'product-name': name, 'console-name': system }), null, title);
   assert.ok(invoke('floorListingMismatch', 'Example Game PS4', { ...item, 'product-name': 'Example Game [Special Edition]' }));
+});
+
+test('audit mismatches cannot drive eBay or Amazon baselines', () => {
+  for (const [name, system, title, good, price] of [
+    ['Final Fight', 'Super Nintendo', 'Final Fight Guy - Nintendo Super NES', 'Final Fight Super Nintendo cartridge tested', 2969],
+    ['Terminator', 'Sega CD', '5 Sega CD Games (Andoid Assault,Lunar,Silpheed,Terminator & Vay) for juanmle-84', 'Terminator Sega CD complete', 20000],
+    ['Nintendo Switch 2 Console', 'Nintendo Switch 2', '**PRE-SALE/PREORDER** Nintendo Switch 2 Console The Legend of Zelda 40th Edition', 'Nintendo Switch 2 System', 49900],
+    ['Time Crisis 4', 'Playstation 3', 'Time Crisis 4 (With Gun) - Sony PlayStation 3 COMPLETE WITH GUN AND SENSORS PS3', 'Time Crisis 4 PS3 complete', 1500],
+    ['Halo 3', 'Xbox 360', 'Halo 3 ODST Xbox 360', 'Halo 3 Xbox 360 complete', 2000],
+    ['Pokemon Sword', 'Nintendo Switch', 'Pokemon Shield Nintendo Switch', 'Pokemon Sword Nintendo Switch complete', 5000],
+  ]) {
+    const product = { ...item, 'product-name': name, 'console-name': system };
+    const example = cur(product, { sales: { cib: [{ title, price: 99900 }, { title: good, price }] },
+      amazon: { found: true, title, offers: [{ price: 99900 }] } });
+    const result = invoke('floorResult', example);
+    assert.equal(result.b.basis, price, name);
+    assert.equal(result.b.sale.title, good, name);
+    assert.ok(result.b.checks.some((s) => s.includes('Amazon excluded')), name);
+    assert.ok(invoke('floorSales', example).find((s) => s.title === title).mismatch, name);
+    if (name === 'Pokemon Sword') { assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 5500); }
+  }
+});
+
+test('preorders, multi-game lots and unknown named editions are held for review', () => {
+  for (const title of ['Example Game pre-order', 'Example Game presale', 'Example Game PRE SALE',
+    'Example Game Zelda 40th Edition', 'Example Game Mario Red Edition', 'Two PlayStation 4 Games Example Game',
+    'Example Game + another game', 'Example Game with gun', 'Example Game and sensors']) {
+    assert.ok(invoke('floorListingMismatch', title, item), title);
+  }
+  const product = { ...item, 'product-name': 'Example Game [Zelda 40th Edition]' };
+  assert.ok(invoke('floorListingMismatch', 'Example Game Mario 40th Edition PS4', product));
+  assert.equal(invoke('floorListingMismatch', 'Example Game Zelda 40th Edition PS4', product), null);
+});
+
+test('normal naming, selected extras and genuine collections remain comparable', () => {
+  for (const [name, system, title] of [
+    ['Example Game', 'Playstation 4', 'Example Game Standard Edition PS4'],
+    ['Resident Evil 4', 'Wii', 'Resident Evil 4 Wii Edition'],
+    ['Final Fight Guy', 'Super Nintendo', 'Final Fight Guy - Nintendo Super NES'],
+    ['Final Fantasy XII', 'Playstation 2', 'Final Fantasy XII 12 PS2 Complete'],
+    ['Super Smash Bros for Nintendo 3DS', 'Nintendo 3DS', 'Super Smash Brothers Nintendo 3DS'],
+    ['Nintendo Switch 2 Console', 'Nintendo Switch 2', 'Nintendo Switch 2 System'],
+    ['Star Fox 64', 'Nintendo 64', 'Starfox 64 Nintendo 64 cartridge'],
+    ['Marvel Spiderman [Game of the Year]', 'Playstation 4', "Marvel's Spider-Man Game of the Year Edition PS4"],
+    ['Zelda Skyward Sword [Soundtrack Bundle]', 'Wii', 'The Legend of Zelda: Skyward Sword with Music CD'],
+    ['Time Crisis 4 [With Gun]', 'Playstation 3', 'Time Crisis 4 With Gun PS3'],
+    ['Halo The Master Chief Collection', 'Xbox One', 'Halo The Master Chief Collection Xbox One CIB'],
+    ['Halo The Master Chief Collection', 'Xbox One', 'Halo The Master Chief Collection Xbox One 6 Games'],
+    ['Example 3 Games Collection', 'Playstation 4', 'Example Three PS4 Games Collection'],
+  ]) assert.equal(invoke('floorListingMismatch', title, { ...item, 'product-name': name, 'console-name': system }), null, title);
+  assert.ok(invoke('floorListingMismatch', 'Zelda Skyward Sword with Music CD and statue', { ...item, 'product-name': 'Zelda Skyward Sword [Soundtrack Bundle]', 'console-name': 'Wii' }));
+  assert.ok(invoke('floorListingMismatch', 'Guitar Hero Live Bundle with guitar and statue', { ...item, 'product-name': 'Guitar Hero Live [Bundle]', 'console-name': 'Wii U' }));
+  assert.ok(invoke('floorListingMismatch', 'Four PS3 Games Mass Effect Trilogy', { ...item, 'product-name': 'Mass Effect Trilogy', 'console-name': 'Playstation 3' }));
+  const collection = { ...item, 'product-name': 'Halo The Master Chief Collection', 'console-name': 'Xbox One' };
+  const title = 'Halo The Master Chief Collection Xbox One 6 Games';
+  const result = invoke('floorResult', cur(collection, { sales: { cib: [{ title, price: 5200 }] },
+    amazon: { found: true, title, offers: [{ price: 4000 }] } }));
+  assert.equal(result.b.from, 'sale'); assert.equal(result.b.basis, 5200); assert.equal(result.r.price, 5000);
 });
 
 test('Amazon missing-title and renewed/digital matches are excluded and visibly explained', () => {
@@ -335,7 +393,7 @@ test('lookup failure is visible and typed prices remain explicit overrides', () 
   assert.equal(invoke('floorResult', cur(item, { typed: 1000, fullLoading: true })).r.price, 1000);
 });
 test('modern hardware uses sales instead of the game retail-sell rule', () => {
-  const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock controller complete', date: '2026-10-01' }] } }));
+  const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock 4 controller complete', date: '2026-10-01' }] } }));
   assert.equal(r.hw, true); assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 4000);
 });
 test('configured premiums apply on top of the winning market baseline', () => {

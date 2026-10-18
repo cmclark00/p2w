@@ -572,6 +572,15 @@ The site's **only server-side code**. Everything else is static.
     explicitly selected variants must agree with the listing. Edition
     and language markers use contextual matching ("French Revolution"
     alone is not a French-language variant). Missing titles are excluded.
+    Product identity words must also be present, with punctuation, common
+    spelling aliases and Roman numerals normalized. Unconfirmed short-title
+    extensions/sequels (Final Fight vs Final Fight Guy, Halo 3 vs ODST),
+    preorders/presales, counted multi-game lots (including platform words
+    between the count and "games"), unknown named/numbered editions, and
+    gun/sensor/accessory extras are held for review on both eBay and Amazon.
+    Standard/platform editions and selected extras remain eligible; named
+    collections can advertise their included games. These filters run before
+    source selection and do not modify premium settings or rounding rules.
     Rows display the reason, and saved/re-check review notes retain the
     mismatch warning. Staff can deliberately include a marked eBay row;
     the warning records that override. Rhythm-game cap calculations also
