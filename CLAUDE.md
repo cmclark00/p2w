@@ -627,7 +627,12 @@ The site's **only server-side code**. Everything else is static.
     System" stay normal; checked on 266 real titles; also "console …
     controllers/cables/cords"), or looks sealed on a non-New condition
     are shown dimmed and never auto-picked; staff can click any sale to
-    use it. `ODD_SALE_RE` also catches signed/autographed copies and "N
+    use it. Original paper/packaging contents (registration/warranty cards,
+    manuals, inserts, posters, maps and foam) joined with "+", "with" or
+    "plus" do not make a CIB listing a bundle. `floorBundleTitle()` removes
+    just those phrases for bundle/title-extension matching; separate extras,
+    variants, incomplete conditions and high-price outliers still get checked.
+    `ODD_SALE_RE` also catches signed/autographed copies and "N
     more games" lots. **"Disc/cart/cartridge/game only" is only odd for
     CIB and New** (`NOT_COMPLETE_RE`): it's what a loose game is (it used
     to be odd everywhere, which threw out 26 of Pokemon Colosseum's 30

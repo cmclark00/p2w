@@ -69,6 +69,49 @@ test('matching variants and ordinary packaging remain eligible while unconfirmed
   assert.ok(invoke('floorListingMismatch', 'Example Game PS4', { ...item, 'product-name': 'Example Game [Special Edition]' }));
 });
 
+test('original paper pack-ins remain CIB evidence for eBay and Amazon', () => {
+  const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
+  for (const title of [
+    'The Terminator (Sega CD, 1993) CIB w/ Reg Card Manual Foam, Near Mint Vintage',
+    'Terminator + Registration Card Sega CD CIB',
+    'Terminator Sega CD CIB + reg. card + original poster + manual',
+    'Terminator Sega CD complete plus warranty card and map',
+    'Terminator Sega CD with original inserts + foam insert',
+    'Terminator + poster Sega CD complete',
+    'Terminator + fold-out map Sega CD complete',
+  ]) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+    assert.equal(invoke('floorOdd', { title }, 'cib'), false, title);
+    const example = cur(product, { sales: { cib: [{ title, price: 25000 }] } });
+    assert.equal(invoke('floorResult', example).b.basis, 25000, title);
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title, offers: [{ price: 25000 }] } })), 25000, title);
+  }
+});
+
+test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
+  const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
+  for (const title of [
+    'Terminator Sega CD + reg card + another game',
+    'Terminator Sega CD + poster + soundtrack',
+    'Terminator Sega CD + manual + controller',
+    'Terminator Sega CD + poster + Sonic',
+    'Terminator Sega CD + poster Special Edition',
+    'Terminator Sega CD + reg card French Version',
+    'Terminator Sega CD 5 games + poster',
+    'Terminator Sega CD + movie poster',
+    'Terminator Sega CD + collectible poster',
+  ]) assert.ok(invoke('floorListingMismatch', title, product), title);
+  assert.equal(invoke('floorOdd', { title: 'Terminator Sega CD disc only + reg card' }, 'cib'), true);
+  assert.equal(invoke('floorOdd', { title: 'Terminator Sega CD reproduction + poster' }, 'cib'), true);
+  const example = cur(product, { sales: { cib: [
+    { title: 'Terminator Sega CD CIB + reg card + poster', price: 50000 },
+    ...[20000, 21000, 22000, 23000, 24000].map((price) => ({ title: 'Terminator Sega CD CIB', price })),
+  ] } });
+  const result = invoke('floorResult', example);
+  assert.equal(result.b.basis, 24000);
+  assert.ok(result.b.checks.some((s) => s.includes('outlier')));
+});
+
 test('audit mismatches cannot drive eBay or Amazon baselines', () => {
   for (const [name, system, title, good, price] of [
     ['Final Fight', 'Super Nintendo', 'Final Fight Guy - Nintendo Super NES', 'Final Fight Super Nintendo cartridge tested', 2969],
