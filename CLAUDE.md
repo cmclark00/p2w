@@ -665,7 +665,11 @@ The site's **only server-side code**. Everything else is static.
     always uses $5 steps, including above $80. Ties round up. Common
     Skylanders/Infinity use the condition's PriceCharting market value;
     uncommon figures and rare Skylanders use the highest eligible sale with
-    existing variant/outlier checks. Those sources replace Amazon/GameStop
+    existing variant checks. Skylanders/Infinity use a looser outlier rule:
+    only an isolated sale at least 3x the next valid sale AND $25 higher is
+    excluded, with at least three lower valid comparables. Their upper-quartile
+    test is disabled; Amiibo, other toy lines and games retain strict detection.
+    Those sources replace Amazon/GameStop
     clamps. Other toy lines retain the general baseline with toy rounding.
     Classification uses the unrounded selected-condition market value:
     below $15 is common; $15 or more is uncommon. This cutoff outranks

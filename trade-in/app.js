@@ -3108,6 +3108,10 @@ const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
 const FLOOR_SALE_CLUSTER_MIN = 8; // broader distribution needs more evidence than the single-gap check
 const FLOOR_SALE_CLUSTER_SEPARATION = 1.2; // nearby high sales still support one another
+// Skylanders/Infinity are priced toward their high sales. Only a much larger
+// isolated spike is excluded; the ordinary upper-quartile test does not apply.
+const FLOOR_TOY_OUTLIER_RATIO = 3;
+const FLOOR_TOY_OUTLIER_GAP = 2500;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
 const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph)\b/i;
 // "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
@@ -3435,14 +3439,16 @@ function floorSales(cur = floorCur) {
       odd: !!mismatch || floorOdd(s, cur.condition, rhythm) || s.price > cap || HOME_CONSOLE_RE.test(s.title) };
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
+  const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
-    const isolatedGap = top.price >= next.price * FLOOR_SALE_OUTLIER_RATIO && top.price - next.price >= FLOOR_SALE_OUTLIER_GAP;
+    const isolatedGap = top.price >= next.price * (relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO)
+      && top.price - next.price >= (relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP);
     // Compare with the upper quartile of the remaining sales, not their median or cheapest copy.
     // This catches a lone $16 among mostly $7-$10 sales even with a few $12-$13 sales.
     const lower = normal.slice(1).map((s) => s.price).sort((a, b) => a - b);
     const upperQuartile = lower[Math.ceil(lower.length * 0.75) - 1];
-    const isolatedCluster = normal.length >= FLOOR_SALE_CLUSTER_MIN
+    const isolatedCluster = !relaxedToys && normal.length >= FLOOR_SALE_CLUSTER_MIN
       && top.price >= next.price * FLOOR_SALE_CLUSTER_SEPARATION
       && top.price >= upperQuartile * FLOOR_SALE_OUTLIER_RATIO
       && top.price - upperQuartile >= FLOOR_SALE_OUTLIER_GAP;

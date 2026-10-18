@@ -815,6 +815,9 @@ Guide (the Google Sheet tab).
    Legendary/chase figures and recognized rare finishes get this minimum
    automatically, even below the cutoff. Mark other rare variants explicitly.
    Automatic groups are recalculated on recheck; staff overrides stay saved.
+   Skylanders/Infinity tolerate higher sold prices: only isolated spikes at
+   least 3× the next valid sale and $25 higher, supported by three lower
+   comparables, are excluded. Wrong variants and bundles remain excluded.
    Figures do not use game minimums or manual
    deductions. Existing percentage premiums still apply. Other toy lines
    keep the usual market baseline with the toy rounding rules.

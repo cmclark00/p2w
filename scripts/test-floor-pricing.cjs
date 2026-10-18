@@ -584,6 +584,43 @@ test('uncommon figures use highest eligible sold evidence, preserving variant an
   assert.ok(r.b.checks.some((s) => s.includes('outlier')));
 });
 
+test('Skylanders and Infinity accept higher comparable sales while other categories stay strict', () => {
+  for (const system of ['Skylanders', 'Disney Infinity', 'Amiibo', 'Lego Dimensions', 'Playstation 4']) {
+    const relaxed = ['Skylanders', 'Disney Infinity'].includes(system);
+    const product = { ...item, 'product-name': 'Example Figure', 'console-name': system, 'loose-price': 1500 };
+    for (const prices of [[4000, 2000, 1900, 1800], [3200, 2600, 2000, 1900, 1800, 1700, 1600, 1500]]) {
+      const example = cur(product, { condition: 'loose', sales: { loose: prices.map((price) => ({ title: 'Example Figure', price })) } });
+      const r = invoke('floorResult', example);
+      assert.equal(r.b.basis, relaxed ? prices[0] : prices[1], system);
+      assert.equal(!!invoke('floorSales', example)[0].outlier, !relaxed, system);
+    }
+  }
+});
+
+test('relaxed toy outliers require 3x the next sale and a 25 dollar gap with three lower matches', () => {
+  for (const system of ['Skylanders', 'Disney Infinity']) {
+    const product = { ...item, 'product-name': 'Example Figure', 'console-name': system, 'loose-price': 1500 };
+    for (const [prices, excluded] of [
+      [[29999, 10000, 9000, 8000], false], [[30000, 10000, 9000, 8000], true],
+      [[3499, 1000, 900, 800], false], [[3500, 1000, 900, 800], true],
+      [[3500, 1000, 900], false], [[5000, 1000, 900, 800], true],
+    ]) {
+      const example = cur(product, { condition: 'loose', sales: { loose: prices.map((price) => ({ title: 'Example Figure', price })) } });
+      assert.equal(!!invoke('floorSales', example)[0].outlier, excluded, `${system}: ${prices}`);
+    }
+  }
+});
+
+test('looser toy outliers do not change common averages, rare minimums or identity filtering', () => {
+  const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 600 };
+  const sales = { loose: [{ title: 'Bash', price: 1600 }, { title: 'Bash', price: 1000 }, { title: 'Bash', price: 900 },
+    { title: 'Bash', price: 800 }, { title: 'Bash Legendary', price: 9999 }, { title: 'Bash bundle', price: 8000 }] };
+  assert.equal(invoke('floorResult', cur(product, { condition: 'loose', sales })).r.price, 600);
+  const uncommon = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'uncommon', sales }));
+  assert.equal(uncommon.b.basis, 1600); assert.equal(uncommon.r.price, 1500);
+  assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'rare', sales })).r.price, 2500);
+});
+
 test('Legendary and staff-classified rare Skylanders cannot fall below 25', () => {
   for (const [name, toyGroup] of [['Trigger Happy - Legendary', undefined], ['Bash', 'rare']]) {
     const product = { ...item, 'product-name': name, 'console-name': 'Skylanders' };
