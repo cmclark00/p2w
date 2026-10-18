@@ -27,7 +27,8 @@
  *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
  *   PUT  floor-sessions          save (create or update) a named session; 409 if someone saved it since baseUpdated
  *   DELETE floor-sessions (id)   delete a saved session
- *   GET  amazon/offers (upc, cond) Amazon's lowest offers for a game, via the shop's SP-API app
+ *   GET  amazon/catalog (upc|q)   Amazon catalog candidates for identity verification
+ *   GET  amazon/offers (asin|upc, cond) Amazon's lowest offers for a verified catalog item
  *   PUT  amazon / GET amazon/test  manager: save / check the Amazon SP-API keys
  */
 
@@ -469,23 +470,78 @@ function amazon_get(array $keys, string $path, array $query): array {
   return [$status, $body];
 }
 
-// A game's lowest Amazon offers by UPC: catalog lookup (UPC -> ASIN), then getItemOffers for the condition.
-// Renewed copies are separate Amazon products, so they never show up here.
-function amazon_offers(string $upc, string $cond): void {
+// Keep full titles and structured platforms: a shared UPC alone cannot identify a game.
+function amazon_candidate(array $item): array {
+  $summary = [];
+  foreach ((array)($item['summaries'] ?? []) as $s) {
+    if (($s['marketplaceId'] ?? '') === AMZ_MARKETPLACE) { $summary = $s; break; }
+  }
+  $platforms = [];
+  foreach (['platform', 'hardware_platform'] as $field) {
+    foreach ((array)($item['attributes'][$field] ?? []) as $a) {
+      if (isset($a['marketplace_id']) && $a['marketplace_id'] !== AMZ_MARKETPLACE) continue;
+      if (is_string($a['value'] ?? null)) $platforms[] = cut_text($a['value'], 120);
+    }
+  }
+  $asin = (string)($item['asin'] ?? '');
+  return ['asin' => $asin, 'title' => cut_text((string)($summary['itemName'] ?? ''), 512),
+    'platforms' => array_values(array_unique($platforms)), 'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin)];
+}
+
+function amazon_cache_file(array $keys, string $kind, array $query): string {
+  $dir = data_path('cache');
+  if (!is_dir($dir)) @mkdir($dir, 0700);
+  return $dir . '/amz-v2-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
+}
+
+function amazon_catalog_items(array $keys, string $upc = '', string $q = '', string $asin = ''): array {
+  if ($asin !== '' && !preg_match('/^[A-Z0-9]{10}$/', $asin)) fail(400, 'Pass a valid Amazon ASIN.');
+  if ($asin === '' && $upc === '' && (strlen(trim($q)) < 2 || strlen($q) > 240)) fail(400, 'Pass a title/platform search (2–240 characters).');
+  if ($upc !== '' && !preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a valid UPC.');
+  if ($upc !== '' && $q !== '') fail(400, 'Search by UPC or title, not both.');
+  $query = ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes'];
+  $path = '/catalog/2022-04-01/items';
+  if ($asin !== '') $path .= '/' . rawurlencode($asin);
+  else {
+    $query['pageSize'] = 20;
+    if ($upc !== '') { $query['identifiers'] = $upc; $query['identifiersType'] = 'UPC'; }
+    else { $query['keywords'] = trim($q); $query['keywordsLocale'] = 'en_US'; }
+  }
+  $cacheFile = amazon_cache_file($keys, 'catalog', [$path, $query]);
+  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) {
+    $cached = json_decode((string)file_get_contents($cacheFile), true);
+    if (is_array($cached)) return $cached;
+  }
+  [$status, $body] = amazon_get($keys, $path, $query);
+  if ($status !== 200) fail(502, amazon_error($status, $body));
+  $data = json_decode($body, true);
+  $items = $asin !== '' ? [$data] : (array)($data['items'] ?? []);
+  $candidates = [];
+  foreach (array_slice($items, 0, 20) as $item) {
+    if (is_array($item) && preg_match('/^[A-Z0-9]{10}$/', (string)($item['asin'] ?? ''))) $candidates[] = amazon_candidate($item);
+  }
+  $out = ['status' => 'success', 'candidates' => $candidates, 'more' => !empty($data['pagination']['nextToken'])];
+  @file_put_contents($cacheFile, json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+  return $out;
+}
+
+function amazon_catalog(string $upc, string $q): void {
   $keys = amazon_keys();
   if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
-  if (!preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a UPC.');
-  $condition = $cond === 'new' ? 'New' : 'Used';
-  $cacheDir = data_path('cache');
-  if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700);
-  $cacheFile = $cacheDir . '/amz-' . $upc . '-' . strtolower($condition) . '.json';
-  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
+  respond(200, amazon_catalog_items($keys, $upc, $q));
+}
 
-  [$status, $body] = amazon_get($keys, '/catalog/2022-04-01/items', [
-    'identifiers' => $upc, 'identifiersType' => 'UPC', 'marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries',
-  ]);
-  if ($status !== 200) fail(502, amazon_error($status, $body));
-  $item = json_decode($body, true)['items'][0] ?? null;
+// Retrieve the title from Amazon again, never from caller-supplied text. The client
+// revalidates this response as well as the search candidate before using its price.
+function amazon_offers(string $upc, string $cond, string $asin = ''): void {
+  $keys = amazon_keys();
+  if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
+  if ($asin === '' && !preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a UPC or ASIN.');
+  if ($asin !== '' && !preg_match('/^[A-Z0-9]{10}$/', $asin)) fail(400, 'Pass a valid Amazon ASIN.');
+  $condition = $cond === 'new' ? 'New' : 'Used';
+  $cacheFile = amazon_cache_file($keys, 'offers', [$upc, $asin, $condition]);
+  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
+  $item = amazon_catalog_items($keys, $asin === '' ? $upc : '', '', $asin)['candidates'][0] ?? null;
   $out = ['status' => 'success', 'found' => false, 'condition' => $condition];
   if ($item && !empty($item['asin'])) {
     $asin = (string)$item['asin'];
@@ -503,7 +559,7 @@ function amazon_offers(string $upc, string $cond): void {
     usort($offers, function ($a, $b) { return $a['price'] <=> $b['price']; });
     $out = [
       'status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $asin,
-      'title' => cut_text((string)($item['summaries'][0]['itemName'] ?? ''), 160),
+      'title' => $item['title'], 'platforms' => $item['platforms'],
       'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin),
       'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)),
       'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers, // Amazon returns up to its 20 lowest
@@ -901,9 +957,13 @@ switch ("$method $route") {
     floor_sessions(function ($all) use ($id) { unset($all[$id]); return [$all, null, true]; });
     respond(200, ['ok' => true]);
 
+  case 'GET amazon/catalog':
+    require_role('staff');
+    amazon_catalog((string)($_GET['upc'] ?? ''), (string)($_GET['q'] ?? ''));
+
   case 'GET amazon/offers':
     require_role('staff');
-    amazon_offers((string)($_GET['upc'] ?? ''), (string)($_GET['cond'] ?? 'used'));
+    amazon_offers((string)($_GET['upc'] ?? ''), (string)($_GET['cond'] ?? 'used'), (string)($_GET['asin'] ?? ''));
 
   // Save the Amazon keys. Blank fields keep what's saved; {"clear": true} removes them all.
   case 'PUT amazon':

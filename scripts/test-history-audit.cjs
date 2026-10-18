@@ -22,6 +22,7 @@ test('table output escapes source titles and notes',()=>{assert.equal(invoke('au
     api:async(route,{params})=>{calls.push(route);if(route==='pc/product')return {id:42,'product-name':'Example','console-name':'Playstation 4',upc:'123456789012'};
       if(route==='pc/sales')return {sales:{cib:[{price:2000}]}};if(route==='amazon/offers')return {found:false};throw Error('Unexpected request');},
     floorResult:cur=>({r:{price:2000},b:{basis:2000,from:'sale',checks:[],sale:{price:2000}},premium:null}),
+    fetchFloorAmazon:async(product,condition,request)=>{const key='test-amazon|'+product.id+'|'+(condition==='new'?'new':'used');return cached(key,()=>request('amazon/offers',{asin:'B000000001',cond:condition==='new'?'new':'used'}));},
     floorAmazonLowest:()=>null,floorGsFor:()=>null};`,ctx);
   const r=await invoke('auditOne',item);assert.equal(r.recommended,2000);assert.equal(r.status,'Compared');assert.equal(r.flag,true);checks++;
   const second=await invoke('auditOne',{...item,id:2,condition:'loose'});assert.equal(second.recommended,2000);

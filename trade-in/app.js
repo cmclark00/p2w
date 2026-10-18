@@ -3174,7 +3174,7 @@ const saveFloorLocal = () => store.set('p2w-floor', floor);
 let floorCur = null;
 const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0 };
 const floorSalesCache = new Map(); // product id -> { loose, cib, new }
-const floorAmazonCache = new Map(); // "upc|used" or "upc|new" -> amazon/offers response
+const floorAmazonCache = new Map(); // product identity + condition -> verified Amazon lookup promise
 // Amazon has no Loose/CIB split: Loose and CIB games compare with its Used offers.
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
@@ -3272,25 +3272,72 @@ function pickFloorGame(product) {
 async function loadFloorAmazon() {
   const cur = floorCur;
   if (!cur || !amazonSet) return;
-  const upc = firstUpc(cur.product.upc);
   const cond = amazonCond(cur.condition);
-  if (!floorAmazonCache.has(`${upc}|${cond}`)) { cur.amazon = { loading: true }; renderFloorPricer(); }
+  cur.amazon = { loading: true }; renderFloorPricer();
   try {
-    const d = await fetchFloorAmazon(upc, cond);
+    const d = await fetchFloorAmazon(cur.product, cur.condition);
     if (floorCur === cur && amazonCond(cur.condition) === cond) cur.amazon = d;
   } catch (err) {
-    if (floorCur === cur) cur.amazon = { error: err.message };
+    if (floorCur === cur && amazonCond(cur.condition) === cond) cur.amazon = { error: err.message };
   }
   if (floorCur === cur) renderFloorPricer();
 }
 
-// Amazon's offers for a barcode in a condition ('used' / 'new'), cached for this page.
+// UPC candidates first; a rejected/missing barcode match triggers one bounded
+// title + platform search. Every candidate AND offer response must pass the same
+// checks. Prices never decide whether a different game or variant is a match.
 const firstUpc = (upc) => String(upc || '').split(/[,\s]+/)[0];
-async function fetchFloorAmazon(upc, cond) {
-  if (!/^\d{8,14}$/.test(upc)) throw new Error('No barcode for this game on PriceCharting, so Amazon can’t be matched.');
-  const key = `${upc}|${cond}`;
-  if (!floorAmazonCache.has(key)) floorAmazonCache.set(key, await api('amazon/offers', { params: { upc, cond } }));
+async function fetchFloorAmazon(product, condition, request = (route, params) => api(route, { params })) {
+  const upc = firstUpc(product.upc), cond = amazonCond(condition);
+  const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upc, cond]);
+  if (!floorAmazonCache.has(key)) {
+    const pending = (async () => {
+      const rejected = [], seen = new Set(), verified = [];
+      let searched = false;
+      async function check(catalog, fallback) {
+        const candidates = (catalog.candidates || []).filter((c) => /^[A-Z0-9]{10}$/.test(c.asin) && !seen.has(c.asin));
+        const matching = candidates.filter((c) => {
+          if (seen.has(c.asin)) return false;
+          seen.add(c.asin);
+          const reason = floorAmazonCandidateMismatch(c, product, condition, fallback);
+          if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
+          return !reason;
+        });
+        if (matching.length > 5) throw new Error('Several possible Amazon listings need review; too many candidates to verify automatically.');
+        for (const c of matching) {
+          const offer = await request('amazon/offers', { asin: c.asin, cond });
+          const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
+            : floorAmazonCandidateMismatch(offer, product, condition, fallback);
+          if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); continue; }
+          if (offer.found) verified.push({ ...offer, matchMethod: fallback ? 'title/platform search' : 'barcode' });
+        }
+      }
+      if (/^\d{8,14}$/.test(upc)) await check(await request('amazon/catalog', { upc }), false);
+      const priced = () => verified.filter((a) => floorAmazonLowest({ product, condition, amazon: a }) > 0);
+      if (!priced().length) {
+        searched = true;
+        const q = `${product['product-name']} ${product['console-name']}`.trim();
+        await check(await request('amazon/catalog', { q }), true);
+      }
+      const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b }) || a.asin.localeCompare(b.asin));
+      const selected = choices[0] || verified[0];
+      const matchNotes = [];
+      if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
+      if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod} after searching title and platform` : 'No verified Amazon listing found in the title/platform search; review manually');
+      if (choices.length > 1) matchNotes.push(`Compared ${choices.length} verified Amazon listings; linked the lowest matching offer`);
+      return { ...(selected || { found: false }), rejected, matchNotes, searched };
+    })();
+    floorAmazonCache.set(key, pending);
+    pending.catch(() => { if (floorAmazonCache.get(key) === pending) floorAmazonCache.delete(key); });
+  }
   return floorAmazonCache.get(key);
+}
+
+function floorAmazonCandidateMismatch(candidate, product, condition, requirePlatform) {
+  const mismatch = floorAmazonMismatch({ product, condition, amazon: { ...candidate, found: true } });
+  if (mismatch) return mismatch;
+  if (requirePlatform && !floorAmazonPlatformConfirmed(candidate, product)) return 'Search result does not confirm the selected platform';
+  return null;
 }
 
 // A game's recent sales ({ loose, cib, new }), cached for this page.
@@ -3424,13 +3471,24 @@ function floorTitleIdentityMismatch(title, product) {
   return null;
 }
 const FLOOR_PLATFORMS = [
-  /\b(?:ps1|psx|playstation 1)\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
+  /\b(?:ps1|psx|playstation 1|playstation(?! [2-5]| portable| vita))\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
   /\b(?:ps4|playstation 4)\b/, /\b(?:ps5|playstation 5)\b/, /\b(?:psp|playstation portable)\b/,
   /\b(?:vita)\b/, /\bxbox 360\b/, /\bxbox one\b/, /\bxbox series\b/,
+  /\bxbox\b(?! (?:360|one|series))/,
   /\b(?:nintendo )?switch 2\b/, /\b(?:nintendo )?switch\b(?! 2)/,
   /\b3ds\b/, /\b(?:nintendo )?ds\b/, /\bwii u\b/, /\bwii\b(?! u)/,
   /\bgamecube\b/, /\b(?:n64|nintendo 64)\b/,
+  /\b(?:snes|super nintendo|super nes)\b/, /\b(?:nintendo nes|(?<!super )nes)\b/,
+  /\b(?:sega cd|mega cd)\b/, /\b(?:sega genesis|genesis|mega drive)\b/,
+  /\b(?:gameboy|game boy) advance\b/, /\b(?:gameboy|game boy) color\b/,
+  /\b(?:gameboy|game boy)\b(?! (?:advance|color))/, /\bsega saturn\b/, /\bdreamcast\b/,
 ];
+function floorAmazonPlatformConfirmed(candidate, product) {
+  const system = norm(product?.['console-name']).replace(/^(?:pal|jp) /, '');
+  const wanted = FLOOR_PLATFORMS.filter((re) => re.test(system));
+  const evidence = [candidate.title, ...(candidate.platforms || [])].map(norm);
+  return wanted.length ? wanted.some((re) => evidence.some((s) => re.test(s))) : evidence.some((s) => hasPhrase(s, system));
+}
 function floorListingMismatch(title, product) {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   const name = product?.['product-name'] || '';
@@ -3475,6 +3533,7 @@ function floorAmazonMismatch(cur) {
   if (!cur.amazon?.found) return null;
   const mismatch = floorListingMismatch(cur.amazon.title, cur.product);
   if (mismatch) return mismatch;
+  if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);
   // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
   if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm)
@@ -3542,6 +3601,7 @@ function floorBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
   const checks = [];
+  checks.push(...(cur.amazon?.matchNotes || []));
   const mismatches = sales.filter((s) => s.mismatch);
   if (mismatches.length) checks.push(`${mismatches.length} eBay listing${mismatches.length === 1 ? '' : 's'} excluded from automatic pricing for title/variant mismatch; review the marked rows${picked?.mismatch ? `. Manually included listing: ${picked.mismatch}` : ''}`);
   const amazonMismatch = floorAmazonMismatch(cur);
@@ -3708,11 +3768,12 @@ function floorAmazonHtml(cur, b) {
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
-  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">This game isn't on Amazon (no match for its barcode).</p>`;
+  const matchNote = (a.matchNotes || []).length ? `<p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p>` : '';
+  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
   const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
-  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>`;
+  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${matchNote}`;
   const mismatch = floorAmazonMismatch(cur);
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
@@ -3864,7 +3925,7 @@ async function recheckFloorPrices() {
       const product = await PC.byId(it.pcId);
       const sales = await fetchFloorSales(it.pcId);
       let amazon = null;
-      if (amazonSet) amazon = await fetchFloorAmazon(firstUpc(product.upc), amazonCond(it.condition)).catch((err) => ({ error: err.message }));
+      if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
       const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, sales, pick: null, typed: null, amazon });
       it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: 'no sales to go by' };
     } catch (err) {

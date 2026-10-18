@@ -55,13 +55,9 @@ async function auditOne(item) {
   let product;
   try { product=await auditProduct(item); }
   catch(err) { return {...item,status:'Match needs review',notes:[err.message],flag:false}; }
-  const upc=String(product.upc || '').split(/[,\s]+/)[0];
-  const condition=item.condition==='new'?'new':'used';
   const [sold,amazon] = await Promise.all([
     cached(`sales|${product.id}`,()=>auditRequest('pc/sales',{id:product.id}).then(d=>({sales:d.sales})).catch(e=>({sales:null,salesError:e.message}))),
-    audit.config.amazonSet ? cached(`amazon|${upc}|${condition}`,()=>/^\d{8,14}$/.test(upc)
-      ? auditRequest('amazon/offers',{upc,cond:condition}).catch(e=>({error:e.message}))
-      : Promise.resolve({error:'No valid catalog barcode for Amazon'})) : Promise.resolve(null),
+    audit.config.amazonSet ? audit.engine.fetchFloorAmazon(product,item.condition,auditRequest).catch(e=>({error:e.message})) : Promise.resolve(null),
   ]);
   const cur={product,condition:item.condition,manualMissing:item.manualMissing,pick:null,typed:null,...sold,amazon};
   const result=audit.engine.floorResult(cur), price=result.r?.price??null;

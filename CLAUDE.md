@@ -784,26 +784,45 @@ The site's **only server-side code**. Everything else is static.
     `sellingpartnerapi-na.amazon.com` (or the sandbox host when the
     "sandbox keys" box is ticked; sandbox only returns Amazon's canned
     sample data) one call at a time, ≥2.1 s apart (`getItemOffers` is
-    0.5 req/s). `GET api.php?route=amazon/offers&upc=…&cond=used|new`:
-    Catalog Items `2022-04-01` UPC search → ASIN, then Product Pricing
+    0.5 req/s). `GET api.php?route=amazon/catalog&upc=…` returns up to
+    20 Catalog Items `2022-04-01` candidates with US titles and structured
+    platform attributes. `amazon/catalog&q=<title + platform>` searches
+    by keywords if barcode candidates are mismatched, missing, or unpriced.
+    Both routes require staff login. The client verifies every candidate
+    before `amazon/offers&asin=…&cond=used|new` fetches Product Pricing
     `getItemOffers` for that condition → offers (price **including
     shipping**, sub-condition, Prime/FBA), sorted low→high, plus the
-    total offer count; cached 6 h as `cache/amz-<upc>-<cond>.json`.
+    total offer count. The server independently re-fetches catalog identity
+    for the ASIN, and the client checks the offer response again. Catalog
+    and offer responses are cached 6 h under `cache/amz-v2-*`, separated by
+    query/ASIN, condition, marketplace, sandbox and credentials. The legacy
+    UPC offers route remains compatible with older open pages.
     **Amazon only returns its ~20 lowest offers per condition** (no API
     lists more); the tab shows them all and "N lowest of M". The frontend
     validates the returned catalog title with the same variant checks as
     eBay before using any offers, including cached responses. Missing or
     mismatched titles, renewed and digital versions are excluded with a
     visible review reason. A UPC match alone is not sufficient. If the
-    returned ASIN is excluded, this lookup does not search alternate ASINs.
+    returned ASIN is excluded, `fetchFloorAmazon(product, condition)` tries
+    the title/platform search. Search replacements require positive platform
+    evidence in the title or attributes. At most five verified ASINs are
+    priced per candidate set; larger ambiguous sets require review. The
+    lowest offer among verified ASINs supplies both the price and displayed
+    product link. No verified match means no Amazon price, with an explicit
+    review note; a failed offer request is not treated as a completed check.
+    Match notes survive saved-item rechecks and history comparisons, which
+    use the same engine helper. In-memory cache keys include product identity
+    and condition; failed promises are evicted so retries work.
     The API supplies a shared catalog title, not each seller's description;
     hidden or mislabeled variants still require staff review. Loose/CIB compare
     with **Used**, New with **New**. **Loaded automatically for every game.** Only the lowest matching
     offer enters the three-reference maximum, for every system. Higher
     offers and missing offers add no markup. The game
-    needs a UPC on PriceCharting to match. `GET amazon/test` checks the
+    can now use the title/platform search without a UPC. `GET amazon/test` checks the
     keys (token exchange only). For local testing, `P2W_AMAZON_LWA` /
     `P2W_AMAZON_HOST` env vars point the server at a fake Amazon.
+    Offline regressions: `node scripts/test-amazon-matching.cjs` and
+    `php scripts/test-amazon-api.php`; both also run in Site checks.
   - **Shop PC offline copy:** `server.ps1` doesn't have the `pc/sales`,
     `amazon/*`, or
     `floor-sessions` routes, so offline the tab shows the PriceCharting
