@@ -3095,11 +3095,13 @@ function manualDeduction(price) {
   return Math.round((price * 0.1) / 500) * 500; // $205+: 10%, to the nearest $5
 }
 
-// Final shelf presentation (owner, Oct 17): over $80, round up to the next multiple of $10 or $25.
-// Keep quarter-hundred prices such as $125/$175; $145 -> $150, $165 -> $170.
+// Final shelf presentation: over $80, choose the nearest multiple of $10 or $25.
+// Exact ties go up: $402 -> $400, $145 -> $150; $125/$175 stay unchanged.
 // Apply after specific adjustments so a manual deduction cannot leave an awkward final price.
 function floorShelfRound(price) {
-  return price > 8000 ? Math.min(Math.ceil(price / 1000) * 1000, Math.ceil(price / 2500) * 2500) : price;
+  if (price <= 8000) return price;
+  const candidates = [1000, 2500].flatMap((step) => [Math.floor(price / step) * step, Math.ceil(price / step) * step]);
+  return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
 }
 
 // Through $80, dollar endings 7/8/9 round up to the next $10; otherwise round down to $5.
@@ -3109,7 +3111,7 @@ function floorLowRound(price) {
 }
 
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
-// round up to $5 with market references, nearest $5 otherwise,
+// keep the unrounded amount until the single final $10/$25 rounding step,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
@@ -3118,17 +3120,16 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const round = referenceMin > 0 ? Math.ceil : Math.round;
-  const full = Math.max(min, premiumBasis <= 8000 ? floorLowRound(premiumBasis) : round(premiumBasis / FLOOR_STEP) * FLOOR_STEP);
+  const full = Math.max(min, premiumBasis <= 8000 ? floorLowRound(premiumBasis) : premiumBasis);
   const ded = manualMissing ? manualDeduction(full) : 0;
-  const roundedReference = (value) => value > 0 ? (value <= 8000 ? floorLowRound(value) : Math.ceil(value / FLOOR_STEP) * FLOOR_STEP) : 0;
+  const roundedReference = (value) => value > 0 ? (value <= 8000 ? floorLowRound(value) : value) : 0;
   const gsFloor = roundedReference(gs);
   const marketFloor = roundedReference(referenceMin);
   const beforeShelfRound = Math.max(full - ded, gsFloor, marketFloor);
-  const price = floorShelfRound(beforeShelfRound);
+  const price = beforeShelfRound <= 8000 && premiumBasis > 8000 ? floorLowRound(beforeShelfRound) : floorShelfRound(beforeShelfRound);
   return { full, ded, price, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
-    roundUp: referenceMin > 0, premium, premiumBasis };
+    premium, premiumBasis };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -3714,7 +3715,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ` <span class="badge info">${esc(s.mismatch || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted nowrap">${esc(s.date)}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Final prices over $80 round up to a multiple of $10 or $25. PriceCharting's own price is only a fallback.</p>`;
+      <p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3793,11 +3794,11 @@ function floorAmazonHtml(cur, b) {
 function floorMath(b, r) {
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
-  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${r.premiumBasis <= 8000 ? 'low-price rounding' : r.roundUp ? 'rounded up to $5' : 'rounded to nearest $5'}: ${money(r.full)}`);
+  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `low-price rounding: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   if (r.marketRaised) parts.push(`held at market minimum ${money(r.marketRaised)}`);
-  if (r.price !== r.beforeShelfRound) parts.push(`rounded up to a $10 or $25 multiple: ${money(r.price)}`);
+  if (r.price !== r.beforeShelfRound) parts.push(`${r.beforeShelfRound > 8000 ? 'rounded to nearest $10 or $25 multiple' : 'low-price rounding'}: ${money(r.price)}`);
   return parts.join(' → ');
 }
 

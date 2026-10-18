@@ -797,10 +797,9 @@ Guide (the Google Sheet tab).
    winning baseline after any premium or discount, including GameStop and
    Amazon references. The $10 minimum ($5 for shitbox games) still applies
    before missing-manual deductions. Specific adjustments take priority.
-   Above $80, prices first round up to $5 (nearest $5 for specific rules,
-   typed overrides and fallback-only prices). Finally, any result
-   **over $80 rounds up to the next multiple of $10 or $25**: $145 → $150,
-   $165 → $170, while $125 and $175 stay as they are. This happens after
+   Prices **over $80 round once to the nearest multiple of $10 or $25**:
+   $402.17 → $400, $145 → $150, $165 → $170, while $125 and $175 stay as
+   they are. Exact ties round up. This happens after
    premiums and missing-manual deductions. If you type
    a price below GameStop's, you'll see a warning. Click **Add to list**.
    (If that game is already on the list in the same condition, it asks

@@ -399,8 +399,8 @@ test('three-reference baseline applies across tiers and conditions before specif
           const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
           assert.equal(r.b.from, from);
           const expected = manualMissing && condition === 'cib'
-            ? { sale: 13000, amazon: 15000, gamestop: 16000 }[from]
-            : { sale: 15000, amazon: 17000, gamestop: 18000 }[from];
+            ? { sale: 13000, amazon: 14000, gamestop: 16000 }[from]
+            : { sale: 15000, amazon: 16000, gamestop: 18000 }[from];
           assert.equal(r.r.price, expected);
         }
       }
@@ -412,7 +412,7 @@ test('pricer displays the lowest Amazon offer and the winning price without midp
   const amazon = { found: true, lowest: 16400, offers: [{ price: 90000 }, { price: 16400 }, { price: 50000 }] };
   run(`amazonSet = true; floorCur = ${JSON.stringify(cur({ ...item, 'console-name': 'Xbox 360' }, { amazon }))}; renderFloorPricer();`);
   const html = element('#floorPricer').innerHTML;
-  assert.ok(html.includes('<strong>$170.00</strong>'));
+  assert.ok(html.includes('<strong>$160.00</strong>'));
   assert.ok(html.includes('<tr class="picked">\n      <td class="num">$164.00'));
   assert.ok(!html.includes('typical'));
   assert.ok(!html.includes('halfway'));
@@ -486,7 +486,7 @@ test('low-price rounding respects dollar endings, cents, market references and t
   for (const [basis, expected] of [[1000, 1000], [1499, 1000], [1500, 1500], [1600, 1500], [1699, 1500],
     [1700, 2000], [1800, 2000], [1999, 2000], [2038, 2000], [2250, 2000], [2499, 2000],
     [2500, 2500], [2699, 2500], [2700, 3000], [5200, 5000], [5250, 5000], [5700, 6000],
-    [7699, 7500], [7700, 8000], [8000, 8000], [8001, 9000]]) {
+    [7699, 7500], [7700, 8000], [8000, 8000], [8001, 8000]]) {
     assert.equal(invoke('floorPrice', basis, { referenceMin: basis, gs: basis }).price, expected, `market basis ${basis}`);
     if (basis <= 8000) assert.equal(invoke('floorPrice', basis, {}).price, expected, `typed basis ${basis}`);
   }
@@ -499,16 +499,16 @@ test('low-price rounding respects dollar endings, cents, market references and t
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
 });
 
-test('final shelf prices over $80 round up to the next $10 or $25 multiple', () => {
-  for (const [price, expected] of [[7500, 7500], [8000, 8000], [8001, 9000], [8500, 9000],
-    [9500, 10000], [10500, 11000], [12000, 12000], [12500, 12500], [12501, 13000],
+test('final shelf prices over $80 round to the nearest $10 or $25 multiple with ties up', () => {
+  for (const [price, expected] of [[7500, 7500], [8000, 8000], [8001, 8000], [8500, 9000],
+    [9500, 10000], [10500, 11000], [12000, 12000], [12500, 12500], [12501, 12500],
     [13500, 14000], [14500, 15000], [15000, 15000], [16500, 17000], [17500, 17500],
     [19500, 20000], [22500, 22500], [24500, 25000], [102500, 102500]]) {
     assert.equal(invoke('floorShelfRound', price), expected);
   }
   const r = invoke('floorPrice', 14500, { referenceMin: 14500 });
   assert.equal(r.beforeShelfRound, 14500); assert.equal(r.price, 15000);
-  assert.ok(invoke('floorMath', { from: 'sale', basis: 14500 }, r).includes('rounded up to a $10 or $25 multiple: $150.00'));
+  assert.ok(invoke('floorMath', { from: 'sale', basis: 14500 }, r).includes('rounded to nearest $10 or $25 multiple: $150.00'));
 });
 
 test('clean shelf rounding follows premiums and manual deductions without replacing their rules', () => {
@@ -519,6 +519,30 @@ test('clean shelf rounding follows premiums and manual deductions without replac
   assert.equal(invoke('floorPrice', 14500, { manualMissing: true }).price, 12500);
   const discount = invoke('floorPrice', 15000, { premium: { phrase: 'Example', pct: -20 } });
   assert.equal(discount.price, 12000);
+});
+
+test('Terminator rounds its raw amount once, including market clamps and manual selections', () => {
+  for (const [basis, expected] of [[40200, 40000], [40217, 40000], [40499, 40000], [40500, 41000],
+    [40600, 41000], [42200, 42000], [42250, 42500], [42750, 43000]]) {
+    for (const opts of [{}, { referenceMin: basis, gs: basis }]) {
+      const r = invoke('floorPrice', basis, opts);
+      assert.equal(r.full, basis);
+      assert.equal(r.beforeShelfRound, basis);
+      assert.equal(r.price, expected);
+      const math = invoke('floorMath', { from: 'sale', basis }, r);
+      assert.equal((math.match(/rounded/g) || []).length, 1, math);
+      assert.ok(!math.includes('to $5'), math);
+    }
+  }
+  const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
+  for (const extra of [{}, { pick: 0 }, { typed: 40217 }]) {
+    assert.equal(invoke('floorResult', cur(product, { sales: { cib: [{ title: 'Terminator Sega CD CIB + reg card', price: 40217 }] }, ...extra })).r.price, 40000);
+  }
+  const premium = invoke('floorPrice', 36561, { premium: { phrase: 'Example', pct: 10 } });
+  assert.equal(premium.premiumBasis, 40217); assert.equal(premium.price, 40000);
+  const manual = invoke('floorPrice', 40217, { manualMissing: true });
+  assert.equal(manual.ded, 4000); assert.equal(manual.beforeShelfRound, 36217); assert.equal(manual.price, 36000);
+  assert.equal(invoke('floorPrice', 8100, { manualMissing: true }).price, 7000);
 });
 test('CSV handles BOM, CRLF, embedded commas/newlines and escaped quotes', () => {
   const r = invoke('fulcrumCsv', '\uFEFFa,b\r\n"Game, \"\"Deluxe\"\"\nEdition",00123\r\n');

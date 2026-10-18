@@ -663,15 +663,15 @@ The site's **only server-side code**. Everything else is static.
     $52 -> $50. The existing $10 minimum ($5 for shitbox games) remains.
     This rounding also applies to GameStop and `referenceMin`, so an
     unrounded market reference cannot undo the owner's low-price rule.
-    Above $80, ordinary prices initially round up to $5, while specific
-    adjustments, typed overrides and fallback-only prices use nearest $5.
+    Above $80, amounts stay unrounded through the baseline and adjustments.
     When a nonzero premium/discount or CIB missing-manual rule applies,
     `floorResult()` omits both `referenceMin` and the GameStop clamp:
-    apply the premium to the basis, round by the applicable price tier, then deduct
-    the manual amount. Specific rules therefore outrank the baseline.
-    Finally, `floorShelfRound()` rounds results over $80 upward to the next
-    multiple of either $10 or $25, whichever is smaller. $145 -> $150,
-    $165 -> $170; $125/$175 stay unchanged. This runs after premiums,
+    apply the premium to the basis, then deduct the manual amount (the low-price
+    rounding still precedes manual deductions through $80). Specific rules
+    therefore outrank the baseline. Finally, `floorShelfRound()` rounds results
+    over $80 once to the nearest multiple of either $10 or $25, with ties going
+    upward. $402.17 -> $400, $145 -> $150, $165 -> $170; $125/$175 stay unchanged.
+    This runs after premiums,
     deductions and minimums, including for typed/fallback calculations.
     Results at or below $80 use the dollar-ending rule above. `floorMath()`
     shows the final rounding step when it changes the price.
