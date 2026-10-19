@@ -734,6 +734,7 @@ Guide (the Google Sheet tab).
    tick **Manual missing** for a CIB game without its manual.
    The game name, system, **Loose / CIB / New** buttons, **Shelf price**, and
    **Add to list** share a pinned bar (compact stacked rows on phones).
+   **Manual missing** stays pinned with the condition buttons for CIB games.
    Switch conditions while scrolling without returning to the top.
    A brief market-reference line stays pinned below the controls and shows
    GameStop pre-owned, PriceCharting for the selected condition, and Amazon.

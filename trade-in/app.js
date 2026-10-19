@@ -3946,7 +3946,10 @@ function renderFloorPricer() {
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · ${esc(GAME_CONDITIONS[cur.condition])}${cur.condition === 'cib' && cur.manualMissing && !hw ? ' · Manual missing' : ''}</div>
       </div>
-      <div class="segs floor-pinned-condition" role="group" aria-label="Condition">${condBtns}</div>
+      <div class="floor-pinned-condition">
+        <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
+        ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
+      </div>
       <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
       <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
@@ -3990,7 +3993,6 @@ function renderFloorPricer() {
         <option value="uncommon"${cur.toyGroup === 'uncommon' ? ' selected' : ''}>Uncommon — highest eligible sale</option>
         ${toy === 'skylanders' ? `<option value="rare"${cur.toyGroup === 'rare' ? ' selected' : ''}>Rare variant — highest sale, $25 minimum</option>` : ''}
       </select></label>` : ''}
-      ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">

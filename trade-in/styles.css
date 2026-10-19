@@ -474,6 +474,8 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   padding: 12px 0;
 }
 .floor-price-context > .link { padding: 0; margin-bottom: 8px; font-size: 0.85rem; }
+.floor-pinned-condition { display: grid; gap: 6px; justify-items: start; }
+.floor-pinned-manual { margin: 0; font-size: 0.85rem; }
 .floor-market-quick { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; font-size: 0.85rem; color: var(--muted); }
 .floor-market-quick > a, .floor-market-quick > span { white-space: nowrap; }
 .floor-market-quick > a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 3px; }
