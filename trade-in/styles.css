@@ -466,24 +466,26 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-price strong { display: block; font: 700 2.2rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
 .floor-pinned-header {
   position: sticky; top: 0; z-index: 5;
-  margin-bottom: 12px; padding-bottom: 10px;
+  margin-bottom: 10px; padding-bottom: 6px;
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .floor-price-actions {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 12px 20px;
-  padding: 12px 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 8px 14px;
+  padding: 8px 0;
 }
-.floor-price-edit { display: grid; gap: 6px; justify-items: start; margin-top: 6px; }
+.floor-price.is-editing { display: flex; align-items: center; gap: 12px; }
+.floor-price-edit { display: grid; gap: 4px; justify-items: start; margin-top: 3px; }
+.floor-price.is-editing .floor-price-edit { margin-top: 0; }
 .floor-price-edit > .link { padding: 0; font-size: 0.8rem; text-align: left; }
-.floor-pinned-condition { display: grid; gap: 6px; justify-items: start; }
+.floor-pinned-condition { display: grid; gap: 4px; justify-items: start; }
 .floor-pinned-manual { margin: 0; font-size: 0.85rem; }
-.floor-market-quick { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; font-size: 0.85rem; color: var(--muted); }
+.floor-market-quick { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 0.85rem; color: var(--muted); }
 .floor-market-quick > a, .floor-market-quick > span { white-space: nowrap; }
 .floor-market-quick > a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .floor-market-quick > a:hover { color: var(--paper); text-decoration-color: currentColor; }
 .floor-market-quick strong { font-variant-numeric: tabular-nums; }
-.floor-typed { width: 140px; max-width: 100%; margin: 0; font-size: 0.8rem; }
-.floor-typed input { padding: 6px 8px; }
+.floor-typed { display: flex; align-items: center; gap: 6px; width: auto; max-width: 100%; margin: 0; font-size: 0.8rem; white-space: nowrap; }
+.floor-typed .money-input input { width: 76px; padding: 5px 6px; }
 .floor-review-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
 .floor-review-summary:empty { display: none; }
 .floor-details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
@@ -510,6 +512,8 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   .floor-price-actions { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 8px 0; }
   .floor-price-actions .icon-btn { grid-column: 2; grid-row: 1; justify-self: end; }
   .floor-price-actions .floor-price { grid-column: 1; grid-row: 2; }
+  .floor-price.is-editing { display: block; }
+  .floor-price.is-editing .floor-price-edit { margin-top: 3px; }
   .floor-price-actions .btn { grid-column: 2; grid-row: 2; }
   .floor-price-actions .floor-price strong { font-size: 1.8rem; }
   .floor-price-actions .btn { padding: 10px 12px; }

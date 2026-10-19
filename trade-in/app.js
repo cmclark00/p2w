@@ -3950,10 +3950,10 @@ function renderFloorPricer() {
         <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
-      <div class="floor-price">
-        <span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong>
+      <div class="floor-price${showTyped ? ' is-editing' : ''}">
+        <div class="floor-price-value"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
         <div class="floor-price-edit">
-          <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
+          <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
           </label>
           ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>'}
