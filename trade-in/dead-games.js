@@ -735,6 +735,16 @@
     && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
   function validate(d) {
     const fail = (s) => { throw new Error('Invalid Dead Games register: ' + s); };
+    // JSON object keys must retain their meaning when emitted in the JavaScript bundle.
+    function safeKeys(value, depth = 0) {
+      if (!value || typeof value !== 'object') return;
+      if (depth > 20) fail('metadata nesting limit');
+      for (const k of Object.keys(value)) {
+        if (['__proto__', 'prototype', 'constructor'].includes(k)) fail('unsafe object key: ' + k);
+        safeKeys(value[k], depth + 1);
+      }
+    }
+    safeKeys(d);
     const text = (s, max = 4000) => typeof s === 'string' && s.trim() && s.length <= max;
     const urlOK = (s) => {
       try { const u = new URL(s); return u.protocol === 'https:' && !u.username && !u.password; } catch { return false; }

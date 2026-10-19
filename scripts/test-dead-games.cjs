@@ -57,6 +57,8 @@ test('schema rejects unsafe links, missing evidence, ambiguous aliases, invalid 
     (d) => d.entries[0].closureDate = '2027-01-01',
     (d) => d.entries[0].category = 'probably dead',
     (d) => d.entries.push(clone(d.entries[0])),
+    (d) => Object.defineProperty(d, '__proto__', { value: { polluted: true }, enumerable: true }),
+    (d) => d.metadata = JSON.parse('{"constructor":{"prototype":{"polluted":true}}}'),
   ]) { const d = clone(data); mutate(d); assert.throws(() => reg.validate(d)); }
 });
 test('import requires higher revision, preserves history and identifies reviewed changes', () => {
@@ -108,6 +110,11 @@ test('CLI dry run is read-only, stale hashes fail, and reviewed apply updates th
     assert.equal(cli(candidate, '--apply', '--expected', 'stale').status, 1);
     assert.equal(fs.readFileSync(path.join(temp, 'trade-in/dead-games.json'), 'utf8'), old);
     const hash = crypto.createHash('sha256').update(old).digest('hex');
+    const malicious = JSON.parse(JSON.stringify(d).replace('"schemaVersion":1', '"schemaVersion":1,"__proto__":{"polluted":true}'));
+    fs.writeFileSync(candidate, JSON.stringify(malicious));
+    assert.equal(cli(candidate, '--apply', '--expected', hash).status, 1);
+    assert.equal(fs.readFileSync(path.join(temp, 'trade-in/dead-games.json'), 'utf8'), old);
+    fs.writeFileSync(candidate, JSON.stringify(d));
     const applied = cli(candidate, '--apply', '--expected', hash);
     assert.equal(applied.status, 0, applied.stderr);
     assert.equal(cli('--check').status, 0);
@@ -166,6 +173,16 @@ test('saved prices are retained but held games cannot be exported as shelf label
   run('printFloorLabels(); printFloorList(); copyFloorList();');
   assert.equal(run('floor.items[0].price'), 3000);
 });
+test('stale saved rechecks cannot change held prices individually or through Use all', () => {
+  run("floor.items = [{id:'held', name:'Anthem', platform:'PS4', price:3000, recheck:{price:4000}}, {id:'ok',name:'Evolve',platform:'PS4',price:1000,recheck:{price:2000}}];");
+  assert.equal(run('recheckChanged(floor.items[0])'), false);
+  assert.equal(run('useRecheck(floor.items[0])'), false);
+  assert.equal(run('floor.items[0].price'), 3000);
+  assert.ok(!run('recheckHtml(floor.items[0])').includes('data-floor-use'));
+  run('useAllRechecks();');
+  assert.equal(run('floor.items[0].price'), 3000);
+  assert.equal(run('floor.items[1].price'), 2000);
+});
 test('register UI renders counts, filters, source caveats and custom-policy conflicts safely', () => {
   run("settings.guide.deadGames = ['Evolve']; showDeadGames();");
   assert.match(element('#deadEntries').innerHTML, /Sandstorm/);
@@ -190,5 +207,15 @@ test('missing register gives an explicit shelving hold, without rewriting saved 
   const deferred = call('mergeSettings', old);
   assert.equal(deferred.version, 11);
   assert.deepEqual(clone(deferred.guide.deadGames), reg.legacy);
+});
+test('old HTML plus updated app keeps ordinary views and login usable without new markup', () => {
+  const original = ctx.document.querySelector;
+  ctx.document.querySelector = (s) => ['#view-dead', '#deadSearch'].includes(s) ? null : element(s);
+  try {
+    run("const keepRender = renderLines, keepFocus = focusScan, keepClear = clearFulcrum; renderLines = () => {}; focusScan = () => {}; clearFulcrum = () => {};");
+    run("wireDeadGames(); showView('trade'); showAuth('login'); showView('dead');");
+    assert.match(element('#toast').textContent, /Update the shop-PC HTML/);
+    run('renderLines = keepRender; focusScan = keepFocus; clearFulcrum = keepClear;');
+  } finally { ctx.document.querySelector = original; }
 });
 console.log(checks + ' Dead Games checks passed.');

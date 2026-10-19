@@ -4197,12 +4197,16 @@ function onFloorPricerChange(e) {
 const FROM_LABELS = { sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
-const recheckChanged = (it) => it.recheck?.price != null && it.recheck.price !== it.price;
+const recheckChanged = (it) => !!globalThis.P2WDeadGames && !deadGameHeld(it.name, it.platform)
+  && it.recheck?.price != null && it.recheck.price !== it.price;
 const floorReviewHtml = (it) => (it.reviewNotes || []).map((note) => `<div class="sub warn-text">Review: ${esc(note)}</div>`).join('');
 
 function recheckHtml(it) {
   const rc = it.recheck;
   if (!rc) return '';
+  if (!globalThis.P2WDeadGames || deadGameHeld(it.name, it.platform)) {
+    return '<div class="sub warn-text">Price suggestion held pending playability review. Saved price kept.</div>';
+  }
   if (rc.error) return `<div class="sub warn-text" title="${esc(rc.error)}">Couldn't re-check</div>`;
   const review = floorReviewHtml(rc);
   if (!recheckChanged(it)) return `<div class="sub">✓ Still this price</div>${review}`;
@@ -4274,14 +4278,16 @@ async function recheckFloorPrices() {
 }
 
 function useRecheck(it) {
-  if (!recheckChanged(it)) return;
+  if (!recheckChanged(it)) return false;
   const { price, basis, from, saleDate, reviewNotes = [] } = it.recheck;
   Object.assign(it, { price, basis, from, saleDate, reviewNotes, edited: false });
   delete it.recheck;
+  return true;
 }
 
 function useAllRechecks() {
   const todo = floor.items.filter((it) => recheckChanged(it) && !it.edited);
+  if (!todo.length) return;
   todo.forEach(useRecheck);
   const skipped = floor.items.filter(recheckChanged).length;
   floor.dirty = true;
@@ -4331,7 +4337,7 @@ function onFloorListClick(e) {
   const tr = e.target.closest('tr[data-id]');
   const it = tr && floor.items.find((x) => x.id === tr.dataset.id);
   if (it && (e.target.closest('[data-floor-use]') || e.target.closest('[data-floor-keep]'))) {
-    if (e.target.closest('[data-floor-use]')) useRecheck(it);
+    if (e.target.closest('[data-floor-use]')) { if (!useRecheck(it)) return; }
     else delete it.recheck;
     floor.dirty = true;
     saveFloorLocal();
@@ -4527,8 +4533,9 @@ function wireFloor() {
 const VIEWS = ['trade', 'bulk', 'floor', 'dead', 'log', 'hardware', 'settings'];
 
 function showView(name) {
+  if (name === 'dead' && !$('#view-dead')) { toast('Update the shop-PC HTML and register together before opening Dead Games.', 'error'); return; }
   currentView = name;
-  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== name;
+  for (const v of VIEWS) { const section = $(`#view-${v}`); if (section) section.hidden = v !== name; }
   $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   $('#totalsBar').hidden = name !== 'trade';
   if (name === 'log') loadLog();
@@ -4763,6 +4770,9 @@ function wireEvents() {
 function deadGameMatch(name, system) {
   return globalThis.P2WDeadGames?.match(name, system) || null;
 }
+function deadGameHeld(name, system) {
+  return ['unplayable', 'conditional'].includes(deadGameMatch(name, system)?.category);
+}
 
 function deadGameNotice(name, system) {
   const reg = globalThis.P2WDeadGames;
@@ -4837,6 +4847,9 @@ function deadShelfReady(items) {
 }
 
 function wireDeadGames() {
+  // Old updaters can leave old HTML in place. Preserve the existing calculator
+  // and show the unavailable-register hold rather than throwing during startup.
+  if (!$('#deadSearch')) return;
   for (const id of ['deadSearch', 'deadPlatform', 'deadCategory']) {
     $('#' + id).addEventListener(id === 'deadSearch' ? 'input' : 'change', showDeadGames);
   }
@@ -4864,7 +4877,7 @@ function showAuth(mode) {
   clearFulcrum();
   auth.mode = mode;
   currentView = 'auth';
-  for (const v of VIEWS) $(`#view-${v}`).hidden = true;
+  for (const v of VIEWS) { const section = $(`#view-${v}`); if (section) section.hidden = true; }
   $('#view-auth').hidden = false;
   $('.tabs').hidden = true;
   $('#totalsBar').hidden = true;

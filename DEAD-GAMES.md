@@ -28,7 +28,9 @@ including typed prices. Existing saved list prices are preserved with notices;
 printing labels, printing lists and copying lists hold until those entries are
 removed from the playable shelf list. A missing register blocks these shelf
 outputs. Offline-playable and upcoming entries retain ordinary price math.
-Dates never change classifications automatically. Unknown related editions
+Stale saved recheck suggestions are held too: neither individual Use nor
+Use all can replace a held game's saved price. Dates never change
+classifications automatically. Unknown related editions
 show review guidance instead of receiving a broad automatic block.
 
 Settings v12 replaces only the entire untouched legacy default list on loading
@@ -71,7 +73,8 @@ matching, filtering and migration helpers; load it before app.js.
 
        node scripts/update-dead-games.cjs --check
        node scripts/test-dead-games.cjs
-       node scripts/test-floor-pricing.cjs
+   node scripts/test-floor-pricing.cjs
+   pwsh -File scripts/test-shop-pc-update.ps1
        python .github/scripts/check_site.py
        node .github/scripts/check_javascript.mjs
 
@@ -80,7 +83,15 @@ matching, filtering and migration helpers; load it before app.js.
    Publish HTML, app.js, styles.css, dead-games.js and dead-games.json together.
    Staff reload the calculator after deployment.
 7. Install the revised scripts/shop-pc/Update-TradeInCalculator.ps1 on the shop
-   PC once, then run it. The old updater does not fetch dead-games.js.
+   PC before publication if its startup shortcut runs an updater automatically.
+   Run it after publication. The old updater does not fetch dead-games.js.
+   The revised updater stages and validates the complete compatible set before
+   replacing files, backs up every changed existing file, and rolls back an
+   installation failure. Before publication it will refuse an incomplete
+   download and keep the installed copy. Site deployment does not directly
+   execute anything on the shop PC; a later updater run can pull site changes.
+   With an old updater, a mixed frontend keeps ordinary calculator views
+   working but holds shelf output until the register dependency is installed.
    The same frontend runs against the old server; no server.ps1 route changes
    are required. Do a real shop-PC smoke test after installation.
 
@@ -94,3 +105,5 @@ authorized execution. No credential or persistent Page access is provisioned.
 Generated JSON and JavaScript must stay together. New coverage must not be
 presented as a newly occurring shutdown. Aliases normalize punctuation, case
 and PAL/JP console prefixes but never strip editions or sequel names.
+Imports reject prototype-related keys recursively so JSON metadata cannot
+change meaning when bundled into JavaScript.
