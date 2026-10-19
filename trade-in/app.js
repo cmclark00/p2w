@@ -1227,7 +1227,7 @@ function updateRow(tr, line) {
   $('[data-cell="credit"]', tr).innerHTML = offerCell(p.credit, line.qty);
 
   const flags = [];
-  if (isGameCat(line.category) && line.condition !== CASE_ONLY) flags.push(deadGameNotice(line.name, line.platform));
+  if (isGameCat(line.category) && line.condition !== CASE_ONLY) flags.push(deadGameNotice(line.name, line.platform, 'Trade-In'));
   if (p.cash == null) flags.push('<span class="badge warn">Needs a price</span>');
   if (p.dontBuy) flags.push(`<span class="badge danger">Don't buy: ${esc(p.guide.note)}</span>`);
   else if (p.flat) flags.push(`<span class="badge guide">Guide: ${esc(p.guide.note)}</span>`);
@@ -3943,9 +3943,9 @@ function floorResult(cur) {
   const shitbox = hw ? null : autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const b = floorBasis(cur);
   const playability = !hw && deadGameMatch(p['product-name'], p['console-name']);
-  if (playability && ['unplayable', 'conditional'].includes(playability.category)) {
-    const note = playability.category === 'unplayable' ? 'Do not shelve as playable: confirmed unplayable on this console.'
-      : 'Hold from normal playable shelves: unofficial / conditional console setup needs verification.';
+  const handling = deadGamePolicy(playability);
+  if (handling?.shelfHold) {
+    const note = handling.title + '. ' + handling.instruction;
     return { b: { ...b, need: note, checks: [...b.checks, `${note} ${playability.caveats}`] }, r: null, shitbox, premium: null, hw, toy, toyGroup, playability };
   }
   const typed = b.from === 'typed';
@@ -4771,20 +4771,44 @@ function deadGameMatch(name, system) {
   return globalThis.P2WDeadGames?.match(name, system) || null;
 }
 function deadGameHeld(name, system) {
-  return ['unplayable', 'conditional'].includes(deadGameMatch(name, system)?.category);
+  return !!deadGamePolicy(deadGameMatch(name, system))?.shelfHold;
 }
 
-function deadGameNotice(name, system) {
+// Store handling is separate from the research classification and trade offer math.
+function deadGamePolicy(e) {
+  if (!e) return null;
+  if (e.category === 'unplayable') return {
+    title: 'STOP: completely unplayable on this console',
+    instruction: 'Do not buy or sell as ordinarily playable. Menus or a title screen are not gameplay.',
+    shelfHold: true,
+  };
+  if (e.category === 'conditional') return {
+    title: 'STOP: not normally playable - unofficial or special setup',
+    instruction: 'Do not buy or sell as ordinarily playable. Verify and explain the unofficial service or special setup with a manager. This is separate from a confirmed completely dead game.',
+    shelfHold: true,
+  };
+  if (e.normalPlay === 'requires-lan') return {
+    title: 'SETUP REQUIRED: LAN-only gameplay, not solo disc play',
+    instruction: 'Not completely dead: LAN gameplay exists. Do not buy or sell as ordinary solo disc play; verify and explain the extra compatible systems and network setup with a manager.',
+    shelfHold: true,
+  };
+  if (e.category === 'upcoming') return {
+    title: 'VERIFY: new-owner playability uncertain - not confirmed dead',
+    instruction: 'Check used-copy setup and remaining single-player before selling as ordinarily playable. A future closure date is not proof that all gameplay is gone.',
+    shelfHold: false,
+  };
+  return null; // Offline-playable exclusions such as Evolve are not warnings.
+}
+
+function deadGameNotice(name, system, checkpoint = 'Pricing') {
   const reg = globalThis.P2WDeadGames;
   if (!reg) return '<div class="dead-callout">Playability register unavailable. Reload the calculator or update the shop-PC files before shelving.</div>';
   const e = reg.match(name, system);
-  const nearby = !e && reg.related(name, system);
-  if (!e && !nearby.length) return '';
-  if (!e) return '<div class="dead-callout">Related Dead Games entry: this exact edition is not verified. Match the disc and console before shelving. <button type="button" class="link" data-dead-find="' + esc(nearby[0].title) + '">Check register</button></div>';
-  const action = { unplayable: 'Do not shelve as playable.', conditional: 'Hold for console/setup verification.',
-    offline: 'Offline gameplay remains; check the edition caveats.', upcoming: 'Verify used-copy setup; do not treat a future closure as unplayable today.' }[e.category];
-  return '<div class="dead-callout dead-' + esc(e.category) + '"><strong>' + esc(action) + '</strong> '
-    + esc(e.caveats) + ' <span class="muted">Reviewed ' + esc(e.reviewedAt) + '.</span> '
+  const policy = deadGamePolicy(e);
+  if (!policy) return ''; // Exact editions only; title prefixes must not flag successors.
+  return '<div class="dead-callout dead-staff-warning dead-' + esc(e.category) + '" role="note" aria-label="' + esc(checkpoint) + ' playability checkpoint">'
+    + '<span class="eyebrow">' + esc(checkpoint) + ' checkpoint</span><strong class="dead-warning-title">' + esc(policy.title) + '</strong>'
+    + '<p class="dead-warning-instruction">' + esc(policy.instruction) + '</p><p>' + esc(e.caveats) + '</p><span class="muted">Reviewed ' + esc(e.reviewedAt) + '.</span> '
     + '<button type="button" class="link" data-dead-find="' + esc(e.title) + '">Evidence &amp; edition</button></div>';
 }
 
@@ -4813,7 +4837,9 @@ function showDeadGames() {
   $('#deadEntries').innerHTML = rows.length ? rows.map((e) =>
     '<article class="panel dead-card dead-' + e.category + '"><div class="dead-card-head"><div><h2>' + esc(e.title)
     + '</h2><div class="muted">' + esc(e.platforms.join(' · ')) + '</div></div><span class="dead-label">' + esc(reg.labels[e.category])
-    + '</span></div><p><strong>' + esc(e.classification) + '</strong></p><dl><dt>Exact edition</dt><dd>' + esc(e.edition)
+    + '</span></div><p><strong>' + esc(e.classification) + '</strong></p>'
+    + (deadGamePolicy(e) ? '<p class="dead-card-policy"><strong>Store handling:</strong> ' + esc(deadGamePolicy(e).title) + '. ' + esc(deadGamePolicy(e).instruction) + '</p>' : '')
+    + '<dl><dt>Exact edition</dt><dd>' + esc(e.edition)
     + '</dd><dt>Closure / effective date</dt><dd>' + esc(e.effective) + '</dd><dt>Evidence reviewed</dt><dd>' + esc(e.reviewedAt)
     + ' · First listed here ' + esc(e.firstListed) + '</dd></dl><p>' + esc(e.caveats)
     + '</p><div class="dead-sources" aria-label="Evidence sources">' + e.sources.map((s) => '<a href="' + esc(s.url)
@@ -4829,7 +4855,7 @@ function showDeadGames() {
       + '. A manager must review this policy in Settings. No custom rule was removed.</p>' : '')
     + (!settings.guide.enabled ? '<p>The buying guide is disabled; automatic trade-in restrictions are off. Shelf playability holds still apply.</p>' : '');
   $('#deadChanges').innerHTML = '<ul>' + d.changes.slice().reverse().map((c) => '<li>' + esc(c.date) + ' · '
-    + esc({ coverage: 'New coverage', shutdown: 'Verified shutdown', status: 'Classification change', correction: 'Correction', review: 'Evidence review' }[c.type])
+    + esc({ coverage: 'New coverage', shutdown: 'Verified shutdown', status: 'Classification change', correction: 'Correction', review: 'Evidence review', policy: 'Store handling policy' }[c.type])
     + ': ' + esc(c.summary) + '</li>').join('') + '</ul>';
 }
 
@@ -4838,7 +4864,7 @@ function deadShelfReady(items) {
     toast('Playability register unavailable. Reload or update the shop-PC frontend before shelving.', 'error');
     return false;
   }
-  const held = items.filter((it) => ['unplayable', 'conditional'].includes(deadGameMatch(it.name, it.platform)?.category));
+  const held = items.filter((it) => deadGameHeld(it.name, it.platform));
   if (held.length) {
     toast('Shelf hold: ' + held.map((it) => it.name + ' (' + it.platform + ')').join(', ') + '. Check Dead Games; saved prices were kept.', 'error');
     return false;

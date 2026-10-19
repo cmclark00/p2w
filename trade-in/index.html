@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261019-gamestop-stock">
+  <link rel="stylesheet" href="styles.css?v=20261019-normal-play-2">
 </head>
 <body>
   <header class="topbar">
@@ -140,11 +140,12 @@
         <div>
           <span class="eyebrow">Console playability register</span>
           <h1 id="deadHeading">Dead Games</h1>
-          <p class="muted">Check the exact console and edition before buying or putting a game on the playable shelf. A closed server does not make a game dead if offline gameplay remains.</p>
+          <p class="muted">Completely dead means zero playable gameplay on that exact console edition. Menus and title screens do not count. Games with offline, bot, local-multiplayer or LAN gameplay are not completely dead; unofficial setups and uncertain cases stay separately labeled.</p>
         </div>
         <button type="button" id="deadExport" class="btn">Download register JSON</button>
       </div>
       <div id="deadSummary" class="dead-summary"></div>
+      <p class="dead-callout"><strong>Store handling:</strong> If a disc cannot provide normal gameplay on a supported customer console without an unofficial service or special setup, do not buy or sell it as ordinarily playable. Both Trade-In and Pricing flag exact matching editions. Setup-dependent games are not automatically completely dead.</p>
       <div class="panel">
         <div class="dead-filters">
           <label>Find a game or edition<input id="deadSearch" type="search" placeholder="Title, edition, revival or caveat" autocomplete="off"></label>
@@ -594,7 +595,7 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="stock-helper-client.js?v=20261019-chrome-stock"></script>
-  <script src="dead-games.js?v=20261019-register-1"></script>
-  <script src="app.js?v=20261019-stock-floor"></script>
+  <script src="dead-games.js?v=20261019-normal-play-2"></script>
+  <script src="app.js?v=20261019-normal-play-2"></script>
 </body>
 </html>

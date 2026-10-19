@@ -587,7 +587,16 @@ wins.
 ### Use the trade-in calculator <a id="trade-in-calculator"></a>
 
 **Dead Games tab:** available to staff and managers. Search a game and filter
-by console and classification; match the exact disc edition and read the
+by console and classification. **Both Trade-In and Pricing** prominently flag
+confirmed unplayable and unofficial/special-setup editions: **do not buy or
+sell as ordinarily playable**. The warnings also appear with manual offers;
+they do not silently change cash/credit calculations. Evolve is not flagged.
+Twisted Metal: Black Online is still LAN-playable, but its separate LAN-setup
+warning holds ordinary solo-play shelf output until setup/disclosure review.
+Destruction AllStars remains an uncertain new-owner/setup caution, not a
+confirmed completely dead game.
+
+Match the exact disc edition and read the
 source links, review/effective dates and setup limitations. Unplayable editions
 stay off playable shelves; conditional revivals need setup verification.
 Offline-playable exclusions such as Evolve remain separate, and future dates

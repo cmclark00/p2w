@@ -97,6 +97,11 @@ main { padding: 20px var(--gutter); }
 .dead-upcoming .dead-label { color: #a6bfff; }
 .dead-maintenance { margin-top: 20px; }
 .dead-maintenance summary { cursor: pointer; font-weight: 600; }
+.dead-staff-warning { border-left-width: 6px; padding: 14px 16px; }
+.dead-warning-title { display: block; font-size: 1rem; }
+.dead-warning-instruction { font-weight: 600; }
+.dead-staff-warning.dead-offline { border-color: var(--gold); }
+.dead-card-policy { padding: 10px 12px; background: var(--surface-2); border-radius: 6px; }
 @media (max-width: 1000px) {
   .dead-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dead-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }

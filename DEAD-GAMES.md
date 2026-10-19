@@ -12,26 +12,44 @@ register, not an exhaustive catalog or fresh shop hardware testing.
   playable stock pending edition/setup verification.
 - Offline exclusions: preserve offline/bot/LAN play and limitations. Evolve's
   Standard disc has offline modes; Twisted Metal: Black Online has LAN.
+  Revision 2 records a separate store-handling policy for the LAN-only disc;
+  its research classification, evidence and review dates remain unchanged.
 - Upcoming/uncertain: do not call a game unplayable merely because a date was
   announced. Destruction AllStars has returning-player Arcade caveats.
 
 ## Buying and shelf behavior
 
-The guide's don't-buy rule applies only to exact confirmed unplayable aliases
+**Two staff checkpoints:** confirmed unplayable and unofficial/setup-dependent
+exact editions receive prominent warnings in both Trade-In and Pricing:
+**Do not buy or sell as ordinarily playable.** Conditional notices explicitly
+say **not normally playable**, rather than declaring the game completely dead.
+These warnings remain visible when the buying guide is disabled or a manual
+trade offer is entered. No new trade-in cash/credit calculation is introduced.
+
+The guide's numerical don't-buy rule still applies only to exact confirmed unplayable aliases
 on their listed consoles, when the guide is enabled. Existing manual trade
 value/cash overrides keep working, with playability guidance visible. Empty
 cases and hardware are not newly restricted. Conditional entries carry a
-notice instead of being called completely unplayable.
+warning instead of being called completely unplayable or automatically zeroed.
 
 Floor Pricing holds confirmed and conditional exact editions from Add to list,
 including typed prices. Existing saved list prices are preserved with notices;
 printing labels, printing lists and copying lists hold until those entries are
 removed from the playable shelf list. A missing register blocks these shelf
-outputs. Offline-playable and upcoming entries retain ordinary price math.
+outputs. Evolve receives no automatic warning and retains ordinary price math.
+Twisted Metal: Black Online remains a LAN-playable exclusion from the completely
+dead category. Its separate normalPlay = requires-lan policy flags both
+checkpoints and holds ordinary solo-play shelf output pending verification and
+disclosure of the additional compatible systems/network setup. It is not
+automatically zeroed in Trade-In.
+Destruction AllStars receives a separate new-owner/setup caution at both
+checkpoints; it is not confirmed dead, is not automatically zeroed or held,
+and its future closure date never automatically changes its classification.
 Stale saved recheck suggestions are held too: neither individual Use nor
 Use all can replace a held game's saved price. Dates never change
 classifications automatically. Unknown related editions
-show review guidance instead of receiving a broad automatic block.
+are not automatically flagged. Exact aliases only: title-prefix matching must
+not warn on a successor such as The Crew 2 or Motorfest.
 
 Settings v12 replaces only the entire untouched legacy default list on loading
 an older save. That list incorrectly included Evolve and matched every console
@@ -52,7 +70,10 @@ matching, filtering and migration helpers; load it before app.js.
 1. Download JSON from the tab or copy the project JSON. Review the current
    linked source register and evidence. Update a candidate JSON, increasing
    revision and setting updatedAt. Preserve every caveat and history event.
-2. Append a changes event per changed entryId. Coverage means newly listed
+2. Append a changes event per changed entryId. A policy event records changes
+   to store handling without claiming new evidence or a new shutdown.
+   The optional normalPlay field currently accepts requires-lan only on an
+   offline/LAN classification. Coverage means newly listed
    evidence, including old shutdowns. A shutdown event must name an unplayable
    entry and use its verified effective date. For removals, append a correction
    event whose summary includes the removed ID. Upcoming dates are not a

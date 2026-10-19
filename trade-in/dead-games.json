@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 1,
+  "revision": 2,
   "updatedAt": "2026-10-19",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
   "sourceSequence": 5,
@@ -10,6 +10,17 @@
       "date": "2026-10-19",
       "type": "coverage",
       "summary": "Initial website coverage of 23 curated register entries. Historical closures are newly listed here, not newly occurring shutdowns."
+    },
+    {
+      "date": "2026-10-19",
+      "type": "policy",
+      "entryId": "tmbo",
+      "summary": "Store handling: flag LAN-only console play at Trade-In and Pricing and hold ordinary solo-play shelf output pending setup verification. LAN gameplay still exists; the offline/LAN research exclusion is unchanged."
+    },
+    {
+      "date": "2026-10-19",
+      "type": "policy",
+      "summary": "Make confirmed and unofficial/setup-dependent exact editions prominent at both staff checkpoints. Trade-in offer math is unchanged; upcoming and offline-playable findings remain separate from completely dead games."
     }
   ],
   "entries": [
@@ -685,7 +696,8 @@
         }
       ],
       "reviewedAt": "2026-10-19",
-      "firstListed": "2026-10-19"
+      "firstListed": "2026-10-19",
+      "normalPlay": "requires-lan"
     },
     {
       "id": "destruction-allstars",

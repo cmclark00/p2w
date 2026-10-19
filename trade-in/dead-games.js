@@ -5,7 +5,7 @@
   // BEGIN REGISTER DATA
   const data = {
   "schemaVersion": 1,
-  "revision": 1,
+  "revision": 2,
   "updatedAt": "2026-10-19",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
   "sourceSequence": 5,
@@ -15,6 +15,17 @@
       "date": "2026-10-19",
       "type": "coverage",
       "summary": "Initial website coverage of 23 curated register entries. Historical closures are newly listed here, not newly occurring shutdowns."
+    },
+    {
+      "date": "2026-10-19",
+      "type": "policy",
+      "entryId": "tmbo",
+      "summary": "Store handling: flag LAN-only console play at Trade-In and Pricing and hold ordinary solo-play shelf output pending setup verification. LAN gameplay still exists; the offline/LAN research exclusion is unchanged."
+    },
+    {
+      "date": "2026-10-19",
+      "type": "policy",
+      "summary": "Make confirmed and unofficial/setup-dependent exact editions prominent at both staff checkpoints. Trade-in offer math is unchanged; upcoming and offline-playable findings remain separate from completely dead games."
     }
   ],
   "entries": [
@@ -690,7 +701,8 @@
         }
       ],
       "reviewedAt": "2026-10-19",
-      "firstListed": "2026-10-19"
+      "firstListed": "2026-10-19",
+      "normalPlay": "requires-lan"
     },
     {
       "id": "destruction-allstars",
@@ -758,6 +770,7 @@
       ids.add(e.id);
       for (const f of ['title', 'edition', 'classification', 'effective', 'caveats']) if (!text(e[f])) fail(e.id + ': ' + f);
       if (!Object.prototype.hasOwnProperty.call(labels, e.category)) fail(e.id + ': category');
+      if (e.normalPlay !== undefined && (e.normalPlay !== 'requires-lan' || e.category !== 'offline')) fail(e.id + ': normal-play policy');
       if (!Array.isArray(e.platforms) || !e.platforms.length || e.platforms.some((p) => !text(p, 80))) fail(e.id + ': platforms');
       if (!Array.isArray(e.aliases) || !e.aliases.length || e.aliases.some((a) => !text(a, 200) || !key(a))) fail(e.id + ': aliases');
       if (!dateOK(e.reviewedAt) || !dateOK(e.firstListed) || e.reviewedAt > d.updatedAt || e.firstListed > d.updatedAt) fail(e.id + ': review / coverage dates');
@@ -773,7 +786,7 @@
     }
     if (!Array.isArray(d.changes) || !d.changes.length || d.changes.length > 500) fail('change history');
     for (const c of d.changes) {
-      if (!dateOK(c.date) || c.date > d.updatedAt || !['coverage', 'shutdown', 'status', 'correction', 'review'].includes(c.type)
+      if (!dateOK(c.date) || c.date > d.updatedAt || !['coverage', 'shutdown', 'status', 'correction', 'review', 'policy'].includes(c.type)
         || !text(c.summary) || (c.entryId && !/^[a-z0-9-]{1,80}$/.test(c.entryId))) fail('change event');
       // Historical events survive later revivals/removals. The importer verifies
       // newly appended shutdown events against the current exact-edition evidence.
@@ -807,7 +820,7 @@
     for (const e of after.entries) {
       const old = before.entries.find((r) => r.id === e.id);
       if (!old) rows.push({ type: 'coverage', id: e.id, title: e.title });
-      else if (JSON.stringify(old) !== JSON.stringify(e)) rows.push({ type: old.category !== e.category ? 'status' : 'review', id: e.id, title: e.title });
+      else if (JSON.stringify(old) !== JSON.stringify(e)) rows.push({ type: old.category !== e.category ? 'status' : old.normalPlay !== e.normalPlay ? 'policy' : 'review', id: e.id, title: e.title });
     }
     for (const e of before.entries) if (!after.entries.some((r) => r.id === e.id)) rows.push({ type: 'removed', id: e.id, title: e.title });
     return rows;

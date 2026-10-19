@@ -56,6 +56,8 @@ test('schema rejects unsafe links, missing evidence, ambiguous aliases, invalid 
     (d) => d.entries[0].reviewedAt = '2026-02-30',
     (d) => d.entries[0].closureDate = '2027-01-01',
     (d) => d.entries[0].category = 'probably dead',
+    (d) => d.entries[0].normalPlay = 'requires-lan',
+    (d) => d.entries.find((e) => e.id === 'tmbo').normalPlay = 'unsupported-policy',
     (d) => d.entries.push(clone(d.entries[0])),
     (d) => Object.defineProperty(d, '__proto__', { value: { polluted: true }, enumerable: true }),
     (d) => d.metadata = JSON.parse('{"constructor":{"prototype":{"polluted":true}}}'),
@@ -118,7 +120,7 @@ test('CLI dry run is read-only, stale hashes fail, and reviewed apply updates th
     const applied = cli(candidate, '--apply', '--expected', hash);
     assert.equal(applied.status, 0, applied.stderr);
     assert.equal(cli('--check').status, 0);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'trade-in/dead-games.json'))).revision, 2);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'trade-in/dead-games.json'))).revision, data.revision + 1);
   } finally {
     const resolved = path.resolve(temp);
     if (path.dirname(resolved).toLowerCase() !== path.resolve(os.tmpdir()).toLowerCase()
@@ -160,11 +162,71 @@ function cur(name, platform) {
 }
 test('real floor pricing holds only exact unplayable/conditional editions, even with typed prices', () => {
   for (const [name, p] of [['Anthem', 'PS4'], ['MAG', 'PS3'], ['SOCOM Confrontation', 'PS3']]) {
-    const r = call('floorResult', cur(name, p)); assert.equal(r.r, null); assert.match(r.b.need, /shel|Hold/i);
+    const r = call('floorResult', cur(name, p)); assert.equal(r.r, null); assert.match(r.b.need, /Do not buy or sell/);
   }
   for (const [name, p] of [['Evolve', 'PS4'], ['DC Universe Online', 'PS4'], ['The Crew 2', 'PS4'], ['Destruction AllStars', 'PS5']]) {
     assert.ok(call('floorResult', cur(name, p)).r);
   }
+});
+test('both rendered checkpoints prominently flag confirmed and special-setup exact editions', () => {
+  const cases = [['Anthem','PS4'], ['MAG','PS3'], ['SOCOM Confrontation','PS3'],
+    ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2']];
+  ctx.policyRow = { classList: { toggle() {} }, querySelector: element, querySelectorAll: () => [] };
+  for (const [name, platform] of cases) {
+    ctx.policyLine = line(name, platform);
+    run('updateRow(policyRow, policyLine);');
+    const tradeHTML = element('[data-cell="flags"]').innerHTML;
+    assert.match(tradeHTML, /Trade-In checkpoint/);
+    assert.match(tradeHTML, /Do not buy or sell as ordinarily playable/);
+    if (name !== 'Anthem') assert.match(tradeHTML, /not normally playable - unofficial or special setup/);
+    ctx.policyCurrent = cur(name, platform); run('floorCur = policyCurrent; renderFloorPricer();');
+    assert.match(element('#floorPricer').innerHTML, /Pricing checkpoint/);
+    assert.match(element('#floorPricer').innerHTML, /data-floor-act="add" disabled/);
+  }
+});
+test('conditional flags remain visible with guide disabled and typed offers, without changing cash', () => {
+  const l = line('MAG','PS3');
+  const before = clone(call('priceLine', l));
+  assert.equal(before.dontBuy, false); assert.ok(before.cash > 0);
+  l.cashOverride = 777;
+  assert.equal(call('priceLine', l).cash, 777);
+  run('settings.guide.enabled = false;');
+  ctx.policyLine = l; run('updateRow(policyRow, policyLine);');
+  assert.match(element('[data-cell="flags"]').innerHTML, /not normally playable/);
+  assert.equal(call('priceLine', l).cash, 777);
+  run('settings.guide.enabled = true;');
+});
+test('Evolve, other platforms and successor titles receive no automatic warning in either checkpoint', () => {
+  for (const [name, platform] of [['Evolve','PS4'], ['Evolve','Xbox One'], ['DC Universe Online','PS4'],
+    ['Plants vs Zombies Garden Warfare','Xbox 360'], ['Final Fantasy XIV Heavensward','PS4'],
+    ['Final Fantasy XI','PS4'], ['SOCOM Confrontation','PS4'], ['The Crew 2','PS4'], ['The Crew Motorfest','PS5']]) {
+    assert.equal(call('deadGameNotice',name,platform,'Trade-In'), '', name);
+    assert.equal(call('deadGameNotice',name,platform,'Pricing'), '', name);
+    assert.ok(call('floorResult',cur(name,platform)).r, name);
+  }
+});
+test('LAN policy is separate from dead classification and blocks ordinary shelf labels/exports', () => {
+  const name = 'Twisted Metal Black Online', platform = 'PS2';
+  const e = reg.match(name,platform);
+  assert.equal(e.category,'offline'); assert.match(e.classification,/LAN multiplayer available/);
+  assert.equal(e.normalPlay,'requires-lan');
+  for (const tab of ['Trade-In','Pricing']) {
+    const html = call('deadGameNotice',name,platform,tab);
+    assert.match(html,/LAN-only gameplay/); assert.match(html,/Not completely dead/);
+  }
+  assert.equal(call('guideCheck',line(name,platform),run('settings')),null);
+  assert.equal(call('floorResult',cur(name,platform)).r,null);
+  run("floor.items = [{name:'Twisted Metal Black Online',platform:'PS2',price:3000,recheck:{price:4000}}];");
+  run('printFloorLabels(); printFloorList(); copyFloorList(); useRecheck(floor.items[0]);');
+  assert.equal(run('floor.items[0].price'),3000);
+});
+test('upcoming returning-player caveat is a caution at both checkpoints, not a dead classification', () => {
+  for (const tab of ['Trade-In','Pricing']) {
+    const html = call('deadGameNotice','Destruction AllStars','PS5',tab);
+    assert.match(html,/not confirmed dead/); assert.match(html,/returning players/);
+  }
+  assert.equal(call('guideCheck',line('Destruction AllStars','PS5'),run('settings')),null);
+  assert.ok(call('floorResult',cur('Destruction AllStars','PS5')).r);
 });
 test('saved prices are retained but held games cannot be exported as shelf labels/list', () => {
   assert.equal(call('deadShelfReady', [{ name: 'Anthem', platform: 'PS4', price: 3000 }]), false);
