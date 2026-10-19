@@ -3220,11 +3220,12 @@ function manualDeduction(price) {
   return Math.round((price * 0.1) / 500) * 500; // $205+: 10%, to the nearest $5
 }
 
-// Final shelf presentation: over $80, choose the nearest multiple of $10 or $25.
+// Final shelf presentation: above $500 use $50 steps; over $80 through $500 use $10/$25.
 // Exact ties go up: $402 -> $400, $145 -> $150; $125/$175 stay unchanged.
 // Apply after specific adjustments so a manual deduction cannot leave an awkward final price.
 function floorShelfRound(price) {
   if (price <= 8000) return price;
+  if (price > 50000) return Math.round(price / 5000) * 5000;
   const candidates = [1000, 2500].flatMap((step) => [Math.floor(price / step) * step, Math.ceil(price / step) * step]);
   return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
 }
@@ -3236,7 +3237,7 @@ function floorLowRound(price) {
 }
 
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
-// keep the unrounded amount until the single final $10/$25 rounding step,
+// keep the unrounded amount until the single final rounding step for its tier,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
@@ -4013,7 +4014,7 @@ function renderFloorPricer() {
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
-            <li>Rounding: through $80, endings 7–9 go up to $10; other endings go down to $5. Above $80, nearest $10 or $25, ties up.</li>
+            <li>Rounding: through $80, endings 7–9 go up to $10; other endings go down to $5. Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
       </aside>
@@ -4055,7 +4056,7 @@ function floorMath(b, r) {
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   if (r.marketRaised) parts.push(`held at market minimum ${money(r.marketRaised)}`);
-  if (r.price !== r.beforeShelfRound) parts.push(`${r.beforeShelfRound > 8000 ? 'rounded to nearest $10 or $25 multiple' : 'low-price rounding'}: ${money(r.price)}`);
+  if (r.price !== r.beforeShelfRound) parts.push(`${r.beforeShelfRound > 50000 ? 'rounded to nearest $50' : r.beforeShelfRound > 8000 ? 'rounded to nearest $10 or $25 multiple' : 'low-price rounding'}: ${money(r.price)}`);
   return parts.join(' → ');
 }
 

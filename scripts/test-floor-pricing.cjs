@@ -499,16 +499,42 @@ test('low-price rounding respects dollar endings, cents, market references and t
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
 });
 
-test('final shelf prices over $80 round to the nearest $10 or $25 multiple with ties up', () => {
+test('final shelf prices over $80 through $500 round to the nearest $10 or $25 multiple with ties up', () => {
   for (const [price, expected] of [[7500, 7500], [8000, 8000], [8001, 8000], [8500, 9000],
     [9500, 10000], [10500, 11000], [12000, 12000], [12500, 12500], [12501, 12500],
     [13500, 14000], [14500, 15000], [15000, 15000], [16500, 17000], [17500, 17500],
-    [19500, 20000], [22500, 22500], [24500, 25000], [102500, 102500]]) {
+    [19500, 20000], [22500, 22500], [24500, 25000], [50000, 50000]]) {
     assert.equal(invoke('floorShelfRound', price), expected);
   }
   const r = invoke('floorPrice', 14500, { referenceMin: 14500 });
   assert.equal(r.beforeShelfRound, 14500); assert.equal(r.price, 15000);
   assert.ok(invoke('floorMath', { from: 'sale', basis: 14500 }, r).includes('rounded to nearest $10 or $25 multiple: $150.00'));
+});
+
+test('above $500 rounds directly to $50 once, preserving threshold, ties and raw references', () => {
+  for (const [basis, expected] of [[49999, 50000], [50000, 50000], [50001, 50000],
+    [52100, 50000], [52499, 50000], [52500, 55000], [52501, 55000], [55000, 55000],
+    [57499, 55000], [57500, 60000], [57600, 60000], [102499, 100000], [102500, 105000]]) {
+    for (const opts of [{}, { gs: basis, referenceMin: basis }]) {
+      const r = invoke('floorPrice', basis, opts);
+      assert.equal(r.beforeShelfRound, basis);
+      assert.equal(r.price, expected);
+      const math = invoke('floorMath', { from: 'sale', basis }, r);
+      assert.equal((math.match(/rounded/g) || []).length, basis === expected ? 0 : 1, math);
+      if (basis > 50000 && basis !== expected) assert.ok(math.includes('rounded to nearest $50'), math);
+    }
+  }
+  const premium = invoke('floorPrice', 47726, { premium: { phrase: 'Example', pct: 10 } });
+  assert.equal(premium.beforeShelfRound, 52499); assert.equal(premium.price, 50000);
+  const manual = invoke('floorPrice', 58217, { manualMissing: true });
+  assert.equal(manual.ded, 6000); assert.equal(manual.beforeShelfRound, 52217); assert.equal(manual.price, 50000);
+  const discounted = invoke('floorPrice', 60000, { premium: { phrase: 'Example', pct: -12.5 } });
+  assert.equal(discounted.beforeShelfRound, 52500); assert.equal(discounted.price, 55000);
+  const below = invoke('floorPrice', 55000, { manualMissing: true });
+  assert.equal(below.beforeShelfRound, 49500); assert.equal(below.price, 50000);
+  for (const extra of [{}, { pick: 0 }, { typed: 52499 }]) {
+    assert.equal(invoke('floorResult', cur(item, { sales: { cib: [{ title: 'Example Game complete', price: 52499 }] }, ...extra })).r.price, 50000);
+  }
 });
 
 test('clean shelf rounding follows premiums and manual deductions without replacing their rules', () => {
