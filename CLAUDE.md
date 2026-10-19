@@ -541,12 +541,14 @@ The site's **only server-side code**. Everything else is static.
     still excluded. PriceCharting's condition market price is a fallback
     only when all three references are missing; retail-sell is reference-only.
     Missing references and failed lookups remain visibly flagged.
-  - **High-value games (owner correction, Oct 19 2026):** when the highest
-    eligible condition-specific sale is at least $500 (`FLOOR_EXPENSIVE_GAME`),
+  - **High-value games (owner correction, Oct 19 2026):** when a valid
+    condition-specific sale exists and either that sale or the lowest verified
+    Amazon offer is at least $500 (`FLOOR_EXPENSIVE_GAME`),
     `floorBasis()` uses `max(sale, GameStop)` and excludes both regular and
     Renewed Amazon from the baseline and `referenceMin`. Amazon stays visible
-    as a reference. The threshold uses filtered sold evidence before adjustments
-    and rounding, not the catalog average or Amazon asking price. Staff-reviewed
+    as a reference. The threshold uses filtered sold evidence or the lowest verified Amazon offer
+    before adjustments and rounding, not the catalog average. No valid sale
+    retains the usual fallback; $450 sold with $700 Amazon uses $450. Staff-reviewed
     sale selections can qualify; typed overrides remain unchanged. Specific
     premiums, discounts, manual deductions and single final rounding still apply.
     Hardware and all toys-to-life families retain their existing source rules.

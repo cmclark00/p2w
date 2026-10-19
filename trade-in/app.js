@@ -3057,7 +3057,7 @@ function clearFulcrum() {
 /* ================================================================== floor pricing */
 
 // Owner correction, Oct 17 2026: max(highest valid eBay sale, lowest Amazon offer, GameStop).
-// Games with eligible sold evidence of $500+ ignore Amazon. PriceCharting's own market price is only a fallback.
+// Games with eligible sold evidence ignore Amazon when either reference reaches $500. PriceCharting's own market price is only a fallback.
 // Systems are PriceCharting console names (norm()'d, without a PAL/JP prefix).
 const FLOOR_TIERS = [
   {
@@ -3076,7 +3076,7 @@ const FLOOR_OTHER = { id: 'other', rule: "Baseline: highest of eBay sold, lowest
 const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
 const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
-const FLOOR_EXPENSIVE_GAME = 50000; // eligible sold evidence at $500+: Amazon is reference-only for games
+const FLOOR_EXPENSIVE_GAME = 50000; // sold or lowest verified Amazon at $500+, with a valid sale: Amazon is reference-only for games
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500;
@@ -3803,7 +3803,7 @@ function floorAmazonLowest(cur) {
 }
 
 // Regular references use the maximum; a verified Renewed fallback replaces
-// the eBay baseline while retaining GameStop's floor. Games with $500+ sold evidence
+// the eBay baseline while retaining GameStop's floor. Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorBasis(cur = floorCur) {
   const sales = floorSales(cur);
@@ -3835,7 +3835,7 @@ function floorBasis(cur = floorCur) {
   const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
   if (waiting) return { basis: null, sale, checks, waiting };
   const amz = cur.amazon?.error ? null : floorAmazonLowest(cur);
-  const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && sale?.price >= FLOOR_EXPENSIVE_GAME;
+  const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) >= FLOOR_EXPENSIVE_GAME;
   const renewedBasis = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
   const toyGroup = floorToyGroup(cur);
   // A verified, priced Amazon match switches figures to the usual three-source
@@ -3868,7 +3868,7 @@ function floorBasis(cur = floorCur) {
   const pc = pcRaw && pcRaw <= rhythmCap ? pcRaw : null;
   const reference = Math.max(sale?.price || 0, gs || 0);
   if (expensiveGameBasis) {
-    checks.push('High-value game: highest eligible PriceCharting sale is $500 or more. Amazon is reference-only; GameStop minimum, specific adjustments and final rounding still apply');
+    checks.push('High-value game: eligible sold evidence or the lowest verified Amazon offer is $500 or more. Amazon is reference-only; GameStop minimum, specific adjustments and final rounding still apply');
   } else if (amz && reference > 0 && amz > reference * FLOOR_AMAZON_OUTLIER) {
     checks.push(`Amazon's lowest offer (${money(amz)}) is more than ${FLOOR_AMAZON_OUTLIER}× eBay/GameStop; verify the match and asking price`);
   } else if (sale && amz && Math.abs(amz - reference) > FLOOR_STEP) {
@@ -4017,7 +4017,7 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : b.renewedBasis ? esc("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
-            <li>Games with an eligible sale of $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
+            <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>

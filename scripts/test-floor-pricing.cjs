@@ -211,21 +211,30 @@ test('sold evidence leads on modern, retro and hardware even when PriceCharting 
     assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 2000);
   }
 });
-test('games at $500 in eligible sold evidence use sales instead of regular or Renewed Amazon', () => {
+test('games with sold evidence and a $500+ reference use sales instead of regular or Renewed Amazon', () => {
   for (const name of ['Rule of Rose', 'Haunting Ground']) {
     const product = { ...item, 'product-name': name, 'console-name': 'Playstation 2' };
     for (const price of [49999, 50000, 130000]) {
       for (const renewedFallback of [false, true]) {
         const result = invoke('floorResult', cur(product, { sales: { cib: [{ title: `${name} complete`, price }] },
           amazon: { found: true, offers: [{ price: 170000 }], renewedFallback } }));
-        const expensive = price >= 50000;
-        assert.equal(!!result.b.expensiveGameBasis, expensive);
-        assert.equal(result.b.basis, expensive ? price : 170000);
-        assert.equal(result.r.price, expensive ? price : 170000);
-        assert.equal(result.b.referenceMin, expensive ? price : 170000);
-        if (expensive) assert.equal(result.b.renewedBasis, false);
+        assert.equal(result.b.expensiveGameBasis, true);
+        assert.equal(result.b.basis, price);
+        assert.equal(result.r.price, price === 49999 ? 50000 : price);
+        assert.equal(result.b.referenceMin, price);
+        assert.equal(result.b.renewedBasis, false);
       }
     }
+  }
+});
+
+test('Mega Man 7 uses $450 sold when Amazon is $700 and switches at the raw $500 Amazon boundary', () => {
+  const product = { ...item, 'product-name': 'Mega Man 7', 'console-name': 'Super Nintendo' };
+  for (const [amazonPrice, expected] of [[49999, 49999], [50000, 45000], [70000, 45000]]) {
+    const result = invoke('floorResult', cur(product, { sales: { cib: [{ title: 'Mega Man 7 SNES complete', price: 45000 }] },
+      amazon: { found: true, offers: [{ price: amazonPrice }, { price: 170000 }] } }));
+    assert.equal(result.b.basis, expected);
+    if (amazonPrice >= 50000) assert.equal(result.r.price, 45000);
   }
 });
 
@@ -248,14 +257,19 @@ test('high-value games retain GameStop floors, specific premiums, manual deducti
   assert.equal(invoke('floorResult', { ...example, typed: 52500 }).r.price, 55000);
 });
 
-test('high-value game threshold ignores rejected sales, does not use the catalog average, and excludes hardware and figures', () => {
+test('high-value game threshold needs a valid sale, ignores catalog averages and excludes hardware and figures', () => {
   const amazon = { found: true, offers: [{ price: 170000 }] };
   const product = { ...item, 'cib-price': 130000 };
-  for (const sales of [{ cib: [] }, { cib: [{ title: 'Example Game complete', price: 40000 }] },
-    { cib: [{ title: 'Example Game Special Edition complete', price: 130000 }, { title: 'Example Game complete', price: 40000 }] },
-    { cib: [130000, 40000, 39000, 38000].map((price) => ({ title: 'Example Game complete', price })) }]) {
+  for (const sales of [{ cib: [] }, { cib: [{ title: 'Example Game Special Edition complete', price: 130000 }] }]) {
     const result = invoke('floorResult', cur(product, { sales, amazon }));
     assert.equal(!!result.b.expensiveGameBasis, false); assert.equal(result.b.basis, 170000);
+  }
+  for (const sales of [{ cib: [{ title: 'Example Game complete', price: 40000 }] },
+    { cib: [130000, 40000, 39000, 38000].map((price) => ({ title: 'Example Game complete', price })) }]) {
+    const lowAmazon = invoke('floorResult', cur(product, { sales, amazon: { found: true, offers: [{ price: 49999 }] } }));
+    assert.equal(lowAmazon.b.expensiveGameBasis, false); assert.equal(lowAmazon.b.basis, 49999);
+    const highAmazon = invoke('floorResult', cur(product, { sales, amazon }));
+    assert.equal(highAmazon.b.expensiveGameBasis, true); assert.equal(highAmazon.b.basis, 40000);
   }
   for (const p of [{ ...item, 'product-name': 'Playstation 5 Console', 'console-name': 'Playstation 5', genre: 'Systems' },
     { ...item, 'product-name': 'Bash - Legendary', 'console-name': 'Skylanders' }]) {
