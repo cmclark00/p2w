@@ -448,7 +448,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .seg.on { background: var(--red); color: #fff; }
 .floor-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; }
 .floor-links a { color: var(--paper); }
-.gamestop-reference, .floor-links a.gamestop-reference { color: #ff374a; font-weight: 700; }
+.gamestop-market-price { color: #ff374a; font-weight: 700; }
 .floor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
 .floor-sales { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .floor-sales td { padding: 6px 8px; border-top: 1px solid var(--line); }
@@ -466,11 +466,14 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-price strong { display: block; font: 700 2.2rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
 .floor-price-actions {
   position: sticky; top: 0; z-index: 5;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px 20px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 12px 20px;
   margin: 0 0 8px; padding: 12px 0;
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .floor-price-context > .link { padding: 0; margin-bottom: 8px; font-size: 0.85rem; }
+.floor-market-quick { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 0 12px; font-size: 0.85rem; color: var(--muted); }
+.floor-market-quick > span { white-space: nowrap; }
+.floor-market-quick strong { font-variant-numeric: tabular-nums; }
 .floor-typed { max-width: 220px; margin: 10px 0; }
 .floor-review-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
 .floor-review-summary:empty { display: none; }
@@ -490,6 +493,10 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   .floor-body { grid-template-columns: 1fr; }
   .floor-result { order: -1; }
 }
+@media (min-width: 601px) and (max-width: 1000px) {
+  .floor-price-actions { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .floor-pinned-condition { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+}
 @media (max-width: 600px) {
   .floor-price-actions { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 8px 0; }
   .floor-price-actions .icon-btn { grid-column: 2; grid-row: 1; justify-self: end; }
@@ -497,6 +504,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   .floor-price-actions .btn { grid-column: 2; grid-row: 2; }
   .floor-price-actions .floor-price strong { font-size: 1.8rem; }
   .floor-price-actions .btn { padding: 10px 12px; }
+  .floor-pinned-condition { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
 }
 .floor-amz-head { margin-top: 18px; }
 .floor-amz-head a { color: var(--paper); text-transform: none; letter-spacing: 0; font-weight: 400; }

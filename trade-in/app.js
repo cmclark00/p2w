@@ -3900,10 +3900,6 @@ function floorResult(cur) {
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
 
-// Keep GameStop's comparison price visually distinct from our shelf price.
-const floorReferenceText = (text) => esc(text).replace(/GameStop(?:&#39;s)?(?: pre-owned(?: price)?)?(?: \(\$[\d,.]+\)| \$[\d,.]+)?/g,
-  (label) => `<span class="gamestop-reference">${label}</span>`);
-
 function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
@@ -3917,7 +3913,7 @@ function renderFloorPricer() {
   const belowGs = !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
     + (tier.id === 'modern' ? ` · Retail sell reference ${Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS['retail-sell'][c]]) || null)}`).join(' · ')}` : '');
-  const gs = Number(p['gamestop-price']) > 0 ? ` · ${floorReferenceText(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
+  const gs = Number(p['gamestop-price']) > 0 ? ` · ${esc(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
 
   const condBtns = Object.entries(GAME_CONDITIONS).map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
@@ -3946,9 +3942,15 @@ function renderFloorPricer() {
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · ${esc(GAME_CONDITIONS[cur.condition])}${cur.condition === 'cib' && cur.manualMissing && !hw ? ' · Manual missing' : ''}</div>
       </div>
+      <div class="segs floor-pinned-condition" role="group" aria-label="Condition">${condBtns}</div>
       <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
       <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="floor-market-quick" aria-label="Market references">
+      <span>GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong></span>
+      <span>PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong>${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong></span>
+      <span>Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong>${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong></span>
     </div>
     <div class="floor-price-context">
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
@@ -3956,7 +3958,7 @@ function renderFloorPricer() {
         <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
-        ${result ? `<div class="floor-math muted">${floorReferenceText(floorMath(b, result))}</div>` : ''}
+        ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
@@ -3976,7 +3978,6 @@ function renderFloorPricer() {
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
     </div>
     <div class="floor-controls">
-      <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
       ${['skylanders', 'infinity'].includes(toy) ? `<label>Figure pricing group<select data-floor-field="toyGroup"${floorToyVariant(p).rare ? ' disabled' : ''}>
         <option value="auto"${!['common', 'uncommon', 'rare'].includes(cur.toyGroup) ? ' selected' : ''}>Automatic — ${esc(floorToyGroup(cur, true))}</option>
         <option value="common"${cur.toyGroup === 'common' ? ' selected' : ''}>Common — PriceCharting average</option>
@@ -3986,7 +3987,7 @@ function renderFloorPricer() {
       ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       <span class="floor-links">
         <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
-        <a class="gamestop-reference" href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
+        <a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
         <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>
         ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
       </span>
@@ -3998,9 +3999,9 @@ function renderFloorPricer() {
         ${floorAmazonHtml(cur, b)}
       </div>
       <aside class="floor-result" aria-label="Pricing details">
-        ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${floorReferenceText(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
+        ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
         <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
-        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.renewedBasis ? floorReferenceText("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</p>
+        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.renewedBasis ? esc("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
