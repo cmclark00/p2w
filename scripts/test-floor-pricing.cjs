@@ -563,12 +563,12 @@ test('toy rounding uses the 2-to-15-to-5 ladder and amiibo always uses 5s', () =
   }
 });
 
-test('common Skylanders and Infinity use condition-specific PriceCharting average without market clamps', () => {
+test('without verified Amazon, common Skylanders and Infinity retain the condition-specific average', () => {
   for (const system of ['Skylanders', 'Disney Infinity']) {
     const product = { ...item, 'product-name': 'Bash', 'console-name': system, 'loose-price': 320, 'cib-price': 1250, 'new-price': 1800, 'gamestop-price': 3000 };
     for (const [condition, expected] of [['loose', 400], ['cib', 1200], ['new', 2000]]) {
       const r = invoke('floorResult', cur(product, { condition, toyGroup: 'common', manualMissing: true,
-        sales: { [condition]: [{ title: 'Bash', price: 4000 }] }, amazon: { found: true, title: 'Bash', offers: [{ price: 5000 }] } }));
+        sales: { [condition]: [{ title: 'Bash', price: 4000 }] }, amazon: { found: false } }));
       assert.equal(r.b.from, 'toyaverage'); assert.equal(r.r.price, expected); assert.equal(r.r.ded, 0); assert.equal(r.shitbox, null);
     }
   }
@@ -579,9 +579,65 @@ test('uncommon figures use highest eligible sold evidence, preserving variant an
   const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'uncommon',
     sales: { loose: [{ title: 'Bash', price: 5000 }, { title: 'Bash Legendary', price: 9000 },
       ...[700, 800, 900, 1000].map((price) => ({ title: 'Bash', price }))] },
-    amazon: { found: true, title: 'Bash', offers: [{ price: 8000 }] } }));
+    amazon: { found: false } }));
   assert.equal(r.b.basis, 1000); assert.equal(r.r.price, 1000); assert.equal(r.b.from, 'sale');
   assert.ok(r.b.checks.some((s) => s.includes('outlier')));
+});
+
+test('verified Amazon switches common and uncommon figures to the normal three-source maximum', () => {
+  for (const system of ['Skylanders', 'Disney Infinity']) {
+    for (const toyGroup of ['common', 'uncommon']) {
+      for (const [ebay, amazon, gs, expected, from] of [[2000, 3000, 2500, 3000, 'amazon'], [4000, 3000, 2500, 4000, 'sale'], [2000, 3000, 3500, 3500, 'gamestop']]) {
+        const product = { ...item, 'product-name': 'Bash', 'console-name': system, 'loose-price': 600, 'gamestop-price': gs };
+        const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup,
+          sales: { loose: [{ title: 'Bash', price: ebay }] }, amazon: { found: true, offers: [{ price: 99900 }, { price: amazon }] } }));
+        assert.equal(r.b.basis, expected); assert.equal(r.b.from, from); assert.equal(r.r.price, expected);
+        assert.ok(r.b.checks.some((s) => s.includes('Verified Amazon offer')));
+      }
+    }
+  }
+});
+
+test('wrong, unpriced, failed or missing Amazon matches retain the figure-only rule', () => {
+  const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 600, 'gamestop-price': 3000 };
+  for (const amazon of [null, { found: false }, { found: true, offers: [] },
+    { found: true, title: 'Bash Legendary', offers: [{ price: 5000 }] },
+    { found: true, title: 'Bash 3-Pack', offers: [{ price: 5000 }] },
+    { found: true, title: 'Bash French Version', offers: [{ price: 5000 }] },
+    { found: true, title: '', offers: [{ price: 5000 }] },
+    { found: true, offers: [{ price: 5000 }], error: 'Incomplete offer lookup' }]) {
+    const r = invoke('floorResult', cur(product, { condition: 'loose', sales: { loose: [{ title: 'Bash', price: 2000 }] }, amazon }));
+    assert.equal(r.b.from, 'toyaverage'); assert.equal(r.r.price, 600);
+  }
+});
+
+test('figures wait for enabled Amazon checks before publishing either baseline', () => {
+  const wasEnabled = run('amazonSet'); run('amazonSet = true');
+  try {
+    const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 600 };
+    for (const amazon of [null, { loading: true }, { found: true, loading: true, offers: [{ price: 3000 }] }]) {
+      const r = invoke('floorResult', cur(product, { condition: 'loose', amazon, sales: { loose: [] } }));
+      assert.equal(r.r, null); assert.equal(r.b.waiting, true);
+    }
+    assert.equal(invoke('floorResult', cur(product, { condition: 'loose', amazon: { found: false }, sales: { loose: [] } })).r.price, 600);
+  } finally { run(`amazonSet = ${wasEnabled}`); }
+});
+
+test('Amazon figure baselines preserve rare minimums, premiums and toy rounding', () => {
+  const rare = { ...item, 'product-name': 'Trigger Happy - Swap Force, Spring Time', 'console-name': 'Skylanders', 'new-price': 850 };
+  const rareCur = cur(rare, { condition: 'new', sales: { new: [] }, amazon: { found: true, title: 'Springtime Trigger Happy', offers: [{ price: 1800 }] } });
+  assert.equal(invoke('floorResult', rareCur).r.price, 2500);
+  rareCur.amazon.offers = [{ price: 4299 }];
+  assert.equal(invoke('floorResult', rareCur).r.price, 4500);
+  const old = json('settings.floorPremiums');
+  try {
+    run('settings.floorPremiums = [{phrase:"Bash",pct:50}]');
+    const p = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders', 'loose-price': 600 };
+    const r = invoke('floorResult', cur(p, { condition: 'loose', sales: { loose: [] }, amazon: { found: true, offers: [{ price: 800 }] } }));
+    assert.equal(r.b.basis, 800); assert.equal(r.r.price, 1200);
+    run('settings.floorPremiums = [{phrase:"Bash",pct:-50}]');
+    assert.equal(invoke('floorResult', cur(p, { condition: 'loose', sales: { loose: [] }, amazon: { found: true, offers: [{ price: 2000 }] } })).r.price, 1000);
+  } finally { run(`settings.floorPremiums = ${JSON.stringify(old)}`); }
 });
 
 test('Skylanders and Infinity accept higher comparable sales while other categories stay strict', () => {

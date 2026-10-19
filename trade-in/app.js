@@ -3767,8 +3767,13 @@ function floorBasis(cur = floorCur) {
   if (cur.fullLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
   if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop may be missing. Retry the search before labeling');
   if (cur.amazon?.error) checks.push(`Amazon check unavailable: ${cur.amazon.error}`);
+  const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
+  if (waiting) return { basis: null, sale, checks, waiting };
+  const amz = cur.amazon?.error ? null : floorAmazonLowest(cur);
   const toyGroup = floorToyGroup(cur);
-  if (['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
+  // A verified, priced Amazon match switches figures to the usual three-source
+  // baseline. Without one, retain their common-average / uncommon-sale rules.
+  if (['review', 'common', 'uncommon', 'rare'].includes(toyGroup) && !amz) {
     if (toyGroup === 'review') return { basis: null, sale, checks, need: 'Choose Common or Uncommon for this figure; choose Rare variant for a special Skylander with the $25 minimum.' };
     if (toyGroup === 'common') {
       const basis = Number(cur.product[PC_FIELDS.market[cur.condition]]);
@@ -3777,6 +3782,9 @@ function floorBasis(cur = floorCur) {
     }
     if (sale) return { basis: sale.price, from: 'sale', sale, checks, toyGroup };
     return { basis: null, sale: null, checks, need: 'No usable sold evidence for this figure and condition. Review the listings or type a price.' };
+  }
+  if (amz && ['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
+    checks.push('Verified Amazon offer found: using the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop; figure premiums, minimums and rounding still apply');
   }
   // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
   // disc-only copies under a bundle's Loose sales, and filtering them still leaves untitled disc sales (World Tour
@@ -3791,15 +3799,12 @@ function floorBasis(cur = floorCur) {
   // PriceCharting's condition-specific market price is the last fallback, never a competing maximum.
   const pcRaw = Number(cur.product[PC_FIELDS.market[cur.condition]]) || null;
   const pc = pcRaw && pcRaw <= rhythmCap ? pcRaw : null;
-  const amz = floorAmazonLowest(cur);
   const reference = Math.max(sale?.price || 0, gs || 0);
   if (amz && reference > 0 && amz > reference * FLOOR_AMAZON_OUTLIER) {
     checks.push(`Amazon's lowest offer (${money(amz)}) is more than ${FLOOR_AMAZON_OUTLIER}× eBay/GameStop; verify the match and asking price`);
   } else if (sale && amz && Math.abs(amz - reference) > FLOOR_STEP) {
     checks.push(`Amazon's lowest offer is ${money(amz)}; compare it with the sold evidence before labeling`);
   }
-  const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
-  if (waiting) return { basis: null, sale, checks, waiting };
   if (!sale) checks.push('No usable eBay sold evidence for this condition; fallback price — verify before labeling');
   const options = [[sale?.price, 'sale'], [amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
   const referenceMin = options.length ? Math.max(...options.map(([v]) => v)) : null;
@@ -3875,7 +3880,7 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${toy ? 'Toys to life: Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. The cutoff takes priority over named variants; known rare Skylanders keep a $25 minimum. Review unrecognized rare variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
+        <div class="floor-rule">${toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw && !toy ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
         ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $25 minimum</span>' : ''}

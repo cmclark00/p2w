@@ -806,7 +806,12 @@ Guide (the Google Sheet tab).
    before adding it twice.)
    **Toys to life:** figures use $2 steps below $15, then $5 steps. Amiibo
    always uses $5 steps. Rounding chooses the nearest step, with ties up.
-   Skylanders/Disney Infinity automatically use the PriceCharting market
+   **When a verified Amazon listing has a usable offer for the selected
+   condition**, Skylanders/Disney Infinity use the normal baseline: the highest
+   of the highest eligible eBay sale, lowest matching Amazon offer (shipping
+   included), and GameStop. A wrong, unpriced or failed Amazon match does not
+   activate this rule. Wait for the Amazon check to finish before labeling.
+   Without a usable verified Amazon offer, they use the PriceCharting market
    average **below $15**, or the highest eligible sale **at $15 or more**.
    The unrounded value for the selected condition sets the ordinary figure group.
    Recognized special Skylanders take priority over this cutoff.

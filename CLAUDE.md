@@ -669,8 +669,13 @@ The site's **only server-side code**. Everything else is static.
     only an isolated sale at least 3x the next valid sale AND $25 higher is
     excluded, with at least three lower valid comparables. Their upper-quartile
     test is disabled; Amiibo, other toy lines and games retain strict detection.
-    Those sources replace Amazon/GameStop
-    clamps. Other toy lines retain the general baseline with toy rounding.
+    When a verified, priced Amazon match exists for the selected condition,
+    Skylanders/Infinity instead use the normal maximum of highest eligible
+    sale, lowest matching Amazon offer and GameStop. Unpriced, mismatched or
+    failed Amazon checks retain the figure-only rules; enabled checks must
+    finish before publishing a recommendation. Toy minimums, premiums and
+    rounding still take priority. Other toy lines retain the general baseline
+    with toy rounding.
     Classification uses the unrounded selected-condition market value:
     below $15 is common; $15 or more is uncommon for ordinary figures.
     Recognized special Skylanders (including Spring Time/Easter, Lightcore,
