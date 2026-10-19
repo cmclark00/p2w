@@ -699,10 +699,11 @@ Everyone in the store shares one internet address, so typos add up.
      2DS and New 2DS XL). **All sealed consoles and handhelds** require
      serials too: select **New** for sealed hardware. Enter one serial per
      unit, separated by commas when there are multiple units on a line.
-   - Other used consoles and handhelds do not require serials. Their fields
-     are under **Optional serial numbers**, and previously entered numbers
-     stay saved. The existing **Photo ID checked** requirement still applies
-     to console/handheld trades; the trade will not save until it is checked.
+   - **Photo ID checked** is required only for those same listed models and
+     sealed consoles/handhelds. Other used hardware, such as a Sega Genesis,
+     completes like games: no ID prompt and no serial-number fields. In a mixed
+     trade, only the listed/sealed hardware gets serial fields and triggers
+     the ID check. Hardware pricing and previously saved serials stay intact.
    - **Save trade**, or **Save & print receipt** for a copy with a
      signature line. Click once; the buttons grey out while it saves.
    The trade is saved to the **Trade Log** with a **trade number** (on the

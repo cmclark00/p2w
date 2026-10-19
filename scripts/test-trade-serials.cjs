@@ -56,10 +56,10 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       assert.equal(invoke('tradeSerialRequired', hardware('Nintendo Switch', { category, condition: 'new' })), false);
     }
   });
-  await test('mixed trade renders required serials prominently and preserves optional serials', () => {
+  await test('mixed trade renders only required serial fields', () => {
     const html = invoke('tradeSerialFields', [hardware('PS5'), hardware('NES', { id: 'old', serial: 'OLD-123' })]);
     assert.match(html, /PS5 \(required\)/); assert.match(html, /spellcheck/);
-    assert.match(html, /Optional serial numbers \(1\)/); assert.match(html, /NES \(optional\)/); assert.match(html, /OLD-123/);
+    assert.doesNotMatch(html, /Optional|NES|OLD-123/);
     assert.equal((html.match(/ required/g) || []).length, 1);
     assert.equal(invoke('tradeSerialFields', [hardware('PS5 Controller', { category: 'accessory' })]), '');
   });
@@ -75,23 +75,71 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     saveTrade=()=>{}; priceLine=()=>({cash:1000,credit:1200}); lineDeductions=()=>[];
     api=async(route,{body})=>{sentRecords.push(body);return {id:1,time:'2026-10-19'};};
     resetTrade=()=>{}; toast=()=>{}; printSheet=()=>{printed++;};`);
-  await test('completion keeps the existing photo-ID check for optional-serial hardware', async () => {
-    ctx.line = hardware('NES'); run('trade.lines=[line];'); invoke('openComplete');
-    assert.equal(element('#idCheckRow').hidden, false);
+  const openTrade = (lines) => {
+    ctx.testLines = lines; run('trade.lines=testLines; sentRecords=[]; printed=0;'); invoke('openComplete');
     element('#staffName').value = 'Test staff'; element('#completeCustomer').value = 'Test customer';
-    await invoke('saveCompleted', false); assert.match(element('#completeError').textContent, /photo ID/);
-    assert.equal(run('sentRecords.length'), 0);
-    element('#idChecked').checked = true; await invoke('saveCompleted', false);
-    assert.equal(run('sentRecords.length'), 1); assert.equal(run('sentRecords[0].items[0].serial'), undefined);
-  });
-  await test('Save and Save-and-print block missing required serials and preserve valid serials', async () => {
-    ctx.line = hardware('PS5'); run('trade.lines=[line];');
-    for (const print of [false, true]) {
-      await invoke('saveCompleted', print); assert.match(element('#completeError').textContent, /serial number/);
-      assert.equal(run('sentRecords.length'), 1);
+  };
+  await test('older used hardware and games save and print without ID or serial fields', async () => {
+    for (const line of [hardware('Sega Genesis'), hardware('NES', { serial: 'OLD-123' }),
+      hardware('Game Boy', { category: 'handheld' }), hardware('Sonic', { category: 'game' })]) {
+      openTrade([line]);
+      assert.equal(element('#idCheckRow').hidden, true);
+      assert.equal(element('#serialFields').innerHTML, '');
+      assert.equal(element('#idChecked').checked, false);
+      // A stale visible ID row must not impose a requirement on exempt items.
+      element('#idCheckRow').hidden = false;
+      for (const print of [false, true]) {
+        await invoke('saveCompleted', print); assert.equal(element('#completeError').textContent, '');
+      }
+      assert.equal(run('sentRecords.length'), 2); assert.equal(run('printed'), 1);
+      assert.equal(run('sentRecords[0].idChecked'), undefined);
+      assert.equal(run('sentRecords[0].items[0].serial'), line.serial);
+      assert.equal(line.category, run('trade.lines[0].category'));
     }
-    run('trade.lines[0].serial="PS5-123"'); await invoke('saveCompleted', true);
-    assert.equal(run('sentRecords.length'), 2); assert.equal(run('sentRecords[1].items[0].serial'), 'PS5-123'); assert.equal(run('printed'), 1);
+  });
+  await test('listed models and sealed Genesis require serials and ID for both completion actions', async () => {
+    for (const line of [hardware('PS5'), hardware('Sega Genesis', { condition: 'new' })]) {
+      openTrade([line]);
+      assert.equal(element('#idCheckRow').hidden, false);
+      assert.match(element('#serialFields').innerHTML, /data-serial/);
+      for (const print of [false, true]) {
+        await invoke('saveCompleted', print); assert.match(element('#completeError').textContent, /serial number/);
+        assert.equal(run('sentRecords.length'), 0);
+      }
+      line.serial = 'TEST-123';
+      // Hidden/stale UI cannot bypass the ID requirement.
+      element('#idCheckRow').hidden = true;
+      for (const print of [false, true]) {
+        await invoke('saveCompleted', print); assert.match(element('#completeError').textContent, /photo ID/);
+        assert.equal(run('sentRecords.length'), 0);
+      }
+      element('#idChecked').checked = true;
+      for (const print of [false, true]) await invoke('saveCompleted', print);
+      assert.equal(run('sentRecords.length'), 2); assert.equal(run('printed'), 1);
+      assert.equal(run('sentRecords[0].items[0].serial'), 'TEST-123');
+      assert.equal(run('sentRecords[0].idChecked'), true);
+    }
+  });
+  await test('mixed trades only collect serials for listed hardware and still require ID', async () => {
+    openTrade([hardware('Genesis', { id: 'old' }), hardware('Switch 2', { id: 'modern', serial: 'SW-123' })]);
+    assert.equal(element('#idCheckRow').hidden, false);
+    assert.doesNotMatch(element('#serialFields').innerHTML, /Genesis|data-serial="old"/);
+    assert.match(element('#serialFields').innerHTML, /Switch 2/);
+    await invoke('saveCompleted', false); assert.match(element('#completeError').textContent, /photo ID/);
+    element('#idChecked').checked = true; await invoke('saveCompleted', false);
+    assert.equal(run('sentRecords.length'), 1); assert.equal(run('sentRecords[0].items.length'), 2);
+  });
+  await test('failed modern hardware does not trigger ID for an older-console trade', async () => {
+    openTrade([hardware('Genesis'), hardware('PS5', { failed: true })]);
+    assert.equal(element('#idCheckRow').hidden, true); assert.equal(element('#serialFields').innerHTML, '');
+    await invoke('saveCompleted', false); assert.equal(run('sentRecords.length'), 1);
+  });
+  await test('default and saved legacy footers have no blanket ID notice; custom footer preserved', () => {
+    const legacy = 'Offer valid today only and subject to inspection. A valid photo ID is required for any console or handheld with a serial number.';
+    for (const saved of [null, { quoteFooter: legacy }]) {
+      assert.equal(invoke('mergeSettings', saved).quoteFooter, 'Offer valid today only and subject to inspection.');
+    }
+    assert.equal(invoke('mergeSettings', { quoteFooter: 'Custom footer' }).quoteFooter, 'Custom footer');
   });
   console.log(`${checks} trade serial checks passed.`);
 })().catch((err) => { console.error(err); process.exitCode = 1; });

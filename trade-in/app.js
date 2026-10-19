@@ -173,7 +173,7 @@ const DEFAULT_SETTINGS = {
     sportsExceptions: ['Wii Sports', 'NFL Street', 'NBA Street', 'NFL Blitz'],
   },
   shopName: 'Play2Win Games',
-  quoteFooter: 'Offer valid today only and subject to inspection. A valid photo ID is required for any console or handheld with a serial number.',
+  quoteFooter: 'Offer valid today only and subject to inspection.',
 };
 
 // Cash prices from the Game Buying Guide. Consoles/handhelds: [name, complete, console only, parts].
@@ -295,6 +295,10 @@ function mergeSettings(saved) {
   if (!saved || typeof saved !== 'object') return s;
   for (const k of ['defaultCondition', 'roundMode', 'roundStep', 'lowValue', 'slowSalesPerYear', 'partsPctOfLoose', 'thirdPartyPct', 'boxedStepPct', 'shopName', 'quoteFooter']) {
     if (saved[k] !== undefined) s[k] = saved[k];
+  }
+  // Retire the blanket ID notice while preserving custom shop footers.
+  if (s.quoteFooter === 'Offer valid today only and subject to inspection. A valid photo ID is required for any console or handheld with a serial number.') {
+    s.quoteFooter = DEFAULT_SETTINGS.quoteFooter;
   }
   if (saved.flatItems && typeof saved.flatItems === 'object') Object.assign(s.flatItems, saved.flatItems);
   if (saved.cases && typeof saved.cases === 'object') Object.assign(s.cases, saved.cases);
@@ -2285,12 +2289,8 @@ function tradeSerialRequired(line) {
 }
 
 function tradeSerialFields(lines) {
-  const hardware = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
-  const field = (l, required) => `<label>Serial number – ${esc(l.name)} (${required ? 'required' : 'optional'})${l.qty > 1 ? ` (×${l.qty}, separate with commas)` : ''}
-    <input type="text" data-serial="${esc(l.id)}" value="${esc(l.serial || '')}"${required ? ' required' : ''} autocomplete="off" spellcheck="false"></label>`;
-  const required = hardware.filter(tradeSerialRequired), optional = hardware.filter((l) => !tradeSerialRequired(l));
-  return required.map((l) => field(l, true)).join('')
-    + (optional.length ? `<details><summary>Optional serial numbers (${optional.length})</summary>${optional.map((l) => field(l, false)).join('')}</details>` : '');
+  return lines.filter(tradeSerialRequired).map((l) => `<label>Serial number – ${esc(l.name)} (required)${l.qty > 1 ? ` (×${l.qty}, separate with commas)` : ''}
+    <input type="text" data-serial="${esc(l.id)}" value="${esc(l.serial || '')}" required autocomplete="off" spellcheck="false"></label>`).join('');
 }
 
 function tradeSerialIssue(lines) {
@@ -2319,9 +2319,8 @@ function openComplete() {
   $('#staffName').value = trade.staff || '';
   $('#completeCustomer').value = trade.customer || '';
   $('#completeNotes').value = '';
-  const serialLines = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
   $('#serialFields').innerHTML = tradeSerialFields(lines);
-  $('#idCheckRow').hidden = !serialLines.length;
+  $('#idCheckRow').hidden = !lines.some(tradeSerialRequired);
   $('#idChecked').checked = false;
   $('#completeError').textContent = '';
   $('#completeDialog').showModal();
@@ -2364,8 +2363,8 @@ async function saveCompleted(print) {
   });
   const serialIssue = tradeSerialIssue(trade.lines);
   if (serialIssue) { error.textContent = serialIssue; return; }
-  const needsId = !$('#idCheckRow').hidden;
-  if (needsId && !$('#idChecked').checked) { error.textContent = "Check the customer's photo ID before buying consoles or handhelds."; return; }
+  const needsId = trade.lines.some((l) => !l.pending && !l.failed && tradeSerialRequired(l));
+  if (needsId && !$('#idChecked').checked) { error.textContent = "Check the customer's photo ID for the items requiring serial numbers."; return; }
   Object.assign(trade, { staff, customer });
   saveTrade();
   const record = {
