@@ -732,6 +732,8 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
+   The **Shelf price** appears directly below the game's name, above the
+   sales and yellow review notes, on both desktop and mobile.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
    - **Every system:** compare the **highest valid eBay sale**, the
