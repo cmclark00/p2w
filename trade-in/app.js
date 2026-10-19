@@ -3087,7 +3087,7 @@ function floorToyListingMismatch(title, product) {
   const name = product['product-name'] || '';
   if (floorToyFamily(product) === 'skylanders') {
     if (floorSkyVariants(title).join('|') !== floorSkyVariants(name).join('|')) return 'Different or unconfirmed figure variant';
-    if (/\b(?:[2-9]|\d{2,}|two|three|four|five)\s*(?:pack|figures|characters)|\b(?:set of|lot of|choose|pick your)\b/i.test(title)) return 'Multiple figures or choice listing';
+    if (/\b(?:[2-9]|\d{2,}|two|three|four|five)[\s-]*(?:pack|figures|characters)\b|\b(?:set of|lot of|choose|pick your)\b/i.test(title)) return 'Multiple figures or choice listing';
     if (floorToyVariant(product).unknown) return 'Unrecognized figure variant needs review';
     return null;
   }

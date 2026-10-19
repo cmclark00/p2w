@@ -31,7 +31,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     for (const title of ['Skylanders Swap Force SPRINGTIME TRIGGER HAPPY New', 'Trigger Happy Easter Spring Edition New', 'Springtime Trigger Happy Limited Edition Easter Variant No Gold No Glory']) {
       e.ctx.title = title; assert.equal(e.run('floorListingMismatch(title,product)'), null, title);
     }
-    for (const title of ['Trigger Happy Legendary New', 'Trigger Happy Power Blue New', 'Trigger Happy New', 'Springtime Spyro New', 'Springtime Trigger Happy 3 pack', 'Springtime Trigger Happy Deluxe Edition', 'Springtime Trigger Happy preorder', 'Springtime Trigger Happy + Spyro bundle']) {
+    for (const title of ['Trigger Happy Legendary New', 'Trigger Happy Power Blue New', 'Trigger Happy New', 'Springtime Spyro New', 'Springtime Trigger Happy 3 pack', 'Springtime Trigger Happy 3-Pack', 'Springtime Trigger Happy Deluxe Edition', 'Springtime Trigger Happy preorder', 'Springtime Trigger Happy + Spyro bundle']) {
       e.ctx.title = title; assert.ok(e.run('floorListingMismatch(title,product)'), title);
     }
   });
