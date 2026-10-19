@@ -672,14 +672,19 @@ The site's **only server-side code**. Everything else is static.
     Those sources replace Amazon/GameStop
     clamps. Other toy lines retain the general baseline with toy rounding.
     Classification uses the unrounded selected-condition market value:
-    below $15 is common; $15 or more is uncommon. This cutoff outranks
-    secondary named-variant classification, which is used when the market
-    value is missing. No value and no recognized variant needs review.
-    Legendary/chase Skylanders and recognized rare finish suffixes (metallic,
-    glitter, flocked, chrome, clear, glow-in-the-dark, gold/silver) automatically
-    have a $25 minimum, overriding the cutoff. Staff can select Rare variant
-    for another special Skylander. Character names such as Golden Queen are
-    not rare-finish evidence. Figure variant matching remains enforced.
+    below $15 is common; $15 or more is uncommon for ordinary figures.
+    Recognized special Skylanders (including Spring Time/Easter, Lightcore,
+    Dark, Nitro, Jade, Enchanted, Power Blue, holiday/promo and rare finishes)
+    take priority and have a $25 minimum regardless of the market value.
+    Unknown catalog variant suffixes require review. Ordinary series/reposes
+    do not automatically receive the rare floor; Golden Queen is a character.
+    `fetchFloorProductSales` searches the same character's catalog entries,
+    checking up to eight related pages after the selected entry. Only exact
+    variant/character titles are recovered, within the original condition;
+    new recovered sales must explicitly confirm new/sealed. Listings are
+    deduplicated by eBay item ID, URL, or title/date/price. Source provenance
+    survives live display and audits. Failures/caps flag incomplete checks.
+    Live pricing, saved rechecks and history audits share this helper.
     `toyGroup` persists on list items; `auto` recomputes classification during
     rechecks, while explicit staff choices persist. History inputs can carry
     it too. Existing percentage premiums

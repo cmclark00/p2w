@@ -28,6 +28,7 @@ jobs:
         run: |
           node scripts/test-floor-pricing.cjs
           node scripts/test-amazon-matching.cjs
+          node scripts/test-skylander-sales.cjs
           node scripts/test-history-audit.cjs
       - name: Install PHP test runtime
         run: sudo apt-get update -qq && sudo apt-get install -y php-cli php-curl php-mbstring php-sqlite3

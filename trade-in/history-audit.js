@@ -56,7 +56,7 @@ async function auditOne(item) {
   try { product=await auditProduct(item); }
   catch(err) { return {...item,status:'Match needs review',notes:[err.message],flag:false}; }
   const [sold,amazon] = await Promise.all([
-    cached(`sales|${product.id}`,()=>auditRequest('pc/sales',{id:product.id}).then(d=>({sales:d.sales})).catch(e=>({sales:null,salesError:e.message}))),
+    cached(`sales|${product.id}`,()=>audit.engine.fetchFloorProductSales(product,auditRequest).catch(e=>({sales:null,salesError:e.message}))),
     audit.config.amazonSet ? audit.engine.fetchFloorAmazon(product,item.condition,auditRequest).catch(e=>({error:e.message})) : Promise.resolve(null),
   ]);
   const cur={product,condition:item.condition,manualMissing:item.manualMissing,toyGroup:item.toyGroup,pick:null,typed:null,...sold,amazon};
@@ -70,6 +70,7 @@ async function auditOne(item) {
     recommended:price,...auditGap(item,price),lookedUpAt:new Date().toISOString(),
     pcId:product.id,matchedName:product['product-name'],matchedSystem:product['console-name'],
     source:result.b.from,basis:result.b.basis,ebay:result.b.sale?.price??null,ebayTitle:result.b.sale?.title||'',ebayUrl:result.b.sale?.url||'',
+    salesSources:sold.salesSources||[],ebaySourcePcId:result.b.sale?.sourcePcId||null,
     amazonLowest:audit.engine.floorAmazonLowest(cur),amazonTitle:amazon?.title||'',amazonUrl:amazon?.url||'',
     gamestop:audit.engine.floorGsFor(cur),premium:result.premium,notes};
 }

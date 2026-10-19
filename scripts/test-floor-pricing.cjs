@@ -642,22 +642,23 @@ test('unknown toy rarity and missing required sources ask for review instead of 
   assert.equal(invoke('floorResult', cur(product, { toyGroup: 'uncommon', sales: { cib: [] } })).r, null);
 });
 
-test('the 15 dollar cutoff takes priority over secondary variant classification', () => {
+test('the 15 dollar cutoff applies to ordinary figures, while special Skylanders take priority', () => {
   for (const system of ['Skylanders', 'Disney Infinity']) {
     for (const name of ['Bash', 'Bash - Crystal']) {
       for (const [market, group, price] of [[1499, 'common', 1500], [1500, 'uncommon', 3000], [1501, 'uncommon', 3000]]) {
         const product = { ...item, 'product-name': name, 'console-name': system, 'loose-price': market };
         const example = cur(product, { condition: 'loose', toyGroup: 'auto', sales: { loose: [{ title: `${name} figure`, price: 3000 }] } });
-        assert.equal(invoke('floorToyGroup', example), group);
-        assert.equal(invoke('floorResult', example).r.price, price);
+        const rare = system === 'Skylanders' && name.includes('Crystal');
+        assert.equal(invoke('floorToyGroup', example), rare ? 'rare' : group);
+        assert.equal(invoke('floorResult', example).r.price, rare ? 3000 : price);
       }
     }
   }
   const product = { ...item, 'product-name': 'Bash - Crystal', 'console-name': 'Skylanders', 'loose-price': 0, 'new-price': 2000 };
-  assert.equal(invoke('floorToyGroup', { product, condition: 'loose' }), 'uncommon');
+  assert.equal(invoke('floorToyGroup', { product, condition: 'loose' }), 'rare');
   assert.equal(invoke('floorToyGroup', { product: { ...product, 'product-name': 'Bash' }, condition: 'loose' }), 'review');
-  assert.equal(invoke('floorToyGroup', { product, condition: 'new' }), 'uncommon');
-  assert.equal(invoke('floorToyGroup', { product, condition: 'new', toyGroup: 'common' }), 'common');
+  assert.equal(invoke('floorToyGroup', { product, condition: 'new' }), 'rare');
+  assert.equal(invoke('floorToyGroup', { product, condition: 'new', toyGroup: 'common' }), 'rare');
 });
 
 test('rare finishes keep the 25 minimum and named figure variants do not mix', () => {

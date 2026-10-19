@@ -808,12 +808,18 @@ Guide (the Google Sheet tab).
    always uses $5 steps. Rounding chooses the nearest step, with ties up.
    Skylanders/Disney Infinity automatically use the PriceCharting market
    average **below $15**, or the highest eligible sale **at $15 or more**.
-   The unrounded value for the selected condition sets this group. It takes
-   priority over named variants; known variants help when that value is missing.
+   The unrounded value for the selected condition sets the ordinary figure group.
+   Recognized special Skylanders take priority over this cutoff.
    You can select **Common** or **Uncommon** to override the automatic group.
    **Rare variant** Skylanders use that sale with a **$25 minimum**;
-   Legendary/chase figures and recognized rare finishes get this minimum
-   automatically, even below the cutoff. Mark other rare variants explicitly.
+   Spring Time/Easter, Legendary, Lightcore, Dark, Nitro, Jade, Enchanted,
+   Power Blue, holiday/promo variants and recognized rare finishes get this
+   minimum automatically, even below the cutoff. Unrecognized variant suffixes
+   need review instead of silently becoming common. Mark other rare variants explicitly.
+   Skylanders also checks up to eight related entries for the same character.
+   Only exact-variant titles in the same condition are recovered; duplicates
+   count once. Recovered rows link their source entry. Failed or truncated
+   searches are flagged as incomplete; other entries' averages are never used.
    Automatic groups are recalculated on recheck; staff overrides stay saved.
    Skylanders/Infinity tolerate higher sold prices: only isolated spikes at
    least 3× the next valid sale and $25 higher, supported by three lower
