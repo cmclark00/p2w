@@ -72,5 +72,16 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route) => { assert.equal(route, 'pc/sales'); return { sales: { new: [sale('Example', 2000)] } }; });
     for (const system of ['Playstation 4', 'Disney Infinity']) { const r = await e.fetch({ ...product, 'console-name': system }); assert.equal(r.sales.new.length, 1); assert.equal(r.salesNotes.length, 0); }
   });
+  await test('GameStop link comes only from the selected catalog entry', async () => {
+    const own = 'https://www.gamestop.com/products/springtime/123.html';
+    const sibling = 'https://www.gamestop.com/products/standard/456.html';
+    for (const selectedLink of [own, null]) {
+      const e = engine(async (route, p) => route === 'pc/products' ? { products: [standard] }
+        : { sales: {}, gamestopUrl: String(p.id) === '1' ? selectedLink : sibling });
+      assert.equal((await e.fetch()).gamestopUrl, selectedLink);
+    }
+    const ordinary = engine(async () => ({ sales: {}, gamestopUrl: own }));
+    assert.equal((await ordinary.fetch({ ...product, 'console-name': 'Playstation 3' })).gamestopUrl, own);
+  });
   console.log(`${checks} Skylander sales checks passed.`);
 })().catch((e) => { console.error(e); process.exitCode = 1; });

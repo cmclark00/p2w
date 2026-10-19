@@ -3492,6 +3492,7 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
   const conditions = ['loose', 'cib', 'new'];
   const sales = Object.fromEntries(conditions.map((c) => [c, []]));
   const salesNotes = [], errors = [], sources = [], seen = new Set();
+  let gamestopUrl = null;
   const sky = floorToyFamily(product) === 'skylanders';
   let pages = [product];
   if (sky) {
@@ -3510,6 +3511,8 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
   for (const page of pages) {
     try {
       const data = await request('pc/sales', { id: page.id });
+      // Related Skylander entries can contribute sales, never another variant's store link.
+      if (String(page.id) === String(product.id)) gamestopUrl = data?.gamestopUrl || null;
       sources.push({ id: String(page.id), name: page['product-name'] });
       for (const condition of conditions) {
         for (const sale of data?.sales?.[condition] || []) {
@@ -3531,7 +3534,7 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
   }
   const salesError = errors.length ? errors.join('; ') : null;
   if (salesError) salesNotes.push(`Sold-evidence check incomplete: ${salesError}`);
-  return { sales, salesNotes, salesSources: sources, salesError };
+  return { sales, salesNotes, salesSources: sources, salesError, gamestopUrl };
 }
 
 async function loadFloorSales(product) {
@@ -3949,7 +3952,7 @@ function renderFloorPricer() {
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
-      <a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer" title="Search this game on GameStop (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ↗</a>
+      <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
       <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong> ↗</a>
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>

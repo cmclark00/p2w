@@ -345,6 +345,36 @@ function pricecharting(string $endpoint, string $param, string $value): void {
   respond_raw($status ?: 502, $body);
 }
 
+// Read the retailer destination attached to this product's GameStop comparison row.
+// Unwrap known affiliate links locally; never follow arbitrary redirects or accept search URLs.
+function pc_gamestop_url(string $html): ?string {
+  // The pinned reference is pre-owned even while staff inspect CIB or New sales.
+  if (preg_match('~<table\b[^>]*class\s*=\s*([\x22\x27])[^\x22\x27]*\bused-prices\b[^\x22\x27]*\1[^>]*>(.*?)</table>~is', $html, $used)) $html = $used[2];
+  preg_match_all('~<tr\b[^>]*\bdata-source-name\s*=\s*([\x22\x27])GameStop\1[^>]*>(.*?)</tr>~is', $html, $rows);
+  $urls = [];
+  foreach ($rows[2] as $row) {
+    preg_match_all('~<a\b[^>]*\shref\s*=\s*([\x22\x27])(.*?)\1~is', $row, $anchors);
+    foreach ($anchors[2] as $href) {
+      $url = html_entity_decode($href, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+      $parts = parse_url($url);
+      if (!is_array($parts)) continue;
+      if (strtolower($parts['host'] ?? '') === 'click.linksynergy.com') {
+        parse_str($parts['query'] ?? '', $query);
+        if (!is_string($query['murl'] ?? null)) continue;
+        $parts = parse_url($query['murl']);
+      }
+      if (!is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
+          || !in_array(strtolower($parts['host'] ?? ''), ['gamestop.com', 'www.gamestop.com'], true)
+          || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) continue;
+      $path = $parts['path'] ?? '';
+      if (!preg_match('~^/(?:[a-z0-9-]+/)*products/(?:[a-z0-9%-]+/)?(\d+)\.html$~i', $path, $product)) continue;
+      // Product id is GameStop's identity; duplicate condition rows can use different slugs.
+      $urls[$product[1]] = 'https://www.gamestop.com' . $path;
+    }
+  }
+  return count($urls) === 1 ? array_values($urls)[0] : null;
+}
+
 // Floor pricing: the recent sold listings on a game's public PriceCharting page (the API has no
 // sales data). One page read covers Loose, CIB, and New; it's cached for SALES_CACHE_SECONDS.
 // If PriceCharting changes their page, this returns no sales and staff use the page link instead.
@@ -352,7 +382,7 @@ function pc_sales(string $id): void {
   if (!preg_match('/^\d{1,10}$/', $id)) fail(400, 'Pass a PriceCharting product id.');
   $cacheDir = data_path('cache');
   if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700);
-  $cacheFile = $cacheDir . '/sales-' . $id . '.json';
+  $cacheFile = $cacheDir . '/sales-v2-' . $id . '.json';
   if (is_file($cacheFile) && time() - filemtime($cacheFile) < SALES_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
 
   // Same one-at-a-time gap as the API calls, so a busy pricing session can't hammer their site.
@@ -369,7 +399,7 @@ function pc_sales(string $id): void {
   if ($status === 0) fail(502, 'Could not reach PriceCharting: ' . $error);
   if ($status !== 200) fail(502, "PriceCharting returned HTTP $status.");
 
-  $out = ['status' => 'success', 'sales' => []];
+  $out = ['status' => 'success', 'sales' => [], 'gamestopUrl' => pc_gamestop_url($html)];
   foreach (['loose' => 'used', 'cib' => 'cib', 'new' => 'new'] as $cond => $cls) {
     $list = [];
     if (preg_match('#<div class="completed-auctions-' . $cls . '"[^>]*>(.*?)</table>#s', $html, $m)) {

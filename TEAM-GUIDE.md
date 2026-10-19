@@ -741,7 +741,10 @@ Guide (the Google Sheet tab).
    for Amazon; other GameStop mentions use normal text colors.
    Click a market reference to open its source in a new tab: PriceCharting's
    product page, the matched Amazon listing (or search if none is found),
-   or GameStop's game search. **eBay sold** opens a search for the current game
+   or the GameStop product linked from that exact PriceCharting entry. If that
+   entry has no usable GameStop product link, GameStop search is the fallback.
+   Related figure entries never replace the selected variant's GameStop link.
+   **eBay sold** opens a search for the current game
    and condition; a direct eBay price feed awaits integration approval.
    Manual-price controls sit below. The pinned controls stay at the top while scrolling the
    game's sales, then leave with the pricing panel. Short badges flag
