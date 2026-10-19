@@ -3393,6 +3393,8 @@ function pickFloorGame(product) {
   }
 }
 
+const AMAZON_RENEWED_RE = /\b(?:renewed|refurbished)\b/i;
+
 // Amazon's offers, loaded for every product. Only the lowest matching offer is a price reference.
 async function loadFloorAmazon() {
   const cur = floorCur;
@@ -3417,24 +3419,34 @@ async function fetchFloorAmazon(product, condition, request = (route, params) =>
   const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upc, cond]);
   if (!floorAmazonCache.has(key)) {
     const pending = (async () => {
-      const rejected = [], seen = new Set(), verified = [];
+      const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
       let searched = false;
-      async function check(catalog, fallback) {
+      async function check(catalog, fallback, renewedFallback = false) {
         const candidates = (catalog.candidates || []).filter((c) => /^[A-Z0-9]{10}$/.test(c.asin) && !seen.has(c.asin));
         const matching = candidates.filter((c) => {
           if (seen.has(c.asin)) return false;
+          if (!renewedFallback && AMAZON_RENEWED_RE.test(c.title)) {
+            deferredRenewed.set(c.asin, c);
+            return false;
+          }
+          if (renewedFallback && !AMAZON_RENEWED_RE.test(c.title)) return false;
           seen.add(c.asin);
-          const reason = floorAmazonCandidateMismatch(c, product, condition, fallback);
+          const reason = floorAmazonCandidateMismatch({ ...c, renewedFallback }, product, condition, fallback);
           if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
           return !reason;
         });
         if (matching.length > 5) throw new Error('Several possible Amazon listings need review; too many candidates to verify automatically.');
         for (const c of matching) {
-          const offer = await request('amazon/offers', { asin: c.asin, cond });
-          const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
-            : floorAmazonCandidateMismatch(offer, product, condition, fallback);
-          if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); continue; }
-          if (offer.found) verified.push({ ...offer, matchMethod: fallback ? 'title/platform search' : 'barcode' });
+          // A renewed ASIN may carry New offers; that is still a renewed item,
+          // never evidence for the original game's sealed condition.
+          for (const offerCond of renewedFallback ? ['used', 'new'] : [cond]) {
+            const offer = { ...await request('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback };
+            const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
+              : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
+              : floorAmazonCandidateMismatch(offer, product, condition, fallback);
+            if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); continue; }
+            if (offer.found) verified.push({ ...offer, matchMethod: fallback ? 'title/platform search' : 'barcode' });
+          }
         }
       }
       if (/^\d{8,14}$/.test(upc)) await check(await request('amazon/catalog', { upc }), false);
@@ -3444,12 +3456,21 @@ async function fetchFloorAmazon(product, condition, request = (route, params) =>
         const q = `${product['product-name']} ${product['console-name']}`.trim();
         await check(await request('amazon/catalog', { q }), true);
       }
+      if (!priced().length && condition !== 'new') {
+        const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
+        const catalog = await request('amazon/catalog', { q });
+        await check({ candidates: [...deferredRenewed.values(), ...(catalog.candidates || [])] }, true, true);
+      }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b }) || a.asin.localeCompare(b.asin));
       const selected = choices[0] || verified[0];
       const matchNotes = [];
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
       if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod} after searching title and platform` : 'No verified Amazon listing found in the title/platform search; review manually');
-      if (choices.length > 1) matchNotes.push(`Compared ${choices.length} verified Amazon listings; linked the lowest matching offer`);
+      const listingCount = new Set(choices.map((a) => a.asin)).size;
+      if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer`);
+      if (selected?.renewedFallback) matchNotes.push(choices.length
+        ? 'Renewed fallback: no usable regular Amazon offer found. Using the lowest verified renewed offer as a used/CIB reference; original packaging and inserts are not confirmed'
+        : 'Renewed listing verified, but no usable offer found; no Amazon price used');
       return { ...(selected || { found: false }), rejected, matchNotes, searched };
     })();
     floorAmazonCache.set(key, pending);
@@ -3720,8 +3741,9 @@ function floorAmazonMismatch(cur) {
   // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
   if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm)
     || HOME_CONSOLE_RE.test(cur.amazon.title))) return 'Non-comparable item, bundle, or condition';
-  if (/\b(?:renewed|refurbished|digital code|download code|digital download)\b/i.test(cur.amazon.title)
-    && !/\b(?:renewed|refurbished|digital)\b/i.test(cur.product?.['product-name'] || '')) return 'Renewed or digital variant';
+  if (/\b(?:digital code|download code|digital download)\b/i.test(cur.amazon.title)
+    && !/\bdigital\b/i.test(cur.product?.['product-name'] || '')) return 'Digital variant';
+  if (AMAZON_RENEWED_RE.test(cur.amazon.title) && !(cur.amazon.renewedFallback && cur.condition !== 'new')) return 'Renewed listing requires the verified used/CIB fallback';
   return null;
 }
 // A home console sold with the game (Fortnite, PS4, CIB, Oct 2026: "Sony PlayStation 4 PS4 Slim 1TB Fortnite Neo Versa
@@ -3971,7 +3993,7 @@ function renderFloorPricer() {
 function floorAmazonHtml(cur, b) {
   if (!amazonSet) return '';
   const a = cur.amazon;
-  const label = `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
+  const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;

@@ -769,6 +769,13 @@ Guide (the Google Sheet tab).
    - **Amazon's offers show on every game**, listed under the sales
      (prices include shipping). Only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
+     For used/CIB items, if barcode and title/platform searches find no usable
+     regular offer, the tool searches **Renewed** listings. A verified match
+     is labeled **Amazon Renewed fallback offers** and its lowest offer enters
+     the normal baseline. Regular priced listings always take priority.
+     Renewed matches still need the correct title, platform, language and
+     edition; they do not confirm original packaging/inserts and cannot price
+     a sealed copy. Specific premiums and deductions still apply.
      The tool waits for sold evidence and reference checks before enabling **Add to list**.
    - **Specific rules take priority:** configured premiums and discounts
      apply to the baseline, and missing-manual deductions still apply.

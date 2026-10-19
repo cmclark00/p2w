@@ -844,7 +844,7 @@ The site's **only server-side code**. Everything else is static.
     lists more); the tab shows them all and "N lowest of M". The frontend
     validates the returned catalog title with the same variant checks as
     eBay before using any offers, including cached responses. Missing or
-    mismatched titles, renewed and digital versions are excluded with a
+    mismatched titles and digital versions are excluded with a
     visible review reason. A UPC match alone is not sufficient. If the
     returned ASIN is excluded, `fetchFloorAmazon(product, condition)` tries
     the title/platform search. Search replacements require positive platform
@@ -853,6 +853,14 @@ The site's **only server-side code**. Everything else is static.
     lowest offer among verified ASINs supplies both the price and displayed
     product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.
+    For used/CIB only, after both regular lookups have no usable price,
+    deferred renewed/refurbished candidates plus a title/platform/renewed
+    search get the same identity checks with positive platform evidence.
+    Each verified renewed ASIN is checked under both Used and New offer
+    conditions; the lowest usable offer is tagged `renewedFallback` and
+    visibly labeled. New offers on a renewed ASIN do not establish original
+    sealed condition. A regular priced match always wins without running
+    this stage. No packaging/inserts are claimed; premiums stay intact.
     Match notes survive saved-item rechecks and history comparisons, which
     use the same engine helper. In-memory cache keys include product identity
     and condition; failed promises are evicted so retries work.

@@ -85,5 +85,82 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     });
     await assert.rejects(broken.fetch(), /Offer lookup failed/);
   });
+  await test('Lollipop Chainsaw PS3 finds renewed offers only after regular listings are unpriced', async () => {
+    const p = { ...product, 'product-name': 'Lollipop Chainsaw', 'console-name': 'Playstation 3' };
+    const regular = candidate('B000000001', 'Lollipop Chainsaw - PS3', ['PlayStation 3']);
+    const renewed = candidate('B000000002', 'Lollipop Chainsaw - PS3 (Renewed)', ['PlayStation 3']);
+    const calls = [];
+    const e = engine(async (route, params) => {
+      calls.push([route, params]);
+      if (route === 'amazon/catalog') return { candidates: params.q?.endsWith('renewed') ? [renewed] : [regular, renewed] };
+      if (params.asin === regular.asin) return offer(regular, null);
+      return { ...offer(renewed, params.cond === 'new' ? 4500 : 5000), condition: params.cond === 'new' ? 'New' : 'Used' };
+    });
+    const result = await e.fetch(p, 'cib');
+    assert.equal(result.asin, renewed.asin); assert.equal(result.renewedFallback, true); assert.equal(result.offers[0].price, 4500);
+    assert.equal(calls[2][1].q, 'Lollipop Chainsaw Playstation 3');
+    assert.equal(calls[3][1].q, 'Lollipop Chainsaw Playstation 3 renewed');
+    assert.equal(calls.filter(([route]) => route === 'amazon/offers').length, 3);
+    e.ctx.result = result; e.ctx.p = p;
+    const priced = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Lollipop Chainsaw PS3 complete",price:3000}]},amazon:result})');
+    assert.equal(priced.b.basis, 4500); assert.equal(priced.b.from, 'amazon');
+    assert.ok(priced.b.checks.some(n => n.includes('Renewed fallback')));
+    e.run('amazonSet=true');
+    assert.match(e.run('floorAmazonHtml({product:p,condition:"cib",amazon:result},{from:"amazon"})'), /Amazon Renewed fallback offers/);
+  });
+  await test('regular priced offers always take priority over cheaper or higher renewed offers', async () => {
+    for (const viaSearch of [false, true]) {
+      const good = candidate('B000000001'), renewed = candidate('B000000002', 'Final Fight SNES (Renewed)');
+      const e = engine(async (route, params) => {
+        if (route === 'amazon/catalog') {
+          assert.ok(!params.q?.endsWith('renewed'));
+          return { candidates: viaSearch && params.upc ? [renewed] : [renewed, good] };
+        }
+        assert.equal(params.asin, good.asin); return offer(good, 2500);
+      });
+      const result = await e.fetch(); assert.equal(result.asin, good.asin); assert.equal(result.renewedFallback, false);
+    }
+  });
+  await test('renewed fallback still rejects wrong games, platforms, imports, editions, bundles and digital copies', async () => {
+    const bad = [candidate('B000000001', 'Final Fight Guy (Renewed)'), candidate('B000000002', 'Final Fight Sega CD (Renewed)', ['Sega CD']),
+      candidate('B000000003', 'Final Fight French Version (Renewed)'), candidate('B000000004', 'Final Fight Special Edition (Renewed)'),
+      candidate('B000000005', 'Final Fight + Street Fighter Bundle (Renewed)'), candidate('B000000006', 'Final Fight Digital Download Code (Renewed)'),
+      candidate('B000000007', 'Final Fight (Renewed)', [])];
+    const e = engine(async (route, params) => {
+      assert.equal(route, 'amazon/catalog'); return { candidates: params.q?.endsWith('renewed') ? bad : [] };
+    });
+    const result = await e.fetch(); assert.equal(result.found, false); assert.equal(result.rejected.length, bad.length);
+  });
+  await test('renewed fallback rechecks offer identity and cannot price sealed copies', async () => {
+    const renewed = candidate('B000000001', 'Final Fight SNES (Renewed)');
+    const e = engine(async (route, params) => route === 'amazon/catalog' ? { candidates: [renewed] }
+      : offer({ ...renewed, title: 'Final Fight Guy SNES (Renewed)' }, 99900));
+    assert.equal((await e.fetch()).found, false);
+    const sealed = engine(async (route, params) => {
+      assert.equal(route, 'amazon/catalog'); assert.ok(!params.q?.endsWith('renewed')); return { candidates: [renewed] };
+    });
+    assert.equal((await sealed.fetch(product, 'new')).found, false);
+    sealed.ctx.result = { ...offer(renewed, 2500), renewedFallback: true };
+    assert.equal(sealed.run('floorAmazonLowest({product,condition:"new",amazon:result})'), null);
+  });
+  await test('renewed failures and missing prices are not represented as a priced fallback', async () => {
+    const renewed = candidate('B000000001', 'Final Fight SNES (Renewed)');
+    const e = engine(async (route) => route === 'amazon/catalog' ? { candidates: [renewed] } : offer(renewed, null));
+    const result = await e.fetch(); assert.equal(result.offers.length, 0);
+    assert.ok(result.matchNotes.some(n => n.includes('no Amazon price used')));
+    const failed = engine(async (route, params) => {
+      if (route === 'amazon/catalog') return { candidates: [renewed] };
+      if (params.cond === 'new') throw Error('Renewed lookup failed'); return offer(renewed, 9000);
+    });
+    await assert.rejects(failed.fetch(), /Renewed lookup failed/);
+  });
+  await test('specific premiums remain applied after the renewed fallback baseline', async () => {
+    const p = { ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
+    const renewed = candidate('B000000001', 'Pokemon Shield Nintendo Switch (Renewed)', ['Nintendo Switch']);
+    const e = engine(async (route) => route === 'amazon/catalog' ? { candidates: [renewed] } : offer(renewed, 6000));
+    e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;
+    const result = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch",price:5000}]},amazon:result})');
+    assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 6500);
+  });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });
