@@ -3937,6 +3937,7 @@ function renderFloorPricer() {
   const outliers = sales.filter((s) => s.outlier).length;
   const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error);
   el.innerHTML = `
+    <div class="floor-pinned-header">
     <div class="floor-price-actions" role="group" aria-label="Game, condition, and price">
       <div class="floor-price-identity">
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
@@ -3949,8 +3950,9 @@ function renderFloorPricer() {
     </div>
     <div class="floor-market-quick" aria-label="Market references">
       <span>GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong></span>
-      <span>PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong>${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong></span>
-      <span>Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong>${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong></span>
+      <span>PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong></span>
+      <span>Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong></span>
+    </div>
     </div>
     <div class="floor-price-context">
         ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
