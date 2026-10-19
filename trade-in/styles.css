@@ -447,6 +447,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .seg + .seg { border-left: 1px solid var(--line); }
 .seg.on { background: var(--red); color: #fff; }
 .gamestop-market-price { color: #ff374a; font-weight: 700; }
+.floor-gs-stock { color: var(--muted); font-size: .85em; font-weight: 400; }
 .pricecharting-market-price { color: var(--green); }
 .amazon-market-price { color: #79a7ff; }
 .floor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }

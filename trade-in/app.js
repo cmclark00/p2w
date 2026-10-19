@@ -3548,11 +3548,35 @@ async function loadFloorSales(product) {
   }
   try {
     const sold = await fetchFloorProductSales(product);
-    if (floorCur?.product === product) Object.assign(floorCur, sold);
+    if (floorCur?.product === product) {
+      Object.assign(floorCur, sold);
+      loadFloorGameStopStock(floorCur);
+    }
   } catch (err) {
     if (floorCur?.product === product) floorCur.salesError = err.message;
   }
   if (floorCur?.product === product) renderFloorPricer();
+}
+
+// Informational only: stock never changes a price or delays Add to list.
+async function loadFloorGameStopStock(cur) {
+  if (!cur.gamestopUrl) return;
+  cur.gamestopStock = { state: 'loading' };
+  try {
+    const stock = await api('gamestop/stock', { params: { url: cur.gamestopUrl } });
+    cur.gamestopStock = ['in', 'out'].includes(stock?.state) && (!stock.title || floorListingMismatch(stock.title, cur.product))
+      ? { state: 'unknown', reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
+  } catch (_) { cur.gamestopStock = { state: 'unknown' }; }
+  if (floorCur === cur) renderFloorPricer();
+}
+
+function floorGameStopStock(cur) {
+  const stock = cur.gamestopStock || {};
+  const labels = { in: 'In stock online', out: 'Out of stock online', loading: 'Checking stock…' };
+  const label = labels[stock.state] || 'Stock unknown';
+  const checked = stock.checkedAt ? ` Checked ${new Date(stock.checkedAt * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : '';
+  const title = (stock.reason || 'Open the matching GameStop listing to check pre-owned online stock. Local store stock may differ.') + checked;
+  return `<span class="floor-gs-stock" title="${esc(title)}">· ${esc(label)}</span>`;
 }
 
 // The condition's sales, highest first, each with its index into that list.
@@ -3970,7 +3994,7 @@ function renderFloorPricer() {
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
-      <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ↗</a>
+      <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
       <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong> ↗</a>
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>

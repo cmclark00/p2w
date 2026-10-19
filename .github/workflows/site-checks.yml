@@ -31,14 +31,17 @@ jobs:
           node scripts/test-skylander-sales.cjs
           node scripts/test-history-audit.cjs
           node scripts/test-trade-serials.cjs
+          node scripts/test-gamestop-stock.cjs
       - name: Install PHP test runtime
-        run: sudo apt-get update -qq && sudo apt-get install -y php-cli php-curl php-mbstring php-sqlite3
+        run: sudo apt-get update -qq && sudo apt-get install -y php-cli php-curl php-mbstring php-sqlite3 php-xml
       - name: Check PHP syntax
         run: find shop trade-in scripts -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Check Amazon catalog and offer boundaries (offline)
         run: php scripts/test-amazon-api.php
       - name: Check GameStop product links (offline)
         run: php scripts/test-gamestop-links.php
+      - name: Check GameStop stock signals (offline)
+        run: php scripts/test-gamestop-stock.php
       - name: Check checkout recovery and inventory mappings (offline)
         run: php scripts/test-shop-checkout.php
       - name: Check preview routes and staff access (offline)

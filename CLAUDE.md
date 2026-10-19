@@ -650,6 +650,17 @@ The site's **only server-side code**. Everything else is static.
     loose sales). **Loose only:** sales with the accessory the game
     shipped with (`LOOSE_EXTRAS_RE`: VRU/mic, Pokewalker, N64 paks) are
     odd, since a loose shelf copy doesn't have it (Hey You Pikachu).
+  - **GameStop online stock:** `gamestop-stock.php` / staff-only `GET gamestop/stock`
+    reads only HTTPS GameStop product pages; same-product redirects only, bounded
+    time/body size, no cookies/cart writes. Product SKU + Pre-Owned condition in
+    the cart button's `data-gtmdata` must agree with enabled/disabled cart and
+    Ship to Home controls. Conflicting or missing fields, preorders, blocks and
+    request failures return unknown. Client title/platform matching adds another
+    guard. Known results cache 10 minutes, unknown 3 minutes. The pinned badge
+    has a check-time tooltip and links to the product; stock neither affects
+    pricing nor blocks Add. Runs separately after the selected catalog page's
+    sales resolve (never a sibling figure's link). Network access may be blocked
+    by GameStop; never treat an HTTP error or a listed price as stock evidence.
   - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and

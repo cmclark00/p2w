@@ -933,6 +933,11 @@ switch ("$method $route") {
     require_role('staff');
     pc_sales((string)($_GET['id'] ?? ''));
 
+  case 'GET gamestop/stock':
+    require_role('staff');
+    require_once __DIR__ . '/gamestop-stock.php';
+    gamestop_stock((string)($_GET['url'] ?? ''));
+
   case 'GET floor-sessions':
     require_role('staff');
     $id = (string)($_GET['id'] ?? '');

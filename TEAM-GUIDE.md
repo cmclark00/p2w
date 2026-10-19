@@ -745,6 +745,12 @@ Guide (the Google Sheet tab).
    or the GameStop product linked from that exact PriceCharting entry. If that
    entry has no usable GameStop product link, GameStop search is the fallback.
    Related figure entries never replace the selected variant's GameStop link.
+   A small status beside GameStop shows **In stock online**, **Out of stock online**,
+   or **Stock unknown** for its pre-owned copy. It checks the product's cart and
+   Ship to Home controls without adding anything to a cart. Blocked requests or
+   unclear product/condition evidence stay unknown; click the link to check.
+   Hover for the check time. Results may be cached for 10 minutes; local store
+   stock may differ. Stock status does not change pricing or delay adding items.
    **eBay sold** opens a search for the current game
    and condition; a direct eBay price feed awaits integration approval.
    **Type a different price**, its price field, and **Use automatic price** stay
