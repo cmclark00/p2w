@@ -747,7 +747,8 @@ Guide (the Google Sheet tab).
    Related figure entries never replace the selected variant's GameStop link.
    **eBay sold** opens a search for the current game
    and condition; a direct eBay price feed awaits integration approval.
-   Manual-price controls sit below. The pinned controls stay at the top while scrolling the
+   **Type a different price**, its price field, and **Use automatic price** stay
+   pinned beneath the shelf price. The pinned controls stay at the top while scrolling the
    game's sales, then leave with the pricing panel. Short badges flag
    excluded listings, outliers, incomplete checks, and prices needing review.
    Expand **Review notes**, **Market references**, **Pricing rules**, or

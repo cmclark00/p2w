@@ -3950,7 +3950,16 @@ function renderFloorPricer() {
         <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
-      <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
+      <div class="floor-price">
+        <span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong>
+        <div class="floor-price-edit">
+          <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
+            <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
+          </label>
+          ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>'}
+          ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>' : ''}
+        </div>
+      </div>
       <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
@@ -3962,11 +3971,6 @@ function renderFloorPricer() {
     </div>
     </div>
     <div class="floor-price-context">
-        ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
-        ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>' : ''}
-        <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
-          <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
-        </label>
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
