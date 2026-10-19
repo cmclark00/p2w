@@ -739,12 +739,16 @@ The site's **only server-side code**. Everything else is static.
     do not automatically receive the rare floor; Golden Queen is a character.
     `fetchFloorProductSales` searches the same character's catalog entries,
     checking up to sixteen related pages after the selected entry. Only exact
-    variant/character titles are recovered, within the original condition;
+    variant/character titles are recovered;
     new recovered sales must explicitly confirm new/sealed. Titles are
     matched using canonical GITD/Glow in Dark aliases; generic chase wording
     is allowed only alongside a confirmed named rare variant. Character pairs
-    stay excluded. Skylander condition checks distinguish Not Sealed from
-    sealed, including related-page recovery and Amazon title checks.
+    stay excluded. All toys-to-life CIB/opened packaging counts as loose through
+    `floorCondition` and `floorFigureSaleCondition`, including related-page
+    recovery and Amazon title checks. Sealed inventory stays separate; source
+    condition provenance is retained and duplicate sales count once. Figure UI
+    offers Loose/New; averages use loose for CIB. Saved rechecks propose the
+    condition change explicitly and apply it only when the suggestion is used.
     Listings are
     deduplicated by eBay item ID, URL, or title/date/price. Source provenance
     survives live display and audits. Failures/caps flag incomplete checks.

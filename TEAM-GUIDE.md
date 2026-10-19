@@ -927,13 +927,17 @@ Guide (the Google Sheet tab).
    minimum automatically, even below the cutoff. Unrecognized variant suffixes
    need review instead of silently becoming common. Mark other rare variants explicitly.
    Skylanders also checks up to sixteen related entries for the same character.
-   Only exact-variant titles in the same condition are recovered; duplicates
+   Only exact-variant titles are recovered; duplicates
    count once. Recovered rows link their source entry. Failed or truncated
    searches are flagged as incomplete; other entries' averages are never used.
    Matching special figures may say **Chase Variant**, **GITD**, or **Glow in Dark**.
    These descriptions do not exclude an otherwise verified variant. **Not Sealed**
-   and opened-box wording are valid used-figure evidence, including in loose
-   results; truly sealed figures and multiple-character lots stay excluded.
+   and opened-box wording are valid used-figure evidence. **All toys-to-life CIB
+   and opened original packaging count as Loose**, including sales filed under
+   CIB on PriceCharting. Figures offer Loose and New controls; loose averages
+   apply to opened figures. Sealed figures stay separate; empty boxes and
+   multiple-character lots stay excluded. A saved CIB figure is rechecked as
+   Loose, and accepting that suggestion updates its condition.
    Automatic groups are recalculated on recheck; staff overrides stay saved.
    Skylanders/Infinity tolerate higher sold prices: only isolated spikes at
    least 3× the next valid sale and $25 higher, supported by three lower

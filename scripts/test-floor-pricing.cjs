@@ -693,15 +693,55 @@ test('toy rounding uses the 2-to-15-to-5 ladder and amiibo always uses 5s', () =
   }
 });
 
-test('without verified Amazon, common Skylanders and Infinity retain the condition-specific average', () => {
+test('without verified Amazon, common Skylanders and Infinity use loose averages for opened/CIB figures', () => {
   for (const system of ['Skylanders', 'Disney Infinity']) {
     const product = { ...item, 'product-name': 'Bash', 'console-name': system, 'loose-price': 320, 'cib-price': 1250, 'new-price': 1800, 'gamestop-price': 3000 };
-    for (const [condition, expected] of [['loose', 400], ['cib', 1200], ['new', 2000]]) {
+    for (const [condition, expected] of [['loose', 400], ['cib', 400], ['new', 2000]]) {
       const r = invoke('floorResult', cur(product, { condition, toyGroup: 'common', manualMissing: true,
         sales: { [condition]: [{ title: 'Bash', price: 4000 }] }, amazon: { found: false } }));
       assert.equal(r.b.from, 'toyaverage'); assert.equal(r.r.price, expected); assert.equal(r.r.ded, 0); assert.equal(r.shitbox, null);
     }
   }
+});
+
+test('all figure lines merge opened/CIB sales into loose while preserving sealed and excluding empty boxes', () => {
+  for (const system of ['Skylanders', 'Disney Infinity', 'Amiibo', 'Lego Dimensions', 'Starlink']) {
+    const product = { 'product-name': 'Bash', 'console-name': system, 'loose-price': 1600, 'cib-price': 9000, 'new-price': 10000 };
+    const duplicate = { title: 'Bash CIB', price: 2000, url: 'https://www.ebay.com/itm/123456789012' };
+    const used = ['Bash Complete In Box Not Sealed', 'Bash with original box', 'Bash + original box', 'Bash and original packaging', 'Bash MIB', 'Bash brand new open box', 'Bash opened blister'];
+    const sales = { loose: [duplicate], cib: [{ ...duplicate, url: duplicate.url + '?tracking=1' }, ...used.map(title => ({ title, price: 2500 })),
+      { title: 'Bash original box only', price: 100000 }],
+      new: [{ title: 'Bash CIB sealed', price: 8000 }, { title: 'Bash CIB', price: 3000 }] };
+    const example = cur(product, { condition: 'cib', sales });
+    const rows = invoke('floorSales', example);
+    assert.equal(rows.filter(s => s.url?.includes('123456789012')).length, 1, system);
+    for (const title of used) assert.equal(rows.find(s => s.title === title)?.odd, false, system + title);
+    assert.ok(rows.find(s => s.title.includes('box only')).odd, system);
+    assert.ok(!rows.some(s => s.title.includes('CIB sealed')), system);
+    assert.equal(invoke('floorResult', example).r.price, 3000, system);
+    assert.equal(invoke('floorResult', { ...example, condition: 'new' }).b.basis, 8000, system);
+    const link = new URL(invoke('floorLinks', product, 'loose').ebay).searchParams.get('_nkw');
+    assert.ok(!link.includes('-cib') && !link.includes('-complete'), system);
+    context.example = example;
+    run('floorCur = example; renderFloorPricer()');
+    assert.match(element('#floorPricer').innerHTML, /data-floor-cond="loose"/);
+    assert.match(element('#floorPricer').innerHTML, /data-floor-cond="new"/);
+    assert.doesNotMatch(element('#floorPricer').innerHTML, /data-floor-cond="cib"/);
+    assert.equal(run('floorCur.condition'), 'loose');
+  }
+  const game = cur(item, { sales: { loose: [{ title: 'Example Game', price: 1000 }], cib: [{ title: 'Example Game CIB', price: 3000 }] } });
+  assert.equal(invoke('floorResult', game).b.basis, 3000, 'Game CIB remains separate');
+});
+
+test('accepting a CIB figure recheck updates condition even when the price stays the same', () => {
+  const entry = { name: 'Bash', platform: 'Skylanders', condition: 'cib', manualMissing: true, price: 2000,
+    recheck: { price: 2000, condition: 'loose', basis: 1800, from: 'sale' } };
+  context.entry = entry;
+  assert.equal(run('recheckChanged(entry)'), true);
+  assert.match(run('recheckHtml(entry)'), /Loose/);
+  assert.equal(run('useRecheck(entry)'), true);
+  assert.equal(entry.condition, 'loose');
+  assert.equal(entry.manualMissing, false);
 });
 
 test('uncommon figures use highest eligible sold evidence, preserving variant and outlier checks', () => {

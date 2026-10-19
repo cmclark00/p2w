@@ -3092,6 +3092,23 @@ function floorToyFamily(product) {
   if (/^amiibo(?: figures)?$/.test(system)) return 'amiibo';
   return ({ skylanders: 'skylanders', 'disney infinity': 'infinity', 'lego dimensions': 'dimensions', starlink: 'starlink' })[system] || null;
 }
+const floorCondition = (product, condition) => floorToyFamily(product) && condition === 'cib' ? 'loose' : condition;
+const floorConditionCur = (cur) => floorCondition(cur.product, cur.condition) === cur.condition ? cur
+  : { ...cur, condition: 'loose', manualMissing: false, pick: null };
+const floorFigureTitle = (title) => String(title || '').replace(/\b(?:not|no longer)\s+(?:factory\s+)?sealed\b|\bnot\s+brand[ -]new\b/gi, 'opened');
+const floorFigurePackagingTitle = (title) => String(title || '').replace(/(?:\bwith\b|\bw\/|\+|&|\band\b)\s*(?:the\s+)?(?:original\s+)?(?:box|packaging|blister(?: pack)?)\b/gi, ' ');
+const FLOOR_FIGURE_SEALED = /\b(?:sealed|brand new|new in box|nib|bnib|nrfb|unopened)\b/i;
+function floorFigureSaleCondition(sale, condition) {
+  const title = floorFigureTitle(sale.title);
+  if (/\b(?:opened|unsealed|open[ -]box|not new|like new)\b/i.test(title)) return 'loose';
+  if (FLOOR_FIGURE_SEALED.test(title)) return 'new';
+  if (/\b(?:cib|mib|box|boxed|packaging|blister)\b/i.test(title)) return 'loose';
+  return condition === 'cib' ? 'loose' : condition;
+}
+function floorSaleKey(sale) {
+  return String(sale.url || '').match(/(?:\/itm\/(?:[^/?]+\/)?|[?&]item=)(\d{9,15})\b/)?.[1]
+    || (sale.url ? sale.url.split('?')[0] : `${norm(sale.title)}|${sale.date}|${sale.price}`);
+}
 const FLOOR_TOY_UNCOMMON = 1500;
 // Canonical labels shared by classification, catalog searches and sold-title matching.
 const FLOOR_SKY_VARIANTS = /\b(?:spring time|legendary|lightcore|dark|nitro|jade|enchanted|crystal|chase|metallic|glitter|flocked|chrome|clear|gold|silver|glow in the dark|power blue|jolly|winterfest|frightful|halloween|pumpkin|snowderdash|mystical|birthday bash|missile tow|love potion|heartbreaker|egg ?cited|steel plated|polar|royal|scarlet|molten|gnarly|granite|volcanic|quickdraw|punch|patina|bronze|pearl|exclusive|variant|elite|e3|employee|toy fair|big bang|double dare|super shot|series [2-9]|purple|green|red|blue|white|black|pink|orange)\b/g;
@@ -3136,7 +3153,7 @@ function floorToyListingMismatch(title, product) {
     if (/\b(?:[2-9]|\d{2,}|two|three|four|five)[\s-]*(?:pack|figures|characters)\b|\b(?:set of|lot of|choose|pick your)\b/i.test(title)) return 'Multiple figures or choice listing';
     // Once aliases match, character pairs must still not become single-figure comps.
     const character = floorSkyCharacter(product);
-    const parts = floorSkyText(floorBundleTitle(title).replace(/\s*[&+]\s*/g, ' and ')).split(/\b(?:and|with)\b/);
+    const parts = floorSkyText(floorFigurePackagingTitle(floorBundleTitle(title)).replace(/\s*[&+]\s*/g, ' and ')).split(/\b(?:and|with)\b/);
     if (parts.length > 1 && parts.some((part) => (` ${part.trim()} `).includes(` ${character} `))
       && parts.some((part) => !(` ${part.trim()} `).includes(` ${character} `)
         && part.replace(FLOOR_SKY_VARIANTS, '').replace(/\b(?:skylanders?|s|spyro s adventure|giants|swap force|trap team|superchargers|imaginators|rare|figures?|characters?|chase|variant|tested|working|works|authentic|original|complete|in|box|cib|mib|mint|condition|very|good|excellent|used|new|sealed|not|fast|free|shipping)\b/g, '').trim())) return 'Multiple figures or choice listing';
@@ -3149,6 +3166,7 @@ function floorToyListingMismatch(title, product) {
   return null;
 }
 function floorToyGroup(cur, automatic = false) {
+  cur = floorConditionCur(cur);
   const family = floorToyFamily(cur.product);
   if (!family) return null;
   const variant = floorToyVariant(cur.product);
@@ -3279,16 +3297,18 @@ const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-pri
 
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
 function floorOdd(sale, condition, rhythm = null, product = null) {
-  const sky = floorToyFamily(product) === 'skylanders';
+  const toy = floorToyFamily(product);
   // Opened packaging is valid used-figure evidence, not a sealed collectible.
-  const t = sky ? String(sale.title || '').replace(/\b(?:not|no longer)\s+(?:factory\s+)?sealed\b|\bnot\s+brand[ -]new\b/gi, 'opened') : sale.title;
-  if (sky && condition === 'new' && /\b(?:used|opened|unsealed|like new)\b/i.test(t)) return true;
+  const t = toy ? floorFigureTitle(sale.title) : sale.title;
+  const sealed = toy ? floorFigureSaleCondition(sale, condition) === 'new' : SEALED_RE.test(t);
+  if (toy && (floorFigureSaleCondition(sale, condition) !== floorCondition(product, condition)
+    || condition === 'new' && /\b(?:used|opened|unsealed|like new)\b/i.test(t))) return true;
   if (rhythm === 'bundle') {
-    return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && SEALED_RE.test(t));
+    return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && sealed);
   }
   return ODD_SALE_RE.test(t) || BUNDLE_RE.test(t) || (rhythm === 'disc' && WITH_INSTRUMENTS_RE.test(t))
     || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(t) : NOT_COMPLETE_RE.test(t))
-    || (condition !== 'new' && SEALED_RE.test(t));
+    || (condition !== 'new' && sealed);
 }
 
 // eBay's item-condition filter for the sold-listings link: Loose and CIB are used copies (eBay's Used, Like
@@ -3300,12 +3320,13 @@ const EBAY_WORDS = { loose: ' -sealed -cib -complete -"brand new"', cib: ' (comp
 
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
+  condition = floorCondition(p, condition);
   const name = baseTitle(p['product-name']) || p['product-name'];
   const sys = p['console-name'] || '';
   const q = (s) => encodeURIComponent(s.replace(/\s+/g, ' ').trim());
   return {
     // Sold listings in this condition, highest price first.
-    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${EBAY_WORDS[condition] || ''}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${floorToyFamily(p) && condition === 'loose' ? '' : EBAY_WORDS[condition] || ''}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
       + `&LH_ItemCondition=${encodeURIComponent(EBAY_CONDITIONS[condition] || EBAY_CONDITIONS.loose)}`,
     gamestop: `https://www.gamestop.com/search/?q=${q(name)}`,
     amazon: `https://www.amazon.com/s?k=${q(`${name} ${sys}`)}`,
@@ -3507,7 +3528,7 @@ function floorAmazonCandidateMismatch(candidate, product, condition, requirePlat
 }
 
 // Related catalog pages often contain misplaced Skylander variants. Never use
-// their averages or move a sale between conditions; verify every recovered title.
+// their averages; verify every recovered title. Opened/CIB figures count as loose.
 async function fetchFloorProductSales(product, request = (route, params) => api(route, { params })) {
   const conditions = ['loose', 'cib', 'new'];
   const sales = Object.fromEntries(conditions.map((c) => [c, []]));
@@ -3537,20 +3558,20 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
       for (const condition of conditions) {
         for (const sale of data?.sales?.[condition] || []) {
           const related = String(page.id) !== String(product.id);
-          if (related && (floorListingMismatch(sale.title, product) || floorOdd(sale, condition, null, product)
-            || (condition === 'new' && (!/\b(?:new|sealed|bnib|nib|nrfb)\b/i.test(sale.title) || /\b(?:used|opened|unsealed|like new)\b/i.test(sale.title))))) continue;
-          const ebayId = String(sale.url || '').match(/(?:\/itm\/(?:[^/?]+\/)?|[?&]item=)(\d{9,15})\b/)?.[1];
-          const key = `${condition}|${ebayId || (sale.url ? sale.url.split('?')[0] : `${norm(sale.title)}|${sale.date}|${sale.price}`)}`;
+          const targetCondition = floorToyFamily(product) ? floorFigureSaleCondition(sale, condition) : condition;
+          if (related && (floorListingMismatch(sale.title, product) || floorOdd(sale, targetCondition, null, product)
+            || (targetCondition === 'new' && (!/\b(?:new|sealed|bnib|nib|nrfb|unopened)\b/i.test(sale.title) || /\b(?:used|opened|unsealed|like new)\b/i.test(sale.title))))) continue;
+          const key = `${targetCondition}|${floorSaleKey(sale)}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          sales[condition].push({ ...sale, sourcePcId: String(page.id), sourcePcName: page['product-name'], recovered: related });
+          sales[targetCondition].push({ ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'], recovered: related });
         }
       }
     } catch (err) { errors.push(`${page['product-name']}: ${err.message}`); }
   }
   if (sky) {
     const recovered = conditions.reduce((n, c) => n + sales[c].filter((s) => s.recovered).length, 0);
-    salesNotes.push(`Checked ${sources.length} Skylanders catalog entries; recovered ${recovered} title-verified sales from related entries. Conditions kept separate; duplicate listings counted once`);
+    salesNotes.push(`Checked ${sources.length} Skylanders catalog entries; recovered ${recovered} title-verified sales from related entries. Opened/CIB figures count as loose; sealed kept separate; duplicate listings counted once`);
   }
   const salesError = errors.length ? errors.join('; ') : null;
   if (salesError) salesNotes.push(`Sold-evidence check incomplete: ${salesError}`);
@@ -3608,10 +3629,14 @@ function floorGameStopStock(cur) {
 
 // The condition's sales, highest first, each with its index into that list.
 function floorSales(cur = floorCur) {
+  cur = floorConditionCur(cur);
   const name = cur.product?.['product-name'] || '';
   const rhythm = rhythmKind(name);
   const cap = rhythmDiscSaleCap(cur);
-  const sales = (cur.sales?.[cur.condition] || []).map((s, i) => {
+  const pool = floorToyFamily(cur.product) ? Object.entries(cur.sales || {}).flatMap(([condition, rows]) =>
+    rows.filter((s) => floorFigureSaleCondition(s, condition) === cur.condition)) : cur.sales?.[cur.condition] || [];
+  const unique = floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool;
+  const sales = unique.map((s, i) => {
     const mismatch = floorListingMismatch(s.title, cur.product);
     return { ...s, i, mismatch,
       odd: !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title) };
@@ -3780,7 +3805,7 @@ function floorListingMismatch(title, product) {
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
   if (floorExtraMismatch(title, name)) return 'Bundled extra item';
-  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(title)))
+  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(title) : title)))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
@@ -3860,6 +3885,7 @@ function floorAmazonLowest(cur) {
 // the eBay baseline while retaining GameStop's floor. Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorBasis(cur = floorCur) {
+  cur = floorConditionCur(cur);
   const sales = floorSales(cur);
   const auto = floorAutoSale(sales);
   const picked = cur.pick != null ? sales.find((s) => s.i === cur.pick) : null;
@@ -3949,6 +3975,7 @@ const floorIsHardware = (p) => !isGameCat(guessCategory(p['product-name'] || '')
 
 // The shelf price for a game being priced (or re-checked): { b: floorBasis, r: floorPrice, shitbox, premium, hw }.
 function floorResult(cur) {
+  cur = floorConditionCur(cur);
   const p = cur.product;
   const toy = floorToyFamily(p), toyGroup = floorToyGroup(cur);
   const hw = !!toy || floorIsHardware(p);
@@ -3975,18 +4002,19 @@ function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
   if (!floorCur) { el.innerHTML = ''; return; }
-  const cur = floorCur;
+  const cur = floorCur = floorConditionCur(floorCur);
   const p = cur.product;
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
   const { b, r: result, shitbox, premium, hw, toy, toyGroup } = floorResult(cur);
   const rhythm = rhythmKind(p['product-name']);
   const belowGs = !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
-  const pcPrices = Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
+  const conditions = Object.entries(GAME_CONDITIONS).filter(([c]) => !toy || c !== 'cib');
+  const pcPrices = conditions.map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
     + (tier.id === 'modern' ? ` · Retail sell reference ${Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS['retail-sell'][c]]) || null)}`).join(' · ')}` : '');
   const gs = Number(p['gamestop-price']) > 0 ? ` · ${esc(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
 
-  const condBtns = Object.entries(GAME_CONDITIONS).map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
+  const condBtns = conditions.map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
   let salesHtml;
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
@@ -4210,7 +4238,7 @@ const FROM_LABELS = { sale: 'eBay sale', toyaverage: 'PriceCharting market avera
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => !!globalThis.P2WDeadGames && !deadGameHeld(it.name, it.platform)
-  && it.recheck?.price != null && it.recheck.price !== it.price;
+  && it.recheck?.price != null && (it.recheck.price !== it.price || it.recheck.condition && it.recheck.condition !== it.condition);
 const floorReviewHtml = (it) => (it.reviewNotes || []).map((note) => `<div class="sub warn-text">Review: ${esc(note)}</div>`).join('');
 
 function recheckHtml(it) {
@@ -4223,7 +4251,7 @@ function recheckHtml(it) {
   const review = floorReviewHtml(rc);
   if (!recheckChanged(it)) return `<div class="sub">✓ Still this price</div>${review}`;
   const up = rc.price > it.price;
-  return `<div class="sub recheck ${up ? 'up' : 'down'}">Now ${money(rc.price)} ${up ? '▲' : '▼'}
+  return `<div class="sub recheck ${up ? 'up' : 'down'}">Now ${money(rc.price)} ${rc.price === it.price ? '' : up ? '▲' : '▼'}${rc.condition && rc.condition !== it.condition ? ` · ${esc(GAME_CONDITIONS[rc.condition])}` : ''}
     <button type="button" class="link" data-floor-use>Use</button><button type="button" class="link" data-floor-keep>Keep</button></div>${review}`;
 }
 
@@ -4267,12 +4295,13 @@ async function recheckFloorPrices() {
     if (floorRecheck.stop || floorEpoch !== epoch) break;
     try {
       const product = await PC.byId(it.pcId);
+      const condition = floorCondition(product, it.condition);
       const sold = await fetchFloorProductSales(product);
       let amazon = null;
       if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
       const gamestopStock = await fetchFloorGameStopStock(product, sold.gamestopUrl);
       const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, gamestopStock, pick: null, typed: null, amazon });
-      it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: b.need || 'no sales to go by' };
+      it.recheck = r ? { price: r.price, condition, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: b.need || 'no sales to go by' };
     } catch (err) {
       it.recheck = { error: err.message };
     }
@@ -4292,6 +4321,10 @@ async function recheckFloorPrices() {
 function useRecheck(it) {
   if (!recheckChanged(it)) return false;
   const { price, basis, from, saleDate, reviewNotes = [] } = it.recheck;
+  if (it.recheck.condition) {
+    it.condition = it.recheck.condition;
+    if (it.condition !== 'cib') it.manualMissing = false;
+  }
   Object.assign(it, { price, basis, from, saleDate, reviewNotes, edited: false });
   delete it.recheck;
   return true;

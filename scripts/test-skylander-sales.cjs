@@ -42,7 +42,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.cur = { product: e.ctx.p, condition: 'loose', sales: { loose: [...valid, ...invalid].map((t, i) => sale(t, i < valid.length ? 2400 : 9000, String(100000000000 + i))) } };
     const rows = e.run('floorSales(cur)');
     for (const t of valid) assert.equal(rows.find(s => s.title === t).odd, false, t);
-    for (const t of invalid) assert.equal(rows.find(s => s.title === t).odd, true, t);
+    for (const t of invalid) assert.notEqual(rows.find(s => s.title === t)?.odd, false, t);
     assert.equal(e.run('floorResult(cur).r.price'), 2500);
     e.ctx.title = valid[3];
     assert.equal(e.run('floorOdd({title}, "new", null, p)'), true, 'Not Sealed cannot price new figures');
@@ -133,6 +133,21 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
   await test('ordinary games and Infinity do not search related character pages', async () => {
     const e = engine(async (route) => { assert.equal(route, 'pc/sales'); return { sales: { new: [sale('Example', 2000)] } }; });
     for (const system of ['Playstation 4', 'Disney Infinity']) { const r = await e.fetch({ ...product, 'console-name': system }); assert.equal(r.sales.new.length, 1); assert.equal(r.salesNotes.length, 0); }
+  });
+  await test('every figure line normalizes CIB during fetch and keeps original condition provenance', async () => {
+    const used = sale('Bash Complete In Box Not Sealed', 2200);
+    for (const system of ['Skylanders', 'Disney Infinity', 'Amiibo', 'Lego Dimensions', 'Starlink']) {
+      const e = engine(async (route) => route === 'pc/products' ? { products: [] } : { sales: {
+        loose: [used], cib: [{ ...used, url: used.url + '?tracking=1' }, sale('Bash with original box', 2400, '222222222222')],
+        new: [sale('Bash CIB sealed', 9000, '333333333333'), sale('Bash opened blister', 2500, '444444444444')],
+      } });
+      const result = await e.fetch({ ...product, 'product-name': 'Bash', 'console-name': system });
+      assert.equal(result.sales.loose.length, 3, system);
+      assert.equal(result.sales.cib.length, 0, system);
+      assert.equal(result.sales.new.length, 1, system);
+      assert.equal(result.sales.loose.find(s => s.price === 2400).sourceCondition, 'cib');
+      assert.equal(result.sales.loose.find(s => s.price === 2500).sourceCondition, 'new');
+    }
   });
   await test('GameStop link comes only from the selected catalog entry', async () => {
     const own = 'https://www.gamestop.com/products/springtime/123.html';
