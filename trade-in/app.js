@@ -3932,22 +3932,45 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ` <span class="badge info">${esc(s.mismatch || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted">${esc(s.date)}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      ${!toy ? `<p class="muted small-print">Normally the baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. When a verified Renewed fallback is used, its lowest offer sets the baseline instead of eBay, with the GameStop minimum retained. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>` : ''}`;
+      `;
   }
 
   const showTyped = !!b.need || cur.typed != null;
+  const reviewNotes = [...new Set(b.checks)];
+  const excluded = sales.filter((s) => s.mismatch).length + (cur.amazon?.rejected?.length || 0);
+  const outliers = sales.filter((s) => s.outlier).length;
+  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error);
   el.innerHTML = `
     <div class="floor-head">
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
-        <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
-        <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${b.renewedBasis ? floorReferenceText("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
+        <div class="sub">${esc(p['console-name'])} · ${esc(GAME_CONDITIONS[cur.condition])}</div>
+        <div class="floor-price-actions">
+          <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
+          <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
+          ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
+          ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>' : ''}
+        </div>
+        <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
+          <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
+        </label>
+        ${result ? `<div class="floor-math muted">${floorReferenceText(floorMath(b, result))}</div>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
+        <div class="floor-review-summary">
+          ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}
+          ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
+          ${outliers ? `<span class="badge warn">${outliers} possible outlier${outliers === 1 ? '' : 's'} · review notes</span>` : ''}
+          ${incomplete ? '<span class="badge warn">Source check incomplete · review notes</span>' : ''}
+          ${result && result.price >= FLOOR_REVIEW ? `<span class="badge warn">Review $${FLOOR_REVIEW / 100}+ price</span>` : ''}
+          ${belowGs ? `<span class="badge warn">Below GameStop ${money(floorGsFor(cur))}</span>` : ''}
+        </div>
+
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
-        ${hw && !toy ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
+        ${hw && !toy ? '<span class="badge info">Hardware pricing</span>' : ''}
         ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $25 minimum</span>' : ''}
-        ${rhythm === 'disc' ? '<span class="badge info">Disc only: sales that came with instruments don\'t count</span>' : ''}
-        ${rhythm === 'bundle' ? `<span class="badge guide">With instruments: disc-only sales don't count${cur.condition === 'loose' ? '. PriceCharting files many disc-only sales under a bundle\'s Loose price, so check what\'s left' : ''}</span>` : ''}
+        ${rhythm === 'disc' ? '<span class="badge info">Disc only</span>' : ''}
+        ${rhythm === 'bundle' ? '<span class="badge guide">With instruments · check included items</span>' : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
       </div>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
@@ -3974,21 +3997,19 @@ function renderFloorPricer() {
         ${salesHtml}
         ${floorAmazonHtml(cur, b)}
       </div>
-      <div class="floor-result">
-        ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
-        ${b.checks.map((c) => `<p class="floor-need">Double-check: ${floorReferenceText(c)}</p>`).join('')}
-        ${result && result.price >= FLOOR_REVIEW ? `<p class="floor-need">Double-check: $${FLOOR_REVIEW / 100} or more. Look over the sales and links before it goes on the shelf.</p>` : ''}
-        ${belowGs ? `<p class="floor-need">${floorReferenceText(`Below GameStop's pre-owned price (${money(floorGsFor(cur))}). Our price shouldn't be under GameStop's.`)}</p>` : ''}
-        <label${showTyped ? '' : ' hidden'}>Your price
-          <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
-        </label>
-        ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
-        ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>' : ''}
-        ${result ? `<div class="floor-math muted">${floorReferenceText(floorMath(b, result))}</div>` : ''}
-        ${fulcrumReference(cur, result?.price)}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking the full product and GameStop price…' : !cur.sales && !cur.salesError ? 'Reading eBay sold evidence…' : 'Checking Amazon…'}</p>` : ''}
-        <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
-      </div>
+      <aside class="floor-result" aria-label="Pricing details">
+        ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${floorReferenceText(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
+        <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
+        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.renewedBasis ? floorReferenceText("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</p>
+          ${!toy ? `<ul>
+            <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
+            <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
+            <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
+            <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
+            <li>Rounding: through $80, endings 7–9 go up to $10; other endings go down to $5. Above $80, nearest $10 or $25, ties up.</li>
+          </ul>` : ''}
+        </details>
+      </aside>
     </div>`;
 }
 
@@ -4000,7 +4021,7 @@ function floorAmazonHtml(cur, b) {
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
-  const matchNote = (a.matchNotes || []).length ? `<p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p>` : '';
+  const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
   const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur));
@@ -4012,7 +4033,7 @@ function floorAmazonHtml(cur, b) {
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === lowestAt ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Prices include shipping. Only the lowest matching offer enters the comparison; higher Amazon offers do not raise the price.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+    <p class="muted small-print">Shipping included · lowest matching offer used.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {

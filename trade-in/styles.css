@@ -437,6 +437,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 #floorScan { flex: 1 1 260px; font-size: 1.1rem; padding: 12px 14px; }
 .floor-pricer { border-left: 4px solid var(--gold); }
 .floor-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.floor-head > div { min-width: 0; flex: 1; }
 .floor-head .item-name { font-size: 1.15rem; }
 .floor-head .item-name a { color: inherit; }
 .floor-rule { margin: 6px 0; font-size: 0.88rem; color: var(--paper); opacity: 0.85; }
@@ -464,6 +465,16 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-need { margin: 0; color: var(--gold); font-size: 0.9rem; }
 .floor-math { font-size: 0.82rem; }
 .floor-price strong { display: block; font: 700 2.2rem/1.1 var(--font-display); color: var(--gold); font-variant-numeric: tabular-nums; }
+.floor-price-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 12px 0 8px; }
+.floor-price-actions .link { padding: 0; font-size: 0.85rem; }
+.floor-typed { max-width: 220px; margin: 10px 0; }
+.floor-review-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.floor-review-summary:empty { display: none; }
+.floor-details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.floor-details ul { padding-left: 18px; margin: 10px 0 0; font-size: 0.85rem; color: var(--muted); }
+.floor-details li + li { margin-top: 10px; }
+.floor-details p { overflow-wrap: anywhere; }
+.floor-amazon-details { margin: 8px 0; }
 .floor-result .link { align-self: flex-start; padding: 0; font-size: 0.82rem; color: var(--muted); }
 .floor-list .money-input input { width: 80px; font-weight: 600; }
 .floor-foot { margin-bottom: 24px; flex-wrap: wrap; }
@@ -473,6 +484,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-list .recheck .link { font-size: 0.8rem; color: var(--paper); }
 @media (max-width: 800px) {
   .floor-body { grid-template-columns: 1fr; }
+  .floor-result { order: -1; }
 }
 .floor-amz-head { margin-top: 18px; }
 .floor-amz-head a { color: var(--paper); text-transform: none; letter-spacing: 0; font-weight: 400; }
