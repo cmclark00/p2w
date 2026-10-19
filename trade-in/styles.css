@@ -523,7 +523,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
   }
   .floor-pinned-condition .seg { padding: 7px 10px; }
   .floor-pinned-manual { white-space: nowrap; }
-  .floor-market-quick { grid-column: 2 / -1; grid-row: 2; align-items: center; }
+  .floor-market-quick { grid-column: 2 / -1; grid-row: 2; align-items: center; gap: 4px 12px; font-size: 0.8rem; }
 }
 @media (max-width: 800px) {
   .floor-body { grid-template-columns: 1fr; }
