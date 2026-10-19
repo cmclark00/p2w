@@ -24,7 +24,7 @@ test('table output escapes source titles and notes',()=>{assert.equal(invoke('au
     fetchFloorProductSales:async(product,request)=>{const d=await request('pc/sales',{id:product.id});return {sales:d.sales};},
     floorResult:cur=>({r:{price:2000},b:{basis:2000,from:'sale',checks:[],sale:{price:2000}},premium:null}),
     fetchFloorAmazon:async(product,condition,request)=>{const key='test-amazon|'+product.id+'|'+(condition==='new'?'new':'used');return cached(key,()=>request('amazon/offers',{asin:'B000000001',cond:condition==='new'?'new':'used'}));},
-    floorAmazonLowest:()=>null,floorGsFor:()=>null};`,ctx);
+    fetchFloorGameStopStock:async()=>({state:'unknown'}),floorAmazonLowest:()=>null,floorGsFor:()=>null};`,ctx);
   const r=await invoke('auditOne',item);assert.equal(r.recommended,2000);assert.equal(r.status,'Compared');assert.equal(r.flag,true);checks++;
   const second=await invoke('auditOne',{...item,id:2,condition:'loose'});assert.equal(second.recommended,2000);
   assert.equal(ctx.calls.length,3);checks++;

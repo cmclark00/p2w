@@ -650,6 +650,13 @@ The site's **only server-side code**. Everything else is static.
     loose sales). **Loose only:** sales with the accessory the game
     shipped with (`LOOSE_EXTRAS_RE`: VRU/mic, Pokewalker, N64 paks) are
     odd, since a loose shelf copy doesn't have it (Hey You Pikachu).
+  - **Amazon throttling:** `amazon-rate-limit.php` shares the private throttle lock
+    across devices, honors Retry-After and per-operation x-amzn-RateLimit-Limit,
+    and retries 429 up to twice (4s/8s default backoff). Long cooldowns return 429
+    without another upstream request; cooldown survives across HTTP requests.
+    Waiting is bounded; non-429 failures are not retried. `http_send()` includes
+    response headers as its fourth return value. Failed checks are never cached
+    as missing offers. UI retains incomplete-check warnings plus Retry Amazon.
   - **GameStop online stock:** `gamestop-stock.php` / staff-only `GET gamestop/stock`
     reads only HTTPS GameStop product pages; same-product redirects only, bounded
     time/body size, no cookies/cart writes. Product SKU + Pre-Owned condition in
@@ -657,8 +664,11 @@ The site's **only server-side code**. Everything else is static.
     Ship to Home controls. Conflicting or missing fields, preorders, blocks and
     request failures return unknown. Client title/platform matching adds another
     guard. Known results cache 10 minutes, unknown 3 minutes. The pinned badge
-    has a check-time tooltip and links to the product; stock neither affects
-    pricing nor blocks Add. Runs separately after the selected catalog page's
+    has a check-time tooltip and links to the product. Confirmed matching out-of-stock
+    results remove GameStop from `floorGsFor()` and every reference clamp, while
+    keeping its displayed amount. Pending checks with a GameStop price block an
+    automatic recommendation; typed overrides still work. Unknown/in-stock retains
+    the usual floor. Rechecks and history audit fetch stock before calculation. Runs separately after the selected catalog page's
     sales resolve (never a sibling figure's link). Network access may be blocked
     by GameStop; never treat an HTTP error or a listed price as stock evidence.
     Optional `trade-in/browser-helper` is a Manifest V3 Chrome extension, packaged

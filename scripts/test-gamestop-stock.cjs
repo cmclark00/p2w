@@ -14,7 +14,8 @@ const current = () => ({ product, gamestopUrl: 'https://www.gamestop.com/product
   ctx.cur = current(); run('floorCur = cur');
   const pending = run('loadFloorGameStopStock(cur)');
   assert.equal(ctx.cur.gamestopStock.state, 'loading');
-  assert.equal(run('floorResult(cur).r.price'), 6000, 'Stock lookup does not block pricing');
+  assert.equal(run('floorResult(cur).r'), null, 'Wait for a priced GameStop stock check before recommending');
+  assert.equal(run('floorResult(cur).b.waiting'), true);
   run('floorCur = null'); resolve({ state: 'out', title: 'Lollipop Chainsaw - PlayStation 3' }); await pending;
   assert.equal(run('stockRenders'), 0, 'Stale item cannot rerender a different game');
   assert.match(run('floorGameStopStock(cur)'), /Out of stock online/);

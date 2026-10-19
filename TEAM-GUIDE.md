@@ -750,7 +750,11 @@ Guide (the Google Sheet tab).
    Ship to Home controls without adding anything to a cart. Blocked requests or
    unclear product/condition evidence stay unknown; click the link to check.
    Hover for the check time. Results may be cached for 10 minutes; local store
-   stock may differ. Stock status does not change pricing or delay adding items.
+   stock may differ. **Confirmed out of stock removes GameStop's minimum**;
+   its amount remains a reference. In-stock or unconfirmed listings retain the
+   normal minimum. A priced GameStop stock check finishes before publishing the
+   automatic recommendation. Specific premiums, deductions and rounding still apply.
+   Saved-list rechecks and history comparisons also check availability.
    **Automatic Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose
    **Load unpacked** → the extracted folder containing `manifest.json`. Reload the
@@ -816,6 +820,10 @@ Guide (the Google Sheet tab).
      with $700 Amazon therefore uses $450; no valid sale keeps the fallback rules. Specific premiums,
      discounts, missing-manual deductions and final rounding still apply.
      Consoles, accessories and toys-to-life figures keep their existing rules.
+   - **Amazon rate limits:** if Amazon temporarily throttles a lookup, the tool
+     waits and retries up to twice, with increasing delays and a shared cooldown.
+     If it still fails, use **Retry Amazon** after waiting. The check remains
+     flagged as incomplete; an error never means no offers or a verified price.
    - **Amazon's offers show on every game**, listed under the sales
      (prices include shipping). Outside the high-value game rule, only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.

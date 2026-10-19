@@ -3558,20 +3558,24 @@ async function loadFloorSales(product) {
   if (floorCur?.product === product) renderFloorPricer();
 }
 
-// Informational only: stock never changes a price or delays Add to list.
+async function fetchFloorGameStopStock(product, url, request = (route, params) => api(route, { params })) {
+  if (!url) return { state: 'unknown' };
+  try {
+    const browserStock = typeof window !== 'undefined' && window.P2WGameStopHelper ? await window.P2WGameStopHelper.check(url) : null;
+    let stock = browserStock;
+    if (!['in', 'out'].includes(stock?.state)) {
+      const serverStock = await request('gamestop/stock', { url });
+      stock = ['in', 'out'].includes(serverStock?.state) ? serverStock : browserStock || serverStock;
+    }
+    return ['in', 'out'].includes(stock?.state) && (!stock.title || floorListingMismatch(stock.title, product))
+      ? { state: 'unknown', reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
+  } catch (_) { return { state: 'unknown' }; }
+}
+
 async function loadFloorGameStopStock(cur) {
   if (!cur.gamestopUrl) return;
   cur.gamestopStock = { state: 'loading' };
-  try {
-    const browserStock = typeof window !== 'undefined' && window.P2WGameStopHelper ? await window.P2WGameStopHelper.check(cur.gamestopUrl) : null;
-    let stock = browserStock;
-    if (!['in', 'out'].includes(stock?.state)) {
-      const serverStock = await api('gamestop/stock', { params: { url: cur.gamestopUrl } });
-      stock = ['in', 'out'].includes(serverStock?.state) ? serverStock : browserStock || serverStock;
-    }
-    cur.gamestopStock = ['in', 'out'].includes(stock?.state) && (!stock.title || floorListingMismatch(stock.title, cur.product))
-      ? { state: 'unknown', reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
-  } catch (_) { cur.gamestopStock = { state: 'unknown' }; }
+  cur.gamestopStock = await fetchFloorGameStopStock(cur.product, cur.gamestopUrl);
   if (floorCur === cur) renderFloorPricer();
 }
 
@@ -3809,8 +3813,11 @@ function looseBundleUnreliable(cur) {
   return loose == null || (cib != null && loose < cib * 0.25);
 }
 
-// GameStop's pre-owned price as a floor, except for a rhythm-game disc whose GameStop price looks like a bundle's.
+// Confirmed out-of-stock GameStop prices remain visible, but cannot set a minimum.
+const floorGsOutOfStock = (cur) => cur.gamestopStock?.state === 'out' && !!cur.gamestopStock.title
+  && !floorListingMismatch(cur.gamestopStock.title, cur.product);
 function floorGsFor(cur) {
+  if (floorGsOutOfStock(cur)) return null;
   const gs = floorGs(cur.product);
   return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
@@ -3839,8 +3846,9 @@ function floorBasis(cur = floorCur) {
   const auto = floorAutoSale(sales);
   const picked = cur.pick != null ? sales.find((s) => s.i === cur.pick) : null;
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
-  const gs = floorGsFor(cur); // a minimum on every system; GameStop is never cheaper
+  const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
+  if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
   const mismatches = sales.filter((s) => s.mismatch);
@@ -3857,6 +3865,7 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
+  if (floorGs(cur.product) && cur.gamestopStock?.state === 'loading') return { basis: null, sale, checks, waiting: true };
   // Never publish a fallback while the primary sold evidence or required checks are still loading.
   if (cur.fullLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
   if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop may be missing. Retry the search before labeling');
@@ -4007,7 +4016,7 @@ function renderFloorPricer() {
     </div>
     <div class="floor-price-context">
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
           ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}
@@ -4064,7 +4073,7 @@ function floorAmazonHtml(cur, b) {
   const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
-  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p>`;
+  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
@@ -4231,7 +4240,8 @@ async function recheckFloorPrices() {
       const sold = await fetchFloorProductSales(product);
       let amazon = null;
       if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
-      const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, pick: null, typed: null, amazon });
+      const gamestopStock = await fetchFloorGameStopStock(product, sold.gamestopUrl);
+      const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, gamestopStock, pick: null, typed: null, amazon });
       it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: 'no sales to go by' };
     } catch (err) {
       it.recheck = { error: err.message };

@@ -51,7 +51,6 @@ const HISTORY_KEEP = 50;            // saved versions of settings / hardware pri
 const LOG_MAX = 100;                // trade-log results without a date range ...
 const LOG_MAX_RANGE = 2000;         // ... and with one (end-of-day totals, export)
 const AMZ_MARKETPLACE = 'ATVPDKIKX0DER'; // amazon.com
-const AMZ_MIN_GAP_SECONDS = 2.1;    // getItemOffers allows 0.5 requests/second
 const AMZ_CACHE_SECONDS = 21600;    // a game's Amazon offers are re-read at most every 6 hours
 
 header('Content-Type: application/json; charset=utf-8');
@@ -273,8 +272,9 @@ function http_get(string $url, bool $follow = false): array {
   return [$status, $body === false ? '' : (string)$body, $body === false ? 'request failed' : ''];
 }
 
-// Any HTTP request with headers (Amazon's token exchange is a form POST). Returns [status, body, error].
+// Any HTTP request with headers (Amazon's token exchange is a form POST). Returns [status, body, error, responseHeaders].
 function http_send(string $method, string $url, array $headers = [], ?string $body = null): array {
+  $responseHeaders = [];
   if (function_exists('curl_init')) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -284,13 +284,21 @@ function http_send(string $method, string $url, array $headers = [], ?string $bo
       CURLOPT_CUSTOMREQUEST => $method,
       CURLOPT_HTTPHEADER => $headers,
       CURLOPT_USERAGENT => 'P2W-TradeIn/1.0 (Language=PHP)',
+      CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$responseHeaders): int {
+        if (preg_match('#^HTTP/#i', $line)) $responseHeaders = [];
+        elseif (strpos($line, ':') !== false) {
+          [$key, $value] = explode(':', $line, 2);
+          $responseHeaders[strtolower(trim($key))] = trim($value);
+        }
+        return strlen($line);
+      },
     ]);
     if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     $out = curl_exec($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
     curl_close($ch);
-    return [$status, $out === false ? '' : (string)$out, $error];
+    return [$status, $out === false ? '' : (string)$out, $error, $responseHeaders];
   }
   $ctx = stream_context_create(['http' => [
     'method' => $method, 'timeout' => 20, 'ignore_errors' => true,
@@ -300,9 +308,13 @@ function http_send(string $method, string $url, array $headers = [], ?string $bo
   $out = @file_get_contents($url, false, $ctx);
   $status = 0;
   foreach ($http_response_header ?? [] as $h) {
-    if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $status = (int)$m[1];
+    if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) { $status = (int)$m[1]; $responseHeaders = []; }
+    elseif (strpos($h, ':') !== false) {
+      [$key, $value] = explode(':', $h, 2);
+      $responseHeaders[strtolower(trim($key))] = trim($value);
+    }
   }
-  return [$status, $out === false ? '' : (string)$out, $out === false ? 'request failed' : ''];
+  return [$status, $out === false ? '' : (string)$out, $out === false ? 'request failed' : '', $responseHeaders];
 }
 
 function pricecharting(string $endpoint, string $param, string $value): void {
@@ -458,6 +470,7 @@ function amazon_keys(): ?array {
 }
 
 function amazon_error(int $status, string $body): string {
+  if ($status === 429) return 'Amazon is temporarily limiting requests. Wait a moment, then use Retry Amazon. Other sources are shown while this check is incomplete.';
   $d = json_decode($body, true);
   $msg = $d['errors'][0]['message'] ?? $d['error_description'] ?? $d['error'] ?? '';
   return "Amazon returned HTTP $status" . ($msg !== '' ? ': ' . rtrim($msg, '.') . '.' : '.');
@@ -486,16 +499,11 @@ function amazon_access_token(array $keys): string {
 function amazon_get(array $keys, string $path, array $query): array {
   $token = amazon_access_token($keys);
   $host = getenv('P2W_AMAZON_HOST') ?: (!empty($keys['sandbox']) ? 'https://sandbox.sellingpartnerapi-na.amazon.com' : 'https://sellingpartnerapi-na.amazon.com');
-  $lock = fopen(data_path('amazon-throttle.lock'), 'c+');
-  flock($lock, LOCK_EX);
-  $wait = AMZ_MIN_GAP_SECONDS - (microtime(true) - (float)stream_get_contents($lock));
-  if ($wait > 0) usleep((int)($wait * 1e6));
-  [$status, $body, $error] = http_send('GET', $host . $path . '?' . http_build_query($query), ['x-amz-access-token: ' . $token, 'Accept: application/json']);
-  ftruncate($lock, 0);
-  rewind($lock);
-  fwrite($lock, (string)microtime(true));
-  flock($lock, LOCK_UN);
-  fclose($lock);
+  require_once __DIR__ . '/amazon-rate-limit.php';
+  $operation = strpos($path, '/catalog/') === 0 ? 'catalog' : 'offers';
+  [$status, $body, $error, $headers] = amazon_rate_request(data_path('amazon-throttle.lock'), $operation,
+    static fn() => http_send('GET', $host . $path . '?' . http_build_query($query), ['x-amz-access-token: ' . $token, 'Accept: application/json']));
+  if ($status === 429) header('Retry-After: ' . max(1, (int)($headers['retry-after'] ?? 5)));
   if ($status === 0) fail(502, 'Could not reach Amazon: ' . $error);
   return [$status, $body];
 }
@@ -543,7 +551,7 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
     if (is_array($cached)) return $cached;
   }
   [$status, $body] = amazon_get($keys, $path, $query);
-  if ($status !== 200) fail(502, amazon_error($status, $body));
+  if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
   $data = json_decode($body, true);
   $items = $asin !== '' ? [$data] : (array)($data['items'] ?? []);
   $candidates = [];
@@ -578,7 +586,7 @@ function amazon_offers(string $upc, string $cond, string $asin = ''): void {
     [$status, $body] = amazon_get($keys, '/products/pricing/v0/items/' . rawurlencode($asin) . '/offers', [
       'MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $condition, 'CustomerType' => 'Consumer',
     ]);
-    if ($status !== 200) fail(502, amazon_error($status, $body));
+    if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
     $payload = json_decode($body, true)['payload'] ?? [];
     $offers = [];
     foreach ((array)($payload['Offers'] ?? []) as $o) {

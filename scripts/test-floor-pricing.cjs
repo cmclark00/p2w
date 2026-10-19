@@ -446,6 +446,42 @@ test('older systems use the same maximum rule without an Amazon midpoint adjustm
   assert.equal(r.b.from, 'amazon'); assert.equal(r.b.basis, 6000); assert.equal(r.r.price, 6000);
 });
 
+test('confirmed out-of-stock GameStop is reference-only across regular, Renewed and high-value pricing', () => {
+  const product = { ...item, 'gamestop-price': 10000 };
+  const example = cur(product, { sales: { cib: [{ title: 'Example Game complete', price: 5000 }] },
+    amazon: { found: true, offers: [{ price: 7000 }] } });
+  for (const state of ['in', 'unknown', undefined]) {
+    assert.equal(invoke('floorResult', { ...example, gamestopStock: { state, title: 'Example Game' } }).r.price, 10000);
+  }
+  const out = { ...example, gamestopStock: { state: 'out', title: 'Example Game' } };
+  const r = invoke('floorResult', out);
+  assert.equal(r.b.basis, 7000); assert.equal(r.b.referenceMin, 7000); assert.equal(r.r.price, 7000);
+  assert.ok(r.b.checks.some(s => s.includes('confirmed out of stock')));
+  assert.equal(invoke('floorResult', { ...out, amazon: { error: 'Rate limited' } }).r.price, 5000);
+  assert.equal(invoke('floorResult', { ...out, amazon: { ...example.amazon, renewedFallback: true } }).r.price, 7000);
+  assert.equal(invoke('floorResult', { ...out, product: { ...product, 'gamestop-price': 170000 }, sales: { cib: [{ title: 'Example Game complete', price: 60000 }] } }).r.price, 60000);
+  assert.equal(invoke('floorResult', { ...out, gamestopStock: { state: 'out', title: 'Another Game PS4' } }).r.price, 10000);
+  assert.equal(invoke('floorResult', { ...out, gamestopStock: { state: 'out' } }).r.price, 10000);
+});
+
+test('out-of-stock exclusion preserves premiums, discounts, deductions and pending-stock safeguards', () => {
+  const product = { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch', 'gamestop-price': 10000 };
+  const example = cur(product, { sales: { cib: [{ title: 'Pokemon Shield complete', price: 5000 }] },
+    amazon: { found: true, offers: [{ price: 7000 }] }, gamestopStock: { state: 'out', title: 'Pokemon Shield Nintendo Switch' } });
+  const r = invoke('floorResult', example);
+  assert.equal(r.b.basis, 7000); assert.equal(r.premium.pct, 10); assert.equal(r.r.price, 8000);
+  const pending = invoke('floorResult', { ...example, gamestopStock: { state: 'loading' } });
+  assert.equal(pending.b.waiting, true); assert.equal(pending.r, null);
+  assert.equal(invoke('floorResult', { ...example, typed: 5000, gamestopStock: { state: 'loading' } }).r.price, 5000);
+  const manual = invoke('floorResult', { ...example, manualMissing: true });
+  assert.ok(manual.r.ded > 0); assert.ok(manual.r.price < r.r.price);
+  const old = json('settings.floorPremiums');
+  try {
+    context.outDiscount = [{ phrase: 'Pokemon Shield', pct: -20 }]; run('settings.floorPremiums = outDiscount');
+    assert.equal(invoke('floorResult', example).r.price, 5500);
+  } finally { context.restorePremiums = old; run('settings.floorPremiums = restorePremiums'); }
+});
+
 test('Operation Darkness stays $150 despite expensive higher Amazon offers', () => {
   const product = { ...item, 'product-name': 'Operation Darkness', 'console-name': 'Xbox 360', 'gamestop-price': 9999 };
   const sales = { cib: [15000, 14000, 12000].map((price) => ({ price, title: 'Operation Darkness complete' })) };

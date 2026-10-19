@@ -39,6 +39,8 @@ jobs:
         run: find shop trade-in scripts -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Check Amazon catalog and offer boundaries (offline)
         run: php scripts/test-amazon-api.php
+      - name: Check Amazon throttle recovery (offline)
+        run: php scripts/test-amazon-rate-limit.php
       - name: Check GameStop product links (offline)
         run: php scripts/test-gamestop-links.php
       - name: Check GameStop stock signals (offline)
