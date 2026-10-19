@@ -1,0 +1,28 @@
+Play2Win GameStop Stock Helper - Chrome - version 1.0.0
+
+ONE-TIME INSTALL
+1. Open chrome://extensions in Chrome.
+2. Turn on Developer mode, choose Load unpacked, and select this folder
+   (the folder containing manifest.json). If downloaded as ZIP, extract first.
+3. Reload https://play2wingames.com/trade-in/ in the same Chrome profile.
+   Sign in normally, choose Floor Pricing, and look up a game.
+
+The helper automatically opens the matching GameStop product in a background
+tab, reads the pre-owned cart and Ship to Home controls, then closes its tab.
+The first check can take up to 25 seconds. Results are cached for 10 minutes.
+
+ACCESS
+Chrome will grant the helper access to Play2Win's /trade-in/ pages and GameStop
+product pages. It only passes a product URL and stock result. It does not read
+customer/trade fields, passwords, cookies, or browsing history, and never clicks
+Add to Cart, buys anything, or sends data to another service. The GameStop page
+loads in your normal browser session; local pickup may differ from online stock.
+
+Confirmed Not Available = Out of stock online. A blocked, incomplete, wrong-item
+or failed check = Check stock. The helper does not solve challenges or bypass
+access controls. Stock status never changes the recommended shelf price.
+
+This helper works only in the Chrome profile where installed. It cannot run in
+the Codex in-app browser. Each staff computer/profile needs its own installation.
+Remove it at chrome://extensions. To update, replace its files and press Reload
+on its extension card, then reload the pricing tool.

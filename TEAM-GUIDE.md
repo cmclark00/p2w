@@ -746,11 +746,21 @@ Guide (the Google Sheet tab).
    entry has no usable GameStop product link, GameStop search is the fallback.
    Related figure entries never replace the selected variant's GameStop link.
    A small status beside GameStop shows **In stock online**, **Out of stock online**,
-   or **Stock unknown** for its pre-owned copy. It checks the product's cart and
+   or **Check stock** for its pre-owned copy. It checks the product's cart and
    Ship to Home controls without adding anything to a cart. Blocked requests or
    unclear product/condition evidence stay unknown; click the link to check.
    Hover for the check time. Results may be cached for 10 minutes; local store
    stock may differ. Stock status does not change pricing or delay adding items.
+   **Automatic Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
+   extract it, then open `chrome://extensions`, enable Developer mode, and choose
+   **Load unpacked** → the extracted folder containing `manifest.json`. Reload the
+   pricing tool in that Chrome profile. The helper needs access only to Play2Win's
+   trade-in pages and GameStop product pages; it reads stock controls, never adds
+   items to a cart. It opens and closes its own background GameStop tab per check.
+   A confirmed Not Available becomes Out of stock online; blocked checks still
+   say Check stock. Each Chrome profile needs installation; the in-app browser
+   cannot run it. Remove or reload it on Chrome's extensions page.
+
    **eBay sold** opens a search for the current game
    and condition; a direct eBay price feed awaits integration approval.
    **Type a different price**, its price field, and **Use automatic price** stay

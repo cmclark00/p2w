@@ -854,12 +854,22 @@ Guide (the Google Sheet tab).</p>
    entry has no usable GameStop product link, GameStop search is the fallback.
    Related figure entries never replace the selected variant's GameStop link.
    A small status beside GameStop shows <strong>In stock online</strong>, <strong>Out of stock online</strong>,
-   or <strong>Stock unknown</strong> for its pre-owned copy. It checks the product's cart and
+   or <strong>Check stock</strong> for its pre-owned copy. It checks the product's cart and
    Ship to Home controls without adding anything to a cart. Blocked requests or
    unclear product/condition evidence stay unknown; click the link to check.
    Hover for the check time. Results may be cached for 10 minutes; local store
    stock may differ. Stock status does not change pricing or delay adding items.
-   <strong>eBay sold</strong> opens a search for the current game
+   <strong>Automatic Chrome helper:</strong> download <a href="trade-in/gamestop-stock-helper.zip">the helper ZIP</a>,
+   extract it, then open <code>chrome://extensions</code>, enable Developer mode, and choose
+   <strong>Load unpacked</strong> → the extracted folder containing <code>manifest.json</code>. Reload the
+   pricing tool in that Chrome profile. The helper needs access only to Play2Win's
+   trade-in pages and GameStop product pages; it reads stock controls, never adds
+   items to a cart. It opens and closes its own background GameStop tab per check.
+   A confirmed Not Available becomes Out of stock online; blocked checks still
+   say Check stock. Each Chrome profile needs installation; the in-app browser
+   cannot run it. Remove or reload it on Chrome's extensions page.</li>
+</ol>
+<p><strong>eBay sold</strong> opens a search for the current game
    and condition; a direct eBay price feed awaits integration approval.
    <strong>Type a different price</strong>, its price field, and <strong>Use automatic price</strong> stay
    pinned beside the shelf price while editing on wider screens (beneath it on
@@ -870,21 +880,21 @@ Guide (the Google Sheet tab).</p>
    excluded listings, outliers, incomplete checks, and prices needing review.
    Expand <strong>Review notes</strong>, <strong>Market references</strong>, <strong>Pricing rules</strong>, or
    <strong>Amazon match details</strong> for the full explanation. <strong>Add to list</strong> stays
-   disabled until the required price checks finish.</li>
-<li>The price fills in by itself from the game's recent eBay sales (the
-   ones PriceCharting lists for that condition), highest first:</li>
-<li><strong>Every system:</strong> compare the <strong>highest valid eBay sale</strong>, the
+   disabled until the required price checks finish.
+3. The price fills in by itself from the game's recent eBay sales (the
+   ones PriceCharting lists for that condition), highest first:
+   - <strong>Every system:</strong> compare the <strong>highest valid eBay sale</strong>, the
      <strong>lowest matching Amazon offer including shipping</strong>, and <strong>GameStop</strong>.
      The highest of those three numbers sets the baseline. Specific rules
      and premiums take priority afterward. For example, eBay $150,
-     Amazon $134, and GameStop below $150 gives a $150 shelf price.</li>
-<li><strong>PriceCharting's own market price is only a fallback</strong> when none
+     Amazon $134, and GameStop below $150 gives a $150 shelf price.
+   - <strong>PriceCharting's own market price is only a fallback</strong> when none
      of those three references is available. Fallback prices always say <strong>Double-check</strong>.
-     PriceCharting's retail-sell number is a reference, not a pricing rule.</li>
-<li><strong>Never counted:</strong> lots, sealed copies, bundles with a console, and
+     PriceCharting's retail-sell number is a reference, not a pricing rule.
+   - <strong>Never counted:</strong> lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
-     the plain game. They show dimmed.</li>
-<li><strong>Read the listing titles:</strong> both eBay and Amazon are checked for
+     the plain game. They show dimmed.
+   - <strong>Read the listing titles:</strong> both eBay and Amazon are checked for
      different language/packaging versions (French, Spanish, etc.),
      regions/imports, special editions/reprints, bundled extras/bonus discs,
      and clearly different platforms. The reason appears beside excluded
@@ -892,8 +902,8 @@ Guide (the Google Sheet tab).</p>
      variants can still qualify. Missing titles need review too. An Amazon
      barcode match does not bypass these checks: a mismatched catalog title
      excludes its offers from pricing. Amazon provides a shared product
-     title, not every seller's description, so open the listing when unsure.</li>
-<li><strong>Possible high outliers:</strong> one isolated high sale is flagged and left
+     title, not every seller's description, so open the listing when unsure.
+   - <strong>Possible high outliers:</strong> one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
      the next highest. With at least eight comparable sales, it can also
@@ -904,8 +914,8 @@ Guide (the Google Sheet tab).</p>
      check that it actually sold and matches the item; click the row to
      include it if warranted. <strong>Back to the automatic price</strong> excludes it
      again. The flag is a pricing warning, not proof that a listing was unsold.
-     Review notes remain visible on saved lists and price re-checks.</li>
-<li><strong>High-value games (sold or lowest verified Amazon at $500+):</strong> when a valid sale exists, use the highest
+     Review notes remain visible on saved lists and price re-checks.
+   - <strong>High-value games (sold or lowest verified Amazon at $500+):</strong> when a valid sale exists, use the highest
      eligible PriceCharting sale, with the GameStop minimum. Amazon and
      Renewed offers remain visible but do not set the price. For example,
      a $1,300 sale and $1,700 Amazon offer give a $1,300 baseline. The cutoff
@@ -913,8 +923,8 @@ Guide (the Google Sheet tab).</p>
      before adjustments and rounding, not PriceCharting's average. A $450 sale
      with $700 Amazon therefore uses $450; no valid sale keeps the fallback rules. Specific premiums,
      discounts, missing-manual deductions and final rounding still apply.
-     Consoles, accessories and toys-to-life figures keep their existing rules.</li>
-<li><strong>Amazon's offers show on every game</strong>, listed under the sales
+     Consoles, accessories and toys-to-life figures keep their existing rules.
+   - <strong>Amazon's offers show on every game</strong>, listed under the sales
      (prices include shipping). Outside the high-value game rule, only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
      For used/CIB items, if barcode and title/platform searches find no usable
@@ -927,16 +937,16 @@ Guide (the Google Sheet tab).</p>
      Renewed matches still need the correct title, platform, language and
      edition; they do not confirm original packaging/inserts and cannot price
      a sealed copy. Specific premiums and deductions still apply.
-     The tool waits for sold evidence and reference checks before enabling <strong>Add to list</strong>.</li>
-<li><strong>Specific rules take priority:</strong> configured premiums and discounts
+     The tool waits for sold evidence and reference checks before enabling <strong>Add to list</strong>.
+   - <strong>Specific rules take priority:</strong> configured premiums and discounts
      apply to the baseline, and missing-manual deductions still apply.
      A specific discount can lower the price below the market references.
      Managers can edit premiums under Settings → Floor price premiums.
      The longest matching phrase wins; a system-specific rule beats the
-     same phrase without a system. A 0% rule exempts a title from a broader premium.</li>
-<li><strong>Consoles and controllers</strong> can be priced here too. They go by
-     their sales without the game rules (a badge says so).</li>
-<li><strong>Instrument games</strong> (Guitar Hero, Rock Band, DJ Hero…): pick the
+     same phrase without a system. A 0% rule exempts a title from a broader premium.
+   - <strong>Consoles and controllers</strong> can be priced here too. They go by
+     their sales without the game rules (a badge says so).
+   - <strong>Instrument games</strong> (Guitar Hero, Rock Band, DJ Hero…): pick the
      <strong>Disc only</strong> or <strong>With instruments</strong> product. Disc prices ignore
      sales that came with instruments, and bundle prices ignore disc-only
      sales. Sellers often list guitar bundles under the plain game, so a
@@ -944,10 +954,10 @@ Guide (the Google Sheet tab).</p>
      for (Guitar Hero Live for Wii U: $10, not the ~$50 bundle price). If
      a <strong>loose</strong> bundle (no box) shows no automatic price, PriceCharting's
      loose sales for it are mostly just the disc: click a sale that clearly
-     has the instruments, or type a price.</li>
-<li>Lots, sealed copies, and other odd listings are marked "odd
-     listing" and never count.</li>
-<li>Only look closer when it says <strong>Double-check</strong> (a possible outlier, very few sales, no
+     has the instruments, or type a price.
+   - Lots, sealed copies, and other odd listings are marked "odd
+     listing" and never count.
+4. Only look closer when it says <strong>Double-check</strong> (a possible outlier, very few sales, no
    sale in the last 6 months, or a price of $100 or more). Clicking a sale
    includes it in the comparison but cannot undercut the highest valid sale.
    For a manual override, choose <strong>Type a different price</strong>. <strong>Back to the automatic
@@ -957,8 +967,8 @@ Guide (the Google Sheet tab).</p>
    can run a prepared history review against live recommendations. It uses
    the current pricing rules and only reads market data. History stays in
    the browser. Download results before closing; the download can also be
-   loaded as a checkpoint to resume unfinished comparisons.</li>
-<li><strong>Through $80</strong>, prices whose whole-dollar amount ends in <strong>7, 8 or 9</strong>
+   loaded as a checkpoint to resume unfinished comparisons.
+5. <strong>Through $80</strong>, prices whose whole-dollar amount ends in <strong>7, 8 or 9</strong>
    round up to the next $10. Otherwise they round <strong>down to a multiple of $5</strong>:
    $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the
    winning baseline after any premium or discount, including GameStop and
@@ -1000,22 +1010,21 @@ Guide (the Google Sheet tab).</p>
    comparables, are excluded. Wrong variants and bundles remain excluded.
    Figures do not use game minimums or manual
    deductions. Existing percentage premiums still apply. Other toy lines
-   keep the usual market baseline with the toy rounding rules.</li>
-<li>Prices in the list can be changed by hand. <strong>Save session</strong> keeps the
+   keep the usual market baseline with the toy rounding rules.
+6. Prices in the list can be changed by hand. <strong>Save session</strong> keeps the
    list on the website under its name, so anyone can open it later from
    <strong>Saved sessions</strong>. If someone else saved the same session after you
    opened it, your save won't erase theirs: it offers to save yours as a
    copy instead. <strong>Copy list</strong> copies it for a spreadsheet, <strong>Print list</strong>
    prints it, and <strong>Print labels</strong> prints a price sticker for every game
    on <strong>Avery 5160</strong> label sheets (30 per page; print at 100% / "Actual
-   size").</li>
-<li><strong>Prices change.</strong> Open an older session and click <strong>Re-check prices</strong>
+   size").
+7. <strong>Prices change.</strong> Open an older session and click <strong>Re-check prices</strong>
    to price every game again with today's sales (about 5 seconds a game;
    click <strong>Stop</strong> to stop). Games whose price moved show <strong>Now $X ▲/▼</strong>:
    click <strong>Use</strong> or <strong>Keep</strong> on each, or <strong>Use N new prices</strong> for all of
    them at once. Prices you typed in by hand are never changed by that
-   button. Save the session afterwards.</li>
-</ol>
+   button. Save the session afterwards.</p>
 <p><strong>Amazon keys (managers):</strong> Amazon prices come from the shop's own
 Amazon seller API app. Its three keys (Client ID, Client secret, Refresh
 token) go in <strong>Settings → Amazon (Selling Partner API)</strong>; click <strong>Save

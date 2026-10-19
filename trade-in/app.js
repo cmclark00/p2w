@@ -3563,7 +3563,12 @@ async function loadFloorGameStopStock(cur) {
   if (!cur.gamestopUrl) return;
   cur.gamestopStock = { state: 'loading' };
   try {
-    const stock = await api('gamestop/stock', { params: { url: cur.gamestopUrl } });
+    const browserStock = typeof window !== 'undefined' && window.P2WGameStopHelper ? await window.P2WGameStopHelper.check(cur.gamestopUrl) : null;
+    let stock = browserStock;
+    if (!['in', 'out'].includes(stock?.state)) {
+      const serverStock = await api('gamestop/stock', { params: { url: cur.gamestopUrl } });
+      stock = ['in', 'out'].includes(serverStock?.state) ? serverStock : browserStock || serverStock;
+    }
     cur.gamestopStock = ['in', 'out'].includes(stock?.state) && (!stock.title || floorListingMismatch(stock.title, cur.product))
       ? { state: 'unknown', reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
   } catch (_) { cur.gamestopStock = { state: 'unknown' }; }
@@ -3573,7 +3578,7 @@ async function loadFloorGameStopStock(cur) {
 function floorGameStopStock(cur) {
   const stock = cur.gamestopStock || {};
   const labels = { in: 'In stock online', out: 'Out of stock online', loading: 'Checking stock…' };
-  const label = labels[stock.state] || 'Stock unknown';
+  const label = labels[stock.state] || 'Check stock';
   const checked = stock.checkedAt ? ` Checked ${new Date(stock.checkedAt * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : '';
   const title = (stock.reason || 'Open the matching GameStop listing to check pre-owned online stock. Local store stock may differ.') + checked;
   return `<span class="floor-gs-stock" title="${esc(title)}">· ${esc(label)}</span>`;

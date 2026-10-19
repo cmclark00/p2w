@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Play2Win GameStop Stock Helper",
+  "version": "1.0.0",
+  "description": "Checks pre-owned online availability on matching GameStop product pages for Play2Win floor pricing. Never adds items to a cart.",
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://play2wingames.com/trade-in/*"], "js": ["bridge.js"], "run_at": "document_start" },
+    { "matches": ["https://www.gamestop.com/*products/*", "https://gamestop.com/*products/*"], "js": ["stock-reader.js"], "run_at": "document_idle" }
+  ]
+}

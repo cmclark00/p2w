@@ -661,6 +661,19 @@ The site's **only server-side code**. Everything else is static.
     pricing nor blocks Add. Runs separately after the selected catalog page's
     sales resolve (never a sibling figure's link). Network access may be blocked
     by GameStop; never treat an HTTP error or a listed price as stock evidence.
+    Optional `trade-in/browser-helper` is a Manifest V3 Chrome extension, packaged
+    by `python scripts/build-gamestop-helper.py`. Scoped content scripts bridge
+    the pricing page to the service worker, which validates sender/product URL,
+    opens an inactive matching product tab, reads stable visible stock controls,
+    and closes only its own tab. No broad tabs/history/cookie/storage permissions;
+    no cart writes. Two concurrent checks maximum; 25-second watchdog; known
+    results cache 10 minutes in worker memory, unknown 30 seconds. The site bridge
+    uses per-request nonces and an ACK timeout; absent helpers use the PHP fallback.
+    Confirmed results still pass title/platform matching in app.js. Failed checks
+    display Check stock, never out-of-stock. Chrome installation is per profile;
+    the Codex in-app browser cannot load this extension. Rebuild the ZIP after
+    extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
+
   - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and

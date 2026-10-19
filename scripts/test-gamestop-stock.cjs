@@ -23,11 +23,20 @@ const current = () => ({ product, gamestopUrl: 'https://www.gamestop.com/product
     assert.equal(ctx.cur.gamestopStock.state, 'unknown', 'Wrong product/platform stays unknown');
   }
   run('api = async () => { throw new Error("Blocked"); }'); await run('loadFloorGameStopStock(cur)');
-  assert.match(run('floorGameStopStock(cur)'), /Stock unknown/);
+  assert.match(run('floorGameStopStock(cur)'), /Check stock/);
   ctx.cur.gamestopStock = { state: 'in', reason: '<script>bad</script>', checkedAt: 1792400000 };
   assert.match(run('floorGameStopStock(cur)'), /In stock online/);
   assert.ok(!run('floorGameStopStock(cur)').includes('<script>'));
   assert.equal(run('floorResult(cur).r.price'), 6000, 'Stock does not change pricing');
+  ctx.window = { P2WGameStopHelper: { check: async () => ({ state: 'out', title: 'Lollipop Chainsaw PS3', source: 'browser-helper' }) } };
+  run('api = async () => { throw new Error("Server must not be called for a confirmed browser result"); }');
+  await run('loadFloorGameStopStock(cur)');
+  assert.equal(ctx.cur.gamestopStock.state, 'out');
+  assert.equal(ctx.cur.gamestopStock.source, 'browser-helper');
+  ctx.window.P2WGameStopHelper.check = async () => null;
+  run('api = async () => ({ state: "out", title: "Lollipop Chainsaw PS3" })');
+  await run('loadFloorGameStopStock(cur)');
+  assert.equal(ctx.cur.gamestopStock.state, 'out', 'Server fallback works without helper');
   ctx.cur = { product }; await run('loadFloorGameStopStock(cur)');
   assert.equal(ctx.cur.gamestopStock, undefined, 'No matched product URL: no request');
   console.log('GameStop stock display, matching and async checks passed.');
