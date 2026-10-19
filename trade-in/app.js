@@ -23,6 +23,8 @@ const HW_PC_CONDITIONS = { cib: 'CIB', new: 'New' };
 const isPcCondition = (c) => c in HW_PC_CONDITIONS;
 // PriceCharting hardware (special editions with no buying-guide row) can also be bought for Parts.
 const isHwCat = (cat) => ['console', 'handheld', 'accessory'].includes(cat);
+// Includes the owner's Logitech G Cloud exception alongside PC handhelds.
+const PC_HANDHELD_RE = /\b(?:steam ?deck|rog (?:xbox )?ally|legion go|msi claw|aya ?neo|onexplayer|one x player|onexfly|gpd win|ayn loki|nitro blaze|zotac zone|logitech(?: g)? cloud|logitech g cloud|(?:handheld|portable)(?: gaming)? pc|pc (?:gaming )?handheld|windows (?:gaming )?handheld)\b/i;
 // A third-party version of a buying-guide controller pays a % of the first-party Working price.
 const THIRD_PARTY = 'thirdparty';
 const CONTROLLER_RE = /\b(controller|joy ?cons?|remote|nunchuk|joystick|pad|zapper)\b/;
@@ -457,6 +459,11 @@ function guessCategory(name) {
   // instrument; "Rock Band Drum Kit" and "DJ Hero Turntable" are instruments.
   if (RHYTHM_RE.test(name) && !RHYTHM_CONSOLE_RE.test(name)) return rhythmKind(name) ? 'game' : 'accessory';
   if (/\b(controller|joy-?cons?|remote|nunchuk|memory card|adapter|cable|charger|headset|dock)\b/.test(n)) return 'accessory';
+  if (PC_HANDHELD_RE.test(n)) {
+    if (/\b(?:case|cover|protector|skin|stand|grip|replacement|repair|battery|shell)\b/.test(n)
+      && !/\b(?:with|bundle|includes|including)\b/.test(n)) return 'accessory';
+    return 'handheld';
+  }
   if (/\b(console|system)\b/.test(n)) {
     return /game ?boy|\bds\b|\b[23]ds\b|\bdsi\b|psp|vita|game gear|switch lite/.test(n) ? 'handheld' : 'console';
   }
@@ -2266,6 +2273,35 @@ function renderSplit(t) {
 
 const SERIAL_CATEGORIES = ['console', 'handheld'];
 
+function tradeSerialRequired(line) {
+  if (!SERIAL_CATEGORIES.includes(line.category)) return false;
+  const name = norm(`${line.name || ''} ${line.platform || ''} ${line.matchedFrom || ''}`);
+  const condition = norm(line.condition || '');
+  const sealedName = name.replace(/\b(?:not|never) (?:factory )?sealed\b|\bun sealed\b/g, '');
+  if (['new', 'sealed'].includes(condition) || /\b(?:sealed|brand new|new in box)\b/.test(sealedName)) return true;
+  return /\b(?:switch(?: 2| oled| lite)?|xbox series [sx]|ps ?[45]|playstation ?[45]|[23]ds)\b/.test(name)
+    || PC_HANDHELD_RE.test(name)
+    || (line.category === 'handheld' && /^(?:pc|windows|handheld pc|pc handheld)$/i.test((line.platform || '').trim()));
+}
+
+function tradeSerialFields(lines) {
+  const hardware = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
+  const field = (l, required) => `<label>Serial number – ${esc(l.name)} (${required ? 'required' : 'optional'})${l.qty > 1 ? ` (×${l.qty}, separate with commas)` : ''}
+    <input type="text" data-serial="${esc(l.id)}" value="${esc(l.serial || '')}"${required ? ' required' : ''} autocomplete="off" spellcheck="false"></label>`;
+  const required = hardware.filter(tradeSerialRequired), optional = hardware.filter((l) => !tradeSerialRequired(l));
+  return required.map((l) => field(l, true)).join('')
+    + (optional.length ? `<details><summary>Optional serial numbers (${optional.length})</summary>${optional.map((l) => field(l, false)).join('')}</details>` : '');
+}
+
+function tradeSerialIssue(lines) {
+  for (const line of lines.filter((l) => !l.pending && !l.failed && tradeSerialRequired(l))) {
+    const count = String(line.serial || '').split(',').filter((s) => s.trim()).length;
+    const qty = Math.max(1, Number(line.qty) || 1);
+    if (count !== qty) return `Enter ${qty === 1 ? 'a serial number' : `${qty} serial numbers, separated by commas,`} for ${line.name}.`;
+  }
+  return null;
+}
+
 function openComplete() {
   const t = tradeTotals();
   const lines = trade.lines.filter((l) => !l.pending && !l.failed);
@@ -2284,8 +2320,7 @@ function openComplete() {
   $('#completeCustomer').value = trade.customer || '';
   $('#completeNotes').value = '';
   const serialLines = lines.filter((l) => SERIAL_CATEGORIES.includes(l.category));
-  $('#serialFields').innerHTML = serialLines.map((l) => `<label>Serial number – ${esc(l.name)}${l.qty > 1 ? ` (×${l.qty}, separate with commas)` : ''}
-    <input type="text" data-serial="${l.id}" value="${esc(l.serial || '')}" autocomplete="off" spellcheck="false"></label>`).join('');
+  $('#serialFields').innerHTML = tradeSerialFields(lines);
   $('#idCheckRow').hidden = !serialLines.length;
   $('#idChecked').checked = false;
   $('#completeError').textContent = '';
@@ -2327,6 +2362,8 @@ async function saveCompleted(print) {
     const line = trade.lines.find((l) => l.id === input.dataset.serial);
     if (line) line.serial = input.value.trim();
   });
+  const serialIssue = tradeSerialIssue(trade.lines);
+  if (serialIssue) { error.textContent = serialIssue; return; }
   const needsId = !$('#idCheckRow').hidden;
   if (needsId && !$('#idChecked').checked) { error.textContent = "Check the customer's photo ID before buying consoles or handhelds."; return; }
   Object.assign(trade, { staff, customer });

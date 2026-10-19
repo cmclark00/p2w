@@ -692,9 +692,17 @@ Everyone in the store shares one internet address, so typos add up.
      and both start blank on every new trade, so whoever is at the
      counter types their own name each time. (The Customer box at the
      top of the screen fills in the same name.)
-   - Enter serial numbers for consoles and handhelds, and tick **Photo ID
-     checked**. The trade won't save without it when there's serialized
-     hardware.
+   - Serial numbers are required for every Switch model (including OLED,
+     Lite and Switch 2), Xbox Series S/X, PS4/PS4 Slim/PS4 Pro, every PS5
+     model, PC handhelds (Steam Deck, ROG Ally, Legion Go, MSI Claw and
+     similar models), Logitech G Cloud, and the entire 3DS family (including
+     2DS and New 2DS XL). **All sealed consoles and handhelds** require
+     serials too: select **New** for sealed hardware. Enter one serial per
+     unit, separated by commas when there are multiple units on a line.
+   - Other used consoles and handhelds do not require serials. Their fields
+     are under **Optional serial numbers**, and previously entered numbers
+     stay saved. The existing **Photo ID checked** requirement still applies
+     to console/handheld trades; the trade will not save until it is checked.
    - **Save trade**, or **Save & print receipt** for a copy with a
      signature line. Click once; the buttons grey out while it saves.
    The trade is saved to the **Trade Log** with a **trade number** (on the

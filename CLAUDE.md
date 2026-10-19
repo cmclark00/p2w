@@ -913,6 +913,17 @@ The site's **only server-side code**. Everything else is static.
     trade and after Complete, so they're never carried over from the last
     trade or remembered per device), payout (`cash` / `credit` / `split` with cents),
     totals, per-item snapshot (incl. serials), `idChecked`, and notes.
+  - Complete-trade serial policy uses `tradeSerialRequired`: Switch family,
+    Xbox Series S/X, PS4/PS5 families, 3DS family including 2DS, PC handhelds
+    and Logitech G Cloud, plus all New/sealed console and handheld lines.
+    Other used hardware has collapsed optional serial fields. Save and
+    Save & print require one comma-separated serial per unit only on required
+    lines. The photo-ID check remains required for all console/handheld
+    trades. Existing serial snapshots and manager trade-log corrections are
+    preserved. PC handheld names are recognized as handhelds during catalog
+    imports; accessories are classified first so docks/controllers stay exempt.
+    `scripts/test-trade-serials.cjs` checks model aliases, sealed conditions,
+    optional hardware and both completion actions without saving real trades.
   - Search is a case-insensitive substring match on the raw JSON line,
     newest first. It returns at most 100 results (`LOG_MAX`) from the last
     36 months, or up to 2000 (`LOG_MAX_RANGE`) with a date range: `from`/
