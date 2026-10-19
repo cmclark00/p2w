@@ -680,7 +680,7 @@ The site's **only server-side code**. Everything else is static.
     below $15 is common; $15 or more is uncommon for ordinary figures.
     Recognized special Skylanders (including Spring Time/Easter, Lightcore,
     Dark, Nitro, Jade, Enchanted, Power Blue, holiday/promo and rare finishes)
-    take priority and have a $25 minimum regardless of the market value.
+    take priority and have a $20 minimum regardless of the market value.
     Unknown catalog variant suffixes require review. Ordinary series/reposes
     do not automatically receive the rare floor; Golden Queen is a character.
     `fetchFloorProductSales` searches the same character's catalog entries,

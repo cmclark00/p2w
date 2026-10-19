@@ -652,7 +652,7 @@ test('figures wait for enabled Amazon checks before publishing either baseline',
 test('Amazon figure baselines preserve rare minimums, premiums and toy rounding', () => {
   const rare = { ...item, 'product-name': 'Trigger Happy - Swap Force, Spring Time', 'console-name': 'Skylanders', 'new-price': 850 };
   const rareCur = cur(rare, { condition: 'new', sales: { new: [] }, amazon: { found: true, title: 'Springtime Trigger Happy', offers: [{ price: 1800 }] } });
-  assert.equal(invoke('floorResult', rareCur).r.price, 2500);
+  assert.equal(invoke('floorResult', rareCur).r.price, 2000);
   rareCur.amazon.offers = [{ price: 4299 }];
   assert.equal(invoke('floorResult', rareCur).r.price, 4500);
   const old = json('settings.floorPremiums');
@@ -700,17 +700,17 @@ test('looser toy outliers do not change common averages, rare minimums or identi
   assert.equal(invoke('floorResult', cur(product, { condition: 'loose', sales })).r.price, 600);
   const uncommon = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'uncommon', sales }));
   assert.equal(uncommon.b.basis, 1600); assert.equal(uncommon.r.price, 1500);
-  assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'rare', sales })).r.price, 2500);
+  assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'rare', sales })).r.price, 2000);
 });
 
-test('Legendary and staff-classified rare Skylanders cannot fall below 25', () => {
+test('Legendary and staff-classified rare Skylanders have a $20 floor and retain higher rounded prices', () => {
   for (const [name, toyGroup] of [['Trigger Happy - Legendary', undefined], ['Bash', 'rare']]) {
     const product = { ...item, 'product-name': name, 'console-name': 'Skylanders' };
-    for (const price of [700, 2400, 8500]) {
+    for (const [price, expected] of [[700, 2000], [1900, 2000], [2000, 2000], [2400, 2500], [8500, 8500]]) {
       const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup, sales: { loose: [{ title: name, price }] } }));
-      assert.equal(r.r.price, Math.max(2500, price)); assert.equal(r.r.ded, 0);
+      assert.equal(r.r.price, expected); assert.equal(r.r.ded, 0);
     }
-    assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup, typed: 1000 })).r.price, 2500);
+    assert.equal(invoke('floorResult', cur(product, { condition: 'loose', toyGroup, typed: 1000 })).r.price, 2000);
   }
   const product = { ...item, 'product-name': 'Trigger Happy - Legendary', 'console-name': 'Skylanders' };
   assert.equal(invoke('floorToyGroup', { product, toyGroup: 'common' }), 'rare');
@@ -743,11 +743,11 @@ test('the 15 dollar cutoff applies to ordinary figures, while special Skylanders
   assert.equal(invoke('floorToyGroup', { product, condition: 'new', toyGroup: 'common' }), 'rare');
 });
 
-test('rare finishes keep the 25 minimum and named figure variants do not mix', () => {
+test('rare finishes keep the 20 minimum and named figure variants do not mix', () => {
   for (const name of ['Trigger Happy - Legendary', 'Eye Brawl - Giants, Purple, Metallic', 'Bash - Gold', 'Bash - Chase']) {
     const product = { ...item, 'product-name': name, 'console-name': 'Skylanders', 'loose-price': 500 };
     const r = invoke('floorResult', cur(product, { condition: 'loose', toyGroup: 'auto', sales: { loose: [{ title: `${name} Skylanders figure`, price: 700 }] } }));
-    assert.equal(r.toyGroup, 'rare'); assert.equal(r.r.price, 2500);
+    assert.equal(r.toyGroup, 'rare'); assert.equal(r.r.price, 2000);
   }
   const product = { ...item, 'product-name': 'Bash', 'console-name': 'Skylanders' };
   for (const title of ['Skylanders Bash Legendary', 'Bash Skylanders Metallic', 'Bash Series 2 Skylanders']) {

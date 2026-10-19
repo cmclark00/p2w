@@ -18,7 +18,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     for (const name of ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy', 'Trigger Happy - Power Blue', 'Hoot Loop - Enchanted', 'Bash - Crystal', 'Hex - Giants, Lightcore', 'Dive Clops - Eggcited', 'Pop Fizz - Love Potion', 'Whirlwind - Polar', 'Royal Double Trouble', 'Scarlet Ninjini', 'Molten Hot Dog', 'Tree Rex - Gnarly', 'Trigger Happy - E3, 2011']) {
       e.ctx.p = { ...product, 'product-name': name }; const g = e.run('floorToyGroup({product:p,condition:"new",toyGroup:"auto"})');
       assert.equal(g, 'rare', name);
-      if (g === 'rare') assert.equal(e.run('floorResult({product:p,condition:"new",toyGroup:"common",typed:850,sales:{new:[]}}).r.price'), 2500);
+      if (g === 'rare') assert.equal(e.run('floorResult({product:p,condition:"new",toyGroup:"common",typed:850,sales:{new:[]}}).r.price'), 2000);
     }
     e.ctx.p = { ...product, 'product-name': 'Bash - Unknown Finish' };
     assert.equal(e.run('floorToyGroup({product:p,condition:"new"})'), 'review');

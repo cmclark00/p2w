@@ -3159,7 +3159,7 @@ function floorToyRound(price, family) {
 function floorToyPrice(basis, { family, group, premium }) {
   if (basis == null) return null;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const min = group === 'rare' ? 2500 : family === 'amiibo' ? 500 : 200;
+  const min = group === 'rare' ? 2000 : family === 'amiibo' ? 500 : 200;
   const beforeShelfRound = Math.max(min, premiumBasis);
   return { full: beforeShelfRound, ded: 0, price: floorToyRound(beforeShelfRound, family), beforeShelfRound,
     min, premium, premiumBasis, toy: family, rareMinimum: group === 'rare' };
@@ -3838,7 +3838,7 @@ function floorBasis(cur = floorCur) {
   // A verified, priced Amazon match switches figures to the usual three-source
   // baseline. Without one, retain their common-average / uncommon-sale rules.
   if (['review', 'common', 'uncommon', 'rare'].includes(toyGroup) && !amz) {
-    if (toyGroup === 'review') return { basis: null, sale, checks, need: 'Choose Common or Uncommon for this figure; choose Rare variant for a special Skylander with the $25 minimum.' };
+    if (toyGroup === 'review') return { basis: null, sale, checks, need: 'Choose Common or Uncommon for this figure; choose Rare variant for a special Skylander with the $20 minimum.' };
     if (toyGroup === 'common') {
       const basis = Number(cur.product[PC_FIELDS.market[cur.condition]]);
       return basis > 0 ? { basis, from: 'toyaverage', sale: null, checks, toyGroup }
@@ -3986,7 +3986,7 @@ function renderFloorPricer() {
 
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw && !toy ? '<span class="badge info">Hardware pricing</span>' : ''}
-        ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $25 minimum</span>' : ''}
+        ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $20 minimum</span>' : ''}
         ${rhythm === 'disc' ? '<span class="badge info">Disc only</span>' : ''}
         ${rhythm === 'bundle' ? '<span class="badge guide">With instruments · check included items</span>' : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
@@ -3996,7 +3996,7 @@ function renderFloorPricer() {
         <option value="auto"${!['common', 'uncommon', 'rare'].includes(cur.toyGroup) ? ' selected' : ''}>Automatic — ${esc(floorToyGroup(cur, true))}</option>
         <option value="common"${cur.toyGroup === 'common' ? ' selected' : ''}>Common — PriceCharting average</option>
         <option value="uncommon"${cur.toyGroup === 'uncommon' ? ' selected' : ''}>Uncommon — highest eligible sale</option>
-        ${toy === 'skylanders' ? `<option value="rare"${cur.toyGroup === 'rare' ? ' selected' : ''}>Rare variant — highest sale, $25 minimum</option>` : ''}
+        ${toy === 'skylanders' ? `<option value="rare"${cur.toyGroup === 'rare' ? ' selected' : ''}>Rare variant — highest sale, $20 minimum</option>` : ''}
       </select></label>` : ''}
     </div>
     <div class="floor-body">
@@ -4008,7 +4008,7 @@ function renderFloorPricer() {
       <aside class="floor-result" aria-label="Pricing details">
         ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
         <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
-        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.renewedBasis ? esc("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
+        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.renewedBasis ? esc("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>

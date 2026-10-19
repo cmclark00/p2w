@@ -862,7 +862,7 @@ Guide (the Google Sheet tab).
    The unrounded value for the selected condition sets the ordinary figure group.
    Recognized special Skylanders take priority over this cutoff.
    You can select **Common** or **Uncommon** to override the automatic group.
-   **Rare variant** Skylanders use that sale with a **$25 minimum**;
+   **Rare variant** Skylanders use that sale with a **$20 minimum**;
    Spring Time/Easter, Legendary, Lightcore, Dark, Nitro, Jade, Enchanted,
    Power Blue, holiday/promo variants and recognized rare finishes get this
    minimum automatically, even below the cutoff. Unrecognized variant suffixes
