@@ -858,7 +858,11 @@ The site's **only server-side code**. Everything else is static.
     search get the same identity checks with positive platform evidence.
     Each verified renewed ASIN is checked under both Used and New offer
     conditions; the lowest usable offer is tagged `renewedFallback` and
-    visibly labeled. New offers on a renewed ASIN do not establish original
+    visibly labeled. A usable Renewed fallback replaces the eBay baseline:
+    `max(lowest Renewed, GameStop)`, before premiums/deductions and rounding.
+    Its `referenceMin` excludes eBay so later rounding cannot restore the
+    higher sold price. Regular Amazon retains the three-source maximum.
+    New offers on a renewed ASIN do not establish original
     sealed condition. A regular priced match always wins without running
     this stage. No packaging/inserts are claimed; premiums stay intact.
     Match notes survive saved-item rechecks and history comparisons, which

@@ -3797,7 +3797,8 @@ function floorAmazonLowest(cur) {
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
 }
 
-// The maximum of three valid market references; PriceCharting is only a last fallback.
+// Regular references use the maximum; a verified Renewed fallback replaces
+// the eBay baseline while retaining GameStop's floor. Specific adjustments follow.
 function floorBasis(cur = floorCur) {
   const sales = floorSales(cur);
   const auto = floorAutoSale(sales);
@@ -3828,6 +3829,7 @@ function floorBasis(cur = floorCur) {
   const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
   if (waiting) return { basis: null, sale, checks, waiting };
   const amz = cur.amazon?.error ? null : floorAmazonLowest(cur);
+  const renewedBasis = !!(amz && cur.amazon.renewedFallback);
   const toyGroup = floorToyGroup(cur);
   // A verified, priced Amazon match switches figures to the usual three-source
   // baseline. Without one, retain their common-average / uncommon-sale rules.
@@ -3841,7 +3843,7 @@ function floorBasis(cur = floorCur) {
     if (sale) return { basis: sale.price, from: 'sale', sale, checks, toyGroup };
     return { basis: null, sale: null, checks, need: 'No usable sold evidence for this figure and condition. Review the listings or type a price.' };
   }
-  if (amz && ['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
+  if (amz && !renewedBasis && ['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
     checks.push('Verified Amazon offer found: using the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop; figure premiums, minimums and rounding still apply');
   }
   // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
@@ -3864,12 +3866,13 @@ function floorBasis(cur = floorCur) {
     checks.push(`Amazon's lowest offer is ${money(amz)}; compare it with the sold evidence before labeling`);
   }
   if (!sale) checks.push('No usable eBay sold evidence for this condition; fallback price — verify before labeling');
-  const options = [[sale?.price, 'sale'], [amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
+  if (renewedBasis) checks.push('Renewed baseline: use the lowest verified Amazon Renewed offer instead of a higher eBay sale, retaining the GameStop minimum. Specific premiums, deductions and rounding still apply');
+  const options = [[renewedBasis ? null : sale?.price, 'sale'], [amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
   const referenceMin = options.length ? Math.max(...options.map(([v]) => v)) : null;
   if (!options.length && pc > 0) options.push([pc, 'pricecharting']);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
-    return { basis, from, sale, checks, waiting, referenceMin };
+    return { basis, from, sale, checks, waiting, referenceMin, renewedBasis };
   }
   if (waiting) return { basis: null, sale, checks, waiting };
   return { basis: null, sale, checks, need: 'No usable sold evidence or fallback price. Check the links and type a price.' };
@@ -3929,7 +3932,7 @@ function renderFloorPricer() {
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd ? ` <span class="badge info">${esc(s.mismatch || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
         <td class="muted">${esc(s.date)}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      ${!toy ? `<p class="muted small-print">The baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>` : ''}`;
+      ${!toy ? `<p class="muted small-print">Normally the baseline is the highest of the highest comparable eBay sale, lowest matching Amazon offer (shipping included), and GameStop. When a verified Renewed fallback is used, its lowest offer sets the baseline instead of eBay, with the GameStop minimum retained. Possible isolated high outliers are flagged and excluded automatically; review the listing before clicking its row to include it. A flag does not establish whether a listing sold. Specific premiums, discounts, and missing-manual rules take priority. Through $80, dollar endings 7/8/9 round up to the next $10; other endings round down to $5 ($16 → $15, $17 → $20). Prices over $80 round once to the nearest multiple of $10 or $25; exact ties round up ($402 → $400, $145 → $150). PriceCharting's own price is only a fallback.</p>` : ''}`;
   }
 
   const showTyped = !!b.need || cur.typed != null;
@@ -3938,7 +3941,7 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · PriceCharting ${pcPrices}${gs}</div>
-        <div class="floor-rule">${toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
+        <div class="floor-rule">${b.renewedBasis ? floorReferenceText("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $25 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : floorReferenceText(tier.rule)}</div>
         ${shitbox ? `<span class="badge guide">${esc(shitbox)}: can go on the shelf at $5</span>` : ''}
         ${hw && !toy ? '<span class="badge info">Hardware: priced from sales, no game rules</span>' : ''}
         ${toyGroup === 'rare' ? '<span class="badge guide">Rare Skylander: $25 minimum</span>' : ''}
