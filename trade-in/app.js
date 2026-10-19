@@ -3051,7 +3051,7 @@ function floorToyFamily(product) {
 }
 const FLOOR_TOY_UNCOMMON = 1500;
 // Canonical labels shared by classification, catalog searches and sold-title matching.
-const FLOOR_SKY_VARIANTS = /\b(?:spring time|legendary|lightcore|dark|nitro|jade|enchanted|crystal|chase|metallic|glitter|flocked|chrome|clear|gold|silver|glow in the dark|power blue|jolly|winterfest|frightful|halloween|pumpkin|snowderdash|mystical|birthday bash|missile tow|love potion|heartbreaker|egg ?cited|steel plated|polar|royal|scarlet|molten|gnarly|granite|volcanic|quickdraw|punch|patina|bronze|pearl|exclusive|variant|elite|double dare|super shot|series [2-9]|purple|green|red|blue|white|black|pink|orange)\b/g;
+const FLOOR_SKY_VARIANTS = /\b(?:spring time|legendary|lightcore|dark|nitro|jade|enchanted|crystal|chase|metallic|glitter|flocked|chrome|clear|gold|silver|glow in the dark|power blue|jolly|winterfest|frightful|halloween|pumpkin|snowderdash|mystical|birthday bash|missile tow|love potion|heartbreaker|egg ?cited|steel plated|polar|royal|scarlet|molten|gnarly|granite|volcanic|quickdraw|punch|patina|bronze|pearl|exclusive|variant|elite|e3|employee|toy fair|big bang|double dare|super shot|series [2-9]|purple|green|red|blue|white|black|pink|orange)\b/g;
 function floorSkyText(text) {
   return norm(text).replace(/\bspringtime\b/g, 'spring time').replace(/\blight core\b/g, 'lightcore')
     .replace(/\bpowerblue\b/g, 'power blue').replace(/\beon s elite\b/g, 'elite')
@@ -3075,7 +3075,7 @@ function floorToyVariant(product) {
   // labels avoid mistaking Golden Queen for a gold finish.
   const sky = floorToyFamily(product) === 'skylanders';
   const labels = floorSkyVariants(name);
-  const rare = sky && (labels.some((v) => !/^(?:series [2-9]|double dare|super shot)$/.test(v)) || /\b(?:exclusive|variant)\b/i.test(suffix));
+  const rare = sky && (labels.some((v) => !/^(?:series [2-9]|big bang|double dare|super shot)$/.test(v)) || /\b(?:exclusive|variant)\b/i.test(suffix));
   const named = rare || /\b(?:lightcore|dark|nitro|jade|enchanted|crystal|exclusive|variant)\b/i.test(suffix)
     || /^(?:dark|nitro|jade|enchanted|crystal)\s/i.test(name);
   const unknown = sky && !!floorSkyText(suffix).replace(FLOOR_SKY_VARIANTS, '')
@@ -3446,8 +3446,8 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
         && String(p.id) !== String(product.id) && floorToyFamily(p) === 'skylanders'
         && floorSkyCharacter(p) === character).map((p) => [String(p.id), p])).values()]
         .sort((a, b) => floorSkyVariants(a['product-name']).length - floorSkyVariants(b['product-name']).length);
-      if (related.length > 8) errors.push('More than eight related entries found; additional pages need manual review');
-      pages.push(...related.slice(0, 8));
+      if (related.length > 16) errors.push('More than sixteen related entries found; additional pages need manual review');
+      pages.push(...related.slice(0, 16));
     } catch (err) { errors.push(`Related-entry search unavailable: ${err.message}`); }
   }
   for (const page of pages) {

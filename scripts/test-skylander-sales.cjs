@@ -15,14 +15,14 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
 (async () => {
   await test('special variants override low averages and saved common overrides', () => {
     const e = engine();
-    for (const name of ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy', 'Trigger Happy - Power Blue', 'Hoot Loop - Enchanted', 'Bash - Crystal', 'Hex - Giants, Lightcore', 'Dive Clops - Eggcited', 'Pop Fizz - Love Potion', 'Whirlwind - Polar', 'Royal Double Trouble', 'Scarlet Ninjini', 'Molten Hot Dog', 'Tree Rex - Gnarly']) {
+    for (const name of ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy', 'Trigger Happy - Power Blue', 'Hoot Loop - Enchanted', 'Bash - Crystal', 'Hex - Giants, Lightcore', 'Dive Clops - Eggcited', 'Pop Fizz - Love Potion', 'Whirlwind - Polar', 'Royal Double Trouble', 'Scarlet Ninjini', 'Molten Hot Dog', 'Tree Rex - Gnarly', 'Trigger Happy - E3, 2011']) {
       e.ctx.p = { ...product, 'product-name': name }; const g = e.run('floorToyGroup({product:p,condition:"new",toyGroup:"auto"})');
       assert.equal(g, 'rare', name);
       if (g === 'rare') assert.equal(e.run('floorResult({product:p,condition:"new",toyGroup:"common",typed:850,sales:{new:[]}}).r.price'), 2500);
     }
     e.ctx.p = { ...product, 'product-name': 'Bash - Unknown Finish' };
     assert.equal(e.run('floorToyGroup({product:p,condition:"new"})'), 'review');
-    for (const name of ['Golden Queen - Imaginators', 'Dark Creation Crystal', 'Water Creation Crystal', 'Fright Rider - Giants', 'Trigger Happy - Series 2', 'Super Shot Stealth Elf - Superchargers']) {
+    for (const name of ['Golden Queen - Imaginators', 'Dark Creation Crystal', 'Water Creation Crystal', 'Fright Rider - Giants', 'Trigger Happy - Series 2', 'Trigger Happy - Swap Force, Big Bang', 'Super Shot Stealth Elf - Superchargers']) {
       e.ctx.p = { ...product, 'product-name': name }; assert.equal(e.run('floorToyGroup({product:p,condition:"new"})'), 'common', name);
     }
   });
@@ -66,7 +66,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
   await test('related lookup is bounded and reports omitted pages', async () => {
     let calls = 0;
     const e = engine(async (route) => { calls++; return route === 'pc/products' ? { products: Array.from({ length: 20 }, (_, i) => ({ ...standard, id: String(i + 2) })) } : { sales: {} }; });
-    assert.match((await e.fetch()).salesError, /eight/); assert.equal(calls, 10);
+    assert.match((await e.fetch()).salesError, /sixteen/); assert.equal(calls, 18);
   });
   await test('ordinary games and Infinity do not search related character pages', async () => {
     const e = engine(async (route) => { assert.equal(route, 'pc/sales'); return { sales: { new: [sale('Example', 2000)] } }; });

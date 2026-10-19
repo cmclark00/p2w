@@ -679,7 +679,7 @@ The site's **only server-side code**. Everything else is static.
     Unknown catalog variant suffixes require review. Ordinary series/reposes
     do not automatically receive the rare floor; Golden Queen is a character.
     `fetchFloorProductSales` searches the same character's catalog entries,
-    checking up to eight related pages after the selected entry. Only exact
+    checking up to sixteen related pages after the selected entry. Only exact
     variant/character titles are recovered, within the original condition;
     new recovered sales must explicitly confirm new/sealed. Listings are
     deduplicated by eBay item ID, URL, or title/date/price. Source provenance
