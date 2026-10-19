@@ -4106,7 +4106,9 @@ function onFloorPricerClick(e) {
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();
-    $('#floorPricer [data-floor-field="typed"]')?.select();
+    const input = $('#floorPricer [data-floor-field="typed"]');
+    input?.focus({ preventScroll: true });
+    input?.select();
     return;
   }
   const row = e.target.closest('tr[data-sale]');
