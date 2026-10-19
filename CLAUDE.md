@@ -740,7 +740,12 @@ The site's **only server-side code**. Everything else is static.
     `fetchFloorProductSales` searches the same character's catalog entries,
     checking up to sixteen related pages after the selected entry. Only exact
     variant/character titles are recovered, within the original condition;
-    new recovered sales must explicitly confirm new/sealed. Listings are
+    new recovered sales must explicitly confirm new/sealed. Titles are
+    matched using canonical GITD/Glow in Dark aliases; generic chase wording
+    is allowed only alongside a confirmed named rare variant. Character pairs
+    stay excluded. Skylander condition checks distinguish Not Sealed from
+    sealed, including related-page recovery and Amazon title checks.
+    Listings are
     deduplicated by eBay item ID, URL, or title/date/price. Source provenance
     survives live display and audits. Failures/caps flag incomplete checks.
     Live pricing, saved rechecks and history audits share this helper.

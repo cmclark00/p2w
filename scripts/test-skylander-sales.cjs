@@ -13,6 +13,68 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Sonic Boom glow singles stay eligible while the screenshot bundles stay excluded', () => {
+    const e = engine();
+    e.ctx.p = { ...product, 'product-name': 'Sonic Boom - Giants, Glow in the Dark', 'loose-price': 977 };
+    const valid = [
+      'Skylanders Giants Glow In The Dark Sonic Boom',
+      'Skylanders Giants Glow in the Dark Sonic Boom Figure Chase Variant',
+      'Skylanders Giants MIB Sonic Boom (Glow-in-the-Dark Walmart exclusive)',
+      'Skylanders Giants Glow In The Dark Sonic Boom Complete In Box, Not Sealed',
+      'Skylanders Giants Sonic Boom GITD Chase Figure',
+      'Skylanders Giants Glow in Dark Sonic Boom Not Factory Sealed',
+      'Sonic Boom Glow in the Dark with original registration card',
+    ];
+    const invalid = [
+      'Skylanders Giants Rare Glow in Dark Figures Sonic Boom and Cynder',
+      "Skylander's Giants Glow in the Dark Figures. Glow in Dark Cynder and Sonic Boom",
+      "Skylander's Giants Bundle of 3 Glow in Dark Cynder, Sonic Boom and Cynder TESTED",
+      'Sonic Boom Glow in the Dark & Cynder',
+      'Sonic Boom Glow in the Dark with Cynder',
+      'Skylanders Giants Sonic Boom Chase Variant',
+      'Skylanders Giants Sonic Boom',
+      'Skylanders Giants Glow in the Dark Cynder',
+      'Sonic Boom Glow in the Dark Metallic Chase',
+      'Sonic Boom Glow in the Dark Sealed',
+      'Sonic Boom Glow in the Dark Box Only',
+      'Sonic Boom Glow in the Dark Preorder',
+    ];
+    e.ctx.cur = { product: e.ctx.p, condition: 'loose', sales: { loose: [...valid, ...invalid].map((t, i) => sale(t, i < valid.length ? 2400 : 9000, String(100000000000 + i))) } };
+    const rows = e.run('floorSales(cur)');
+    for (const t of valid) assert.equal(rows.find(s => s.title === t).odd, false, t);
+    for (const t of invalid) assert.equal(rows.find(s => s.title === t).odd, true, t);
+    assert.equal(e.run('floorResult(cur).r.price'), 2500);
+    e.ctx.title = valid[3];
+    assert.equal(e.run('floorOdd({title}, "new", null, p)'), true, 'Not Sealed cannot price new figures');
+    e.ctx.p = { ...product, 'product-name': 'Sonic Boom - Giants, Series 2' };
+    e.ctx.title = 'Sonic Boom Series 2 Chase';
+    assert.ok(e.run('floorListingMismatch(title,p)'), 'Generic chase cannot confirm an ordinary repose');
+  });
+  await test('used glow aliases are recovered from related pages without pairs or opened-as-new sales', async () => {
+    const p = { ...product, 'product-name': 'Sonic Boom - Giants, Glow in the Dark' };
+    const single = sale('Skylanders Sonic Boom Glow in Dark Chase Complete In Box Not Sealed', 2400);
+    const e = engine(async (route, params) => route === 'pc/products'
+      ? { products: [{ ...p, id: '2', 'product-name': 'Sonic Boom' }] }
+      : { sales: String(params.id) === '1' ? {} : { loose: [single, sale('Sonic Boom GITD and Cynder', 9000, '222222222222')], new: [single] } });
+    const result = await e.fetch(p);
+    assert.equal(result.sales.loose.length, 1);
+    assert.equal(result.sales.loose[0].price, 2400);
+    assert.equal(result.sales.new.length, 0);
+  });
+  await test('chase is descriptive only when the named rare variant is confirmed', () => {
+    const e = engine();
+    for (const [name, title] of [
+      ['Cynder - Giants, Glow in the Dark', 'Skylanders Cynder GITD Chase Variant'],
+      ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy Chase Variant Not Sealed'],
+      ['Bash - Crystal', 'Crystal Bash Chase Variant'],
+    ]) {
+      e.ctx.p = { ...product, 'product-name': name }; e.ctx.title = title;
+      assert.equal(e.run('floorListingMismatch(title,p)'), null, title);
+      assert.equal(e.run('floorOdd({title}, "loose", null, p)'), false, title);
+    }
+    e.ctx.p = { ...product, 'product-name': 'Bash' }; e.ctx.title = 'Bash Chase Variant';
+    assert.ok(e.run('floorListingMismatch(title,p)'));
+  });
   await test('special variants override low averages and saved common overrides', () => {
     const e = engine();
     for (const name of ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy', 'Trigger Happy - Power Blue', 'Hoot Loop - Enchanted', 'Bash - Crystal', 'Hex - Giants, Lightcore', 'Dive Clops - Eggcited', 'Pop Fizz - Love Potion', 'Whirlwind - Polar', 'Royal Double Trouble', 'Scarlet Ninjini', 'Molten Hot Dog', 'Tree Rex - Gnarly', 'Trigger Happy - E3, 2011']) {

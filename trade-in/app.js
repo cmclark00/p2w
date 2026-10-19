@@ -3097,6 +3097,7 @@ const FLOOR_TOY_UNCOMMON = 1500;
 const FLOOR_SKY_VARIANTS = /\b(?:spring time|legendary|lightcore|dark|nitro|jade|enchanted|crystal|chase|metallic|glitter|flocked|chrome|clear|gold|silver|glow in the dark|power blue|jolly|winterfest|frightful|halloween|pumpkin|snowderdash|mystical|birthday bash|missile tow|love potion|heartbreaker|egg ?cited|steel plated|polar|royal|scarlet|molten|gnarly|granite|volcanic|quickdraw|punch|patina|bronze|pearl|exclusive|variant|elite|e3|employee|toy fair|big bang|double dare|super shot|series [2-9]|purple|green|red|blue|white|black|pink|orange)\b/g;
 function floorSkyText(text) {
   return norm(text).replace(/\bspringtime\b/g, 'spring time').replace(/\blight core\b/g, 'lightcore')
+    .replace(/\b(?:gitd|glow in (?:the )?dark)\b/g, 'glow in the dark')
     .replace(/\bpowerblue\b/g, 'power blue').replace(/\beon s elite\b/g, 'elite')
     .replace(/\bno gold no glory\b/g, '').replace(/\beaster(?: egg)?\b/g, 'spring time')
     .replace(/\bspring edition\b/g, 'spring time edition').replace(/\begg cited\b/g, 'eggcited')
@@ -3129,8 +3130,16 @@ function floorToyListingMismatch(title, product) {
   if (!floorToyFamily(product)) return null;
   const name = product['product-name'] || '';
   if (floorToyFamily(product) === 'skylanders') {
-    if (floorSkyVariants(title).join('|') !== floorSkyVariants(name).join('|')) return 'Different or unconfirmed figure variant';
+    const wanted = floorSkyVariants(name);
+    const listed = floorSkyVariants(title).filter((v) => v !== 'chase' || wanted.includes('chase') || !wanted.length || !floorToyVariant(product).rare);
+    if (listed.join('|') !== wanted.join('|')) return 'Different or unconfirmed figure variant';
     if (/\b(?:[2-9]|\d{2,}|two|three|four|five)[\s-]*(?:pack|figures|characters)\b|\b(?:set of|lot of|choose|pick your)\b/i.test(title)) return 'Multiple figures or choice listing';
+    // Once aliases match, character pairs must still not become single-figure comps.
+    const character = floorSkyCharacter(product);
+    const parts = floorSkyText(floorBundleTitle(title).replace(/\s*[&+]\s*/g, ' and ')).split(/\b(?:and|with)\b/);
+    if (parts.length > 1 && parts.some((part) => (` ${part.trim()} `).includes(` ${character} `))
+      && parts.some((part) => !(` ${part.trim()} `).includes(` ${character} `)
+        && part.replace(FLOOR_SKY_VARIANTS, '').replace(/\b(?:skylanders?|s|spyro s adventure|giants|swap force|trap team|superchargers|imaginators|rare|figures?|characters?|chase|variant|tested|working|works|authentic|original|complete|in|box|cib|mib|mint|condition|very|good|excellent|used|new|sealed|not|fast|free|shipping)\b/g, '').trim())) return 'Multiple figures or choice listing';
     if (floorToyVariant(product).unknown) return 'Unrecognized figure variant needs review';
     return null;
   }
@@ -3269,8 +3278,11 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
 const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
-function floorOdd(sale, condition, rhythm = null) {
-  const t = sale.title;
+function floorOdd(sale, condition, rhythm = null, product = null) {
+  const sky = floorToyFamily(product) === 'skylanders';
+  // Opened packaging is valid used-figure evidence, not a sealed collectible.
+  const t = sky ? String(sale.title || '').replace(/\b(?:not|no longer)\s+(?:factory\s+)?sealed\b|\bnot\s+brand[ -]new\b/gi, 'opened') : sale.title;
+  if (sky && condition === 'new' && /\b(?:used|opened|unsealed|like new)\b/i.test(t)) return true;
   if (rhythm === 'bundle') {
     return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && SEALED_RE.test(t));
   }
@@ -3525,7 +3537,7 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
       for (const condition of conditions) {
         for (const sale of data?.sales?.[condition] || []) {
           const related = String(page.id) !== String(product.id);
-          if (related && (floorListingMismatch(sale.title, product) || floorOdd(sale, condition)
+          if (related && (floorListingMismatch(sale.title, product) || floorOdd(sale, condition, null, product)
             || (condition === 'new' && (!/\b(?:new|sealed|bnib|nib|nrfb)\b/i.test(sale.title) || /\b(?:used|opened|unsealed|like new)\b/i.test(sale.title))))) continue;
           const ebayId = String(sale.url || '').match(/(?:\/itm\/(?:[^/?]+\/)?|[?&]item=)(\d{9,15})\b/)?.[1];
           const key = `${condition}|${ebayId || (sale.url ? sale.url.split('?')[0] : `${norm(sale.title)}|${sale.date}|${sale.price}`)}`;
@@ -3602,7 +3614,7 @@ function floorSales(cur = floorCur) {
   const sales = (cur.sales?.[cur.condition] || []).map((s, i) => {
     const mismatch = floorListingMismatch(s.title, cur.product);
     return { ...s, i, mismatch,
-      odd: !!mismatch || floorOdd(s, cur.condition, rhythm) || s.price > cap || HOME_CONSOLE_RE.test(s.title) };
+      odd: !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title) };
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
@@ -3783,7 +3795,7 @@ function floorAmazonMismatch(cur) {
   if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);
   // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
-  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm)
+  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm, cur.product)
     || HOME_CONSOLE_RE.test(cur.amazon.title))) return 'Non-comparable item, bundle, or condition';
   if (/\b(?:digital code|download code|digital download)\b/i.test(cur.amazon.title)
     && !/\bdigital\b/i.test(cur.product?.['product-name'] || '')) return 'Digital variant';
