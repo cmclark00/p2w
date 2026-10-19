@@ -749,7 +749,9 @@ Guide (the Google Sheet tab).
    and condition; a direct eBay price feed awaits integration approval.
    **Type a different price**, its price field, and **Use automatic price** stay
    pinned beside the shelf price while editing on wider screens (beneath it on
-   phones). Compact spacing keeps all controls visible. The pinned controls stay at the top while scrolling the
+   phones). Desktop controls align horizontally in two rows, with condition and
+   manual controls beside the market links. Phones retain the stacked layout.
+   The pinned controls stay at the top while scrolling the
    game's sales, then leave with the pricing panel. Short badges flag
    excluded listings, outliers, incomplete checks, and prices needing review.
    Expand **Review notes**, **Market references**, **Pricing rules**, or

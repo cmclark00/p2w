@@ -500,6 +500,31 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-list .recheck.up { color: var(--green); }
 .floor-list .recheck.down { color: #ff8a99; }
 .floor-list .recheck .link { font-size: 0.8rem; color: var(--paper); }
+@media (min-width: 1001px) {
+  .floor-pinned-header {
+    display: grid; grid-template-columns: minmax(310px, 1fr) auto auto auto;
+    align-items: center; gap: 8px 14px; padding: 8px 0;
+  }
+  .floor-price-actions { display: contents; }
+  .floor-price-identity { grid-column: 1; grid-row: 1; }
+  .floor-price-actions .floor-price {
+    grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 12px;
+  }
+  .floor-price-value { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .floor-price-value .eyebrow { margin: 0; font-size: 0.68rem; }
+  .floor-price-value strong { font-size: 1.8rem; }
+  .floor-price-edit { display: flex; align-items: center; gap: 10px; margin: 0; }
+  .floor-typed { flex-direction: row; }
+  .floor-price-edit > .link { white-space: nowrap; font-size: 0.75rem; }
+  .floor-price-actions > .btn { grid-column: 3; grid-row: 1; }
+  .floor-price-actions > .icon-btn { grid-column: 4; grid-row: 1; }
+  .floor-pinned-condition {
+    grid-column: 1; grid-row: 2; display: flex; align-items: center; gap: 12px;
+  }
+  .floor-pinned-condition .seg { padding: 7px 10px; }
+  .floor-pinned-manual { white-space: nowrap; }
+  .floor-market-quick { grid-column: 2 / -1; grid-row: 2; align-items: center; }
+}
 @media (max-width: 800px) {
   .floor-body { grid-template-columns: 1fr; }
   .floor-result { order: -1; }
