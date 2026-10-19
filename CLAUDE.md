@@ -537,10 +537,19 @@ The site's **only server-side code**. Everything else is static.
     Amazon midpoint adjustment, scarcity markup, and modern Amazon
     comparison-only rule. Never use Amazon's median or higher offers.
     An unusually high lowest Amazon offer (>2x eBay/GameStop) is flagged
-    for review but remains a minimum. Wrong-product rhythm bundles are
+    for review but remains a minimum outside the high-value game exception. Wrong-product rhythm bundles are
     still excluded. PriceCharting's condition market price is a fallback
     only when all three references are missing; retail-sell is reference-only.
     Missing references and failed lookups remain visibly flagged.
+  - **High-value games (owner correction, Oct 19 2026):** when the highest
+    eligible condition-specific sale is at least $500 (`FLOOR_EXPENSIVE_GAME`),
+    `floorBasis()` uses `max(sale, GameStop)` and excludes both regular and
+    Renewed Amazon from the baseline and `referenceMin`. Amazon stays visible
+    as a reference. The threshold uses filtered sold evidence before adjustments
+    and rounding, not the catalog average or Amazon asking price. Staff-reviewed
+    sale selections can qualify; typed overrides remain unchanged. Specific
+    premiums, discounts, manual deductions and single final rounding still apply.
+    Hardware and all toys-to-life families retain their existing source rules.
   - **Tiers** (`FLOOR_TIERS`, PriceCharting console names, PAL/JP prefixes
     ignored) label systems; they no longer change the source calculation.
     Hardware follows the same maximum rule. Full-product lookup, sold

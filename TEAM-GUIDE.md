@@ -791,8 +791,16 @@ Guide (the Google Sheet tab).
      include it if warranted. **Back to the automatic price** excludes it
      again. The flag is a pricing warning, not proof that a listing was unsold.
      Review notes remain visible on saved lists and price re-checks.
+   - **High-value games ($500+ in eligible sold evidence):** use the highest
+     eligible PriceCharting sale, with the GameStop minimum. Amazon and
+     Renewed offers remain visible but do not set the price. For example,
+     a $1,300 sale and $1,700 Amazon offer give a $1,300 baseline. The cutoff
+     uses the selected condition's filtered sales before premiums or rounding,
+     not Amazon's asking price or PriceCharting's average. Specific premiums,
+     discounts, missing-manual deductions and final rounding still apply.
+     Consoles, accessories and toys-to-life figures keep their existing rules.
    - **Amazon's offers show on every game**, listed under the sales
-     (prices include shipping). Only the lowest matching offer affects
+     (prices include shipping). Outside the high-value game rule, only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
      For used/CIB items, if barcode and title/platform searches find no usable
      regular offer, the tool searches **Renewed** listings. A verified match

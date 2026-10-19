@@ -211,6 +211,59 @@ test('sold evidence leads on modern, retro and hardware even when PriceCharting 
     assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 2000);
   }
 });
+test('games at $500 in eligible sold evidence use sales instead of regular or Renewed Amazon', () => {
+  for (const name of ['Rule of Rose', 'Haunting Ground']) {
+    const product = { ...item, 'product-name': name, 'console-name': 'Playstation 2' };
+    for (const price of [49999, 50000, 130000]) {
+      for (const renewedFallback of [false, true]) {
+        const result = invoke('floorResult', cur(product, { sales: { cib: [{ title: `${name} complete`, price }] },
+          amazon: { found: true, offers: [{ price: 170000 }], renewedFallback } }));
+        const expensive = price >= 50000;
+        assert.equal(!!result.b.expensiveGameBasis, expensive);
+        assert.equal(result.b.basis, expensive ? price : 170000);
+        assert.equal(result.r.price, expensive ? price : 170000);
+        assert.equal(result.b.referenceMin, expensive ? price : 170000);
+        if (expensive) assert.equal(result.b.renewedBasis, false);
+      }
+    }
+  }
+});
+
+test('high-value games retain GameStop floors, specific premiums, manual deductions and one final rounding', () => {
+  const product = { ...item, 'gamestop-price': 60000 };
+  const example = cur(product, { sales: { cib: [{ title: 'Example Game complete', price: 57500 }] },
+    amazon: { found: true, offers: [{ price: 170000 }] } });
+  assert.equal(invoke('floorResult', example).r.price, 60000);
+  const old = json('settings.floorPremiums');
+  try {
+    context.highGamePremiums = [{ phrase: 'Example Game', pct: 10 }];
+    run('settings.floorPremiums = highGamePremiums');
+    assert.equal(invoke('floorResult', example).r.price, 65000);
+    context.highGamePremiums = [{ phrase: 'Example Game', pct: -10 }];
+    run('settings.floorPremiums = highGamePremiums');
+    assert.equal(invoke('floorResult', example).r.price, 55000);
+  } finally { context.restorePremiums = old; run('settings.floorPremiums = restorePremiums'); }
+  const missing = invoke('floorResult', { ...example, manualMissing: true });
+  assert.equal(missing.r.ded, 6000); assert.equal(missing.r.price, 55000);
+  assert.equal(invoke('floorResult', { ...example, typed: 52500 }).r.price, 55000);
+});
+
+test('high-value game threshold ignores rejected sales, does not use the catalog average, and excludes hardware and figures', () => {
+  const amazon = { found: true, offers: [{ price: 170000 }] };
+  const product = { ...item, 'cib-price': 130000 };
+  for (const sales of [{ cib: [] }, { cib: [{ title: 'Example Game complete', price: 40000 }] },
+    { cib: [{ title: 'Example Game Special Edition complete', price: 130000 }, { title: 'Example Game complete', price: 40000 }] },
+    { cib: [130000, 40000, 39000, 38000].map((price) => ({ title: 'Example Game complete', price })) }]) {
+    const result = invoke('floorResult', cur(product, { sales, amazon }));
+    assert.equal(!!result.b.expensiveGameBasis, false); assert.equal(result.b.basis, 170000);
+  }
+  for (const p of [{ ...item, 'product-name': 'Playstation 5 Console', 'console-name': 'Playstation 5', genre: 'Systems' },
+    { ...item, 'product-name': 'Bash - Legendary', 'console-name': 'Skylanders' }]) {
+    const result = invoke('floorResult', cur(p, { sales: { cib: [{ title: `${p['product-name']} complete`, price: 60000 }] }, amazon }));
+    assert.equal(!!result.b.expensiveGameBasis, false); assert.equal(result.b.basis, 170000);
+  }
+});
+
 test('a single high outlier cannot drive the price and odd editions do not support it', () => {
   const sales = { cib: Array.from({ length: 30 }, (_, i) => ({ title: 'Example Game complete', price: i === 0 ? 16000 : 1999, date: '2026-10-01' })) };
   sales.cib.push({ title: 'Example Game Steelbook', price: 20000, date: '2026-10-01' });
