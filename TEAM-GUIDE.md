@@ -739,6 +739,10 @@ Guide (the Google Sheet tab).
    GameStop pre-owned, PriceCharting for the selected condition, and Amazon.
    The market amounts are red for GameStop, green for PriceCharting, and blue
    for Amazon; other GameStop mentions use normal text colors.
+   Click a market reference to open its source in a new tab: PriceCharting's
+   product page, the matched Amazon listing (or search if none is found),
+   or GameStop's game search. **eBay sold** opens a search for the current game
+   and condition; a direct eBay price feed awaits integration approval.
    Manual-price controls sit below. The pinned controls stay at the top while scrolling the
    game's sales, then leave with the pricing panel. Short badges flag
    excluded listings, outliers, incomplete checks, and prices needing review.

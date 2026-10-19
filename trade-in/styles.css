@@ -446,8 +446,6 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .seg { font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--muted); background: var(--surface-2); border: 0; padding: 8px 16px; cursor: pointer; }
 .seg + .seg { border-left: 1px solid var(--line); }
 .seg.on { background: var(--red); color: #fff; }
-.floor-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; }
-.floor-links a { color: var(--paper); }
 .gamestop-market-price { color: #ff374a; font-weight: 700; }
 .pricecharting-market-price { color: var(--green); }
 .amazon-market-price { color: #79a7ff; }
@@ -477,7 +475,9 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 }
 .floor-price-context > .link { padding: 0; margin-bottom: 8px; font-size: 0.85rem; }
 .floor-market-quick { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; font-size: 0.85rem; color: var(--muted); }
-.floor-market-quick > span { white-space: nowrap; }
+.floor-market-quick > a, .floor-market-quick > span { white-space: nowrap; }
+.floor-market-quick > a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.floor-market-quick > a:hover { color: var(--paper); text-decoration-color: currentColor; }
 .floor-market-quick strong { font-variant-numeric: tabular-nums; }
 .floor-typed { max-width: 220px; margin: 10px 0; }
 .floor-review-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }

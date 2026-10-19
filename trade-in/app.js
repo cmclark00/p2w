@@ -3949,9 +3949,10 @@ function renderFloorPricer() {
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
-      <span>GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong></span>
-      <span>PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong></span>
-      <span>Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong></span>
+      <a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer" title="Search this game on GameStop (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ↗</a>
+      ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
+      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong> ↗</a>
+      <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
     </div>
     <div class="floor-price-context">
@@ -3987,12 +3988,6 @@ function renderFloorPricer() {
         ${toy === 'skylanders' ? `<option value="rare"${cur.toyGroup === 'rare' ? ' selected' : ''}>Rare variant — highest sale, $25 minimum</option>` : ''}
       </select></label>` : ''}
       ${cur.condition === 'cib' && !hw ? `<label class="check"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
-      <span class="floor-links">
-        <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer">eBay sold ↗</a>
-        <a href="${esc(links.gamestop)}" target="_blank" rel="noopener noreferrer">GameStop ↗</a>
-        <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a>
-        ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">PriceCharting ↗</a>` : ''}
-      </span>
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
