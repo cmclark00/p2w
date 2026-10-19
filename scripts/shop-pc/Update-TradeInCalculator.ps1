@@ -3,7 +3,7 @@
   Updates the shop PC's offline Trade-In Calculator (the TradeInCalculator folder) from the website.
 
 .DESCRIPTION
-  The calculator's front end (index.html, app.js, styles.css) and the TCG bulk rates
+  The calculator's front end (index.html, app.js, dead-games.js, styles.css) and the TCG bulk rates
   (assets/bulk-rates.json) must match the website's copies. Instead of copying them by hand after
   every change, run this script. It downloads each file to a temporary folder, checks it looks right,
   keeps a backup of the old one, and only then replaces it. Files that are already current are left
@@ -28,8 +28,9 @@ $ErrorActionPreference = 'Stop'
 
 # Each file, where it comes from, and text it must contain (so an error page is never installed).
 $files = @(
-  @{ Name = 'index.html';      Url = "$Site/trade-in/index.html";    Must = 'src="app.js"';     Dir = 'front' },
+  @{ Name = 'index.html';      Url = "$Site/trade-in/index.html";    Must = 'data-view="trade"'; Dir = 'front' },
   @{ Name = 'app.js';          Url = "$Site/trade-in/app.js";        Must = 'DEFAULT_SETTINGS'; Dir = 'front' },
+  @{ Name = 'dead-games.js';   Url = "$Site/trade-in/dead-games.js"; Must = 'P2WDeadGames';     Dir = 'front' },
   @{ Name = 'styles.css';      Url = "$Site/trade-in/styles.css";    Must = '#printArea';       Dir = 'front' },
   @{ Name = 'bulk-rates.json'; Url = "$Site/assets/bulk-rates.json"; Must = '"groups"';         Dir = 'assets' }
 )
@@ -86,7 +87,13 @@ try {
     $updated++
   }
 } finally {
-  Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+  # Only clean up this updater's exact temporary child directory.
+  $resolvedTemp = [IO.Path]::GetFullPath($temp)
+  $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+  if ([IO.Path]::GetDirectoryName($resolvedTemp) -eq $tempParent -and
+      [IO.Path]::GetFileName($resolvedTemp).StartsWith('p2w-tradein-')) {
+    Remove-Item -LiteralPath $resolvedTemp -Recurse -Force -ErrorAction SilentlyContinue
+  }
 }
 
 if ($updated) {

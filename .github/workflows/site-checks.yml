@@ -26,6 +26,8 @@ jobs:
         run: node .github/scripts/check_javascript.mjs
       - name: Check pricing and Amazon identity matching (offline)
         run: |
+          node scripts/update-dead-games.cjs --check
+          node scripts/test-dead-games.cjs
           node scripts/test-floor-pricing.cjs
           node scripts/test-amazon-matching.cjs
           node scripts/test-skylander-sales.cjs

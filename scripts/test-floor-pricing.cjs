@@ -12,10 +12,11 @@ const element = (selector) => {
     listeners: {}, addEventListener(type, handler) { this.listeners[type] = handler; }, focus() {}, scrollIntoView() {} });
   return elements.get(selector);
 };
-const context = vm.createContext({ console, Date, setTimeout, clearTimeout, crypto: require('node:crypto').webcrypto,
+const context = vm.createContext({ console, Date, URL, setTimeout, clearTimeout, crypto: require('node:crypto').webcrypto,
   localStorage: { getItem: () => null, setItem: () => {} },
   document: { querySelector: element, listeners: [], addEventListener(type, handler) { this.listeners.push({ type, handler }); } },
 });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../trade-in/dead-games.js'), 'utf8'), context);
 vm.runInContext(source.replace(/\binit\(\);\s*$/, ''), context);
 const run = (js) => vm.runInContext(js, context);
 const json = (js) => JSON.parse(JSON.stringify(run(js)));
@@ -566,7 +567,7 @@ test('settings migration retires the Killzone -45% rule without deleting other c
   for (const version of [7, 8, 9, 10]) {
     const saved = { version, floorPremiums: [retired, custom, pokemon] };
     const migrated = JSON.parse(JSON.stringify(invoke('mergeSettings', saved)));
-    assert.equal(migrated.version, 11);
+    assert.equal(migrated.version, 12);
     assert.deepEqual(migrated.floorPremiums, [custom, pokemon]);
     assert.equal(JSON.stringify(invoke('mergeSettings', migrated).floorPremiums), JSON.stringify([custom, pokemon]));
   }

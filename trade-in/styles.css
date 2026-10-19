@@ -54,7 +54,7 @@ code, kbd { font-family: ui-monospace, Consolas, monospace; font-size: 0.88em; b
 }
 .brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
 .brand img { height: 38px; width: auto; border-radius: 6px; }
-.tabs { display: flex; gap: 4px; background: var(--ink); padding: 4px; border-radius: 999px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; background: var(--ink); padding: 4px; border-radius: 18px; }
 .tabs button {
   border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 0.92rem;
   padding: 8px 16px; border-radius: 999px; cursor: pointer;
@@ -72,6 +72,42 @@ code, kbd { font-family: ui-monospace, Consolas, monospace; font-size: 0.88em; b
 .link { background: none; border: 0; color: var(--paper); text-decoration: underline; cursor: pointer; font: inherit; padding: 0 4px; }
 
 main { padding: 20px var(--gutter); }
+/* Console playability: labels always accompany colors. */
+.dead-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.dead-stat { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--surface); color: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: var(--radius); cursor: pointer; text-align: left; font: inherit; }
+.dead-stat strong { font: 700 2rem var(--font-display); }
+.dead-stat.selected { outline: 2px solid var(--paper); outline-offset: 2px; }
+.dead-filters { display: grid; grid-template-columns: 2fr 1fr 1.5fr auto; align-items: end; gap: 12px; }
+.dead-entries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.dead-card { border-top: 3px solid var(--gold); min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.dead-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
+.dead-card h2 { font-size: 1.25rem; margin: 0 0 5px; }
+.dead-label { font-size: .8rem; padding: 4px 8px; border: 1px solid currentColor; border-radius: 6px; color: var(--gold); }
+.dead-card dl { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 14px; font-size: .9rem; }
+.dead-card dt { color: var(--muted); }
+.dead-card dd { margin: 0; }
+.dead-sources { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .88rem; }
+.dead-sources a { color: var(--paper); text-underline-offset: 3px; }
+.dead-callout { padding: 12px 14px; margin: 10px 0; border-left: 3px solid var(--gold); background: var(--surface-2); border-radius: 5px; white-space: normal; font-size: .88rem; }
+.dead-unplayable { border-color: var(--red); }
+.dead-unplayable .dead-label { color: #ff8d9a; }
+.dead-offline { border-color: var(--green); }
+.dead-offline .dead-label { color: var(--green); }
+.dead-upcoming { border-color: #7ca2ff; }
+.dead-upcoming .dead-label { color: #a6bfff; }
+.dead-maintenance { margin-top: 20px; }
+.dead-maintenance summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 1000px) {
+  .dead-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dead-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .dead-entries, .dead-filters { grid-template-columns: minmax(0, 1fr); }
+  .dead-stat { display: block; padding: 12px; }
+  .dead-stat strong, .dead-stat span { display: block; }
+  .dead-card dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .dead-card dd { margin-bottom: 9px; }
+}
 .view { max-width: 1500px; margin: 0 auto; }
 
 /* ---------------------------------------------------------------- form controls */

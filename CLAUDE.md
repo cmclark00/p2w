@@ -458,6 +458,15 @@ the Konami leaderboard (`p2w-leaderboard`).
 
 ## Trade-in calculator (staff tool, `trade-in/`)
 
+**Dead Games register:** both-role tab, platform-scoped buying/shelf checks,
+JSON snapshot and safe local import route are documented in
+[DEAD-GAMES.md](DEAD-GAMES.md). Settings v12 migrates only the entire untouched
+legacy dead-game list; custom title-wide overrides remain independent.
+Evolve's offline evidence corrects the legacy default. No PHP route or live
+Page synchronization is added. Keep dead-games.json and its generated bundle
+dead-games.js in sync with the importer, and install the revised shop-PC
+updater so it fetches the new JavaScript dependency.
+
 The site's **only server-side code**. Everything else is static.
 
 - **Why PHP:** the PriceCharting API token must never reach a browser.

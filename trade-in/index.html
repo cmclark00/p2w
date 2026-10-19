@@ -19,6 +19,7 @@
       <button type="button" data-view="trade" class="active">Trade-In</button>
       <button type="button" data-view="bulk">TCG Bulk</button>
       <button type="button" data-view="floor">Floor Pricing</button>
+      <button type="button" data-view="dead">Dead Games</button>
       <button type="button" data-view="log">Trade Log</button>
       <button type="button" data-view="hardware">Hardware Prices</button>
       <button type="button" data-view="settings">Settings</button>
@@ -131,6 +132,43 @@
         </div>
         <button id="bulkAdd" type="button" class="btn primary" disabled>Add to trade</button>
       </div>
+    </section>
+
+    <!-- ============================================================ CONSOLE PLAYABILITY REGISTER -->
+    <section id="view-dead" class="view" hidden aria-labelledby="deadHeading">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Console playability register</span>
+          <h1 id="deadHeading">Dead Games</h1>
+          <p class="muted">Check the exact console and edition before buying or putting a game on the playable shelf. A closed server does not make a game dead if offline gameplay remains.</p>
+        </div>
+        <button type="button" id="deadExport" class="btn">Download register JSON</button>
+      </div>
+      <div id="deadSummary" class="dead-summary"></div>
+      <div class="panel">
+        <div class="dead-filters">
+          <label>Find a game or edition<input id="deadSearch" type="search" placeholder="Title, edition, revival or caveat" autocomplete="off"></label>
+          <label>Console<select id="deadPlatform"><option value="">All consoles</option></select></label>
+          <label>Classification<select id="deadCategory">
+            <option value="">All classifications</option>
+            <option value="unplayable">Unplayable on normal consoles</option>
+            <option value="conditional">Conditional / unofficial revival</option>
+            <option value="offline">Offline / single-player exclusions</option>
+            <option value="upcoming">Upcoming / needs verification</option>
+          </select></label>
+          <button id="deadClear" type="button" class="btn">Clear filters</button>
+        </div>
+        <p id="deadCount" class="muted" role="status" aria-live="polite"></p>
+      </div>
+      <div id="deadOverrides" class="dead-callout" hidden></div>
+      <p id="deadMetadata" class="muted"></p>
+      <div id="deadEntries" class="dead-entries"></div>
+      <details class="panel dead-maintenance">
+        <summary>Review history and maintaining this register</summary>
+        <div id="deadChanges"></div>
+        <p>Updates are reviewed snapshots. This website does not read the private ChatGPT register automatically. New coverage means an older finding was added here; only a verified effective closure is a new shutdown. Upcoming dates never change a classification automatically.</p>
+        <p>Give a maintainer the updated register JSON and evidence. The project importer previews changes, validates exact-console aliases and sources, then requires the current file hash before applying an update. Publishing the reviewed project update makes it available to staff. Downloading this file does not change settings or prices.</p>
+      </details>
     </section>
 
     <!-- ============================================================ FLOOR PRICING -->
@@ -378,15 +416,16 @@
         <h2>Game buying guide rules</h2>
         <label class="check"><input type="checkbox" name="guideEnabled"> Apply the buying guide automatically to games</label>
         <ul class="guide-summary muted">
-          <li><strong>Don't buy:</strong> PC games and the dead games below.</li>
+          <li><strong>Don't buy:</strong> PC games, exact editions confirmed unplayable in Dead Games, and independent title-wide overrides below. Conditional revivals need setup review before normal shelving.</li>
           <li><strong>Disc-only</strong> (Loose on a disc system): shitbox games $0.10 · under $10 $0.50 · $10–$20 $1.00 · over $20 priced normally.</li>
           <li><strong>Shitbox games in box</strong> (CIB or New) $0.25 when worth $20 or less.</li>
           <li><strong>Shitbox games:</strong> games needing an accessory, sports games (except the exceptions), and the listed titles. Staff can mark or unmark any game from its <em>+ Deduction</em> menu.</li>
           <li>Flat guide amounts are paid the same in cash and credit. One title or keyword per line in each box.</li>
         </ul>
         <div class="grid-3 guide-lists">
-          <label>Dead games (don't buy)
+          <label>Independent don't-buy overrides (all platforms)
             <textarea name="deadGames" rows="8"></textarea>
+            <span>Manager rules, separate from the sourced Dead Games register. A title here blocks matching editions on every platform; review conflicts such as Evolve before saving.</span>
           </label>
           <label>Needs-an-accessory keywords
             <textarea name="accessoryKeywords" rows="8"></textarea>
@@ -555,6 +594,7 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="stock-helper-client.js?v=20261019-chrome-stock"></script>
+  <script src="dead-games.js?v=20261019-register-1"></script>
   <script src="app.js?v=20261019-stock-floor"></script>
 </body>
 </html>

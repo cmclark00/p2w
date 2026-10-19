@@ -586,6 +586,23 @@ wins.
 
 ### Use the trade-in calculator <a id="trade-in-calculator"></a>
 
+**Dead Games tab:** available to staff and managers. Search a game and filter
+by console and classification; match the exact disc edition and read the
+source links, review/effective dates and setup limitations. Unplayable editions
+stay off playable shelves; conditional revivals need setup verification.
+Offline-playable exclusions such as Evolve remain separate, and future dates
+never automatically turn a game into a dead game. An absent title has not been
+verified.
+
+Floor Pricing holds exact unplayable/conditional editions from shelf lists
+and labels, while preserving existing saved prices. Independent manager
+**don't-buy overrides (all platforms)** stay in Settings and show conflicts
+in the tab. Only an entirely untouched old default list is replaced.
+See [Dead Games staff and maintenance guide](DEAD-GAMES.md) for the reviewed
+JSON import process and deployment steps. The website uses a dated snapshot:
+editing the source ChatGPT register alone does not update it. The shop PC
+needs the revised updater that also downloads dead-games.js.
+
 **What it is:** a staff-only page at **`play2wingames.com/trade-in/`**
 (bookmark it; it isn't linked anywhere and search engines are told to
 ignore it). It works out cash and store credit offers for every item.

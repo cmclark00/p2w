@@ -1,0 +1,809 @@
+/* Platform-scoped console playability register. Generated data comes from dead-games.json.
+   Import with node scripts/update-dead-games.cjs; never put credentials in this file. */
+(function (root) {
+  'use strict';
+  // BEGIN REGISTER DATA
+  const data = {
+  "schemaVersion": 1,
+  "revision": 1,
+  "updatedAt": "2026-10-19",
+  "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
+  "sourceSequence": 5,
+  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup.",
+  "changes": [
+    {
+      "date": "2026-10-19",
+      "type": "coverage",
+      "summary": "Initial website coverage of 23 curated register entries. Historical closures are newly listed here, not newly occurring shutdowns."
+    }
+  ],
+  "entries": [
+    {
+      "id": "anthem",
+      "title": "Anthem",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One"
+      ],
+      "aliases": [
+        "Anthem",
+        "Anthem Legion of Dawn Edition"
+      ],
+      "edition": "PlayStation 4 and Xbox One physical editions, including Legion of Dawn",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2026-01-12",
+      "effective": "12 January 2026",
+      "caveats": "Online-only; EA states the game is no longer playable after shutdown. Solo or private sessions were not offline modes. No released normal-console restoration verified.",
+      "sources": [
+        {
+          "label": "EA shutdown FAQ",
+          "url": "https://www.ea.com/security/news/anthem-game-update"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "babylons-fall",
+      "title": "Babylon’s Fall",
+      "platforms": [
+        "PlayStation 4",
+        "PlayStation 5"
+      ],
+      "aliases": [
+        "Babylon's Fall"
+      ],
+      "edition": "PlayStation 4 and PlayStation 5 physical editions",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2023-02-28",
+      "effective": "28 February 2023 UTC",
+      "caveats": "All gameplay became unavailable after service ended. No released console revival verified.",
+      "sources": [
+        {
+          "label": "Square Enix closure notice",
+          "url": "https://support.na.square-enix.com/news.php?drt=1663002000&id=18932&n=2&tag=4f0ff3f10a101be3386327747e14d7563eb10bf2"
+        },
+        {
+          "label": "developer game page",
+          "url": "https://www.platinumgames.com/works/babylons-fall"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "battleborn",
+      "title": "Battleborn",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One"
+      ],
+      "aliases": [
+        "Battleborn"
+      ],
+      "edition": "PlayStation 4 and Xbox One physical editions",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2021-01-31",
+      "effective": "31 January 2021",
+      "caveats": "The campaign is also unavailable. Battleborn Reborn is PC-only and does not restore these console editions. Publisher support page is currently unavailable; a physical PS4 test and contemporary closure reporting corroborate the loss of gameplay.",
+      "sources": [
+        {
+          "label": "Physical PS4 playability test",
+          "url": "https://www.doesitplay.org/game/Battleborn/ps4/PS4%20Pro?region=ESRB"
+        },
+        {
+          "label": "shutdown reporting",
+          "url": "https://www.psu.com/news/battleborn-is-officially-no-longer-playable-as-servers-shut-down/"
+        },
+        {
+          "label": "Battleborn Reborn FAQ",
+          "url": "https://steamcommunity.com/app/394230/discussions/5/4038103255309049964/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "concord",
+      "title": "Concord",
+      "platforms": [
+        "PlayStation 5"
+      ],
+      "aliases": [
+        "Concord"
+      ],
+      "edition": "PlayStation 5 physical edition",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2024-09-06",
+      "effective": "6 September 2024",
+      "caveats": "Official service ended. Community custom-server playtests were for PC, not a released PS5-disc restoration.",
+      "sources": [
+        {
+          "label": "PlayStation closure notice",
+          "url": "https://blog.playstation.com/?p=395540"
+        },
+        {
+          "label": "community PC-server announcement",
+          "url": "https://www.reddit.com/r/ConcordGame/comments/1owxnp4/concord_is_now_running_on_custom_servers/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "dcuo-ps3",
+      "title": "DC Universe Online",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "DC Universe Online"
+      ],
+      "edition": "PlayStation 3 physical edition only",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2018-01-31",
+      "effective": "31 January 2018",
+      "caveats": "PS3 service permanently closed; this online-only game has no offline mode. This closure does not apply to PS4 or newer editions.",
+      "sources": [
+        {
+          "label": "Publisher PS3 closure notice",
+          "url": "https://www.dcuniverseonline.com/news/dcuo-changes-coming-to-playstation-3-2017"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "defiance-ps3",
+      "title": "Defiance",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "Defiance"
+      ],
+      "edition": "PlayStation 3 original 2013 physical edition",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2021-04-29",
+      "effective": "29 April 2021",
+      "caveats": "Official PS3 service closed. The later Windows revival does not restore PS3 discs; console support has not been verified. Do not confuse this with Defiance 2050.",
+      "sources": [
+        {
+          "label": "Publisher shutdown notices",
+          "url": "https://steamcommunity.com/app/224600/allnews/"
+        },
+        {
+          "label": "revival publisher",
+          "url": "https://fawkesgames.com/en/defiance-news/defiance-revival-what-to-expect/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "defiance-x360",
+      "title": "Defiance",
+      "platforms": [
+        "Xbox 360"
+      ],
+      "aliases": [
+        "Defiance"
+      ],
+      "edition": "Xbox 360 original 2013 physical edition",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2020-05-25",
+      "effective": "25 May 2020",
+      "caveats": "Official Xbox 360 service closed. The later Windows revival does not restore Xbox 360 discs; console support has not been verified. Shutdown date is preserved in reporting of the publisher notice.",
+      "sources": [
+        {
+          "label": "Publisher notice reported by TrueAchievements",
+          "url": "https://www.trueachievements.com/n41662/defiance-xbox-360-servers"
+        },
+        {
+          "label": "revival publisher",
+          "url": "https://fawkesgames.com/en/defiance-news/defiance-revival-what-to-expect/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "ffxi-x360",
+      "title": "Final Fantasy XI",
+      "platforms": [
+        "Xbox 360"
+      ],
+      "aliases": [
+        "Final Fantasy XI",
+        "Final Fantasy XI Online"
+      ],
+      "edition": "Xbox 360 physical editions",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2016-03-31",
+      "effective": "31 March 2016",
+      "caveats": "Official console service ended. No public playable Xbox 360 revival verified. The Windows version is separate and remains outside this closure.",
+      "sources": [
+        {
+          "label": "Square Enix console-service notice",
+          "url": "https://support.na.square-enix.com/faqarticle.php?kid=74249&id=20&la=1"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "ffxiv-ps3",
+      "title": "Final Fantasy XIV: A Realm Reborn and Heavensward",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "Final Fantasy XIV A Realm Reborn",
+        "Final Fantasy XIV Heavensward"
+      ],
+      "edition": "PlayStation 3 packages only",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2017-06-16",
+      "effective": "16 June 2017",
+      "caveats": "PS3 service ended; no offline mode. Modern Final Fantasy XIV editions are not covered by this closure.",
+      "sources": [
+        {
+          "label": "Square Enix service notice",
+          "url": "https://na.finalfantasyxiv.com/lodestone/topics/detail/e9fbafe97c1042d749b57ca57cfd8ee1cc02518c"
+        },
+        {
+          "label": "closure schedule",
+          "url": "https://na.finalfantasyxiv.com/lodestone/topics/detail/80860d4b71d06a09f0deba11d0b4bb84c5dcc63c"
+        },
+        {
+          "label": "internet requirement",
+          "url": "https://support.na.square-enix.com/faqarticle.php?id=5382&kid=64537&page=1&sc=0"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "lawbreakers",
+      "title": "LawBreakers",
+      "platforms": [
+        "PlayStation 4"
+      ],
+      "aliases": [
+        "LawBreakers"
+      ],
+      "edition": "PlayStation 4 physical Limited Run edition",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2018-09-14",
+      "effective": "14 September 2018",
+      "caveats": "No offline or official console gameplay. The RELB revival is PC-only and its FAQ says PS4 support is not possible.",
+      "sources": [
+        {
+          "label": "LawBreakers Team shutdown notice",
+          "url": "https://steamcommunity.com/app/350280/discussions/0/1694923613875285953/"
+        },
+        {
+          "label": "RELB FAQ",
+          "url": "https://relb.org/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "paragon",
+      "title": "Paragon",
+      "platforms": [
+        "PlayStation 4"
+      ],
+      "aliases": [
+        "Paragon Essentials Edition"
+      ],
+      "edition": "PlayStation 4 Essentials Edition physical disc",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2018-04-26",
+      "effective": "26 April 2018",
+      "caveats": "Online-only service closed; no usable offline mode or released normal-console restoration verified. Project Legacy targets PC, not this PS4 disc. Predecessor is a separate successor, not a restoration of the disc. Epic documents the physical release and shutdown; a firsthand post-closure PS4-disc report corroborates the loss of gameplay, but is not a fresh Play2Win hardware test.",
+      "sources": [
+        {
+          "label": "Epic physical-disc announcement",
+          "url": "https://blog.playstation.com/2016/06/07/paragon-essentials-edition-hits-stores-today/"
+        },
+        {
+          "label": "Epic shutdown post preserved on Reddit",
+          "url": "https://www.reddit.com/r/paragon/comments/7t7734/paragon_to_close_on_april_26/"
+        },
+        {
+          "label": "PS Store online requirement preserved by Deku",
+          "url": "https://www.dekudeals.com/items/paragon"
+        },
+        {
+          "label": "Firsthand PS4-disc report",
+          "url": "https://www.reddit.com/r/paragon/comments/r777yz/"
+        },
+        {
+          "label": "Project Legacy representative: PC-only",
+          "url": "https://www.reddit.com/r/paragon/comments/1ggvmhh/community_qas_project_legacy/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "pvz-gw-ps3",
+      "title": "Plants vs. Zombies: Garden Warfare",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "Plants vs. Zombies Garden Warfare"
+      ],
+      "edition": "PlayStation 3 physical edition only",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2026-04-28",
+      "effective": "28 April 2026",
+      "caveats": "No offline mode after the PS3 service shutdown. This finding does not apply to PS4, Xbox 360, Xbox One or PC.",
+      "sources": [
+        {
+          "label": "EA shutdown FAQ",
+          "url": "https://forums.ea.com/blog/plants-vs-zombies-game-info-hub-en/service-update-garden-warfare-on-ps3/13229159"
+        },
+        {
+          "label": "EA service updates",
+          "url": "https://www.ea.com/legal/service-updates/i-q?isLocalized=true"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "rocket-arena",
+      "title": "Rocket Arena",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One"
+      ],
+      "aliases": [
+        "Rocket Arena"
+      ],
+      "edition": "PlayStation 4 and Xbox One physical editions",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2024-03-21",
+      "effective": "21 March 2024",
+      "caveats": "All gameplay requires the online service. RocketForever is a PC-only offline-bot project requiring PC installation files, not a console restoration.",
+      "sources": [
+        {
+          "label": "EA closure notice",
+          "url": "https://www.ea.com/games/rocket-arena/news/sunset-announcement"
+        },
+        {
+          "label": "EA Xbox One manual",
+          "url": "https://eaassets-a.akamaihd.net/eahelp/manuals/rocket-arena-xboxone-na.pdf"
+        },
+        {
+          "label": "RocketForever requirements",
+          "url": "https://github.com/SyST3MDeV/rocketforever"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "starblood-arena",
+      "title": "StarBlood Arena",
+      "platforms": [
+        "PlayStation 4"
+      ],
+      "aliases": [
+        "StarBlood Arena"
+      ],
+      "edition": "PlayStation 4 physical edition with PlayStation VR",
+      "category": "unplayable",
+      "classification": "Completely unplayable",
+      "closureDate": "2019-07-25",
+      "effective": "25 July 2019",
+      "caveats": "Solo modes also require online service. Sony’s specific shutdown statement says the game is unplayable after closure; do not apply a generic offline-games footer to this title. No released console revival verified.",
+      "sources": [
+        {
+          "label": "PlayStation online requirement",
+          "url": "https://store.playstation.com/en-us/concept/227196/"
+        },
+        {
+          "label": "Sony shutdown statement reproduced by Gematsu",
+          "url": "https://www.gematsu.com/2019/03/driveclub-driveclub-vr-and-driveclub-bikes-to-be-delisted-from-playstation-store-on-august-31"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "the-crew",
+      "title": "The Crew",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One",
+        "Xbox 360"
+      ],
+      "aliases": [
+        "The Crew"
+      ],
+      "edition": "Original 2014 game: PlayStation 4, Xbox One and Xbox 360 physical editions",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2024-03-31",
+      "effective": "31 March 2024",
+      "caveats": "Original game became inaccessible. The Crew Unlimited is an unofficial PC restoration, not a verified console-disc revival. Do not apply The Crew 2’s offline support to the original game.",
+      "sources": [
+        {
+          "label": "Ubisoft closure notice",
+          "url": "https://www.ubisoft.com/en-gb/game/the-crew/the-crew-2/news-updates/3u0la29yUBGBzYlwKp5QMZ"
+        },
+        {
+          "label": "The Crew Unlimited project",
+          "url": "https://thecrewunlimited.com/about/"
+        },
+        {
+          "label": "PC revival details",
+          "url": "https://www.pcgamer.com/games/racing/the-crew-is-set-to-spring-back-to-life-as-fan-made-server-emulator-project-prepares-to-launch-later-this-month/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "the-crew-wild-run",
+      "title": "The Crew: Wild Run",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One"
+      ],
+      "aliases": [
+        "The Crew Wild Run",
+        "The Crew Wild Run Edition",
+        "The Crew Complete Edition",
+        "The Crew Calling All Units"
+      ],
+      "edition": "PlayStation 4 and Xbox One Wild Run Edition; not Xbox 360",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2024-03-31",
+      "effective": "31 March 2024",
+      "caveats": "Depends on the original The Crew, whose service ended. Original-game Complete and Calling All Units bundles have the same base-game dependency. This does not cover The Crew 2 or Motorfest.",
+      "sources": [
+        {
+          "label": "Ubisoft closure notice",
+          "url": "https://www.ubisoft.com/en-gb/game/the-crew/the-crew-2/news-updates/3u0la29yUBGBzYlwKp5QMZ"
+        },
+        {
+          "label": "Ubisoft Wild Run platforms and dependency",
+          "url": "https://news.ubisoft.com/en-us/article/7oFYtMITvI8Ha4IQiQAYcs/the-crew-goes-wild-at-e3-2015"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "eqoa",
+      "title": "EverQuest Online Adventures / Frontiers",
+      "platforms": [
+        "PlayStation 2"
+      ],
+      "aliases": [
+        "EverQuest Online Adventures",
+        "EverQuest Online Adventures Frontiers"
+      ],
+      "edition": "PlayStation 2: original European/PAL disc and US Frontiers disc",
+      "category": "conditional",
+      "classification": "Officially closed; unofficial console revival",
+      "closureDate": "2012-03-29",
+      "effective": "Official services closed; final US closure 29 March 2012",
+      "caveats": "Sandstorm publicly supports these editions on real PS2 hardware, but requires a patched disc image or runtime cheats and compatible boot setup. It is not standard insert-disc play. The original pre-Frontiers US disc is explicitly unsupported by Sandstorm. Keep separate from ordinary playable stock pending setup verification.",
+      "sources": [
+        {
+          "label": "Sandstorm supported editions",
+          "url": "https://eqoa.live/"
+        },
+        {
+          "label": "PS2 and disc-specific setup",
+          "url": "https://eqoa.live/install.html"
+        },
+        {
+          "label": "closure anniversary",
+          "url": "https://www.projectreturnhome.com/PRHBlog/EQOA-6-Year-Shut-Down-Anniversary"
+        },
+        {
+          "label": "Sony closure notice reported by Shacknews",
+          "url": "https://www.shacknews.com/article/72671/soe-killing-four-mmos-in-march"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "ffxi-ps2",
+      "title": "Final Fantasy XI",
+      "platforms": [
+        "PlayStation 2"
+      ],
+      "aliases": [
+        "Final Fantasy XI",
+        "Final Fantasy XI Online"
+      ],
+      "edition": "PlayStation 2 physical editions",
+      "category": "conditional",
+      "classification": "Officially closed; experimental revival only",
+      "closureDate": "2016-03-31",
+      "effective": "31 March 2016",
+      "caveats": "No normal official play. An experimental real-PS2 revival requires HDD, patched disc image and self-hosted server, with known gameplay bugs. It is not standard retail-console play.",
+      "sources": [
+        {
+          "label": "Square Enix console-service notice",
+          "url": "https://support.na.square-enix.com/faqarticle.php?kid=74249&id=20&la=1"
+        },
+        {
+          "label": "PS2 revival requirements",
+          "url": "https://github.com/HAB3X/ffxi-2016-ps2"
+        },
+        {
+          "label": "experimental server project",
+          "url": "https://github.com/Project-Crystal-Server"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "mag",
+      "title": "MAG",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "MAG"
+      ],
+      "edition": "PlayStation 3 physical editions",
+      "category": "conditional",
+      "classification": "Officially closed; closed revival playtests",
+      "closureDate": null,
+      "effective": "Official service closed; exact date not verified here",
+      "caveats": "No offline mode. A developer reported closed PS3 revival playtesting on 15 September 2026; this is not a public restoration. Required console setup is unverified. Keep off normal playable shelves.",
+      "sources": [
+        {
+          "label": "PlayStation service notice",
+          "url": "https://www.playstation.com/en-us/legal/gameservers/"
+        },
+        {
+          "label": "developer playtest update",
+          "url": "https://www.reddit.com/r/mag/comments/1wh3ged/mag_server_project_now_in_closed_playtesting/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "socom-confrontation",
+      "title": "SOCOM: U.S. Navy SEALs Confrontation",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "SOCOM U.S. Navy SEALs Confrontation",
+        "SOCOM Confrontation"
+      ],
+      "edition": "PlayStation 3 physical editions",
+      "category": "conditional",
+      "classification": "Unofficial console revival; setup required",
+      "closureDate": null,
+      "effective": "Official service closed; community service available",
+      "caveats": "No offline or official service. PSRewired provides a PS3 route using custom DNS/network settings, with no firmware-modification step in its setup guide. Do not treat this as ordinary shelf-ready play without testing and explaining the community-service dependency.",
+      "sources": [
+        {
+          "label": "PlayStation service notice",
+          "url": "https://www.playstation.com/en-us/legal/gameservers/"
+        },
+        {
+          "label": "PSRewired supported games",
+          "url": "https://psrewired.com/"
+        },
+        {
+          "label": "PS3 setup",
+          "url": "https://psrewired.com/guides/ps3"
+        },
+        {
+          "label": "SOCOM HQ connection guide",
+          "url": "https://socomhq.com/connect-confrontation"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "evolve",
+      "title": "Evolve",
+      "platforms": [
+        "PlayStation 4",
+        "Xbox One"
+      ],
+      "aliases": [
+        "Evolve",
+        "Evolve Legacy"
+      ],
+      "edition": "Original or Legacy PlayStation 4 and Xbox One releases; PS4 Standard disc specifically tested",
+      "category": "offline",
+      "classification": "Playable offline; exclude from dead-game list",
+      "closureDate": null,
+      "effective": "Offline content remains after online shutdowns",
+      "caveats": "Solo and bot-based modes remain playable. The PS4 Standard disc test covers tutorials, Evacuation, Quick Play, Hunt, Defend, Nest and Rescue without a download. Publisher documents offline support on both consoles. DLC and Ultimate Edition entitlements are not verified.",
+      "sources": [
+        {
+          "label": "Publisher offline-content statement",
+          "url": "https://ir.take2games.com/static-files/1a12d810-dfa0-4db6-a99d-33de950974a6"
+        },
+        {
+          "label": "PS4 Standard disc test",
+          "url": "https://www.doesitplay.org/game/Evolve/ps4/Base%20PS4?region=ESRB&version=Standard"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "tmbo",
+      "title": "Twisted Metal: Black Online",
+      "platforms": [
+        "PlayStation 2"
+      ],
+      "aliases": [
+        "Twisted Metal Black Online"
+      ],
+      "edition": "PlayStation 2 separate Online disc, North American NTSC and European PAL releases; not the original Twisted Metal: Black disc",
+      "category": "offline",
+      "classification": "LAN multiplayer available; exclude from completely unplayable list",
+      "closureDate": null,
+      "effective": "Official servers closed 19 March 2007 (North America) and 30 June 2008 (Europe), per revival-project history",
+      "caveats": "The revival project documents built-in LAN multiplayer, but no story, endurance or same-console split-screen modes. Its unofficial online server supports both regional discs using a matching-region PS2 or PS2-compatible PS3, memory card, network profile and custom DNS. Verify the required network setup before selling as playable. The original Black disc’s offline modes are unaffected.",
+      "sources": [
+        {
+          "label": "Project FAQ: editions, LAN and hardware",
+          "url": "https://tmbosvr.com/tmbofaq.html"
+        },
+        {
+          "label": "Revival author’s setup details",
+          "url": "https://www.neogaf.com/threads/over-a-decade-later-twisted-metal-black-online-is-back-online.1159487/"
+        },
+        {
+          "label": "PSONE current revival listing",
+          "url": "https://www.psone.online/game/tmbo"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    },
+    {
+      "id": "destruction-allstars",
+      "title": "Destruction AllStars",
+      "platforms": [
+        "PlayStation 5"
+      ],
+      "aliases": [
+        "Destruction AllStars"
+      ],
+      "edition": "PlayStation 5 physical edition",
+      "category": "upcoming",
+      "classification": "Single-player remains for returning players; verify used-copy setup",
+      "closureDate": "2026-11-25",
+      "effective": "Remaining services scheduled to close 25 November 2026",
+      "caveats": "Multiplayer has closed. Sony says Arcade Mode single-player challenges remain playable for returning players after the remaining services close, although functionality may be affected. Fresh-install and new-owner behavior is not yet verified.",
+      "sources": [
+        {
+          "label": "PlayStation service notices",
+          "url": "https://www.playstation.com/en-us/legal/gameservers/"
+        }
+      ],
+      "reviewedAt": "2026-10-19",
+      "firstListed": "2026-10-19"
+    }
+  ]
+};
+  // END REGISTER DATA
+  const labels = { unplayable: 'Unplayable on normal consoles', conditional: 'Conditional / unofficial revival',
+    offline: 'Offline / single-player exclusions', upcoming: 'Upcoming / needs verification' };
+  const legacy = ['Final Fantasy XI', 'Final Fantasy XI Online', 'MAG', 'SOCOM U.S. Navy SEALs Confrontation', 'SOCOM Confrontation',
+    'Defiance', 'Lawbreakers', 'Starblood Arena', 'Battleborn', 'Evolve', "Babylon's Fall", 'The Crew',
+    'The Crew Wild Run Edition', 'Rocket Arena', 'Anthem', 'Concord'];
+  const key = (s) => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const platform = (s) => {
+    const p = key(s).replace(/^(pal|jp) /, '');
+    return ({ ps2: 'playstation 2', ps3: 'playstation 3', ps4: 'playstation 4', ps5: 'playstation 5',
+      xbox360: 'xbox 360', xboxone: 'xbox one' })[p] || p;
+  };
+  const dateOK = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
+    && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+  function validate(d) {
+    const fail = (s) => { throw new Error('Invalid Dead Games register: ' + s); };
+    const text = (s, max = 4000) => typeof s === 'string' && s.trim() && s.length <= max;
+    const urlOK = (s) => {
+      try { const u = new URL(s); return u.protocol === 'https:' && !u.username && !u.password; } catch { return false; }
+    };
+    if (!d || d.schemaVersion !== 1 || !Number.isSafeInteger(d.revision) || d.revision < 1) fail('schema / revision');
+    if (!dateOK(d.updatedAt) || !urlOK(d.sourceRegister) || !text(d.notice)) fail('metadata');
+    if (!Array.isArray(d.entries) || !d.entries.length || d.entries.length > 500) fail('entries');
+    const ids = new Set(), matches = new Set();
+    for (const e of d.entries) {
+      if (!e || !/^[a-z0-9-]{1,80}$/.test(e.id) || ids.has(e.id)) fail('duplicate / invalid id');
+      ids.add(e.id);
+      for (const f of ['title', 'edition', 'classification', 'effective', 'caveats']) if (!text(e[f])) fail(e.id + ': ' + f);
+      if (!Object.prototype.hasOwnProperty.call(labels, e.category)) fail(e.id + ': category');
+      if (!Array.isArray(e.platforms) || !e.platforms.length || e.platforms.some((p) => !text(p, 80))) fail(e.id + ': platforms');
+      if (!Array.isArray(e.aliases) || !e.aliases.length || e.aliases.some((a) => !text(a, 200) || !key(a))) fail(e.id + ': aliases');
+      if (!dateOK(e.reviewedAt) || !dateOK(e.firstListed) || e.reviewedAt > d.updatedAt || e.firstListed > d.updatedAt) fail(e.id + ': review / coverage dates');
+      if (e.closureDate !== null && !dateOK(e.closureDate)) fail(e.id + ': closure date');
+      if (e.category === 'unplayable' && (!e.closureDate || e.closureDate > e.reviewedAt)) fail(e.id + ': closure not yet verified');
+      if (!Array.isArray(e.sources) || !e.sources.length || e.sources.length > 20
+        || e.sources.some((s) => !s || !text(s.label, 300) || !urlOK(s.url))) fail(e.id + ': HTTPS evidence required');
+      for (const a of e.aliases) for (const p of e.platforms) {
+        const k = key(a) + '@' + platform(p);
+        if (matches.has(k)) fail('ambiguous title / platform: ' + k);
+        matches.add(k);
+      }
+    }
+    if (!Array.isArray(d.changes) || !d.changes.length || d.changes.length > 500) fail('change history');
+    for (const c of d.changes) {
+      if (!dateOK(c.date) || c.date > d.updatedAt || !['coverage', 'shutdown', 'status', 'correction', 'review'].includes(c.type)
+        || !text(c.summary) || (c.entryId && !/^[a-z0-9-]{1,80}$/.test(c.entryId))) fail('change event');
+      // Historical events survive later revivals/removals. The importer verifies
+      // newly appended shutdown events against the current exact-edition evidence.
+      if (c.type === 'shutdown' && !c.entryId) fail('shutdown entry id required');
+    }
+    return d;
+  }
+  validate(data);
+  // Exact aliases only. Unknown editions remain a manual review, never a broad title block.
+  function match(name, consoleName, d = data) {
+    const n = key(name), p = platform(consoleName);
+    return d.entries.find((e) => e.platforms.some((s) => platform(s) === p) && e.aliases.some((a) => key(a) === n)) || null;
+  }
+  function related(name, consoleName, d = data) {
+    const n = key(name), p = platform(consoleName);
+    return d.entries.filter((e) => e.platforms.some((s) => platform(s) === p)
+      && e.aliases.some((a) => n.startsWith(key(a) + ' ') || key(a).startsWith(n + ' ')));
+  }
+  function filter(query = '', system = '', category = '', d = data) {
+    const words = key(query).split(' ').filter(Boolean);
+    return d.entries.filter((e) => (!system || e.platforms.includes(system)) && (!category || e.category === category)
+      && words.every((w) => key([e.title, e.edition, e.caveats, e.classification, ...e.aliases, ...e.platforms].join(' ')).includes(w)));
+  }
+  function migrateLegacy(list) {
+    if (!Array.isArray(list)) return [];
+    const a = list.map(key).sort(), b = legacy.map(key).sort();
+    return JSON.stringify(a) === JSON.stringify(b) ? [] : list.slice();
+  }
+  function diff(before, after) {
+    const rows = [];
+    for (const e of after.entries) {
+      const old = before.entries.find((r) => r.id === e.id);
+      if (!old) rows.push({ type: 'coverage', id: e.id, title: e.title });
+      else if (JSON.stringify(old) !== JSON.stringify(e)) rows.push({ type: old.category !== e.category ? 'status' : 'review', id: e.id, title: e.title });
+    }
+    for (const e of before.entries) if (!after.entries.some((r) => r.id === e.id)) rows.push({ type: 'removed', id: e.id, title: e.title });
+    return rows;
+  }
+  const api = { data, labels, key, platform, validate, match, related, filter, migrateLegacy, diff, legacy };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.P2WDeadGames = api;
+})(globalThis);
+

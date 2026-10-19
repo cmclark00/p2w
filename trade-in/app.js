@@ -69,7 +69,7 @@ const SCRATCH_FREE_MAX = 50;
 
 // Pricing and rules from the shop's Game Buying Guide (Google Sheet) and pricing policy.
 const DEFAULT_SETTINGS = {
-  version: 11,
+  version: 12,
   defaultCondition: 'loose',
   rules: {
     game:      { basis: 'retail-buy', cashPct: GAME_CASH_PCT, creditPct: GAME_CREDIT_PCT },
@@ -161,11 +161,7 @@ const DEFAULT_SETTINGS = {
   ],
   guide: {
     enabled: true,
-    deadGames: [
-      'Final Fantasy XI', 'Final Fantasy XI Online', 'MAG', 'SOCOM U.S. Navy SEALs Confrontation', 'SOCOM Confrontation',
-      'Defiance', 'Lawbreakers', 'Starblood Arena', 'Battleborn', 'Evolve', "Babylon's Fall", 'The Crew',
-      'The Crew Wild Run Edition', 'Rocket Arena', 'Anthem', 'Concord',
-    ],
+    deadGames: [], // Independent manager overrides; curated restrictions are scoped in dead-games.js.
     lowValueTitles: ['Destiny'],
     accessoryKeywords: ['Kinect', 'PlayStation Move', 'EyeToy', 'Wii Fit', 'DJ Hero', 'Band Hero', 'SingStar', 'Karaoke'],
     sportsKeywords: ['Madden', 'FIFA', 'NBA', 'NFL', 'NHL', 'MLB', 'NCAA', 'PGA', 'Tiger Woods', 'NASCAR',
@@ -342,6 +338,13 @@ function mergeSettings(saved) {
     s.floorPremiums = s.floorPremiums.filter((p) => !(norm(p.phrase) === 'killzone shadow fall'
       && norm(p.system) === 'playstation 4' && Number(p.pct) === -45));
   }
+  // Version 12: replace only the entire untouched legacy list with the exact-console register.
+  // A customized list is independent shop policy and must never be silently discarded.
+  if ((Number(saved.version) || 0) < 12 && globalThis.P2WDeadGames) {
+    s.guide.deadGames = globalThis.P2WDeadGames.migrateLegacy(s.guide.deadGames);
+  }
+  // An incomplete offline update must not mark the legacy policy as already migrated.
+  if ((Number(saved.version) || 0) < 12 && !globalThis.P2WDeadGames) s.version = 11;
   return s;
 }
 
@@ -596,7 +599,9 @@ function guideCheck(line, s) {
   if (!g.enabled || line.source !== 'pc' || !isGameCat(line.category)) return null;
   if (/\bpc games?\b/.test(norm(line.platform))) return { dontBuy: true, note: "PC game – we don't buy PC games" };
   const title = baseTitle(line.name);
-  if (g.deadGames.some((t) => baseTitle(t) === title)) return { dontBuy: true, note: 'Dead game – do not buy' };
+  if (g.deadGames.some((t) => baseTitle(t) === title)) return { dontBuy: true, note: 'Manager title-wide override - do not buy' };
+  const dead = deadGameMatch(line.name, line.platform);
+  if (dead?.category === 'unplayable') return { dontBuy: true, note: `Confirmed unplayable on ${line.platform} - check Dead Games (${dead.reviewedAt})` };
 
   const reason = shitboxReason(line, g);
   const loose = line.prices?.['loose-price'];
@@ -1222,6 +1227,7 @@ function updateRow(tr, line) {
   $('[data-cell="credit"]', tr).innerHTML = offerCell(p.credit, line.qty);
 
   const flags = [];
+  if (isGameCat(line.category) && line.condition !== CASE_ONLY) flags.push(deadGameNotice(line.name, line.platform));
   if (p.cash == null) flags.push('<span class="badge warn">Needs a price</span>');
   if (p.dontBuy) flags.push(`<span class="badge danger">Don't buy: ${esc(p.guide.note)}</span>`);
   else if (p.flat) flags.push(`<span class="badge guide">Guide: ${esc(p.guide.note)}</span>`);
@@ -3936,6 +3942,12 @@ function floorResult(cur) {
   const hw = !!toy || floorIsHardware(p);
   const shitbox = hw ? null : autoShitboxReason({ name: p['product-name'], genre: p.genre });
   const b = floorBasis(cur);
+  const playability = !hw && deadGameMatch(p['product-name'], p['console-name']);
+  if (playability && ['unplayable', 'conditional'].includes(playability.category)) {
+    const note = playability.category === 'unplayable' ? 'Do not shelve as playable: confirmed unplayable on this console.'
+      : 'Hold from normal playable shelves: unofficial / conditional console setup needs verification.';
+    return { b: { ...b, need: note, checks: [...b.checks, `${note} ${playability.caveats}`] }, r: null, shitbox, premium: null, hw, toy, toyGroup, playability };
+  }
   const typed = b.from === 'typed';
   const premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
   const manualMissing = !hw && cur.condition === 'cib' && cur.manualMissing;
@@ -4004,7 +4016,7 @@ function renderFloorPricer() {
           ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>' : ''}
         </div>
       </div>
-      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
+      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
@@ -4015,6 +4027,7 @@ function renderFloorPricer() {
     </div>
     </div>
     <div class="floor-price-context">
+        ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
@@ -4113,6 +4126,7 @@ const floorBasisInfo = (b) => ({
 });
 
 function addFloorItem() {
+  if (!deadShelfReady([])) return;
   const cur = floorCur;
   const p = cur.product;
   const { b, r, hw } = floorResult(cur);
@@ -4200,7 +4214,7 @@ function recheckHtml(it) {
 function renderFloorList() {
   const items = floor.items;
   $('#floorBody').innerHTML = items.map((it) => `<tr data-id="${esc(it.id)}">
-      <td class="item"><div class="item-name">${pcLink(it.pcId, it.name)}</div></td>
+      <td class="item"><div class="item-name">${pcLink(it.pcId, it.name)}</div>${deadGameNotice(it.name, it.platform)}</td>
       <td>${esc(it.platform)}</td>
       <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td>
       <td class="muted">${it.basis != null ? `${esc(FROM_LABELS[it.from] || '')} ${money(it.basis)}` : '—'}${it.saleDate ? `<div class="sub">${esc(it.saleDate)}</div>` : ''}${floorReviewHtml(it)}</td>
@@ -4242,7 +4256,7 @@ async function recheckFloorPrices() {
       if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
       const gamestopStock = await fetchFloorGameStopStock(product, sold.gamestopUrl);
       const { b, r } = floorResult({ product, condition: it.condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, gamestopStock, pick: null, typed: null, amazon });
-      it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: 'no sales to go by' };
+      it.recheck = r ? { price: r.price, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: b.need || 'no sales to go by' };
     } catch (err) {
       it.recheck = { error: err.message };
     }
@@ -4280,6 +4294,7 @@ function useAllRechecks() {
 
 // Price labels on Avery 5160-size sheets (30 per letter page, 2⅝" × 1"), in list order.
 function printFloorLabels() {
+  if (!deadShelfReady(floor.items)) return;
   if (!floor.items.length) { toast('Nothing to print yet.'); return; }
   const labels = floor.items.map((it) => `<div class="label">
       <div class="label-name">${esc(it.name)}</div>
@@ -4337,6 +4352,7 @@ function floorListText() {
 }
 
 async function copyFloorList() {
+  if (!deadShelfReady(floor.items)) return;
   if (!floor.items.length) { toast('Nothing to copy yet.'); return; }
   try {
     await navigator.clipboard.writeText(floorListText());
@@ -4347,6 +4363,7 @@ async function copyFloorList() {
 }
 
 function printFloorList() {
+  if (!deadShelfReady(floor.items)) return;
   if (!floor.items.length) { toast('Nothing to print yet.'); return; }
   const rows = floor.items.map((it) => `<tr><td>${esc(it.name)}${it.manualMissing ? '<div class="sub">Manual missing</div>' : ''}</td><td>${esc(it.platform)}</td>
     <td>${esc(GAME_CONDITIONS[it.condition] || it.condition)}</td><td class="num">${money(it.price)}</td></tr>`).join('');
@@ -4507,7 +4524,7 @@ function wireFloor() {
   $('#floorUseAll').addEventListener('click', useAllRechecks);
 }
 
-const VIEWS = ['trade', 'bulk', 'floor', 'log', 'hardware', 'settings'];
+const VIEWS = ['trade', 'bulk', 'floor', 'dead', 'log', 'hardware', 'settings'];
 
 function showView(name) {
   currentView = name;
@@ -4521,10 +4538,12 @@ function showView(name) {
   }
   if (name === 'bulk') showBulk();
   if (name === 'floor') showFloor();
+  if (name === 'dead') showDeadGames();
   if (name === 'trade') { renderLines(); focusScan(); }
 }
 
 function wireEvents() {
+  wireDeadGames();
   wireFloor();
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
   $$('[data-goto]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.goto)));
@@ -4738,6 +4757,105 @@ function wireEvents() {
   });
 
   window.addEventListener('beforeunload', (e) => { if (hwDirty || settingsDirty) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+/* ================================================================== sourced console playability */
+function deadGameMatch(name, system) {
+  return globalThis.P2WDeadGames?.match(name, system) || null;
+}
+
+function deadGameNotice(name, system) {
+  const reg = globalThis.P2WDeadGames;
+  if (!reg) return '<div class="dead-callout">Playability register unavailable. Reload the calculator or update the shop-PC files before shelving.</div>';
+  const e = reg.match(name, system);
+  const nearby = !e && reg.related(name, system);
+  if (!e && !nearby.length) return '';
+  if (!e) return '<div class="dead-callout">Related Dead Games entry: this exact edition is not verified. Match the disc and console before shelving. <button type="button" class="link" data-dead-find="' + esc(nearby[0].title) + '">Check register</button></div>';
+  const action = { unplayable: 'Do not shelve as playable.', conditional: 'Hold for console/setup verification.',
+    offline: 'Offline gameplay remains; check the edition caveats.', upcoming: 'Verify used-copy setup; do not treat a future closure as unplayable today.' }[e.category];
+  return '<div class="dead-callout dead-' + esc(e.category) + '"><strong>' + esc(action) + '</strong> '
+    + esc(e.caveats) + ' <span class="muted">Reviewed ' + esc(e.reviewedAt) + '.</span> '
+    + '<button type="button" class="link" data-dead-find="' + esc(e.title) + '">Evidence &amp; edition</button></div>';
+}
+
+function showDeadGames() {
+  const reg = globalThis.P2WDeadGames;
+  if (!reg) {
+    $('#deadMetadata').textContent = 'Register unavailable. Update dead-games.js with the calculator frontend; no playability check has completed.';
+    $('#deadEntries').innerHTML = '';
+    $('#deadExport').disabled = true;
+    return;
+  }
+  const d = reg.data, category = $('#deadCategory').value;
+  $('#deadExport').disabled = false;
+  const systems = [...new Set(d.entries.flatMap((e) => e.platforms))].sort();
+  if ($('#deadPlatform').options.length === 1) {
+    $('#deadPlatform').innerHTML += systems.map((s) => '<option>' + esc(s) + '</option>').join('');
+  }
+  $('#deadSummary').innerHTML = Object.entries(reg.labels).map(([k, label]) =>
+    '<button type="button" class="dead-stat dead-' + k + (category === k ? ' selected' : '') + '" data-dead-category="' + k
+    + '" aria-pressed="' + (category === k) + '"><strong>' + d.entries.filter((e) => e.category === k).length
+    + '</strong><span>' + esc(label) + '</span></button>').join('');
+  const rows = reg.filter($('#deadSearch').value, $('#deadPlatform').value, category);
+  $('#deadCount').textContent = rows.length + ' of ' + d.entries.length + ' register entries. Counts describe entries, some covering several consoles.';
+  $('#deadMetadata').innerHTML = 'Snapshot revision ' + d.revision + ' · Updated ' + esc(d.updatedAt) + '. '
+    + esc(d.notice) + ' <a href="' + esc(d.sourceRegister) + '" target="_blank" rel="noopener noreferrer">Source register (access required)</a>';
+  $('#deadEntries').innerHTML = rows.length ? rows.map((e) =>
+    '<article class="panel dead-card dead-' + e.category + '"><div class="dead-card-head"><div><h2>' + esc(e.title)
+    + '</h2><div class="muted">' + esc(e.platforms.join(' · ')) + '</div></div><span class="dead-label">' + esc(reg.labels[e.category])
+    + '</span></div><p><strong>' + esc(e.classification) + '</strong></p><dl><dt>Exact edition</dt><dd>' + esc(e.edition)
+    + '</dd><dt>Closure / effective date</dt><dd>' + esc(e.effective) + '</dd><dt>Evidence reviewed</dt><dd>' + esc(e.reviewedAt)
+    + ' · First listed here ' + esc(e.firstListed) + '</dd></dl><p>' + esc(e.caveats)
+    + '</p><div class="dead-sources" aria-label="Evidence sources">' + e.sources.map((s) => '<a href="' + esc(s.url)
+    + '" target="_blank" rel="noopener noreferrer">' + esc(s.label) + '</a>').join('')
+    + '</div></article>').join('') : '<div class="panel"><h2>No entries match these filters</h2><p>Absence from the starter register does not verify playability. Clear filters or check the exact edition with a manager.</p></div>';
+  const overrides = settings.guide.deadGames || [];
+  $('#deadOverrides').hidden = !overrides.length && settings.guide.enabled;
+  const conflicts = overrides.filter((s) => d.entries.some((e) => e.category === 'offline'
+    && e.aliases.some((a) => baseTitle(a) === baseTitle(s))));
+  $('#deadOverrides').innerHTML = (overrides.length ? '<strong>Independent manager overrides are configured.</strong> They apply to matching titles on every platform when the buying guide is enabled, separately from this register: '
+    + overrides.map(esc).join(', ') + '.' : '')
+    + (conflicts.length ? '<p><strong>Conflict with offline-playable evidence:</strong> ' + conflicts.map(esc).join(', ')
+      + '. A manager must review this policy in Settings. No custom rule was removed.</p>' : '')
+    + (!settings.guide.enabled ? '<p>The buying guide is disabled; automatic trade-in restrictions are off. Shelf playability holds still apply.</p>' : '');
+  $('#deadChanges').innerHTML = '<ul>' + d.changes.slice().reverse().map((c) => '<li>' + esc(c.date) + ' · '
+    + esc({ coverage: 'New coverage', shutdown: 'Verified shutdown', status: 'Classification change', correction: 'Correction', review: 'Evidence review' }[c.type])
+    + ': ' + esc(c.summary) + '</li>').join('') + '</ul>';
+}
+
+function deadShelfReady(items) {
+  if (!globalThis.P2WDeadGames) {
+    toast('Playability register unavailable. Reload or update the shop-PC frontend before shelving.', 'error');
+    return false;
+  }
+  const held = items.filter((it) => ['unplayable', 'conditional'].includes(deadGameMatch(it.name, it.platform)?.category));
+  if (held.length) {
+    toast('Shelf hold: ' + held.map((it) => it.name + ' (' + it.platform + ')').join(', ') + '. Check Dead Games; saved prices were kept.', 'error');
+    return false;
+  }
+  return true;
+}
+
+function wireDeadGames() {
+  for (const id of ['deadSearch', 'deadPlatform', 'deadCategory']) {
+    $('#' + id).addEventListener(id === 'deadSearch' ? 'input' : 'change', showDeadGames);
+  }
+  $('#deadClear').addEventListener('click', () => {
+    $('#deadSearch').value = ''; $('#deadPlatform').value = ''; $('#deadCategory').value = ''; showDeadGames();
+  });
+  document.addEventListener('click', (e) => {
+    const cat = e.target.closest('[data-dead-category]');
+    if (cat) { $('#deadCategory').value = $('#deadCategory').value === cat.dataset.deadCategory ? '' : cat.dataset.deadCategory; showDeadGames(); }
+    const find = e.target.closest('[data-dead-find]');
+    if (find) { $('#deadSearch').value = find.dataset.deadFind; $('#deadCategory').value = ''; $('#deadPlatform').value = ''; showView('dead'); }
+  });
+  $('#deadExport').addEventListener('click', () => {
+    const d = globalThis.P2WDeadGames?.data;
+    if (!d) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2) + '\n'], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'p2w-dead-games-r' + d.revision + '.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 }
 
 /* ================================================================== login (website only) */
