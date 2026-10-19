@@ -294,7 +294,7 @@ test('reviewed outliers can be selected explicitly and returning to automatic ex
   assert.ok(selected.b.checks.some((s) => s.includes('Manually included possible high sale outlier')));
   run(`floorCur = ${JSON.stringify(example)}; renderFloorPricer();`);
   assert.ok(element('#floorPricer').innerHTML.includes('Possible high outlier'));
-  assert.ok(element('#floorPricer').innerHTML.includes('Back to the automatic price'));
+  assert.ok(element('#floorPricer').innerHTML.includes('Use automatic price'));
   context.autoEvent = { target: { closest: (selector) => selector === '[data-floor-act]' ? { dataset: { floorAct: 'auto' } } : null } };
   run('onFloorPricerClick(autoEvent);');
   assert.equal(run('floorCur.pick'), null); assert.equal(json('floorResult(floorCur)').b.basis, 1000);
