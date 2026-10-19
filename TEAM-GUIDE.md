@@ -733,7 +733,9 @@ Guide (the Google Sheet tab).
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
    The **Shelf price**, **Add to list**, and manual-price control appear
-   together below the game's name on desktop and mobile. Short badges flag
+   together below the game's name on desktop and mobile.
+   The price and action buttons stay pinned at the top while scrolling the
+   game's sales, then leave with the pricing panel. Short badges flag
    excluded listings, outliers, incomplete checks, and prices needing review.
    Expand **Review notes**, **Market references**, **Pricing rules**, or
    **Amazon match details** for the full explanation. **Add to list** stays

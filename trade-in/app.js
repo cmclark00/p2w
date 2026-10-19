@@ -3945,12 +3945,16 @@ function renderFloorPricer() {
       <div>
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · ${esc(GAME_CONDITIONS[cur.condition])}</div>
-        <div class="floor-price-actions">
+      </div>
+      <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="floor-price-actions" role="group" aria-label="Price and actions">
           <div class="floor-price"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
           <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting ? '' : ' disabled'}>Add to list</button>
           ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>'}
           ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Back to the automatic price</button>' : ''}
-        </div>
+    </div>
+    <div class="floor-price-context">
         <label class="floor-typed"${showTyped ? '' : ' hidden'}>Your price
           <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
         </label>
@@ -3972,8 +3976,6 @@ function renderFloorPricer() {
         ${rhythm === 'disc' ? '<span class="badge info">Disc only</span>' : ''}
         ${rhythm === 'bundle' ? '<span class="badge guide">With instruments · check included items</span>' : ''}
         ${premium ? `<span class="badge guide">${esc(premiumText(premium))}</span>` : ''}
-      </div>
-      <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-controls">
       <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
