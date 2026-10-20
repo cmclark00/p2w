@@ -24,6 +24,22 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
 > agreement content embedded). Use when it's time to print a clean
 > copy to sign.
 
+## Before editing: update first
+
+- Inspect `git status --short --branch` and the current branch before editing,
+  including uncommitted and untracked files. Fetch the latest GitHub state
+  with `git fetch origin main`; verify that the working branch is based on
+  the latest fetched `origin/main` before making changes.
+- Preserve all uncommitted/untracked work and other agents' changes, including
+  Dead Games register updates. Do not overwrite newer work with an older copy.
+- Never blindly pull into a dirty or diverged checkout, discard changes, run
+  `git reset --hard`, or force-push.
+- If the existing checkout cannot be updated safely, use a clean isolated
+  worktree based on the current `origin/main`, keeping existing work intact.
+- If fetching fails, the latest state cannot be verified, or conflicts prevent
+  safe integration, stop and report the branch, affected files and blocker
+  before editing a stale copy. Do not guess that a local checkout is current.
+
 ## Hosting & deploy
 
 - **LIVE on GoDaddy at `https://play2wingames.com` (hosting cutover done
