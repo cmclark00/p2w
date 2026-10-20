@@ -5,7 +5,7 @@ const manifest = JSON.parse(fs.readFileSync(root + 'manifest.json', 'utf8'));
 assert.equal(manifest.manifest_version, 3);
 assert.equal(manifest.permissions, undefined);
 assert.equal(manifest.host_permissions, undefined);
-assert.deepEqual(manifest.content_scripts.flatMap(s => s.matches), ['https://play2wingames.com/trade-in/*', 'https://www.gamestop.com/*products/*', 'https://gamestop.com/*products/*']);
+assert.deepEqual(manifest.content_scripts.flatMap(s => s.matches), ['https://play2wingames.com/trade-in/*', 'https://www.gamestop.com/*products/*', 'https://gamestop.com/*products/*', 'https://www.ebay.com/itm/*', 'https://ebay.com/itm/*']);
 const reader = vm.createContext({ chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} } } });
 vm.runInContext(fs.readFileSync(root + 'stock-reader.js', 'utf8'), reader);
 function button({ state = 'in', condition = 'Pre-Owned', sku = '930799', visible = true, disabled = state === 'out', label = state === 'out' ? 'Not Available' : 'Add to Cart', availability = state === 'out' ? 'Not Available' : 'In Stock' } = {}) {
@@ -62,7 +62,7 @@ const send = (message, from = sender) => new Promise(resolve => { const async = 
   vm.runInContext(fs.readFileSync(root + 'bridge.js', 'utf8'), bridge);
   vm.runInContext(fs.readFileSync('trade-in/stock-helper-client.js', 'utf8'), bridge);
   assert.equal((await pageWindow.P2WGameStopHelper.check(url)).state, 'out', 'Bridge returns browser result to the page');
-  assert.equal(listeners.size, 1, 'Per-request listeners are cleaned up');
+  assert.equal(listeners.size, 2, 'Per-request listeners are cleaned up');
   listeners.clear();
   assert.equal(await pageWindow.P2WGameStopHelper.check(url), null, 'Missing extension falls back without hanging');
   assert.equal(listeners.size, 0);

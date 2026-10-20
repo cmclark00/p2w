@@ -910,6 +910,16 @@ Guide (the Google Sheet tab).</p>
    disabled until the required price checks finish.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
+   - <strong>Original eBay checks:</strong> the updated Chrome Market Helper opens matching
+     listings in temporary background tabs and expands <strong>See original listing</strong>.
+     Ended listings, accepted offers and struck-through prices are excluded.
+     A verified sale must show the same USD amount and match the item/condition.
+     Blocked, missing or unclear pages stay <strong>Sale unverified</strong> and are excluded;
+     other sources and existing fallback rules remain available. The price waits
+     for checks to finish. <strong>Recheck sales</strong> retries them; recently checked results
+     are cached. Specific premiums and rare-figure minimums still apply.
+     Reload the updated helper at <code>chrome://extensions</code>, allow eBay item-page
+     access if prompted, then refresh the tool. It cannot run in the in-app browser.
    - <strong>Every system:</strong> compare the <strong>highest valid eBay sale</strong>, the
      <strong>lowest matching Amazon offer including shipping</strong>, and <strong>GameStop</strong>.
      The highest of those three numbers sets the baseline. Specific rules

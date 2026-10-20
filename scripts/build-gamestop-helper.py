@@ -4,8 +4,9 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 root = Path(__file__).resolve().parents[1]
 source = root / 'trade-in' / 'browser-helper'
-files = ['manifest.json', 'background.js', 'bridge.js', 'stock-reader.js', 'INSTALL.txt']
+files = ['manifest.json', 'background.js', 'bridge.js', 'stock-reader.js', 'ebay-background.js', 'ebay-reader.js', 'EBAY-UPDATE.txt']
 with ZipFile(root / 'trade-in' / 'gamestop-stock-helper.zip', 'w', ZIP_DEFLATED) as archive:
     for name in files:
         archive.write(source / name, 'play2win-gamestop-stock-helper/' + name)
+    archive.writestr('play2win-gamestop-stock-helper/INSTALL.txt', (source / 'EBAY-UPDATE.txt').read_text(encoding='utf-8'))
 print('Built trade-in/gamestop-stock-helper.zip')

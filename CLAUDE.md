@@ -693,6 +693,26 @@ The site's **only server-side code**. Everything else is static.
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
 
+  - **Original eBay sale verification:** Market Helper 1.1.0 adds only
+    ebay.com/itm/* content-script access. `ebay-background.js` validates sender,
+    HTTPS host and item ID; queues at most eight jobs with two inactive tabs,
+    a 25-second watchdog, and memory caching (known 24h, unknown 60s).
+    `ebay-reader.js` expands only See original listing and reads visible original
+    title/status/primary price. SOLD summary alone is insufficient. Accepted offers
+    and struck-through primary prices never supply a sale amount. Ambiguous or
+    blocked pages remain unknown; no cart, offer, bid or challenge actions.
+    `verifyFloorEbaySales` gates live pricing and saved rechecks, rechecks original
+    title/condition and exact USD cents against PriceCharting, excludes all
+    unverified prices, and waits before calculating. Existing specific premiums,
+    common-figure averages, rare minimums and rounding remain downstream unchanged.
+    Typed overrides remain deliberate overrides, but excluded rows cannot be
+    selected as sold comps. Condition changes isolate pending results. History
+    audit invokes the same helper and marks unavailable/unclear checks incomplete.
+    The helper currently requires a top-level pricing tab; audit iframes cannot
+    obtain its capability. Reload unpacked extension and pricing page after updating.
+    Build ZIP uses EBAY-UPDATE.txt for its install guide. Tests:
+    test-ebay-helper.cjs and test-ebay-verification.cjs.
+
   - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not
     carried) is one of the basis options for every tier, and
