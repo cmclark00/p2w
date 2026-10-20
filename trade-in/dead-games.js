@@ -5,11 +5,11 @@
   // BEGIN REGISTER DATA
   const data = {
   "schemaVersion": 1,
-  "revision": 5,
+  "revision": 6,
   "updatedAt": "2026-10-20",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
   "sourceSequence": 9,
-  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup. Reviewed subset of source sequence 9: Front Mission Online PS2 and Monster Hunter Frontier G Vita remain outside website coverage pending safe exact-edition matching.",
+  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup. Reviewed subset of source sequence 9: Front Mission Online PS2 remains outside website coverage pending safe retail/beta matching.",
   "changes": [
     {
       "date": "2026-10-19",
@@ -50,6 +50,12 @@
       "type": "coverage",
       "entryId": "monster-hunter-frontier-online-xbox360-beginners",
       "summary": "Added the Japanese Xbox 360 Beginner's Package retail game disc, JES1-00049; JAN 4976219034241; verified PriceCharting record 4400119. Released 24 June 2010 per Capcom, despite PriceCharting's incorrect 2007 date. Not the separate Online Trial Version Edition. Official service ended 1 August 2018. No normal retail-console gameplay or verified public Xbox 360 restoration. Historical coverage from source sequence 9, not a new shutdown. Front Mission Online PS2 and Monster Hunter Frontier G Vita are not imported."
+    },
+    {
+      "date": "2026-10-20",
+      "type": "coverage",
+      "entryId": "monster-hunter-frontier-g-vita",
+      "summary": "Added the Japanese Vita Beginner's Package card (VLJM-35137; JAN 4976219056304) after reconciling PriceCharting 2156539 by its cover/date and serial/JAN-linked sales against AmiAmi/CDJapan. This is cross-source identity inference, not a PriceCharting model/JAN field or a verified barcode route. Historical official closure on 18 December 2019; unofficial setup remains conditional and original-card compatibility is unverified. New coverage, not a new shutdown. Website covers 28 of source sequence 9's 29 rows; Front Mission Online PS2 remains excluded."
     }
   ],
   "entries": [
@@ -909,6 +915,55 @@
         {
           "label": "Exact PriceCharting edition: 4400119 (release date corrected from Capcom)",
           "url": "https://www.pricecharting.com/game/jp-xbox-360/monster-hunter-frontier-online-beginner%27s-package"
+        }
+      ],
+      "reviewedAt": "2026-10-20",
+      "firstListed": "2026-10-20"
+    },
+    {
+      "id": "monster-hunter-frontier-g-vita",
+      "title": "Monster Hunter Frontier G",
+      "platforms": [
+        "PlayStation Vita"
+      ],
+      "aliases": [
+        "Monster Hunter Frontier G",
+        "Monster Hunter Frontier G Beginner's Package"
+      ],
+      "edition": "Japanese PS Vita Beginner's Package game card, VLJM-35137; JAN 4976219056304; released 13 August 2014. PriceCharting 2156539 identity is a cross-source inference from its Beginner's Package cover, matching release date and sales-ledger links to VLJM-35137 and a JAN-bearing listing, reconciled with AmiAmi/CDJapan. PriceCharting itself has no model/JAN metadata fields populated. Other G-number packages and trial/beta clients are not covered.",
+      "category": "conditional",
+      "classification": "Officially closed; unofficial server support requires special setup",
+      "closureDate": "2019-12-18",
+      "effective": "Official Vita service ended 18 December 2019, 21:00 JST",
+      "caveats": "Online-only; no ordinary official-console gameplay remains. Erupe documents Vita support using unofficial server/client setup; exact original-card compatibility is unverified. Keep off ordinary playable shelves. Exclude free trial/beta clients, later G-number packages and other Monster Hunter games from this exact-edition finding. The catalog identity is reconciled across sources, not a working JAN barcode mapping: the live JAN lookup returned no product at review, so staff may need title search and exact package verification.",
+      "sources": [
+        {
+          "label": "Capcom final closure announcement",
+          "url": "https://prtimes.jp/main/html/rd/p/000001262.000013450.html"
+        },
+        {
+          "label": "Sony online-only description",
+          "url": "https://blog.ja.playstation.com/2019/01/31/20190131-mhfz/"
+        },
+        {
+          "label": "Physical package, cover, JAN and release date",
+          "url": "https://www.amiami.jp/top/detail/detail?gcode=GAME-0011553"
+        },
+        {
+          "label": "Package serial, JAN and release date",
+          "url": "https://www.cdjapan.co.jp/product/VLJM-35137"
+        },
+        {
+          "label": "Reconciled catalog 2156539: cover, release date and serial/JAN-linked sales",
+          "url": "https://www.pricecharting.com/game/jp-playstation-vita/monster-hunter-frontier-g"
+        },
+        {
+          "label": "Catalog-linked Beginner package listing with JAN 4976219056304",
+          "url": "https://www.ebay.com/itm/254561712823"
+        },
+        {
+          "label": "Erupe Vita support and unofficial setup",
+          "url": "https://github.com/Mezeporta/Erupe"
         }
       ],
       "reviewedAt": "2026-10-20",

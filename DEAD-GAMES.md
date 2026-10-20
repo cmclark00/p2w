@@ -37,14 +37,33 @@ Only the full Xbox Beginner's Package alias matches; generic Frontier Online,
 trial/beta, Season, Forward, Memorial and later G-number package names are
 outside these additions. The preceding 25 entries and handling policy survive.
 
-This is a reviewed subset of the 29-row source sequence 9, not full Page
-synchronization. Front Mission Online PS2 remains pending because the current
+At revision 5 this was a reviewed subset of the 29-row source sequence 9.
+Front Mission Online PS2 remained pending because the current
 title/console matcher cannot distinguish retail SLPM-65981 from beta SLPM-68514
 in its mixed catalog record. Monster Hunter Frontier G Vita (VLJM-35137;
-JAN 4976219056304) remains pending exact-edition catalog reconciliation:
+JAN 4976219056304) also remained pending exact-edition catalog reconciliation:
 candidate 2156539 has a Beginner's Package cover and matching release date,
 but no model/JAN fields, and the live JAN lookup returned no product. Neither
-pending row is imported or matched by this revision.
+pending row was imported or matched by that revision.
+
+Revision 6 adds only that Vita Beginner's Package card, bringing coverage to
+28 of source sequence 9's 29 rows. PriceCharting 2156539 is reconciled by its
+Beginner's Package cover (matching AmiAmi GAME-0011553), 13 August 2014 release
+date and sales-ledger links naming VLJM-35137 and eBay item 254561712823.
+That listing identifies JAN 4976219056304; CDJapan independently joins the
+serial, JAN and date. This is cross-source exact-edition inference, not a
+populated model/JAN field in PriceCharting. The barcode lookup limitation
+remains: use title search and verify the package when the JAN returns no
+product. The normal catalog title and full Beginner's Package alias match
+only on Vita; named beta/free trial, Memorial and later G-number packages do
+not match. Existing PS3/Wii U entries keep their independent evidence.
+
+Vita remains conditional after the 18 December 2019, 21:00 JST closure:
+Erupe documents platform support requiring unofficial server/client setup;
+exact original-card compatibility is unverified. Both staff warnings and
+ordinary shelf holds remain. The prior 27 entries, pricing and trade math are
+unchanged. Front Mission Online PS2 remains excluded pending safe retail/beta
+matching approval; this is still a reviewed subset, not full Page synchronization.
 
 - Unplayable: confirmed no normal-console gameplay; do not shelve that edition
   as playable. PC revivals do not restore console discs.
