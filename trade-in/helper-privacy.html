@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Helper Privacy | Play2Win Games</title>
+  <link rel="icon" href="../favicon.ico">
+  <style>body{margin:0;background:#111217;color:#f4f4f6;font:17px/1.65 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:48px 24px}h1,h2{line-height:1.2}h2{margin-top:32px;font-size:22px}a{color:#83bcff}.muted{color:#b7bbc6}</style>
+</head>
+<body><main>
+  <a href="helper.html">Play2Win Market Helper</a>
+  <h1>Extension privacy</h1>
+  <p class="muted">Effective October 20, 2026 · Play2Win Games</p>
+  <p>The Play2Win Market Helper extension checks market references for the Play2Win pricing tool. This notice covers the extension. The <a href="../privacy.html">website privacy policy</a> covers the website separately.</p>
+  <h2>What the helper reads</h2>
+  <p>The helper receives a GameStop product URL or an eBay item URL from a Play2Win trade-in page. It opens that listing in a temporary background tab and reads the product title, item identifier, visible stock or sale status, and, for a confirmed eBay sale, the displayed US-dollar price. It also handles temporary tab identifiers and check timestamps to route results and close its own tabs.</p>
+  <p>GameStop checks can run automatically during pricing. eBay checks run only when you request a selected sale check. On eBay, the helper may expand “See original listing” to read the original item. It does not buy, bid, submit offers, change carts, or message sellers.</p>
+  <h2>Where that information goes</h2>
+  <p>Results are passed locally to the requesting Play2Win page in your browser so that it can show market evidence and calculate recommendations. The extension does not upload results to an extension analytics service or a separate database, and includes no advertising or analytics SDKs. It does not sell this information or use it for advertising, creditworthiness, or lending decisions.</p>
+  <p>Opening a listing makes a normal HTTPS browser request to GameStop or eBay. Those sites receive ordinary browser request information, such as your IP address and any existing site cookies, and apply their own privacy policies. The helper does not read your cookies, passwords, payment information, personal messages, or general browsing history. Its page access is limited to Play2Win trade-in pages, GameStop product pages, and eBay item pages.</p>
+  <h2>Retention and control</h2>
+  <p>The extension keeps a bounded cache in service-worker memory, not permanent extension storage. Cached GameStop results are reused for up to 10 minutes and confirmed eBay results for up to 24 hours; inconclusive results have shorter reuse periods. Entries may remain in memory until evicted or the worker stops. The requesting page keeps check results for its current workflow. Any saved pricing records are handled by the Play2Win website, not an extension database.</p>
+  <p>Disable or remove the helper in Chrome’s extensions settings to stop its checks. Reload open Play2Win pages to clear their current check state. The helper closes only tabs it created.</p>
+  <h2>Contact</h2>
+  <p>Play2Win Games · 3903 Western Avenue, Knoxville, TN 37921<br><a href="mailto:inquiries@play2wingames.com">inquiries@play2wingames.com</a> · <a href="tel:+18659108357">865-910-8357</a></p>
+</main></body>
+</html>

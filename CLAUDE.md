@@ -694,6 +694,13 @@ The site's **only server-side code**. Everything else is static.
     display Check stock, never out-of-stock. Chrome installation is per profile;
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
+    Chrome Web Store preparation is documented in `trade-in/browser-helper/WEB-STORE.md`.
+    Helper 1.1.3 adds icons/homepage and reads its capability version from the manifest;
+    permissions and pricing behavior are unchanged. The builder's `--store-output`
+    option emits a separate root-manifest ZIP for upload. Store publication is separate
+    from website deployment; unpacked copies do not gain automatic updates. Public
+    `trade-in/helper.html` offers manual connection checks without staff credentials,
+    and `helper-privacy.html` describes the extension's scoped local data handling.
 
   - **Optional original eBay sale verification:** Market Helper 1.1.2 uses only
     ebay.com/itm/* content-script access. `ebay-background.js` validates sender,

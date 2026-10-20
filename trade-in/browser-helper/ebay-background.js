@@ -46,7 +46,7 @@ function pumpEbay() {
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: '1.1.2', protocol: 2 }); return false; }
+  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: chrome.runtime.getManifest().version, protocol: 2 }); return false; }
   if (message?.type === 'P2W_EBAY_CHECK' && pricingSender(sender)) {
     // Reject stale pricing pages/bridges that still launch automatic all-sales sweeps.
     if (message.protocol !== 2 || message.mode !== 'manual') { respond(ebayUnknown()); return false; }

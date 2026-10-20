@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Helper | Play2Win Games</title>
+  <meta name="description" content="Setup and connection checks for Play2Win Market Helper, the Chrome companion to Play2Win floor pricing.">
+  <link rel="icon" href="../favicon.ico">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#111217;color:#f4f4f6;font:16px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:48px 28px}header{display:flex;align-items:center;gap:20px;margin-bottom:28px}header img{width:96px;height:96px}h1{font-size:34px;line-height:1.15;margin:0 0 8px}h2{font-size:21px;margin:0 0 10px}p{margin:8px 0 16px}.muted{color:#b7bbc6}a{color:#83bcff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{background:#1b1d25;border:1px solid #343743;border-radius:14px;padding:24px}label{display:block;font-size:14px;color:#b7bbc6}input{width:100%;border:1px solid #4d5262;border-radius:7px;padding:10px;margin:5px 0 14px;background:#111217;color:white}button{font:inherit;font-weight:650;background:#d51c3c;color:white;border:0;border-radius:7px;padding:10px 16px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}output{display:block;margin-top:16px;color:#f4cd51;overflow-wrap:anywhere}footer{margin-top:28px;font-size:14px}@media(max-width:650px){.grid{grid-template-columns:1fr}h1{font-size:27px}main{padding:28px 20px}}
+  </style>
+</head>
+<body><main>
+  <header><img src="browser-helper/icons/icon-128.png" alt=""><div><h1>Play2Win Market Helper</h1><p class="muted">Market checks alongside your floor pricing.</p></div></header>
+  <p>Checks GameStop’s pre-owned online stock and the original status of a selected eBay sale. The helper opens a temporary background tab, reads the listing, and closes that tab.</p>
+  <p class="muted">Use this page in Chrome with the helper enabled. These connection checks need no staff login and do not change pricing rules. The staff pricing tool still requires its normal login.</p>
+  <div class="grid">
+    <section class="card"><h2>GameStop stock</h2><p>Read the matching product’s pre-owned Ship to Home controls.</p>
+      <label for="gs-url">GameStop product link</label><input id="gs-url" type="url" value="https://www.gamestop.com/products/lollipop-chainsaw---playstation-3/930799.html">
+      <button id="gs-check" type="button">Check stock</button><output id="gs-result" aria-live="polite">Ready to check.</output>
+    </section>
+    <section class="card"><h2>One eBay sale</h2><p>Check an original listing for a sale, an ended listing, or an accepted offer.</p>
+      <label for="ebay-url">eBay item link</label><input id="ebay-url" type="url" value="https://www.ebay.com/itm/334736933439?nordt=true&amp;rt=nc">
+      <button id="ebay-check" type="button">Check selected sale</button><output id="ebay-result" aria-live="polite">Ready to check.</output>
+    </section>
+  </div>
+  <footer><p>Never buys, bids, submits offers, or changes carts. Blocked or unclear pages remain unverified.</p><p><a href="./">Open staff pricing tool</a> · <a href="helper-privacy.html">Extension privacy</a> · <a href="mailto:inquiries@play2wingames.com">Support</a></p></footer>
+</main>
+<script src="stock-helper-client.js?v=20261019-ebay-handshake"></script>
+<script src="helper-demo.js"></script>
+</body></html>

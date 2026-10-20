@@ -1,4 +1,14 @@
-Play2Win Market Helper 1.1.2
+Play2Win Market Helper 1.1.3
+
+Chrome Web Store migration is being prepared; this ZIP is still the manual
+unpacked installation. It does not automatically update. Once the unlisted
+store link is available, remove the unpacked copy and install from that link
+once per Chrome profile. Later published store releases update through Chrome.
+Do not keep both copies enabled. Website deployment alone does not publish a
+new extension version to the Chrome Web Store.
+
+Connection checks: https://play2wingames.com/trade-in/helper.html
+Privacy: https://play2wingames.com/trade-in/helper-privacy.html
 
 Update the existing unpacked helper in Chrome at chrome://extensions:
 click Reload on Play2Win's helper, approve eBay item-page access if Chrome asks,

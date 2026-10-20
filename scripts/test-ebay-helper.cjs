@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const root = 'trade-in/browser-helper/';
+const manifest = JSON.parse(fs.readFileSync(root + 'manifest.json', 'utf8'));
 let readHandler, tick, now = 0, clicks = 0, timerCleared = false;
 const reader = vm.createContext({ URL, Date: { now: () => now },
   setInterval(fn) { tick = fn; return 1; }, clearInterval() { timerCleared = true; },
@@ -52,7 +53,7 @@ let handler, removedHandler, nextId = 10, created = [], removed = [], pending = 
 const background = vm.createContext({ URL, Date, Map,
   setTimeout(fn) { watchdogs.add(fn); return fn; }, clearTimeout(fn) { watchdogs.delete(fn); },
   pricingSender: s => s.url === sender.url && s.frameId === 0 && Number.isInteger(s.tab?.id),
-  chrome: { runtime: { onMessage: { addListener(h) { handler = h; } } }, tabs: {
+  chrome: { runtime: { getManifest: () => manifest, onMessage: { addListener(h) { handler = h; } } }, tabs: {
     create: async args => { created.push(args); return { id: nextId++ }; },
     remove: async id => { removed.push(id); },
     sendMessage: (id, message) => new Promise(resolve => pending.push({ id, message, resolve })),
@@ -65,7 +66,7 @@ const send = (message, from = sender) => new Promise(resolve => { if (!handler(m
 const check = id => send({ type: 'P2W_EBAY_CHECK', url: url(id), protocol: 2, mode: 'manual' });
 const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game PS4', state: 'sold', price: 1800, ...extra });
 (async () => {
-  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, '1.1.2');
+  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, manifest.version);
   assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).protocol, 2);
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, url: 'https://evil.test/' }), null);
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, frameId: 1 }), null);

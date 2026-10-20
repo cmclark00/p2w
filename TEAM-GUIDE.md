@@ -781,7 +781,15 @@ Guide (the Google Sheet tab).
    normal minimum. A priced GameStop stock check finishes before publishing the
    automatic recommendation. Specific premiums, deductions and rounding still apply.
    Saved-list rechecks and history comparisons also check availability.
-   **Automatic Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
+   **Chrome Web Store migration:** an unlisted listing is being prepared; it is
+   not published yet. The ZIP install below still needs manual updates. Once the
+   store link is supplied, remove the old unpacked copy and install the store
+   version once per Chrome profile. Keep only one helper enabled. Chrome will
+   then deliver future published extension updates automatically. Website deploys
+   and Web Store releases are separate. [Connection check and support](trade-in/helper.html)
+   · [Extension privacy](trade-in/helper-privacy.html).
+
+   **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose
    **Load unpacked** → the extracted folder containing `manifest.json`. Reload the
    pricing tool in that Chrome profile. The helper needs access only to Play2Win's
