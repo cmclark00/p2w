@@ -9,13 +9,13 @@ const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../trade-in/dead-g
 const clone = (s) => JSON.parse(JSON.stringify(s));
 let checks = 0;
 const test = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
-test('all 24 source-register entries and four categories survive generation', () => {
+test('all 25 source-register entries and four categories survive generation', () => {
   assert.deepEqual(reg.data, data);
-  assert.equal(data.revision, 3); assert.equal(data.sourceSequence, 6);
-  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [16, 5, 2, 1]);
+  assert.equal(data.revision, 4); assert.equal(data.sourceSequence, 7);
+  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [16, 6, 2, 1]);
   for (const e of data.entries) {
     assert.ok(e.sources.length);
-    assert.equal(e.reviewedAt, e.id === 'monster-hunter-frontier-g-ps3' ? '2026-10-20' : '2026-10-19');
+    assert.equal(e.reviewedAt, ['monster-hunter-frontier-g-ps3', 'phantasy-star-online-2-vita-special'].includes(e.id) ? '2026-10-20' : '2026-10-19');
   }
 });
 
@@ -37,6 +37,19 @@ test('every curated exact alias matches its own platform and category', () => {
     assert.equal(reg.match(a, p).id, e.id, a + ' @ ' + p);
     assert.equal(reg.match(a, 'PAL ' + p).id, e.id);
   }
+});
+
+test('PSO2 matches only the verified Vita Special Package and keeps Sega release and experimental caveats', () => {
+  const e = reg.match('Phantasy Star Online 2 [Special Package]', 'JP Playstation Vita');
+  assert.equal(e.id, 'phantasy-star-online-2-vita-special'); assert.equal(e.category, 'conditional');
+  for (const id of ['PCSG-00141', 'VLJM-35031', '4974365821111', '1179918', '28 February 2013']) assert.ok(e.edition.includes(id), id);
+  assert.equal(e.closureDate, '2020-09-16');
+  assert.match(e.caveats, /6\.1001\.2/); assert.match(e.caveats, /gameplay completeness and original-card compatibility are unverified/);
+  for (const [name, p] of [['Phantasy Star Nova', 'PlayStation Vita'], ['Phantasy Star Online 2', 'PlayStation Vita'],
+    ['Phantasy Star Online 2 New Genesis', 'PlayStation Vita'], ['Phantasy Star Online 2 Episode 2 Special Package', 'PlayStation Vita'],
+    ['Phantasy Star Online 2 Episode 4 Deluxe Package', 'PlayStation Vita'], ['Phantasy Star Online 2 Special Package Unknown Edition', 'PlayStation Vita'],
+    ['Phantasy Star Online 2 [Special Package]', 'PS4'], ['Phantasy Star Online 2 [Special Package]', 'PC Games'],
+    ['Phantasy Star Online 2 [Special Package]', 'PS3']]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
 });
 test('closures never leak across platforms, sequels, expansions or unknown editions', () => {
   for (const [name, p] of [['DC Universe Online', 'PlayStation 4'], ['Final Fantasy XIV Heavensward', 'PlayStation 4'],
@@ -188,7 +201,8 @@ test('real floor pricing holds only exact unplayable/conditional editions, even 
 });
 test('both rendered checkpoints prominently flag confirmed and special-setup exact editions', () => {
   const cases = [['Anthem','PS4'], ['MAG','PS3'], ['SOCOM Confrontation','PS3'],
-    ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2'], ['Monster Hunter: Frontier G','JP Playstation 3']];
+    ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2'], ['Monster Hunter: Frontier G','JP Playstation 3'],
+    ['Phantasy Star Online 2 [Special Package]','JP Playstation Vita']];
   ctx.policyRow = { classList: { toggle() {} }, querySelector: element, querySelectorAll: () => [] };
   for (const [name, platform] of cases) {
     ctx.policyLine = line(name, platform);
@@ -243,6 +257,27 @@ test('Evolve, other platforms and successor titles receive no automatic warning 
     assert.ok(call('floorResult',cur(name,platform)).r, name);
   }
 });
+
+test('PSO2 Special Package preserves trade overrides and saved prices while both checkpoints hold normal shelves', () => {
+  const name = 'Phantasy Star Online 2 [Special Package]', platform = 'JP Playstation Vita';
+  const l = line(name, platform);
+  assert.equal(call('guideCheck', l, run('settings')), null);
+  assert.ok(call('priceLine', l).cash > 0);
+  l.cashOverride = 777; ctx.policyLine = l; run('updateRow(policyRow, policyLine);');
+  assert.match(element('[data-cell="flags"]').innerHTML, /Trade-In checkpoint/);
+  assert.match(element('[data-cell="flags"]').innerHTML, /gameplay completeness and original-card compatibility are unverified/);
+  assert.equal(call('priceLine', l).cash, 777);
+  assert.equal(call('floorResult', cur(name, platform)).r, null);
+  run("floor.items = [{name:'Phantasy Star Online 2 [Special Package]',platform:'JP Playstation Vita',price:3000,recheck:{price:4000}}];");
+  run('printFloorLabels(); printFloorList(); copyFloorList(); useRecheck(floor.items[0]);');
+  assert.equal(run('floor.items[0].price'), 3000);
+  for (const [name, p] of [['Phantasy Star Nova', platform], ['Phantasy Star Online 2', platform],
+    ['Phantasy Star Online 2 New Genesis', platform], ['Phantasy Star Online 2 Episode 2 Special Package', platform],
+    ['Phantasy Star Online 2 [Special Package]', 'PS4'], ['Phantasy Star Online 2 [Special Package]', 'PC Games']]) {
+    for (const checkpoint of ['Trade-In', 'Pricing']) assert.equal(call('deadGameNotice', name, p, checkpoint), '', name);
+    assert.ok(call('floorResult', cur(name, p)).r, name);
+  }
+});
 test('LAN policy is separate from dead classification and blocks ordinary shelf labels/exports', () => {
   const name = 'Twisted Metal Black Online', platform = 'PS2';
   const e = reg.match(name,platform);
@@ -288,7 +323,7 @@ test('register UI renders counts, filters, source caveats and custom-policy conf
   assert.match(element('#deadEntries').innerHTML, /Sandstorm/);
   assert.match(element('#deadOverrides').innerHTML, /Conflict with offline-playable evidence/);
   element('#deadSearch').value = 'Evolve'; element('#deadCategory').value = 'offline'; run('showDeadGames();');
-  assert.match(element('#deadCount').textContent, /^1 of 24/);
+  assert.match(element('#deadCount').textContent, /^1 of 25/);
   element('#deadSearch').value = 'impossible'; run('showDeadGames();');
   assert.match(element('#deadEntries').innerHTML, /No entries match/);
   assert.ok(!call('deadGameNotice', '<img src=x onerror=alert(1)>', 'PS4').includes('<img'));

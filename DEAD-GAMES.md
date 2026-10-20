@@ -14,6 +14,15 @@ requires special setup and exact original-disc compatibility is unverified.
 Other Monster Hunter games, Frontier editions and download-code-only packages
 are outside this entry's coverage. The original 23 entries are unchanged.
 
+Revision 4 adds the Japanese 2013 PS Vita Phantasy Star Online 2 Special
+Package card from source sequence 7 (PCSG-00141 / VLJM-35031;
+JAN 4974365821111; PriceCharting 1179918), bringing coverage to 25 entries.
+The experimental patched-client/self-hosted server setup remains conditional;
+gameplay completeness and original-card compatibility are unverified. Sega's
+28 February 2013 release date takes precedence over PriceCharting's conflicting
+date. Nova, PS4/PC, New Genesis and unverified packages are not matched.
+The preceding 24 entries and staff handling policy are unchanged.
+
 - Unplayable: confirmed no normal-console gameplay; do not shelve that edition
   as playable. PC revivals do not restore console discs.
 - Conditional: unofficial console setups or closed playtests; hold from normal

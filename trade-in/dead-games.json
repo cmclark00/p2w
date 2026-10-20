@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "revision": 3,
+  "revision": 4,
   "updatedAt": "2026-10-20",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
-  "sourceSequence": 6,
+  "sourceSequence": 7,
   "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup.",
   "changes": [
     {
@@ -27,6 +27,12 @@
       "type": "coverage",
       "entryId": "monster-hunter-frontier-g-ps3",
       "summary": "Added the Japanese PS3 Monster Hunter Frontier G Beginner's Package disc (BLJM-60577; JAN 4976219051682), verified as PriceCharting 4562923. Historical official closure on 18 December 2019; unofficial PS3 server/client setup remains conditional and exact-disc compatibility is unverified. New coverage, not a new shutdown."
+    },
+    {
+      "date": "2026-10-20",
+      "type": "coverage",
+      "entryId": "phantasy-star-online-2-vita-special",
+      "summary": "Added the Japanese 2013 PS Vita Phantasy Star Online 2 Special Package card (PCSG-00141 / VLJM-35031; JAN 4974365821111; PriceCharting 1179918). Vita service ended on 16 September 2020; experimental unofficial patched-client/self-hosted setup remains conditional and original-card compatibility is unverified. New historical coverage, not a new shutdown."
     }
   ],
   "entries": [
@@ -769,6 +775,46 @@
         {
           "label": "Client/patch-server requirements",
           "url": "https://github.com/Mezeporta/Servers"
+        }
+      ],
+      "reviewedAt": "2026-10-20",
+      "firstListed": "2026-10-20"
+    },
+    {
+      "id": "phantasy-star-online-2-vita-special",
+      "title": "Phantasy Star Online 2",
+      "platforms": [
+        "PlayStation Vita"
+      ],
+      "aliases": [
+        "Phantasy Star Online 2 Special Package"
+      ],
+      "edition": "Japanese PS Vita 2013 Special Package game card, PCSG-00141 / box VLJM-35031; JAN 4974365821111; verified PriceCharting record 1179918. Released 28 February 2013 per Sega; other editions are not covered.",
+      "category": "conditional",
+      "classification": "Officially closed; experimental unofficial server setup documented",
+      "closureDate": "2020-09-16",
+      "effective": "Official Vita service ended 16 September 2020",
+      "caveats": "Sega confirms online-only play and the end of Vita service. No normal insert-card gameplay remains. PhantasyServer targets Vita client 6.1001.2 with a modified/patched client and self-hosted server; actual gameplay completeness and original-card compatibility are unverified. Keep off ordinary playable shelves. Do not apply this finding to Phantasy Star Nova, PS4/PC editions, New Genesis or other unverified packages. Sega's 28 February 2013 release date takes precedence over the conflicting PriceCharting date.",
+      "sources": [
+        {
+          "label": "Sega physical-card, release date and online-only notice",
+          "url": "https://pso2.jp/players/news/635/"
+        },
+        {
+          "label": "Sega completed Vita closure notice",
+          "url": "https://pso2.jp/players/news/25893/"
+        },
+        {
+          "label": "Experimental Vita server documentation",
+          "url": "https://github.com/PhantasyServer/phantasyserver"
+        },
+        {
+          "label": "Exact PriceCharting edition: 1179918",
+          "url": "https://www.pricecharting.com/game/jp-playstation-vita/phantasy-star-online-2-special-package"
+        },
+        {
+          "label": "Card/box identifiers",
+          "url": "https://renascene.com/psv/?page=114&sort=ID&target=title"
         }
       ],
       "reviewedAt": "2026-10-20",
