@@ -62,14 +62,17 @@ vm.runInContext(fs.readFileSync(root + 'ebay-background.js', 'utf8'), background
 const flush = () => new Promise(r => setImmediate(r));
 const url = id => `https://www.ebay.com/itm/${id}`;
 const send = (message, from = sender) => new Promise(resolve => { if (!handler(message, from, resolve)) resolve(null); });
-const check = id => send({ type: 'P2W_EBAY_CHECK', url: url(id) });
+const check = id => send({ type: 'P2W_EBAY_CHECK', url: url(id), protocol: 2, mode: 'manual' });
 const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game PS4', state: 'sold', price: 1800, ...extra });
 (async () => {
-  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, '1.1.1');
+  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, '1.1.2');
+  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).protocol, 2);
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, url: 'https://evil.test/' }), null);
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, frameId: 1 }), null);
   for (const bad of ['https://evil.test/itm/404870222598', 'http://ebay.com/itm/404870222598', 'https://user@ebay.com/itm/404870222598',
-    'https://ebay.com:123/itm/404870222598', 'https://ebay.com/sch/test', 'https://ebay.com/itm/123']) assert.equal((await send({ type: 'P2W_EBAY_CHECK', url: bad })).state, 'unknown');
+    'https://ebay.com:123/itm/404870222598', 'https://ebay.com/sch/test', 'https://ebay.com/itm/123']) assert.equal((await send({ type: 'P2W_EBAY_CHECK', url: bad, protocol: 2, mode: 'manual' })).state, 'unknown');
+  for (const stale of [{}, { protocol: 1, mode: 'manual' }, { protocol: 2, mode: 'automatic' }])
+    assert.equal((await send({ type: 'P2W_EBAY_CHECK', url: url('334736933439'), ...stale })).state, 'unknown');
   assert.equal(created.length, 0);
   const one = check('404870222598'), duplicate = check('404870222598'), two = check('404870222599'), three = check('404870222600');
   await flush(); assert.equal(created.length, 2); assert.ok(created.every(c => c.active === false));
@@ -97,6 +100,15 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   assert.equal(await pageWindow.P2WEbayHelper.available(), true);
   assert.equal((await pageWindow.P2WEbayHelper.check(url('404870222598'))).state, 'offer');
   assert.equal(listeners.size, 2, 'Request listeners cleaned up');
+  let oldRequests = 0;
+  bridge.chrome.runtime.sendMessage = async message => {
+    if (message.type === 'P2W_EBAY_CAPABILITY') return { available: true, version: '1.1.0' };
+    oldRequests++; return { state: 'unknown' };
+  };
+  assert.equal(await pageWindow.P2WEbayHelper.available(), false, 'Old helpers fail the capability handshake');
+  assert.equal((await pageWindow.P2WEbayHelper.check(url('334736933439'))).reason, 'helper-update-required');
+  assert.equal(oldRequests, 0, 'No tab-creating request is sent to an old helper, even through direct check()');
+  assert.equal(listeners.size, 2);
   listeners.clear(); assert.equal(await pageWindow.P2WEbayHelper.available(), false); assert.equal(listeners.size, 0);
   console.log('eBay original-listing parsing, expansion, timeout, URL/sender validation, two-tab queue, cache, cleanup and bridge checks passed.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

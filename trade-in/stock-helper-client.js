@@ -32,10 +32,14 @@ function ebayHelperRequest(type, url) {
     const probe = setTimeout(() => { if (!acknowledged) finish(null); }, 800);
     const deadline = setTimeout(() => finish({ state: 'unknown' }), type === 'P2W_EBAY_PING' ? 2500 : 28000);
     window.addEventListener('message', receive);
-    window.postMessage({ type, nonce, url }, location.origin);
+    window.postMessage({ type, nonce, url, protocol: 2, mode: 'manual' }, location.origin);
   });
 }
 window.P2WEbayHelper = {
-  available: async () => !!(await ebayHelperRequest('P2W_EBAY_PING'))?.available,
-  check: url => ebayHelperRequest('P2W_EBAY_REQUEST', url),
+  available: async () => { const helper = await ebayHelperRequest('P2W_EBAY_PING'); return !!helper?.available && helper.protocol === 2; },
+  async check(url) {
+    // An old installed worker must never receive a request that can create a tab.
+    if (!await window.P2WEbayHelper.available()) return { state: 'unknown', reason: 'helper-update-required' };
+    return ebayHelperRequest('P2W_EBAY_REQUEST', url);
+  },
 };

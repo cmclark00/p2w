@@ -3942,7 +3942,7 @@ function floorBasis(cur = floorCur) {
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
-  if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Review the original listing manually; PriceCharting pricing continues');
+  if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Reload Chrome Market Helper 1.1.2 or later and refresh the tool, or review the listing manually; normal pricing continues');
   if (sales.some(s => s.verification?.state === 'unknown')) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
   for (const state of ['ended', 'offer', 'price', 'mismatch']) {
     const count = sales.filter(s => s.verification?.state === state).length;
@@ -4153,7 +4153,7 @@ function renderFloorPricer() {
     <div class="floor-body">
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
-        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale — pricing stays available.' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}eBay check optional; select a sale to check it.`}${cur.ebayChecks?.unavailable ? ' Open the sale link to review manually.' : ''}</p>
+        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale — pricing stays available.' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}eBay check optional; select a sale to check it.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorAmazonHtml(cur, b)}
       </div>

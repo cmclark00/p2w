@@ -693,13 +693,16 @@ The site's **only server-side code**. Everything else is static.
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
 
-  - **Optional original eBay sale verification:** Market Helper 1.1.1 uses only
+  - **Optional original eBay sale verification:** Market Helper 1.1.2 uses only
     ebay.com/itm/* content-script access. `ebay-background.js` validates sender,
     HTTPS host and item ID; queues at most eight jobs with two inactive tabs,
     a 12-second watchdog, and memory caching (known 24h, unknown 60s).
     Canonical item URLs retain `?nordt=true&rt=nc`: removing these redirects
     expired listings to product/recommendation pages (reproduced on Gundam
     Battle Assault 2 item 334736933439). Tracking parameters are still dropped.
+    Protocol 2 handshake blocks older workers before any tab-creating request.
+    The worker requires protocol 2 plus manual mode, so old all-sales pages and
+    old bridges cannot keep opening tabs after the helper is reloaded.
     `ebay-reader.js` expands only See original listing and reads visible original
     title/status/primary price. SOLD summary alone is insufficient. Accepted offers
     and struck-through primary prices never supply a sale amount. Ambiguous or

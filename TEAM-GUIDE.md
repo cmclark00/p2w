@@ -814,6 +814,9 @@ Guide (the Google Sheet tab).
      must match the original item/condition and USD amount. Specific premiums
      remain unchanged. Reload the updated helper at `chrome://extensions`, then
      refresh the tool. Normal pricing and saved rechecks do not need the helper.
+     Chrome must show helper version **1.1.2** or later for optional eBay checks.
+     If old duplicate tabs keep opening, switch the helper off, refresh all open
+     pricing pages, reload the extension, turn it on, and refresh the tool again.
    - **Every system:** compare the **highest valid eBay sale**, the
      **lowest matching Amazon offer including shipping**, and **GameStop**.
      The highest of those three numbers sets the baseline. Specific rules

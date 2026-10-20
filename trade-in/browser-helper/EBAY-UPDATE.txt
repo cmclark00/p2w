@@ -1,10 +1,17 @@
-Play2Win Market Helper 1.1.1
+Play2Win Market Helper 1.1.2
 
 Update the existing unpacked helper in Chrome at chrome://extensions:
 click Reload on Play2Win's helper, approve eBay item-page access if Chrome asks,
 then refresh the pricing tool. This folder now contains the complete update.
 On another computer, replace the unpacked folder with the new downloaded ZIP
 contents before clicking Reload.
+
+If duplicate eBay product tabs are opening, switch the helper off first and
+refresh every open pricing-tool tab to stop an old sweep. Reload this extension,
+confirm Chrome shows version 1.1.2, turn it back on and refresh the pricing tool.
+Close the unwanted duplicate product tabs. The website cannot reload an installed
+Chrome extension for you. Version 1.1.2 rejects old automatic sweep requests;
+the updated website refuses eBay checks through an older installed helper.
 
 First installation: extract the ZIP, open chrome://extensions, turn on Developer
 mode, choose Load unpacked, and select the folder containing manifest.json.
