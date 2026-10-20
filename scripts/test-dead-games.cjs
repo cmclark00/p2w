@@ -9,13 +9,14 @@ const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../trade-in/dead-g
 const clone = (s) => JSON.parse(JSON.stringify(s));
 let checks = 0;
 const test = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
-test('all 25 source-register entries and four categories survive generation', () => {
+test('all 27 reviewed source-register entries and four categories survive generation', () => {
   assert.deepEqual(reg.data, data);
-  assert.equal(data.revision, 4); assert.equal(data.sourceSequence, 7);
-  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [16, 6, 2, 1]);
+  assert.equal(data.revision, 5); assert.equal(data.sourceSequence, 9);
+  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [17, 7, 2, 1]);
   for (const e of data.entries) {
     assert.ok(e.sources.length);
-    assert.equal(e.reviewedAt, ['monster-hunter-frontier-g-ps3', 'phantasy-star-online-2-vita-special'].includes(e.id) ? '2026-10-20' : '2026-10-19');
+    assert.equal(e.reviewedAt, ['monster-hunter-frontier-g-ps3', 'phantasy-star-online-2-vita-special',
+      'monster-hunter-frontier-g-wii-u', 'monster-hunter-frontier-online-xbox360-beginners'].includes(e.id) ? '2026-10-20' : '2026-10-19');
   }
 });
 
@@ -30,7 +31,31 @@ test('Frontier G matches only the verified PS3 disc names, preserving exact-edit
     ['Monster Hunter Frontier GG', 'PS3'], ['Monster Hunter Frontier G2', 'PS3'],
     ['Monster Hunter Frontier G [Download Code]', 'PS3'], ['Monster Hunter Frontier G Premium Package', 'PS3'],
     ['Monster Hunter Frontier G', 'PS4'], ['Monster Hunter Frontier G', 'PlayStation Vita'],
-    ['Monster Hunter Frontier G', 'Wii U'], ['Monster Hunter Frontier G', 'PC Games']]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
+    ['Monster Hunter Frontier G', 'PC Games']]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
+});
+test('Wii U and Xbox 360 match only their verified Beginner packages with independent classifications', () => {
+  const wii = reg.match('Monster Hunter: Frontier G', 'JP Wii U');
+  assert.equal(wii.id, 'monster-hunter-frontier-g-wii-u'); assert.equal(wii.category, 'conditional');
+  for (const id of ['WUP-P-AMFJ', '4976219051699', '4042087']) assert.ok(wii.edition.includes(id), id);
+  assert.match(wii.caveats, /through Z2/); assert.match(wii.caveats, /Exact original-disc compatibility is unverified/);
+  const xbox = reg.match("Monster Hunter Frontier Online [Beginner's Package]", 'JP Xbox 360');
+  assert.equal(xbox.id, 'monster-hunter-frontier-online-xbox360-beginners'); assert.equal(xbox.category, 'unplayable');
+  for (const id of ['JES1-00049', '4976219034241', '4400119', '24 June 2010']) assert.ok(xbox.edition.includes(id), id);
+  assert.match(xbox.caveats, /not the separate Online Trial Version Edition/);
+  assert.equal(wii.closureDate, '2018-08-01'); assert.equal(xbox.closureDate, '2018-08-01');
+  for (const [name, p] of [
+    ['Monster Hunter Frontier G Memorial Package', 'Wii U'], ['Monster Hunter Frontier G5', 'Wii U'],
+    ['Monster Hunter Frontier G6 Premium Package', 'Wii U'], ['Monster Hunter Frontier G Trial', 'Wii U'],
+    ['Monster Hunter Frontier G Beta', 'Wii U'], ['Monster Hunter Frontier Z', 'Wii U'],
+    ['Monster Hunter 3 Ultimate', 'Wii U'], ['Monster Hunter Frontier Online', 'Xbox 360'],
+    ['Monster Hunter Frontier Online Trial Version Edition', 'Xbox 360'],
+    ['Monster Hunter Frontier Online Season 9.0', 'Xbox 360'], ['Monster Hunter Frontier Online Forward.1', 'Xbox 360'],
+    ['Monster Hunter Frontier G', 'Xbox 360'], ["Monster Hunter Frontier Online Beginner's Package", 'PC Games'],
+    ['Monster Hunter Frontier G', 'PlayStation Vita'], ["Monster Hunter Frontier G Beginner's Package", 'PlayStation Vita'],
+    ['Front Mission Online', 'PS2'], ['Front Mission Online SLPM-65981', 'PS2'], ['Front Mission Online SLPM-68514', 'PS2'],
+  ]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
+  assert.match(data.notice, /Reviewed subset of source sequence 9/);
+  assert.match(data.notice, /Front Mission Online PS2 and Monster Hunter Frontier G Vita remain outside website coverage/);
 });
 test('every curated exact alias matches its own platform and category', () => {
   for (const e of data.entries) for (const a of e.aliases) for (const p of e.platforms) {
@@ -202,7 +227,8 @@ test('real floor pricing holds only exact unplayable/conditional editions, even 
 test('both rendered checkpoints prominently flag confirmed and special-setup exact editions', () => {
   const cases = [['Anthem','PS4'], ['MAG','PS3'], ['SOCOM Confrontation','PS3'],
     ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2'], ['Monster Hunter: Frontier G','JP Playstation 3'],
-    ['Phantasy Star Online 2 [Special Package]','JP Playstation Vita']];
+    ['Phantasy Star Online 2 [Special Package]','JP Playstation Vita'],
+    ['Monster Hunter: Frontier G','JP Wii U'], ["Monster Hunter Frontier Online [Beginner's Package]",'JP Xbox 360']];
   ctx.policyRow = { classList: { toggle() {} }, querySelector: element, querySelectorAll: () => [] };
   for (const [name, platform] of cases) {
     ctx.policyLine = line(name, platform);
@@ -210,10 +236,34 @@ test('both rendered checkpoints prominently flag confirmed and special-setup exa
     const tradeHTML = element('[data-cell="flags"]').innerHTML;
     assert.match(tradeHTML, /Trade-In checkpoint/);
     assert.match(tradeHTML, /Do not buy or sell as ordinarily playable/);
-    if (name !== 'Anthem') assert.match(tradeHTML, /not normally playable - unofficial or special setup/);
+    if (reg.match(name, platform).category === 'conditional') assert.match(tradeHTML, /not normally playable - unofficial or special setup/);
     ctx.policyCurrent = cur(name, platform); run('floorCur = policyCurrent; renderFloorPricer();');
     assert.match(element('#floorPricer').innerHTML, /Pricing checkpoint/);
     assert.match(element('#floorPricer').innerHTML, /data-floor-act="add" disabled/);
+  }
+});
+test('new Wii U and Xbox packages preserve offer rules, saved prices and exact-edition shelf holds', () => {
+  for (const [name, platform, confirmed] of [['Monster Hunter: Frontier G', 'JP Wii U', false],
+    ["Monster Hunter Frontier Online [Beginner's Package]", 'JP Xbox 360', true]]) {
+    const l = line(name, platform);
+    assert.equal(!!call('guideCheck', l, run('settings'))?.dontBuy, confirmed);
+    assert.equal(call('priceLine', l).cash === 0, confirmed);
+    l.cashOverride = 777; assert.equal(call('priceLine', l).cash, 777);
+    run('settings.guide.enabled = false;');
+    ctx.policyLine = l; run('updateRow(policyRow, policyLine);');
+    assert.match(element('[data-cell="flags"]').innerHTML, /Trade-In checkpoint/);
+    assert.equal(call('priceLine', l).cash, 777);
+    assert.equal(call('floorResult', cur(name, platform)).r, null);
+    run('settings.guide.enabled = true;');
+    ctx.packageSaved = [{name, platform, price:3000, recheck:{price:4000}}];
+    run('floor.items = packageSaved; printFloorLabels(); printFloorList(); copyFloorList(); useRecheck(floor.items[0]);');
+    assert.equal(run('floor.items[0].price'), 3000);
+  }
+  for (const [name, p] of [['Monster Hunter Frontier G Memorial Package', 'Wii U'],
+    ['Monster Hunter Frontier G5', 'Wii U'], ['Monster Hunter Frontier Online Trial Version Edition', 'Xbox 360'],
+    ['Monster Hunter Frontier Online', 'Xbox 360'], ['Monster Hunter Frontier G', 'PlayStation Vita']]) {
+    for (const checkpoint of ['Trade-In', 'Pricing']) assert.equal(call('deadGameNotice', name, p, checkpoint), '', name);
+    assert.ok(call('floorResult', cur(name, p)).r, name);
   }
 });
 test('conditional flags remain visible with guide disabled and typed offers, without changing cash', () => {
@@ -323,7 +373,7 @@ test('register UI renders counts, filters, source caveats and custom-policy conf
   assert.match(element('#deadEntries').innerHTML, /Sandstorm/);
   assert.match(element('#deadOverrides').innerHTML, /Conflict with offline-playable evidence/);
   element('#deadSearch').value = 'Evolve'; element('#deadCategory').value = 'offline'; run('showDeadGames();');
-  assert.match(element('#deadCount').textContent, /^1 of 25/);
+  assert.match(element('#deadCount').textContent, /^1 of 27/);
   element('#deadSearch').value = 'impossible'; run('showDeadGames();');
   assert.match(element('#deadEntries').innerHTML, /No entries match/);
   assert.ok(!call('deadGameNotice', '<img src=x onerror=alert(1)>', 'PS4').includes('<img'));

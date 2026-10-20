@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "revision": 4,
+  "revision": 5,
   "updatedAt": "2026-10-20",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
-  "sourceSequence": 7,
-  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup.",
+  "sourceSequence": 9,
+  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup. Reviewed subset of source sequence 9: Front Mission Online PS2 and Monster Hunter Frontier G Vita remain outside website coverage pending safe exact-edition matching.",
   "changes": [
     {
       "date": "2026-10-19",
@@ -33,6 +33,18 @@
       "type": "coverage",
       "entryId": "phantasy-star-online-2-vita-special",
       "summary": "Added the Japanese 2013 PS Vita Phantasy Star Online 2 Special Package card (PCSG-00141 / VLJM-35031; JAN 4974365821111; PriceCharting 1179918). Vita service ended on 16 September 2020; experimental unofficial patched-client/self-hosted setup remains conditional and original-card compatibility is unverified. New historical coverage, not a new shutdown."
+    },
+    {
+      "date": "2026-10-20",
+      "type": "coverage",
+      "entryId": "monster-hunter-frontier-g-wii-u",
+      "summary": "Added the Japanese Wii U Beginner's Package game disc, WUP-P-AMFJ; JAN 4976219051699; verified PriceCharting record 4042087. Memorial and later G-number packages are not covered. Official service ended 1 August 2018. Unofficial Wii U setup remains conditional; exact original-disc compatibility is unverified. Historical coverage from source sequence 9, not a new shutdown. Front Mission Online PS2 and Monster Hunter Frontier G Vita are not imported."
+    },
+    {
+      "date": "2026-10-20",
+      "type": "coverage",
+      "entryId": "monster-hunter-frontier-online-xbox360-beginners",
+      "summary": "Added the Japanese Xbox 360 Beginner's Package retail game disc, JES1-00049; JAN 4976219034241; verified PriceCharting record 4400119. Released 24 June 2010 per Capcom, despite PriceCharting's incorrect 2007 date. Not the separate Online Trial Version Edition. Official service ended 1 August 2018. No normal retail-console gameplay or verified public Xbox 360 restoration. Historical coverage from source sequence 9, not a new shutdown. Front Mission Online PS2 and Monster Hunter Frontier G Vita are not imported."
     }
   ],
   "entries": [
@@ -815,6 +827,83 @@
         {
           "label": "Card/box identifiers",
           "url": "https://renascene.com/psv/?page=114&sort=ID&target=title"
+        }
+      ],
+      "reviewedAt": "2026-10-20",
+      "firstListed": "2026-10-20"
+    },
+    {
+      "id": "monster-hunter-frontier-g-wii-u",
+      "title": "Monster Hunter Frontier G",
+      "platforms": [
+        "Wii U"
+      ],
+      "aliases": [
+        "Monster Hunter Frontier G",
+        "Monster Hunter Frontier G Beginner's Package"
+      ],
+      "edition": "Japanese Wii U Beginner's Package game disc, WUP-P-AMFJ; JAN 4976219051699; verified PriceCharting record 4042087. Memorial and later G-number packages are not covered.",
+      "category": "conditional",
+      "classification": "Officially closed; unofficial setup-dependent revival",
+      "closureDate": "2018-08-01",
+      "effective": "Official Wii U service ended 1 August 2018",
+      "caveats": "Online-only; no ordinary official-console gameplay remains. Erupe documents Wii U support through Z2 using unofficial server/client setup. Exact original-disc compatibility is unverified. Keep off ordinary playable shelves. Do not apply this finding to Memorial, later G-number packages, trial/beta clients or other Monster Hunter games.",
+      "sources": [
+        {
+          "label": "Capcom closure notice reproduced by 4Gamer",
+          "url": "https://www.4gamer.net/games/034/G003450/20180620062/"
+        },
+        {
+          "label": "Physical disc, JAN and online-only details",
+          "url": "https://www.amiami.jp/top/detail/detail?gcode=TVG-WIU-00222"
+        },
+        {
+          "label": "Exact PriceCharting edition: 4042087",
+          "url": "https://www.pricecharting.com/game/jp-wii-u/monster-hunter-frontier-g"
+        },
+        {
+          "label": "Erupe supported platforms and setup",
+          "url": "https://github.com/Mezeporta/Erupe"
+        }
+      ],
+      "reviewedAt": "2026-10-20",
+      "firstListed": "2026-10-20"
+    },
+    {
+      "id": "monster-hunter-frontier-online-xbox360-beginners",
+      "title": "Monster Hunter Frontier Online",
+      "platforms": [
+        "Xbox 360"
+      ],
+      "aliases": [
+        "Monster Hunter Frontier Online Beginner's Package"
+      ],
+      "edition": "Japanese Xbox 360 Beginner's Package retail game disc, JES1-00049; JAN 4976219034241; verified PriceCharting record 4400119. Released 24 June 2010 per Capcom, despite PriceCharting's incorrect 2007 date. Not the separate Online Trial Version Edition.",
+      "category": "unplayable",
+      "classification": "No normal retail-console gameplay",
+      "closureDate": "2018-08-01",
+      "effective": "Official Xbox 360 service ended 1 August 2018",
+      "caveats": "Online-only service ended; no ordinary offline gameplay or public Xbox 360 restoration verified. The current Erupe supported-platform list does not include Xbox 360. This retail package initially used the open beta before full service; it is not the separate Online Trial Version Edition. Keep off ordinary playable shelves. Other Season, Forward and G packages require separate review; do not generalize to other Monster Hunter games.",
+      "sources": [
+        {
+          "label": "Capcom completed-closure notice",
+          "url": "https://www.fsa.go.jp/policy/prepaid/shohinken/20180802capcom.pdf"
+        },
+        {
+          "label": "Capcom retail disc, 2010 release and online-only specifications",
+          "url": "https://www.4gamer.net/games/104/G010477/20100225008/"
+        },
+        {
+          "label": "Capcom annual report",
+          "url": "https://www.capcom.co.jp/ir/data/pdf/annual/2013/annual_2013_06.pdf"
+        },
+        {
+          "label": "Erupe supported platforms",
+          "url": "https://github.com/Mezeporta/Erupe"
+        },
+        {
+          "label": "Exact PriceCharting edition: 4400119 (release date corrected from Capcom)",
+          "url": "https://www.pricecharting.com/game/jp-xbox-360/monster-hunter-frontier-online-beginner%27s-package"
         }
       ],
       "reviewedAt": "2026-10-20",

@@ -23,6 +23,29 @@ gameplay completeness and original-card compatibility are unverified. Sega's
 date. Nova, PS4/PC, New Genesis and unverified packages are not matched.
 The preceding 24 entries and staff handling policy are unchanged.
 
+Revision 5 imports two independently verified Beginner's Packages from source
+sequence 9, bringing website coverage to 27 entries: Wii U Monster Hunter
+Frontier G (WUP-P-AMFJ; JAN 4976219051699; PriceCharting 4042087), and Xbox 360
+Monster Hunter Frontier Online (JES1-00049; JAN 4976219034241; PriceCharting
+4400119). Both historical services ended 1 August 2018. Wii U remains
+conditional: Erupe support through Z2 requires unofficial setup and exact
+original-disc compatibility is unverified. Xbox 360 has no verified public
+restoration or ordinary offline play. Capcom's 24 June 2010 Xbox package release
+date takes precedence over PriceCharting's incorrect 2007 metadata. Its initial
+open-beta use does not make it the separate Online Trial Version Edition.
+Only the full Xbox Beginner's Package alias matches; generic Frontier Online,
+trial/beta, Season, Forward, Memorial and later G-number package names are
+outside these additions. The preceding 25 entries and handling policy survive.
+
+This is a reviewed subset of the 29-row source sequence 9, not full Page
+synchronization. Front Mission Online PS2 remains pending because the current
+title/console matcher cannot distinguish retail SLPM-65981 from beta SLPM-68514
+in its mixed catalog record. Monster Hunter Frontier G Vita (VLJM-35137;
+JAN 4976219056304) remains pending exact-edition catalog reconciliation:
+candidate 2156539 has a Beginner's Package cover and matching release date,
+but no model/JAN fields, and the live JAN lookup returned no product. Neither
+pending row is imported or matched by this revision.
+
 - Unplayable: confirmed no normal-console gameplay; do not shelve that edition
   as playable. PC revivals do not restore console discs.
 - Conditional: unofficial console setups or closed playtests; hold from normal
