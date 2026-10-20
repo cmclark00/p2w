@@ -89,6 +89,30 @@ test('original paper pack-ins remain CIB evidence for eBay and Amazon', () => {
   }
 });
 
+test('CIB disc, case and manual combinations are ordinary contents, including the Alice screenshot', () => {
+  const product = { ...item, 'product-name': 'Alice: Madness Returns', 'console-name': 'Playstation 3' };
+  const title = 'Alice: Madness Returns PlayStation 3 PS3 Complete Disc + Case + Manual';
+  for (const listing of [title,
+    'Alice Madness Returns PS3 Complete Case + Manual + Game Disc',
+    'Alice Madness Returns PS3 CIB Disc + Original Jewel Case + Instruction Booklet',
+    'Alice Madness Returns PS3 Complete Manual + Box + Disc',
+    'Alice Madness Returns PS3 Complete Disc plus Case and Manual']) {
+    assert.equal(invoke('floorListingMismatch', listing, product), null, listing);
+    assert.equal(invoke('floorSales', cur(product, { sales: { cib: [{ title: listing, price: 13995 }] } }))[0].odd, false, listing);
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title: listing, offers: [{ price: 13995 }] } })), 13995, listing);
+  }
+  const example = cur(product, { sales: { cib: [{ title, price: 13995 }, { title: 'Alice Madness Returns PS3 CIB', price: 12800 }] },
+    amazon: { found: true, title: 'Alice Madness Returns PS3', offers: [{ price: 12898 }] } });
+  assert.equal(invoke('floorResult', example).b.basis, 13995);
+  assert.equal(invoke('floorResult', example).r.price, 14000);
+  for (const extra of [' + Another Game', ' + Controller', ' + Bonus Disc', ' + Soundtrack', ' + Figurine', ' + Steelbook', ' French Version', ' Special Edition'])
+    assert.ok(invoke('floorListingMismatch', title + extra, product), extra);
+  for (const incomplete of ['Case + Manual Only', 'Disc Only + Case, No Manual'])
+    assert.equal(invoke('floorSales', cur(product, { sales: { cib: [{ title: 'Alice Madness Returns PS3 ' + incomplete, price: 13995 }] } }))[0].odd, true, incomplete);
+  assert.ok(invoke('floorListingMismatch', 'Skylanders Trigger Happy + Game Disc', { 'product-name': 'Trigger Happy', 'console-name': 'Skylanders' }), 'A game disc bundled with a figure is still an extra');
+  assert.ok(invoke('floorListingMismatch', 'Nintendo Switch Console + Game Cartridge', { 'product-name': 'Nintendo Switch Console', 'console-name': 'Nintendo Switch', genre: 'Systems' }), 'A game bundled with hardware is still an extra');
+});
+
 test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
   const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
   for (const title of [

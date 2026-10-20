@@ -837,6 +837,8 @@ Guide (the Google Sheet tab).
      barcode match does not bypass these checks: a mismatched catalog title
      excludes its offers from pricing. Amazon provides a shared product
      title, not every seller's description, so open the listing when unsure.
+     Normal contents such as **Disc + Case + Manual** are CIB, not a bundle;
+     separate games, controllers, bonus discs and other extras remain excluded.
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above

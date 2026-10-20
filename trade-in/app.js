@@ -3748,8 +3748,10 @@ const FLOOR_EXTRA_ITEMS = ['figurines?|figures?|statues?', 'soundtracks?|music c
 // and the named paper/packaging item when testing bundle wording; leave every
 // other extra, edition, region, condition and price-outlier check in place.
 const FLOOR_PACK_IN = String.raw`(?:(?:original|included|pack[ -]?in|factory|fold[ -]?out)\s+)*(?:(?:registration|reg\.?|warranty)\s+cards?|registration|instructions?(?:\s+(?:manuals?|booklets?))?|manuals?|(?:instruction|warranty)\s+booklets?|(?:paper|advertising|safety|warranty)\s+inserts?|inserts?|posters?|maps?|foam(?:\s+(?:inserts?|blocks?))?)\b`;
-function floorBundleTitle(title) {
-  return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:the\\s+|a\\s+|an\\s+)?(?:${FLOOR_PACK_IN})`, 'gi'), ' ');
+const FLOOR_GAME_CONTENTS = String.raw`(?:(?:original|included|factory)\s+)*(?:(?:jewel\s+|game\s+)?cases?|box(?:es)?|(?:game\s+)?(?:discs?|disks?|cartridges?|carts?))\b`;
+function floorBundleTitle(title, gameContents = false) {
+  const contents = gameContents ? `${FLOOR_PACK_IN}|${FLOOR_GAME_CONTENTS}` : FLOOR_PACK_IN;
+  return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:the\\s+|a\\s+|an\\s+)?(?:${contents})`, 'gi'), ' ');
 }
 function floorExtraMismatch(title, name) {
   return FLOOR_EXTRA_ITEMS.some((item) => {
@@ -3784,7 +3786,7 @@ function floorTitleIdentityMismatch(title, product) {
   if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
   const hardware = !!floorToyFamily(product) || floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
   if (!hardware) {
-    const text = ` ${floorTitleWords(floorBundleTitle(title)).join(' ')} `, phrase = ` ${core.join(' ')} `;
+    const text = ` ${floorTitleWords(floorBundleTitle(title, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
     // Sellers may reorder a platform or descriptive subtitle. Missing identity
     // words are still rejected above; do not confuse ordering with another game.
@@ -3852,7 +3854,7 @@ function floorListingMismatch(title, product) {
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
   if (floorExtraMismatch(title, name)) return 'Bundled extra item';
-  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(title) : title)))
+  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(title) : title, !floorToyFamily(product) && !floorIsHardware(product))))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
