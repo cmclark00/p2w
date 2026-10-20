@@ -693,23 +693,27 @@ The site's **only server-side code**. Everything else is static.
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
 
-  - **Original eBay sale verification:** Market Helper 1.1.0 adds only
+  - **Optional original eBay sale verification:** Market Helper 1.1.1 uses only
     ebay.com/itm/* content-script access. `ebay-background.js` validates sender,
     HTTPS host and item ID; queues at most eight jobs with two inactive tabs,
-    a 25-second watchdog, and memory caching (known 24h, unknown 60s).
+    a 12-second watchdog, and memory caching (known 24h, unknown 60s).
+    Canonical item URLs retain `?nordt=true&rt=nc`: removing these redirects
+    expired listings to product/recommendation pages (reproduced on Gundam
+    Battle Assault 2 item 334736933439). Tracking parameters are still dropped.
     `ebay-reader.js` expands only See original listing and reads visible original
     title/status/primary price. SOLD summary alone is insufficient. Accepted offers
     and struck-through primary prices never supply a sale amount. Ambiguous or
     blocked pages remain unknown; no cart, offer, bid or challenge actions.
-    `verifyFloorEbaySales` gates live pricing and saved rechecks, rechecks original
-    title/condition and exact USD cents against PriceCharting, excludes all
-    unverified prices, and waits before calculating. Existing specific premiums,
+    `verifyFloorEbaySale` checks only an explicitly selected sale. No automatic
+    queue or pricing wait; saved rechecks/history audits never open eBay tabs.
+    Original title/condition and exact USD cents must match for verification.
+    Confirmed ended/offer/mismatch/price issues exclude that row in the current
+    lookup. Unknown/pending results remain eligible PriceCharting evidence with
+    a review label, and failed retries cannot erase known exclusions. Specific premiums,
     common-figure averages, rare minimums and rounding remain downstream unchanged.
     Typed overrides remain deliberate overrides, but excluded rows cannot be
-    selected as sold comps. Condition changes isolate pending results. History
-    audit invokes the same helper and marks unavailable/unclear checks incomplete.
-    The helper currently requires a top-level pricing tab; audit iframes cannot
-    obtain its capability. Reload unpacked extension and pricing page after updating.
+    selected as sold comps. Condition changes isolate pending results.
+    Reload unpacked extension and pricing page after updating.
     Build ZIP uses EBAY-UPDATE.txt for its install guide. Tests:
     test-ebay-helper.cjs and test-ebay-verification.cjs.
 

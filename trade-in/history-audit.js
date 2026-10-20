@@ -61,14 +61,12 @@ async function auditOne(item) {
   ]);
   const gamestopStock=await audit.engine.fetchFloorGameStopStock(product,sold.gamestopUrl,auditRequest);
   const cur={product,condition:item.condition,manualMissing:item.manualMissing,toyGroup:item.toyGroup,pick:null,typed:null,...sold,amazon,gamestopStock};
-  await audit.engine.verifyFloorEbaySales(cur);
   const result=audit.engine.floorResult(cur), price=result.r?.price??null;
   const notes=[...(result.b.checks || [])];
   if(item.allUnits<3) notes.push('Fewer than three historical units sold');
   if(item.latestDate<'2026-04-20') notes.push('Most recent store sale is over 180 days old');
   if(audit.config.amazonSandbox) notes.push('Amazon sandbox data: recommendation is not a real-market comparison');
-  const incomplete=!!(sold.salesError || amazon?.error || audit.config.amazonSandbox || cur.ebayChecks?.unavailable
-    || Object.values(cur.ebayChecks?.results||{}).some(r=>['unknown','mismatch','price'].includes(r.state)));
+  const incomplete=!!(sold.salesError || amazon?.error || audit.config.amazonSandbox);
   return {...item,status:price==null?'No recommendation':incomplete?'Incomplete market check':result.b.from==='pricecharting'?'PriceCharting fallback':'Compared',
     recommended:price,...auditGap(item,price),lookedUpAt:new Date().toISOString(),
     pcId:product.id,matchedName:product['product-name'],matchedSystem:product['console-name'],

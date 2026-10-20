@@ -42,9 +42,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     }
     const value = readEbaySale(document, message.id, location.href), key = JSON.stringify(value);
     if (key !== previous) { previous = key; stableSince = Date.now(); }
-    if (document.readyState === 'complete' && value.state !== 'unknown' && Date.now() - started >= 4000 && Date.now() - stableSince >= 2000) {
+    if (document.readyState === 'complete' && value.state !== 'unknown' && Date.now() - started >= 2000 && Date.now() - stableSince >= 1000) {
       clearInterval(timer); respond(value);
-    } else if (Date.now() - started > 18000) { clearInterval(timer); respond({ state: 'unknown' }); }
+    } else if (Date.now() - started > 9000) { clearInterval(timer); respond({ state: 'unknown' }); }
   }, 500);
   return true;
 });

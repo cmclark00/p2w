@@ -3590,7 +3590,6 @@ async function loadFloorSales(product) {
     if (floorCur?.product === product) {
       Object.assign(floorCur, sold);
       loadFloorGameStopStock(floorCur);
-      loadFloorEbayChecks(floorCur);
     }
   } catch (err) {
     if (floorCur?.product === product) floorCur.salesError = err.message;
@@ -3599,7 +3598,8 @@ async function loadFloorSales(product) {
 }
 
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
-  price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Sale unverified', pending: 'Checking sale…' };
+  price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
+const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state);
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
@@ -3609,34 +3609,35 @@ function floorEbayResult(sale, product, result, condition) {
   if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== sale.price)) return { state: 'price' };
   return { state: result.state, price: result.price, checkedAt: result.checkedAt };
 }
-async function verifyFloorEbaySales(cur, progress = () => {}, cancelled = () => false,
+async function verifyFloorEbaySale(cur, index, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
-  const candidates = floorSales({ ...cur, ebayChecks: null }).filter(s => !s.odd);
-  const checks = { loading: true, results: {}, done: 0, total: candidates.length, unavailable: false };
+  if (cur.ebayChecks?.loading) return;
+  const sale = floorSales({ ...cur, ebayChecks: null }).find(s => s.i === index && !s.odd && s.url);
+  if (!sale) return;
+  const key = floorSaleKey(sale), previous = cur.ebayChecks?.results[key];
+  const checks = { loading: true, results: { ...cur.ebayChecks?.results }, key, unavailable: false };
+  if (!previous) checks.results[key] = { state: 'pending' };
   cur.ebayChecks = checks; progress();
   try {
-    if (!candidates.length) return checks;
     if (!helper || !await helper.available()) { checks.unavailable = true; return checks; }
-    let next = 0;
-    async function worker() {
-      while (next < candidates.length && !cancelled()) {
-        const sale = candidates[next++], key = floorSaleKey(sale);
-        let result;
-        try { result = sale.url ? await helper.check(sale.url) : null; } catch (_) { result = null; }
-        checks.results[key] = floorEbayResult(sale, cur.product, result, floorCondition(cur.product, cur.condition));
-        checks.done++; progress();
-      }
+    if (cancelled()) return checks;
+    const result = await helper.check(sale.url);
+    if (!cancelled()) {
+      const value = floorEbayResult(sale, cur.product, result, floorCondition(cur.product, cur.condition));
+      checks.results[key] = value.state === 'unknown' && previous ? previous : value;
     }
-    await Promise.all([worker(), worker()]);
   } catch (_) { checks.unavailable = true; }
-  finally { checks.loading = false; progress(); }
+  finally {
+    if (checks.results[key]?.state === 'pending') checks.results[key] = { state: 'unknown' };
+    checks.loading = false; progress();
+  }
   return checks;
 }
-function loadFloorEbayChecks(cur) {
+function loadFloorEbayCheck(cur, index) {
   const condition = cur.condition;
   const run = {}; cur.ebayRun = run;
   // A condition switch replaces this run; old results cannot overwrite the new run.
-  const task = verifyFloorEbaySales(cur, () => {
+  const task = verifyFloorEbaySale(cur, index, () => {
     if (floorCur === cur && cur.condition === condition && cur.ebayRun === run) renderFloorPricer();
   }, () => floorCur !== cur || cur.condition !== condition || cur.ebayRun !== run);
   return task;
@@ -3684,8 +3685,8 @@ function floorSales(cur = floorCur) {
   const sales = unique.map((s, i) => {
     const mismatch = floorListingMismatch(s.title, cur.product);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
-    const verification = cur.ebayChecks && !invalid ? cur.ebayChecks.results[floorSaleKey(s)] || { state: cur.ebayChecks.loading ? 'pending' : 'unknown' } : null;
-    return { ...s, i, mismatch, verification, odd: invalid || !!verification && verification.state !== 'sold' };
+    const verification = !invalid ? cur.ebayChecks?.results[floorSaleKey(s)] : null;
+    return { ...s, i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
@@ -3934,15 +3935,16 @@ function floorBasis(cur = floorCur) {
   cur = floorConditionCur(cur);
   const sales = floorSales(cur);
   const auto = floorAutoSale(sales);
-  const picked = cur.pick != null ? sales.find((s) => s.i === cur.pick && (!s.verification || s.verification.state === 'sold')) : null;
+  const picked = cur.pick != null ? sales.find((s) => s.i === cur.pick && !floorEbayExcluded(s.verification)) : null;
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
-  if (cur.ebayChecks?.unavailable) checks.push('eBay sale verification unavailable: reload the updated Chrome Market Helper. Unverified eBay prices are excluded; other pricing rules and sources still apply');
-  for (const state of ['ended', 'offer', 'price', 'mismatch', 'unknown']) {
+  if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Review the original listing manually; PriceCharting pricing continues');
+  if (sales.some(s => s.verification?.state === 'unknown')) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
+  for (const state of ['ended', 'offer', 'price', 'mismatch']) {
     const count = sales.filter(s => s.verification?.state === state).length;
     if (count) checks.push(`${count} eBay listing${count === 1 ? '' : 's'} excluded: ${FLOOR_EBAY_LABELS[state]}`);
   }
@@ -3960,7 +3962,6 @@ function floorBasis(cur = floorCur) {
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
-  if (cur.ebayChecks?.loading) return { basis: null, sale, checks, waiting: true };
   if (floorGs(cur.product) && cur.gamestopStock?.state === 'loading') return { basis: null, sale, checks, waiting: true };
   // Never publish a fallback while the primary sold evidence or required checks are still loading.
   if (cur.fullLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
@@ -4069,6 +4070,7 @@ function renderFloorPricer() {
   const condBtns = conditions.map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
   let salesHtml;
+  const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || b.sale;
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
   else if (cur.salesError && !sales.length) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
@@ -4121,7 +4123,7 @@ function renderFloorPricer() {
     <div class="floor-price-context">
         ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.ebayChecks?.loading ? `Verifying eBay sales… ${cur.ebayChecks.done}/${cur.ebayChecks.total}` : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
           ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}
@@ -4151,7 +4153,7 @@ function renderFloorPricer() {
     <div class="floor-body">
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
-        ${cur.ebayChecks ? `<p class="small-print muted">${cur.ebayChecks.loading ? `Verifying ${cur.ebayChecks.done}/${cur.ebayChecks.total} matching sales…` : cur.ebayChecks.unavailable ? 'eBay unverified — update/reload the Chrome helper.' : 'Original eBay listings checked. Unverified prices excluded.'} ${!cur.ebayChecks.loading ? '<button type="button" class="link" data-floor-act="ebay">Recheck sales</button>' : ''}${cur.ebayChecks.unavailable ? ' · <a href="gamestop-stock-helper.zip">Download helper</a>' : ''}</p>` : ''}
+        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale — pricing stays available.' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}eBay check optional; select a sale to check it.`}${cur.ebayChecks?.unavailable ? ' Open the sale link to review manually.' : ''}</p>
         ${salesHtml}
         ${floorAmazonHtml(cur, b)}
       </div>
@@ -4247,7 +4249,7 @@ function onFloorPricerClick(e) {
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
     if (cond !== 'cib') floorCur.manualMissing = false;
     if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
-    if (floorCur.sales) loadFloorEbayChecks(floorCur);
+    floorCur.ebayChecks = null; floorCur.ebayRun = null;
     renderFloorPricer();
     return;
   }
@@ -4257,7 +4259,7 @@ function onFloorPricerClick(e) {
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
-  if (act === 'ebay') { if (!floorCur.ebayChecks?.loading) loadFloorEbayChecks(floorCur); return; }
+  if (act === 'ebay') { if (!floorCur.ebayChecks?.loading) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();
@@ -4269,7 +4271,7 @@ function onFloorPricerClick(e) {
   const row = e.target.closest('tr[data-sale]');
   if (row && !e.target.closest('a')) {
     const sale = floorSales(floorCur).find(s => s.i === Number(row.dataset.sale));
-    if (sale?.verification && sale.verification.state !== 'sold') { toast('This eBay price is not verified and cannot be used as a sold comp.', 'error'); return; }
+    if (floorEbayExcluded(sale?.verification)) { toast('This eBay listing was excluded by its original-listing check.', 'error'); return; }
     floorCur.pick = Number(row.dataset.sale);
     floorCur.typed = null;
     renderFloorPricer();
@@ -4358,7 +4360,6 @@ async function recheckFloorPrices() {
       if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
       const gamestopStock = await fetchFloorGameStopStock(product, sold.gamestopUrl);
       const cur = { product, condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, gamestopStock, pick: null, typed: null, amazon };
-      await verifyFloorEbaySales(cur, () => {}, () => floorRecheck.stop || floorEpoch !== epoch);
       const { b, r } = floorResult(cur);
       it.recheck = r ? { price: r.price, condition, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: b.need || 'no sales to go by' };
     } catch (err) {

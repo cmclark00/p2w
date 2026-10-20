@@ -6,7 +6,8 @@ function ebayTarget(value) {
     const u = new URL(value);
     if (u.protocol !== 'https:' || !['www.ebay.com', 'ebay.com'].includes(u.hostname) || u.port || u.username || u.password) return null;
     const id = u.pathname.match(/^\/itm\/(?:[^/]+\/)?(\d{9,15})\/?$/)?.[1];
-    return id ? { id, url: `https://www.ebay.com/itm/${id}` } : null;
+    // nordt keeps archived item URLs from redirecting to a product/recommendation page.
+    return id ? { id, url: `https://www.ebay.com/itm/${id}?nordt=true&rt=nc` } : null;
   } catch (_) { return null; }
 }
 const ebayUnknown = () => ({ state: 'unknown', source: 'browser-helper', checkedAt: Math.floor(Date.now() / 1000) });
@@ -36,7 +37,7 @@ function pumpEbay() {
     if (ebayRunning >= 2) break;
     if (job.running || job.done) continue;
     job.running = true; ebayRunning++;
-    job.timer = setTimeout(() => finishEbay(job, null), 25000);
+    job.timer = setTimeout(() => finishEbay(job, null), 12000);
     chrome.tabs.create({ url: job.target.url, active: false }).then(async tab => {
       job.tabId = tab.id;
       if (job.done) { try { await chrome.tabs.remove(tab.id); } catch (_) {} return; }
@@ -45,7 +46,7 @@ function pumpEbay() {
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: '1.1.0' }); return false; }
+  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: '1.1.1' }); return false; }
   if (message?.type === 'P2W_EBAY_CHECK' && pricingSender(sender)) {
     const target = ebayTarget(message.url);
     if (!target) { respond(ebayUnknown()); return false; }

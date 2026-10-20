@@ -30,7 +30,7 @@ function ebayHelperRequest(type, url) {
       if (event.data.type === 'P2W_EBAY_RESULT' && acknowledged) finish(event.data.result || { state: 'unknown' });
     };
     const probe = setTimeout(() => { if (!acknowledged) finish(null); }, 800);
-    const deadline = setTimeout(() => finish({ state: 'unknown' }), type === 'P2W_EBAY_PING' ? 2500 : 115000);
+    const deadline = setTimeout(() => finish({ state: 'unknown' }), type === 'P2W_EBAY_PING' ? 2500 : 28000);
     window.addEventListener('message', receive);
     window.postMessage({ type, nonce, url }, location.origin);
   });

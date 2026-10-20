@@ -65,7 +65,7 @@ const send = (message, from = sender) => new Promise(resolve => { if (!handler(m
 const check = id => send({ type: 'P2W_EBAY_CHECK', url: url(id) });
 const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game PS4', state: 'sold', price: 1800, ...extra });
 (async () => {
-  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, '1.1.0');
+  assert.equal((await send({ type: 'P2W_EBAY_CAPABILITY' })).version, '1.1.1');
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, url: 'https://evil.test/' }), null);
   assert.equal(await send({ type: 'P2W_EBAY_CHECK', url: url('404870222598') }, { ...sender, frameId: 1 }), null);
   for (const bad of ['https://evil.test/itm/404870222598', 'http://ebay.com/itm/404870222598', 'https://user@ebay.com/itm/404870222598',
@@ -73,6 +73,7 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   assert.equal(created.length, 0);
   const one = check('404870222598'), duplicate = check('404870222598'), two = check('404870222599'), three = check('404870222600');
   await flush(); assert.equal(created.length, 2); assert.ok(created.every(c => c.active === false));
+  assert.equal(created[0].url, 'https://www.ebay.com/itm/404870222598?nordt=true&rt=nc', 'Original-item redirect controls survive URL cleanup');
   pending[0].resolve(result(pending[0], { state: 'offer' }));
   assert.equal((await one).state, 'offer'); assert.equal((await duplicate).price, null);
   await flush(); assert.equal(created.length, 3); assert.deepEqual(removed, [10]);

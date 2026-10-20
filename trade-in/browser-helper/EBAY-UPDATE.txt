@@ -1,4 +1,4 @@
-Play2Win Market Helper 1.1.0
+Play2Win Market Helper 1.1.1
 
 Update the existing unpacked helper in Chrome at chrome://extensions:
 click Reload on Play2Win's helper, approve eBay item-page access if Chrome asks,
@@ -13,7 +13,10 @@ Each staff computer/profile needs its own installation. Remove the helper at
 chrome://extensions. It cannot run inside the Codex in-app browser.
 
 The helper reads matching GameStop product pages and eBay.com/itm/ item pages.
-eBay checks open at most two inactive tabs, expand See original listing, read
+Click Check selected sale for one optional eBay check. Normal lookups, saved
+rechecks and history audits do not open eBay tabs or wait for eBay verification.
+Checks retain the original-listing URL controls to avoid product-page redirects.
+The helper expands See original listing, reads
 the item's status/title/price, and close only those temporary tabs. It never
 buys, bids, submits offers, messages sellers, changes carts, or solves challenges.
 Blocked or unclear pages remain unverified, not confirmed sales.
@@ -21,8 +24,9 @@ Blocked or unclear pages remain unverified, not confirmed sales.
 Ended listings and accepted-offer/struck-through prices are excluded. A sold
 price must be visible in USD and match the PriceCharting amount. Specific
 premiums, rare-figure minimums and existing rounding still apply afterward.
-Without the updated helper, eBay evidence stays unverified and is excluded;
-other verified sources and the existing fallback rules remain available.
+Without the helper or if a page cannot be read, the check is inconclusive:
+PriceCharting evidence stays eligible, labeled for manual review. A check takes
+at most 12 seconds with this version and does not block pricing or Add to list.
 
 Confirmed out-of-stock GameStop prices
 are reference-only and do not set a minimum. Specific premiums still apply.
