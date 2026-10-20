@@ -9,10 +9,28 @@ const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../trade-in/dead-g
 const clone = (s) => JSON.parse(JSON.stringify(s));
 let checks = 0;
 const test = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
-test('all 23 source-register entries and four categories survive generation', () => {
+test('all 24 source-register entries and four categories survive generation', () => {
   assert.deepEqual(reg.data, data);
-  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [16, 4, 2, 1]);
-  for (const e of data.entries) { assert.ok(e.sources.length); assert.equal(e.reviewedAt, '2026-10-19'); }
+  assert.equal(data.revision, 3); assert.equal(data.sourceSequence, 6);
+  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [16, 5, 2, 1]);
+  for (const e of data.entries) {
+    assert.ok(e.sources.length);
+    assert.equal(e.reviewedAt, e.id === 'monster-hunter-frontier-g-ps3' ? '2026-10-20' : '2026-10-19');
+  }
+});
+
+test('Frontier G matches only the verified PS3 disc names, preserving exact-edition evidence', () => {
+  const e = reg.match('Monster Hunter: Frontier G', 'JP Playstation 3');
+  assert.equal(e.id, 'monster-hunter-frontier-g-ps3'); assert.equal(e.category, 'conditional');
+  assert.match(e.edition, /BLJM-60577/); assert.match(e.edition, /4976219051682/); assert.match(e.edition, /4562923/);
+  assert.match(e.caveats, /exact original-disc revival setup and hardware compatibility are unverified/);
+  assert.equal(reg.match("Monster Hunter Frontier G Beginner's Package", 'PS3').id, e.id);
+  for (const [name, p] of [['Monster Hunter', 'PS3'], ['Monster Hunter Portable 3rd HD', 'PS3'],
+    ['Monster Hunter Portable 3rd HD Ver.', 'PS3'], ['Monster Hunter Frontier', 'PS3'], ['Monster Hunter Frontier Z', 'PS3'],
+    ['Monster Hunter Frontier GG', 'PS3'], ['Monster Hunter Frontier G2', 'PS3'],
+    ['Monster Hunter Frontier G [Download Code]', 'PS3'], ['Monster Hunter Frontier G Premium Package', 'PS3'],
+    ['Monster Hunter Frontier G', 'PS4'], ['Monster Hunter Frontier G', 'PlayStation Vita'],
+    ['Monster Hunter Frontier G', 'Wii U'], ['Monster Hunter Frontier G', 'PC Games']]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
 });
 test('every curated exact alias matches its own platform and category', () => {
   for (const e of data.entries) for (const a of e.aliases) for (const p of e.platforms) {
@@ -67,27 +85,27 @@ test('import requires higher revision, preserves history and identifies reviewed
   const d = clone(data); d.entries[0].caveats += ' Review note.';
   assert.throws(() => importer.plan(d, data), /Revision/);
   d.revision++; assert.throws(() => importer.plan(d, data), /history/);
-  d.changes.push({ date: '2026-10-19', type: 'review', entryId: 'anthem', summary: 'Rechecked exact-console evidence.' });
+  d.changes.push({ date: data.updatedAt, type: 'review', entryId: 'anthem', summary: 'Rechecked exact-console evidence.' });
   assert.equal(importer.plan(d, data)[0].type, 'review');
   d.changes[0].summary = 'Overwritten history'; assert.throws(() => importer.plan(d, data), /Preserve/);
 });
 test('new coverage is not labeled a new shutdown, and upcoming dates never auto-promote', () => {
   const d = clone(data), e = clone(d.entries[0]); e.id = 'new-coverage'; e.aliases = ['Historical Game']; e.title = 'Historical Game';
-  d.entries.push(e); d.revision++; d.changes.push({ date: '2026-10-19', type: 'coverage', entryId: e.id, summary: 'Added historical closure evidence.' });
+  d.entries.push(e); d.revision++; d.changes.push({ date: data.updatedAt, type: 'coverage', entryId: e.id, summary: 'Added historical closure evidence.' });
   assert.equal(importer.plan(d, data).find((r) => r.id === e.id).type, 'coverage');
-  const bad = clone(d); bad.changes[1].type = 'shutdown'; assert.throws(() => importer.plan(bad, data));
+  const bad = clone(d); bad.changes.at(-1).type = 'shutdown'; assert.throws(() => importer.plan(bad, data));
   assert.equal(reg.match('Destruction AllStars', 'PS5', d).category, 'upcoming');
 });
 test('revivals and removals preserve historical events instead of rewriting past shutdowns', () => {
   const closed = clone(data); closed.revision++;
-  closed.entries[0].closureDate = '2026-10-19';
-  closed.changes.push({date:'2026-10-19',type:'shutdown',entryId:'anthem',summary:'Verified exact-edition closure on the effective date.'});
+  closed.entries[0].closureDate = data.updatedAt; closed.entries[0].reviewedAt = data.updatedAt;
+  closed.changes.push({date:data.updatedAt,type:'shutdown',entryId:'anthem',summary:'Verified exact-edition closure on the effective date.'});
   assert.ok(importer.plan(closed, data).length);
   const revived = clone(closed); revived.revision++; revived.entries[0].category = 'offline';
-  revived.changes.push({date:'2026-10-19',type:'status',entryId:'anthem',summary:'New evidence verifies offline gameplay for this edition.'});
+  revived.changes.push({date:data.updatedAt,type:'status',entryId:'anthem',summary:'New evidence verifies offline gameplay for this edition.'});
   assert.equal(importer.plan(revived, closed)[0].type, 'status');
   const removed = clone(revived); removed.revision++; removed.entries = removed.entries.filter((r) => r.id !== 'anthem');
-  removed.changes.push({date:'2026-10-19',type:'correction',summary:'Removed anthem after correcting register coverage.'});
+  removed.changes.push({date:data.updatedAt,type:'correction',summary:'Removed anthem after correcting register coverage.'});
   assert.equal(importer.plan(removed, revived)[0].type, 'removed');
 });
 test('CLI dry run is read-only, stale hashes fail, and reviewed apply updates the pair consistently', () => {
@@ -100,7 +118,7 @@ test('CLI dry run is read-only, stale hashes fail, and reviewed apply updates th
     }
     const old = fs.readFileSync(path.join(temp, 'trade-in/dead-games.json'), 'utf8');
     const d = clone(data); d.revision++; d.entries[0].caveats += ' Reviewed.';
-    d.changes.push({ date: '2026-10-19', type: 'review', entryId: 'anthem', summary: 'Reviewed console evidence.' });
+    d.changes.push({ date: data.updatedAt, type: 'review', entryId: 'anthem', summary: 'Reviewed console evidence.' });
     const candidate = path.join(temp, 'candidate.json'); fs.writeFileSync(candidate, JSON.stringify(d));
     const cli = (...args) => {
       const r = cp.spawnSync(process.execPath, [path.join(temp, 'scripts/update-dead-games.cjs'), ...args], { encoding: 'utf8' });
@@ -170,7 +188,7 @@ test('real floor pricing holds only exact unplayable/conditional editions, even 
 });
 test('both rendered checkpoints prominently flag confirmed and special-setup exact editions', () => {
   const cases = [['Anthem','PS4'], ['MAG','PS3'], ['SOCOM Confrontation','PS3'],
-    ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2']];
+    ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2'], ['Monster Hunter: Frontier G','JP Playstation 3']];
   ctx.policyRow = { classList: { toggle() {} }, querySelector: element, querySelectorAll: () => [] };
   for (const [name, platform] of cases) {
     ctx.policyLine = line(name, platform);
@@ -195,6 +213,26 @@ test('conditional flags remain visible with guide disabled and typed offers, wit
   assert.match(element('[data-cell="flags"]').innerHTML, /not normally playable/);
   assert.equal(call('priceLine', l).cash, 777);
   run('settings.guide.enabled = true;');
+});
+
+test('Frontier G keeps both checkpoints and shelf holds without zeroing offers or touching saved prices', () => {
+  const name = 'Monster Hunter: Frontier G', platform = 'JP Playstation 3';
+  const l = line(name, platform);
+  assert.equal(call('guideCheck', l, run('settings')), null);
+  assert.ok(call('priceLine', l).cash > 0);
+  l.cashOverride = 777; ctx.policyLine = l; run('updateRow(policyRow, policyLine);');
+  assert.match(element('[data-cell="flags"]').innerHTML, /Trade-In checkpoint/);
+  assert.match(element('[data-cell="flags"]').innerHTML, /exact original-disc revival setup and hardware compatibility are unverified/);
+  assert.equal(call('priceLine', l).cash, 777);
+  assert.equal(call('floorResult', cur(name, platform)).r, null);
+  run("floor.items = [{name:'Monster Hunter: Frontier G',platform:'JP Playstation 3',price:3000,recheck:{price:4000}}];");
+  run('printFloorLabels(); printFloorList(); copyFloorList(); useRecheck(floor.items[0]);');
+  assert.equal(run('floor.items[0].price'), 3000);
+  for (const name of ['Monster Hunter', 'Monster Hunter Portable 3rd HD', 'Monster Hunter Frontier Z',
+    'Monster Hunter Frontier G2', 'Monster Hunter Frontier G [Download Code]', 'Monster Hunter Frontier G Premium Package']) {
+    for (const checkpoint of ['Trade-In', 'Pricing']) assert.equal(call('deadGameNotice', name, platform, checkpoint), '', name);
+    assert.ok(call('floorResult', cur(name, platform)).r, name);
+  }
 });
 test('Evolve, other platforms and successor titles receive no automatic warning in either checkpoint', () => {
   for (const [name, platform] of [['Evolve','PS4'], ['Evolve','Xbox One'], ['DC Universe Online','PS4'],
@@ -250,7 +288,7 @@ test('register UI renders counts, filters, source caveats and custom-policy conf
   assert.match(element('#deadEntries').innerHTML, /Sandstorm/);
   assert.match(element('#deadOverrides').innerHTML, /Conflict with offline-playable evidence/);
   element('#deadSearch').value = 'Evolve'; element('#deadCategory').value = 'offline'; run('showDeadGames();');
-  assert.match(element('#deadCount').textContent, /^1 of 23/);
+  assert.match(element('#deadCount').textContent, /^1 of 24/);
   element('#deadSearch').value = 'impossible'; run('showDeadGames();');
   assert.match(element('#deadEntries').innerHTML, /No entries match/);
   assert.ok(!call('deadGameNotice', '<img src=x onerror=alert(1)>', 'PS4').includes('<img'));

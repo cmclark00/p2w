@@ -6,6 +6,14 @@ sources and setup caveats. The initial 23-entry snapshot transcribes sequence 5
 of the linked Play2Win register, reviewed October 19, 2026. This is a starter
 register, not an exhaustive catalog or fresh shop hardware testing.
 
+Revision 3 adds one entry from source sequence 6, reviewed October 20, 2026:
+the Japanese PS3 Monster Hunter Frontier G Beginner's Package disc
+(BLJM-60577; JAN 4976219051682; PriceCharting 4562923). The 24-entry register
+keeps this historical closure conditional because unofficial PS3 support
+requires special setup and exact original-disc compatibility is unverified.
+Other Monster Hunter games, Frontier editions and download-code-only packages
+are outside this entry's coverage. The original 23 entries are unchanged.
+
 - Unplayable: confirmed no normal-console gameplay; do not shelve that edition
   as playable. PC revivals do not restore console discs.
 - Conditional: unofficial console setups or closed playtests; hold from normal

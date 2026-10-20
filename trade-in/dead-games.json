@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "revision": 2,
-  "updatedAt": "2026-10-19",
+  "revision": 3,
+  "updatedAt": "2026-10-20",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
-  "sourceSequence": 5,
+  "sourceSequence": 6,
   "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup.",
   "changes": [
     {
@@ -21,6 +21,12 @@
       "date": "2026-10-19",
       "type": "policy",
       "summary": "Make confirmed and unofficial/setup-dependent exact editions prominent at both staff checkpoints. Trade-in offer math is unchanged; upcoming and offline-playable findings remain separate from completely dead games."
+    },
+    {
+      "date": "2026-10-20",
+      "type": "coverage",
+      "entryId": "monster-hunter-frontier-g-ps3",
+      "summary": "Added the Japanese PS3 Monster Hunter Frontier G Beginner's Package disc (BLJM-60577; JAN 4976219051682), verified as PriceCharting 4562923. Historical official closure on 18 December 2019; unofficial PS3 server/client setup remains conditional and exact-disc compatibility is unverified. New coverage, not a new shutdown."
     }
   ],
   "entries": [
@@ -722,6 +728,51 @@
       ],
       "reviewedAt": "2026-10-19",
       "firstListed": "2026-10-19"
+    },
+    {
+      "id": "monster-hunter-frontier-g-ps3",
+      "title": "Monster Hunter Frontier G",
+      "platforms": [
+        "PlayStation 3"
+      ],
+      "aliases": [
+        "Monster Hunter Frontier G",
+        "Monster Hunter Frontier G Beginner's Package"
+      ],
+      "edition": "Japanese PlayStation 3 Beginner's Package game disc, BLJM-60577; JAN 4976219051682; verified PriceCharting record 4562923. Other Frontier editions and download-code-only packages are not covered.",
+      "category": "conditional",
+      "classification": "Officially closed; unofficial server support requires special setup",
+      "closureDate": "2019-12-18",
+      "effective": "Official service ended 18 December 2019, 21:00 JST",
+      "caveats": "Online-only service ended; no ordinary official-console gameplay. Erupe documents PS3 server emulation and private server/client setup, but exact original-disc revival setup and hardware compatibility are unverified. Keep off ordinary playable shelves. Do not apply this finding to other Monster Hunter games, other Frontier editions or download-code-only packages.",
+      "sources": [
+        {
+          "label": "Capcom closure announcement",
+          "url": "https://prtimes.jp/main/html/rd/p/000001271.000013450.html"
+        },
+        {
+          "label": "Sony online-only description",
+          "url": "https://blog.ja.playstation.com/2019/01/31/20190131-mhfz/"
+        },
+        {
+          "label": "Physical disc and identifiers",
+          "url": "https://www.cdjapan.co.jp/product/BLJM-60577"
+        },
+        {
+          "label": "Exact PriceCharting edition: 4562923",
+          "url": "https://www.pricecharting.com/game/jp-playstation-3/monster-hunter-frontier-g"
+        },
+        {
+          "label": "Erupe PS3 support",
+          "url": "https://github.com/Mezeporta/Erupe"
+        },
+        {
+          "label": "Client/patch-server requirements",
+          "url": "https://github.com/Mezeporta/Servers"
+        }
+      ],
+      "reviewedAt": "2026-10-20",
+      "firstListed": "2026-10-20"
     }
   ]
 }
