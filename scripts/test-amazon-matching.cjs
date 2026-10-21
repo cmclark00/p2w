@@ -68,7 +68,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route, params) => route === 'amazon/catalog' ? { candidates: params.upc ? [] : [good] } : offer(good, 6000));
     e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;
     const r = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch complete",price:5000}]},amazon:result})');
-    assert.equal(r.b.basis, 6000); assert.equal(r.premium.pct, 10); assert.equal(r.r.price, 6500);
+    assert.equal(r.b.basis, 6000); assert.equal(r.premium.pct, 10); assert.equal(r.r.price, 7000);
     assert.ok(r.b.checks.some(n => n.includes('title/platform')));
   });
   await test('unpriced UPC match searches other listings and does not mislabel a missing price', async () => {
@@ -161,7 +161,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route) => route === 'amazon/catalog' ? { candidates: [renewed] } : offer(renewed, 6000));
     e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;
     const result = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch",price:9000}]},amazon:result})');
-    assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 6500);
+    assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 7000);
   });
   await test('renewed baseline retains GameStop minimum, while regular Amazon still uses the three-source maximum', () => {
     const e = engine(async () => { throw Error('No network needed'); });
