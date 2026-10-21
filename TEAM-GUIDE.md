@@ -970,8 +970,14 @@ Guide (the Google Sheet tab).
    Only exact-variant titles are recovered; duplicates
    count once. Recovered rows link their source entry. Failed or truncated
    searches are flagged as incomplete; other entries' averages are never used.
-   Matching special figures may say **Chase Variant**, **GITD**, or **Glow in Dark**.
-   These descriptions do not exclude an otherwise verified variant. **Not Sealed**
+   Matching special figures may say **Rare**, **Special**, **Chase Variant**,
+   **Exclusive**, or **Limited Edition** without being excluded just for those
+   descriptions. The actual character and finish still need to match.
+   **Crystal**, **Clear**, and **Crystal Clear** are equivalent finish names;
+   **GITD** and **Glow in Dark** also match. Missing or conflicting variant
+   labels now say which label needs review. Error-box/misprinted packaging
+   listings require separate review. **BNIFSP** means factory-sealed packaging
+   and belongs under New; reglued/opened packaging counts as Loose. **Not Sealed**
    and opened-box wording are valid used-figure evidence. **All toys-to-life CIB
    and opened original packaging count as Loose**, including sales filed under
    CIB on PriceCharting. Figures offer Loose and New controls; loose averages

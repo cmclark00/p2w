@@ -814,11 +814,17 @@ The site's **only server-side code**. Everything else is static.
     checking up to sixteen related pages after the selected entry. Only exact
     variant/character titles are recovered;
     new recovered sales must explicitly confirm new/sealed. Titles are
-    matched using canonical GITD/Glow in Dark aliases; generic chase wording
-    is allowed only alongside a confirmed named rare variant. Character pairs
+    matched using canonical GITD/Glow in Dark and Crystal/Clear/Crystal Clear
+    aliases. Generic rarity descriptions (rare, special, variant, exclusive,
+    limited/collectible edition and chase) do not change a confirmed named
+    rare figure's identity. Actual missing/conflicting variant labels have
+    explicit review reasons. Error/misprinted packaging needs separate review.
+    Regression matrices cover seller descriptions across multiple characters
+    for both sold listings and Amazon. Character pairs
     stay excluded. All toys-to-life CIB/opened packaging counts as loose through
     `floorCondition` and `floorFigureSaleCondition`, including related-page
-    recovery and Amazon title checks. Sealed inventory stays separate; source
+    recovery and Amazon title checks. BNIFSP is factory-sealed packaging;
+    reglued/opened packaging counts as loose. Sealed inventory stays separate; source
     condition provenance is retained and duplicate sales count once. Figure UI
     offers Loose/New; averages use loose for CIB. Saved rechecks propose the
     condition change explicitly and apply it only when the suggestion is used.

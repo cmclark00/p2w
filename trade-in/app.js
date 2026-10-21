@@ -3097,10 +3097,10 @@ const floorConditionCur = (cur) => floorCondition(cur.product, cur.condition) ==
   : { ...cur, condition: 'loose', manualMissing: false, pick: null };
 const floorFigureTitle = (title) => String(title || '').replace(/\b(?:not|no longer)\s+(?:factory\s+)?sealed\b|\bnot\s+brand[ -]new\b/gi, 'opened');
 const floorFigurePackagingTitle = (title) => String(title || '').replace(/(?:\bwith\b|\bw\/|\+|&|\band\b)\s*(?:the\s+)?(?:original\s+)?(?:box|packaging|blister(?: pack)?)\b/gi, ' ');
-const FLOOR_FIGURE_SEALED = /\b(?:sealed|brand new|new in box|nib|bnib|nrfb|unopened)\b/i;
+const FLOOR_FIGURE_SEALED = /\b(?:sealed|brand new|new in box|nib|bnib|bnifsp|nrfb|unopened)\b/i;
 function floorFigureSaleCondition(sale, condition) {
   const title = floorFigureTitle(sale.title);
-  if (/\b(?:opened|unsealed|open[ -]box|not new|like new)\b/i.test(title)) return 'loose';
+  if (/\b(?:opened|unsealed|open[ -]box|not new|like new|reglued?|re[ -]glued?)\b/i.test(title)) return 'loose';
   if (FLOOR_FIGURE_SEALED.test(title)) return 'new';
   if (/\b(?:cib|mib|box|boxed|packaging|blister)\b/i.test(title)) return 'loose';
   return condition === 'cib' ? 'loose' : condition;
@@ -3122,8 +3122,13 @@ function floorSkyText(text) {
 }
 function floorSkyVariants(text) {
   return [...new Set([...floorSkyText(text).replace(/\b(?:dark )?creation crystal\b/g, '').matchAll(FLOOR_SKY_VARIANTS)].map((m) => m[0])
+    // Crystal, Clear and Crystal Clear describe the same transparent finish.
+    // Normalize identity labels, rather than requiring identical seller wording.
+    .map((v) => v === 'crystal' ? 'clear' : v)
     .filter((v) => !['variant', 'exclusive'].includes(v)))].sort();
 }
+const floorSkyMarketingTitle = (title) => floorSkyText(title)
+  .replace(/\b(?:limited|special|rare|exclusive|chase|collectible|spring time) edition\b/g, '');
 function floorSkyCharacter(product) {
   if (/\bcreation crystal\b/i.test(product?.['product-name'] || '')) return floorSkyText(product['product-name'].split(/\s+-\s+|\[/)[0]);
   return floorSkyText((product?.['product-name'] || '').split(/\s+-\s+|\[/)[0])
@@ -3149,14 +3154,18 @@ function floorToyListingMismatch(title, product) {
   if (floorToyFamily(product) === 'skylanders') {
     const wanted = floorSkyVariants(name);
     const listed = floorSkyVariants(title).filter((v) => v !== 'chase' || wanted.includes('chase') || !wanted.length || !floorToyVariant(product).rare);
-    if (listed.join('|') !== wanted.join('|')) return 'Different or unconfirmed figure variant';
+    const missing = wanted.filter(v => !listed.includes(v)), different = listed.filter(v => !wanted.includes(v));
+    if (different.length) return `Different figure variant: ${different.join(', ')}`;
+    if (missing.length) return `Listing does not confirm figure variant: ${missing.join(', ')}`;
+    if (/\b(?:error box|box error|misprinted (?:box|packaging)|packaging error)\b/i.test(title)
+      && !/\b(?:error|misprint)/i.test(name)) return 'Special/error packaging; review separately';
     if (/\b(?:[2-9]|\d{2,}|two|three|four|five)[\s-]*(?:pack|figures|characters)\b|\b(?:set of|lot of|choose|pick your)\b/i.test(title)) return 'Multiple figures or choice listing';
     // Once aliases match, character pairs must still not become single-figure comps.
     const character = floorSkyCharacter(product);
-    const parts = floorSkyText(floorFigurePackagingTitle(floorBundleTitle(title)).replace(/\s*[&+]\s*/g, ' and ')).split(/\b(?:and|with)\b/);
+    const parts = floorSkyMarketingTitle(floorFigurePackagingTitle(floorBundleTitle(title)).replace(/\s*[&+]\s*/g, ' and ')).split(/\b(?:and|with)\b/);
     if (parts.length > 1 && parts.some((part) => (` ${part.trim()} `).includes(` ${character} `))
       && parts.some((part) => !(` ${part.trim()} `).includes(` ${character} `)
-        && part.replace(FLOOR_SKY_VARIANTS, '').replace(/\b(?:skylanders?|s|spyro s adventure|giants|swap force|trap team|superchargers|imaginators|rare|figures?|characters?|chase|variant|tested|working|works|authentic|original|complete|in|box|cib|mib|mint|condition|very|good|excellent|used|new|sealed|not|fast|free|shipping)\b/g, '').trim())) return 'Multiple figures or choice listing';
+        && part.replace(FLOOR_SKY_VARIANTS, '').replace(/\b(?:skylanders?|s|spyro s adventure|giants|swap force|trap team|superchargers|imaginators|rare|special|limited|collectible|htf|vhtf|figures?|characters?|chase|variant|tested|working|works|authentic|original|complete|in|box|cib|mib|mint|condition|very|good|excellent|used|new|sealed|not|fast|free|shipping)\b/g, '').trim())) return 'Multiple figures or choice listing';
     if (floorToyVariant(product).unknown) return 'Unrecognized figure variant needs review';
     return null;
   }
@@ -3729,7 +3738,8 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
           const related = String(page.id) !== String(product.id);
           const targetCondition = floorToyFamily(product) ? floorFigureSaleCondition(sale, condition) : condition;
           if (related && (floorListingMismatch(sale.title, product) || floorOdd(sale, targetCondition, null, product)
-            || (targetCondition === 'new' && (!/\b(?:new|sealed|bnib|nib|nrfb|unopened)\b/i.test(sale.title) || /\b(?:used|opened|unsealed|like new)\b/i.test(sale.title))))) continue;
+            || (targetCondition === 'new' && (!FLOOR_FIGURE_SEALED.test(sale.title) && !/\bnew\b/i.test(sale.title)
+              || /\b(?:used|opened|unsealed|like new)\b/i.test(sale.title))))) continue;
           const key = `${targetCondition}|${floorSaleKey(sale)}`;
           if (seen.has(key)) continue;
           seen.add(key);
@@ -4011,7 +4021,7 @@ function floorListingMismatch(title, product) {
   // Marketing "limited edition" on an already verified special figure is not
   // a separate game edition. Other edition names still require confirmation.
   const editionCheckTitle = floorToyFamily(product) === 'skylanders' && floorToyVariant(product).rare
-    ? floorSkyText(title).replace(/\b(?:limited|special|spring time) edition\b/g, '') : title;
+    ? floorSkyMarketingTitle(title) : title;
   if (otherEdition(editionCheckTitle, name)) return 'Different special edition or reprint';
   let editionTitle = norm(editionCheckTitle).replace(/\b(?:standard|regular|base) edition\b/g, '');
   for (const platform of FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])))) {

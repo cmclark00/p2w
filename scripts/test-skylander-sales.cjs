@@ -13,6 +13,73 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Crystal Whirlwind screenshot uses finish aliases, marketing wording and correct conditions', () => {
+    const e = engine();
+    e.ctx.p = { ...product, 'product-name': 'Whirlwind - Crystal', 'loose-price': 21755 };
+    const titles = [
+      "Activision Skylanders Spyro's Adventure crystal clear whirlwind error box",
+      '*Very Rare* Skylanders Crystal Clear Whirlwind Variant - VHTF',
+      "Skylanders - Spyro's Adventure - Crystal Clear Whirlwind 🦄🐉 BNIFSP",
+      "Skylanders - Spyro's Adv. - Crystal Clear Whirlwind 🦄🐉 New/Store Pk. Reglue",
+      'Skylanders Spyros Adventure Crystal Clear Whirlwind In Box Very Rare Variant',
+      'Skylanders Spyros Adventure Crystal Clear Whirlwind Very Rare Variant L@@K READ!',
+    ];
+    e.ctx.cur = { product: e.ctx.p, condition: 'loose', sales: { loose: titles.map((t, i) => sale(t, [160000, 80000, 48500, 38300, 30000, 16995][i], String(100000000000 + i))) } };
+    const rows = e.run('floorSales(cur)');
+    assert.match(rows.find(s => s.title === titles[0]).mismatch, /packaging/);
+    assert.ok(!rows.some(s => s.title === titles[2]), 'factory-sealed abbreviation stays out of Loose');
+    for (const title of titles.slice(1).filter(t => !t.includes('BNIFSP'))) assert.equal(rows.find(s => s.title === title).odd, false, title);
+    assert.equal(e.run('floorResult(cur).r.price'), 80000);
+    e.ctx.title = titles[2];
+    assert.equal(e.run('floorListingMismatch(title,p)'), null, 'sealed listing has correct variant identity');
+    assert.equal(e.run('floorFigureSaleCondition({title},"loose")'), 'new');
+    assert.equal(e.run('floorOdd({title},"new",null,p)'), false);
+    assert.equal(e.run('floorResult({...cur,condition:"new"}).r.price'), 48500);
+    e.run('settings.floorPremiums=[{phrase:"Whirlwind",pct:10}]');
+    assert.equal(e.run('floorResult(cur).r.price'), 88000, 'specific premium remains applied');
+  });
+  await test('variant identity is stable across generic seller descriptions and equivalent finish names', () => {
+    const e = engine();
+    const variants = [
+      ['Whirlwind - Crystal', 'Crystal Clear Whirlwind'], ['Whirlwind - Clear', 'Crystal Whirlwind'],
+      ['Bash - Crystal', 'Clear Bash'], ['Cynder - Giants, Glow in the Dark', 'Cynder GITD'],
+      ['Trigger Happy - Swap Force, Spring Time', 'Springtime Trigger Happy'],
+      ['Tree Rex - Gnarly', 'Gnarly Tree Rex'], ['Whirlwind - Giants, Polar, Series 2', 'Polar Whirlwind Series 2'],
+    ];
+    const descriptions = ['Very Rare', 'Special Rare Variant', 'Chase Variant', 'Exclusive Variant', 'Limited Edition', 'Special Edition', 'Rare Edition', 'Exclusive Edition', 'Collectible Edition', 'VHTF'];
+    for (const [name, alias] of variants) for (const description of descriptions) {
+      e.ctx.p = { ...product, 'product-name': name };
+      e.ctx.title = `Skylanders ${alias} ${description}`;
+      assert.equal(e.run('floorListingMismatch(title,p)'), null, e.ctx.title);
+      assert.equal(e.run('floorAmazonMismatch({product:p,condition:"loose",amazon:{found:true,title}})'), null, 'Amazon: ' + e.ctx.title);
+    }
+    e.ctx.p = { ...product, 'product-name': 'Whirlwind - Crystal' };
+    for (const title of ['Very Rare Whirlwind Variant', 'Polar Whirlwind Special Rare Variant', 'Crystal Clear Cynder Very Rare',
+      'Crystal Clear Whirlwind Metallic Chase', 'Crystal Clear Whirlwind Series 2', 'Crystal Clear Whirlwind and Cynder',
+      'Crystal Clear Whirlwind + Bash', 'Crystal Clear Whirlwind 3 pack', 'Crystal Clear Whirlwind Deluxe Edition',
+      'Crystal Clear Whirlwind Preorder']) {
+      e.ctx.title = title; assert.ok(e.run('floorListingMismatch(title,p)'), title);
+    }
+    e.ctx.title = 'Crystal Clear Whirlwind Metallic';
+    assert.match(e.run('floorListingMismatch(title,p)'), /metallic/);
+    e.ctx.title = 'Very Rare Whirlwind';
+    assert.match(e.run('floorListingMismatch(title,p)'), /does not confirm.*clear/);
+    e.ctx.p = { ...product, 'product-name': 'Whirlwind' }; e.ctx.title = 'Crystal Clear Whirlwind Rare';
+    assert.ok(e.run('floorListingMismatch(title,p)'), 'standard figure cannot inherit rare finish sales');
+  });
+  await test('Crystal aliases recover misplaced sales and route BNIFSP to sealed without mixing variants', async () => {
+    const p = { ...product, 'product-name': 'Whirlwind - Crystal' };
+    const e = engine(async (route, params) => route === 'pc/products' ? { products: [{ ...p, id: '2', 'product-name': 'Whirlwind' }] }
+      : { sales: String(params.id) === '1' ? {} : { loose: [
+        sale('Skylanders Crystal Clear Whirlwind Very Rare Variant', 80000),
+        sale('Skylanders Crystal Clear Whirlwind BNIFSP', 48500, '222222222222'),
+        sale('Skylanders Polar Whirlwind Rare Variant', 90000, '333333333333'),
+      ] } });
+    const sold = await e.fetch(p);
+    assert.equal(sold.sales.loose.length, 1); assert.equal(sold.sales.loose[0].price, 80000);
+    assert.equal(sold.sales.new.length, 1); assert.equal(sold.sales.new[0].price, 48500);
+    assert.equal(sold.sales.new[0].sourceCondition, 'loose');
+  });
   await test('Sonic Boom glow singles stay eligible while the screenshot bundles stay excluded', () => {
     const e = engine();
     e.ctx.p = { ...product, 'product-name': 'Sonic Boom - Giants, Glow in the Dark', 'loose-price': 977 };
