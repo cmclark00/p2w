@@ -3264,16 +3264,16 @@ function floorShelfRound(price) {
   return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
 }
 
-// Through $80, dollar endings 7/8/9 round up to the next $10; otherwise round down to $5.
-// Ignore cents for the ending: $16.99 -> $15, $17 -> $20, $26 -> $25.
+// Through $80, round up to the next $5, including cents; exact multiples stay unchanged.
+// $12 -> $15, $14.95 -> $15, $15 -> $15, $17 -> $20.
 function floorLowRound(price) {
-  return price % 1000 >= 700 ? Math.ceil(price / 1000) * 1000 : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
+  return Math.ceil(price / FLOOR_STEP) * FLOOR_STEP;
 }
 
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
 // keep the unrounded amount until the single final rounding step for its tier,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
-// Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
+// Market references receive the same upward rounding. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
 function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null }) {
@@ -4187,7 +4187,7 @@ function renderFloorPricer() {
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
-            <li>Rounding: through $80, endings 7–9 go up to $10; other endings go down to $5. Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
+            <li>Rounding: through $80, round up to the next $5 including cents; exact multiples stay unchanged. Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
       </aside>

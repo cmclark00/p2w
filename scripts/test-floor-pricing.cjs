@@ -224,7 +224,7 @@ test('normal naming, selected extras and genuine collections remain comparable',
   const title = 'Halo The Master Chief Collection Xbox One 6 Games';
   const result = invoke('floorResult', cur(collection, { sales: { cib: [{ title, price: 5200 }] },
     amazon: { found: true, title, offers: [{ price: 4000 }] } }));
-  assert.equal(result.b.from, 'sale'); assert.equal(result.b.basis, 5200); assert.equal(result.r.price, 5000);
+  assert.equal(result.b.from, 'sale'); assert.equal(result.b.basis, 5200); assert.equal(result.r.price, 5500);
 });
 
 test('Amazon missing-title and renewed/digital matches are excluded and visibly explained', () => {
@@ -248,7 +248,7 @@ test('variant exclusions precede premiums and leave matching Amazon offers eligi
     { title: 'Pokemon Shield (French Version) Nintendo Switch', price: 9000 }] },
     amazon: { found: true, title: 'Pokemon Shield - Nintendo Switch', offers: [{ price: 6000 }, { price: 10000 }] } });
   const result = invoke('floorResult', example);
-  assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 6500);
+  assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 7000);
   example.amazon.title = 'Pokemon Shield (French Version) - Nintendo Switch';
   const excluded = invoke('floorResult', example);
   assert.equal(excluded.b.basis, 5000); assert.equal(excluded.r.price, 5500);
@@ -367,20 +367,20 @@ test('outlier thresholds require both a large relative gap and a $5 gap with thr
   assert.equal(invoke('floorResult', example).b.basis, 1600);
 });
 
-test('Killzone real CIB price distribution excludes $16 and rounds the remaining $13 to $10', () => {
+test('Killzone real CIB price distribution excludes $16 and rounds the remaining $13 to $15', () => {
   // Public PriceCharting CIB table, fetched Oct 17, 2026; the $1.50 Greatest Hits edition is omitted.
   const prices = [300, 750, 598, 1237, 601, 899, 999, 554, 799, 750, 900, 240, 1299, 1179,
     700, 399, 528, 1600, 499, 883, 444, 799, 695, 729, 500, 574, 995, 971, 1300];
   const product = { ...item, 'product-name': 'Killzone Shadow Fall', 'gamestop-price': 999 };
   const example = highSaleCur(prices, product, { amazon: { found: true, lowest: 1000, offers: [{ price: 1000 }] } });
   const result = invoke('floorResult', example);
-  assert.equal(result.b.basis, 1300); assert.equal(result.r.price, 1000);
+  assert.equal(result.b.basis, 1300); assert.equal(result.r.price, 1500);
   assert.ok(result.b.checks.some((s) => s.includes('75%')));
-  assert.equal(invoke('floorResult', { ...example, pick: prices.indexOf(1600) }).r.price, 1500);
+  assert.equal(invoke('floorResult', { ...example, pick: prices.indexOf(1600) }).r.price, 2000);
   // A second nearby high sale supports the high price rather than being discarded recursively.
   example.sales.cib.push({ price: 1550, title: 'Killzone Shadow Fall complete' });
   assert.equal(invoke('floorResult', example).b.basis, 1600);
-  assert.equal(invoke('floorResult', example).r.price, 1500);
+  assert.equal(invoke('floorResult', example).r.price, 2000);
 });
 
 test('distribution-based flags need eight comparables, a 20% top gap, and a $5 / 50% quartile gap', () => {
@@ -446,9 +446,9 @@ test('Halo MCC uses the highest supported sale then low-price rounding across sy
     const product = { ...item, 'product-name': 'Halo: The Master Chief Collection', 'console-name': system, 'gamestop-price': 3499 };
     const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection CIB' })) };
     const r = invoke('floorResult', cur(product, { sales }));
-    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5000);
+    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5500);
     // Clicking a lower sale cannot undercut the highest valid sale; typed prices are explicit overrides.
-    assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5000);
+    assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5500);
   }
 });
 
@@ -463,7 +463,7 @@ test('highest-sale selection filters odd listings before ranking and handles spa
   ] };
   assert.equal(invoke('floorResult', cur(item, { sales })).b.basis, 5200);
   const one = invoke('floorResult', cur(item, { sales: { cib: [sales.cib[3]] } }));
-  assert.equal(one.r.price, 5000); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
+  assert.equal(one.r.price, 5500); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
   assert.equal(invoke('floorAutoSale', [{ price: 5200 }, { price: 4999 }]).sale.price, 5200);
   assert.equal(invoke('floorAutoSale', []).sale, null);
 });
@@ -534,7 +534,7 @@ test('out-of-stock exclusion preserves premiums, discounts, deductions and pendi
   const old = json('settings.floorPremiums');
   try {
     context.outDiscount = [{ phrase: 'Pokemon Shield', pct: -20 }]; run('settings.floorPremiums = outDiscount');
-    assert.equal(invoke('floorResult', example).r.price, 5500);
+    assert.equal(invoke('floorResult', example).r.price, 6000);
   } finally { context.restorePremiums = old; run('settings.floorPremiums = restorePremiums'); }
 });
 
@@ -604,7 +604,7 @@ test('configured premiums apply on top of the winning market baseline', () => {
   const r = invoke('floorResult', cur(product, { sales: { cib: [{ price: 5000, title: 'Pokemon Shield complete' }] },
     amazon: { found: true, lowest: 6000, offers: [{ price: 6000 }, { price: 20000 }] } }));
   assert.equal(r.b.from, 'amazon'); assert.equal(r.b.basis, 6000);
-  assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 6600); assert.equal(r.r.price, 6500);
+  assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 6600); assert.equal(r.r.price, 7000);
 });
 test('specific discounts outrank all three market references and saved settings remain intact', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'Pokemon Black', 'console-name': 'Nintendo DS', 'gamestop-price': 14500 },
@@ -638,24 +638,34 @@ test('longest and system-specific rules win, while zero-percent exemptions retai
   assert.equal(invoke('floorPremium', 'Example Game', 'Xbox 360', overrides).pct, 20);
   const product = { ...item, 'product-name': 'Pokemon Black Version 2', 'console-name': 'Nintendo DS' };
   const r = invoke('floorResult', cur(product, { sales: { cib: [{ price: 5200, title: 'Pokemon Black Version 2 complete' }] } }));
-  assert.equal(r.premium, null); assert.equal(r.r.price, 5000);
+  assert.equal(r.premium, null); assert.equal(r.r.price, 5500);
   assert.equal(invoke('floorResult', cur({ ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }, { typed: 1000 })).r.price, 1000);
 });
-test('low-price rounding respects dollar endings, cents, market references and the $80 boundary', () => {
-  for (const [basis, expected] of [[1000, 1000], [1499, 1000], [1500, 1500], [1600, 1500], [1699, 1500],
-    [1700, 2000], [1800, 2000], [1999, 2000], [2038, 2000], [2250, 2000], [2499, 2000],
-    [2500, 2500], [2699, 2500], [2700, 3000], [5200, 5000], [5250, 5000], [5700, 6000],
-    [7699, 7500], [7700, 8000], [8000, 8000], [8001, 8000]]) {
+test('low-price rounding rounds up to $5 with cents, exact multiples, market references and the $80 boundary', () => {
+  for (const [basis, expected] of [[1000, 1000], [1001, 1500], [1200, 1500], [1249, 1500], [1250, 1500], [1495, 1500], [1499, 1500], [1500, 1500], [1600, 2000], [1699, 2000],
+    [1700, 2000], [1749, 2000], [1750, 2000], [1800, 2000], [1999, 2000], [2038, 2500], [2250, 2500], [2499, 2500],
+    [2500, 2500], [2699, 3000], [2700, 3000], [5200, 5500], [5250, 5500], [5700, 6000],
+    [7699, 8000], [7700, 8000], [7750, 8000], [7999, 8000], [8000, 8000], [8001, 8000]]) {
     assert.equal(invoke('floorPrice', basis, { referenceMin: basis, gs: basis }).price, expected, `market basis ${basis}`);
     if (basis <= 8000) assert.equal(invoke('floorPrice', basis, {}).price, expected, `typed basis ${basis}`);
   }
   assert.equal(invoke('floorPrice', 200, {}).price, 1000);
   assert.equal(invoke('floorPrice', 200, { shitbox: true }).price, 500);
-  assert.equal(invoke('floorPrice', 5200, { gs: 5200 }).price, 5000);
+  assert.equal(invoke('floorPrice', 5200, { gs: 5200 }).price, 5500);
   assert.equal(invoke('floorPrice', 5200, { manualMissing: true }).price, 4500);
   const rounded = invoke('floorPrice', 5200, {});
-  assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('low-price rounding: $50.00'));
+  assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('low-price rounding: $55.00'));
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
+});
+
+test('LEGO DC Super Villains PS4 CIB rounds its winning $14.95 sale to $15', () => {
+  const product = { ...item, 'product-name': 'LEGO DC Super Villains', 'cib-price': 1073, 'gamestop-price': 999 };
+  const result = invoke('floorResult', cur(product, {
+    sales: { cib: [{ title: 'LEGO DC Super Villains PS4 PlayStation 4 Complete - 1 Year Warranty EX Cond', price: 1495, date: '2026-07-13' }] },
+    amazon: { found: true, title: 'LEGO DC Super-Villains - PlayStation 4', lowest: 1263, offers: [{ price: 1263 }] },
+  }));
+  assert.equal(result.b.basis, 1495);
+  assert.equal(result.r.price, 1500);
 });
 
 test('final shelf prices over $80 through $500 round to the nearest $10 or $25 multiple with ties up', () => {
@@ -727,7 +737,7 @@ test('Terminator rounds its raw amount once, including market clamps and manual 
   assert.equal(premium.premiumBasis, 40217); assert.equal(premium.price, 40000);
   const manual = invoke('floorPrice', 40217, { manualMissing: true });
   assert.equal(manual.ded, 4000); assert.equal(manual.beforeShelfRound, 36217); assert.equal(manual.price, 36000);
-  assert.equal(invoke('floorPrice', 8100, { manualMissing: true }).price, 7000);
+  assert.equal(invoke('floorPrice', 8100, { manualMissing: true }).price, 7500);
 });
 test('toy category detection uses figure catalogs and leaves same-named games alone', () => {
   for (const [system, family] of [['Skylanders', 'skylanders'], ['Disney Infinity', 'infinity'], ['Amiibo', 'amiibo'], ['Lego Dimensions', 'dimensions'], ['Starlink', 'starlink']]) {
