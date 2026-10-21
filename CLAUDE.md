@@ -819,9 +819,9 @@ The site's **only server-side code**. Everything else is static.
     still apply before toy rounding; the rare minimum applies afterward.
 
   - **Price math** (`floorPrice()`): through $80, `floorLowRound()` rounds
-    up to the next $5 including cents; exact multiples stay unchanged.
-    Examples: $12 -> $15, $14.95 -> $15, $15 -> $15, $17 -> $20,
-    $52 -> $55. The existing $10 minimum ($5 for shitbox games) remains.
+    dollar endings 7/8/9 up to the next $10; other endings round down to $5.
+    Cents do not affect the ending: $16.99 -> $15, $17 -> $20, $26 -> $25,
+    $52 -> $50. The existing $10 minimum ($5 for shitbox games) remains.
     This rounding also applies to GameStop and `referenceMin`, so an
     unrounded market reference cannot undo the owner's low-price rule.
     Above $80, amounts stay unrounded through the baseline and adjustments.

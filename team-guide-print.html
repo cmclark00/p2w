@@ -1023,9 +1023,9 @@ Guide (the Google Sheet tab).</p>
    the current pricing rules and only reads market data. History stays in
    the browser. Download results before closing; the download can also be
    loaded as a checkpoint to resume unfinished comparisons.
-5. <strong>Through $80</strong>, prices <strong>round up to the next $5</strong>, including cents.
-   Exact multiples stay unchanged: $12 → $15, $14.95 → $15,
-   $15 → $15, and $17 → $20. This applies to the
+5. <strong>Through $80</strong>, prices whose whole-dollar amount ends in <strong>7, 8 or 9</strong>
+   round up to the next $10. Otherwise they round <strong>down to a multiple of $5</strong>:
+   $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the
    winning baseline after any premium or discount, including GameStop and
    Amazon references. The $10 minimum ($5 for shitbox games) still applies
    before missing-manual deductions. Specific adjustments take priority.
@@ -1647,7 +1647,7 @@ repo write access, GoDaddy account, password vault read access }}</em></p>
 </ol>
 <hr>
 <p><em>Last updated by the dev when this guide was written. If you find
-something out of date, <strong>edit this file</strong> — it's just another file in
+something out of date, </em><em>edit this file</em><em> — it's just another file in
 the repo. The dev who maintains the site should be reviewing this
 guide whenever the site structure changes meaningfully.</em></p>
 </body>

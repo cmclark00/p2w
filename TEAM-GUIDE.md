@@ -919,9 +919,9 @@ Guide (the Google Sheet tab).
    the current pricing rules and only reads market data. History stays in
    the browser. Download results before closing; the download can also be
    loaded as a checkpoint to resume unfinished comparisons.
-5. **Through $80**, prices **round up to the next $5**, including cents.
-   Exact multiples stay unchanged: $12 → $15, $14.95 → $15,
-   $15 → $15, and $17 → $20. This applies to the
+5. **Through $80**, prices whose whole-dollar amount ends in **7, 8 or 9**
+   round up to the next $10. Otherwise they round **down to a multiple of $5**:
+   $16.99 → $15, $17 → $20, $26 → $25, and $52 → $50. This applies to the
    winning baseline after any premium or discount, including GameStop and
    Amazon references. The $10 minimum ($5 for shitbox games) still applies
    before missing-manual deductions. Specific adjustments take priority.
