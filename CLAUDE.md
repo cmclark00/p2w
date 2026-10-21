@@ -559,6 +559,12 @@ The site's **only server-side code**. Everything else is static.
     become that floor. Specific premiums/deductions and rounding apply once
     afterward; typed overrides still work. Standard evidence appears in its
     own expandable section. Toys-to-life/hardware keep their existing rules.
+    Named game releases labeled Collection (e.g. WWII Valor Collection) are
+    variant evidence, not standard-game comps. The shared listing matcher
+    rejects them in selected-page sales, sibling recovery and Amazon; selected
+    bracketed Collection releases require their qualifier words in the title.
+    Actual compilation names and seller personal-collection descriptions stay
+    eligible. Figure-specific variant matching remains separate.
     Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's

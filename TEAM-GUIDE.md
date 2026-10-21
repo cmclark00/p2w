@@ -835,6 +835,9 @@ Guide (the Google Sheet tab).
      if the variant is $20 and the standard game is $25, its baseline is $25.
      Specific premiums and deductions still apply, followed by one rounding
      step. Other special editions do not raise the standard game's price.
+     This includes named collections such as **WWII Valor Collection**; choose
+     that version only when pricing the collection itself. Ordinary compilation
+     games and seller wording such as “from my personal collection” still qualify.
      Expand **Standard game** to inspect that evidence, or use **Other editions**
      to change the selected version. Failed or capped searches are flagged.
    - **Every system:** compare the **highest valid eBay sale**, the

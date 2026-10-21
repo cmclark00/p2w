@@ -70,5 +70,22 @@ function engine(request) {
   assert.equal(e.run('floorResult(example).r.price'), 4000);
   e.run('example.standardGame.product=base; example.standardGame.sales.cib[0].price=45000; example.amazon.standard.offers[0].price=70000');
   assert.equal(e.run('floorResult(example).r.price'), 45000, 'high-value Amazon protection survives base comparison');
-  console.log('Game evidence passed: related sales, duplicates, region/platform/edition filters, standard minimum, Amazon/GameStop, premiums, deductions, conditions and failures.');
+  const cod = { ...base, id: '100', 'product-name': 'Call of Duty WWII' };
+  const valor = { ...cod, id: '101', 'product-name': 'Call of Duty WWII [Valor Collection]' };
+  const collectionSale = sale('123456789022', 'Call of Duty WWII Valor Collection Valor Great Condition PS4 Playstation 4', 10000);
+  const baseSale = sale('123456789023', 'Call of Duty WWII PS4 CIB', 1200);
+  const collections = engine(async (route, params) => {
+    if (route === 'pc/products') return { products: [cod, valor] };
+    if (route === 'pc/product') return cod;
+    return { sales: { cib: params.id === '100' ? [baseSale] : [collectionSale, baseSale] } };
+  });
+  collections.ctx.cod = cod; collections.ctx.valor = valor;
+  const baseEvidence = await collections.run('fetchFloorProductSales(cod,request)');
+  assert.equal(baseEvidence.sales.cib.length, 1, 'Valor sales cannot be recovered into standard game');
+  assert.equal(baseEvidence.sales.cib[0].price, 1200);
+  const valorEvidence = await collections.run('fetchFloorProductSales(valor,request)');
+  assert.ok(valorEvidence.sales.cib.some(s => s.price === 10000), 'selected Valor retains its own sales');
+  assert.equal(valorEvidence.standardGame.sales.cib.length, 1, 'Valor cannot contaminate its standard-game floor');
+  assert.equal(valorEvidence.standardGame.sales.cib[0].price, 1200);
+  console.log('Game evidence passed: related sales, duplicates, region/platform/edition/collection filters, standard minimum, Amazon/GameStop, premiums, deductions, conditions and failures.');
 })().catch(err => { console.error(err); process.exitCode = 1; });

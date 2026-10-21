@@ -168,6 +168,43 @@ test('pack-ins do not excuse separate extras, variants, incomplete copies or hig
   assert.ok(result.b.checks.some((s) => s.includes('outlier')));
 });
 
+test('named collections cannot raise the standard game price, including the Valor screenshot', () => {
+  const product = { ...item, 'product-name': 'Call of Duty WWII', 'console-name': 'Playstation 4', 'gamestop-price': 999 };
+  const titles = [
+    'Call of Duty WWII Valor Collection Valor Great Condition PS4 Playstation 4',
+    'Call of Duty WWII Valor Collection Valor Great Condition PS4 Statue',
+    'Call of Duty WWII VALOR Collection WW2 Ps4 ArmyPatches Cod Zombies Used Game',
+    'Call of Duty: WWII Valor Collection PS4',
+    'Call of Duty: WWII WW2 Valor Collection (Sony Playstation 4, 2017) Open Box +',
+    'Call of Duty WWII Valor Collection (PS4 PlayStation 4) - CIB Complete, Very good',
+    'Call of Duty WWII Valor Collection PS4 Statue WWII with Bloodraven Sword Pin',
+    'Call of Duty WWII Unknown Named Collection PS4',
+  ];
+  const example = cur(product, { sales: { cib: [...titles.map(title => ({ title, price: 10000 })),
+    { title: 'Call of Duty WWII PS4 CIB', price: 1200 }] },
+    amazon: { found: true, title: titles[0], offers: [{ price: 15000 }] } });
+  assert.equal(invoke('floorResult', example).b.basis, 1200);
+  assert.equal(invoke('floorResult', example).r.price, 1500);
+  assert.equal(invoke('floorAmazonLowest', example), null);
+  assert.equal(invoke('floorEstimate', { ...example, salesLoading: true }).price, 1500);
+  for (const title of titles) assert.ok(invoke('floorListingMismatch', title, product), title);
+  const valor = { ...product, 'product-name': 'Call of Duty WWII [Valor Collection]' };
+  assert.equal(invoke('floorListingMismatch', titles[0], valor), null);
+  for (const title of ['Call of Duty WWII PS4 CIB', 'Call of Duty WWII Other Collection PS4'])
+    assert.ok(invoke('floorListingMismatch', title, valor), title);
+  for (const suffix of ['from my collection', 'from my personal collection', 'personal collection', 'add to your collection'])
+    assert.equal(invoke('floorListingMismatch', 'Call of Duty WWII PS4 CIB ' + suffix, product), null, suffix);
+  assert.ok(invoke('floorListingMismatch', titles[0] + ' from my personal collection', product));
+  for (const name of ['Halo Master Chief Collection', 'Sonic Mega Collection Plus', 'Castlevania Anniversary Collection'])
+    assert.equal(invoke('floorListingMismatch', name + ' PS4 CIB', { ...product, 'product-name': name }), null, name);
+  const savedPremiums = run('settings.floorPremiums');
+  run('settings.floorPremiums=[{phrase:"Call of Duty WWII",pct:20}]');
+  assert.equal(invoke('floorResult', example).r.price, 1500, '1200 + 20% rounds once to 1500');
+  assert.equal(invoke('floorResult', cur(valor, { sales: { cib: [{ title: titles[0], price: 10000 }] } })).r.price, 12000);
+  context.savedCollectionTestPremiums = savedPremiums;
+  run('settings.floorPremiums=savedCollectionTestPremiums');
+});
+
 test('audit mismatches cannot drive eBay or Amazon baselines', () => {
   for (const [name, system, title, good, price] of [
     ['Final Fight', 'Super Nintendo', 'Final Fight Guy - Nintendo Super NES', 'Final Fight Super Nintendo cartridge tested', 2969],

@@ -4115,7 +4115,15 @@ function floorListingMismatch(title, product) {
   }
   if (/\bedition\b/i.test(editionTitle) && !/\bedition\b/i.test(name)
     && !EDITION_RES.some((re) => re.test(name) && re.test(title))) return 'Unconfirmed named or numbered edition';
-  const selectedEdition = name.match(/\[[^\]]*\bedition\b[^\]]*\]|\([^)]*\bedition\b[^)]*\)/gi) || [];
+  // Named collector releases can say "Collection" rather than "Edition".
+  // Do not confuse those with a seller describing their personal collection,
+  // or with an actual compilation whose selected product name says Collection.
+  const collectionTitle = norm(editionCheckTitle)
+    .replace(/\b(?:(?:from|out of) )?(?:(?:my|our|a|the) )?personal collection\b/g, '')
+    .replace(/\b(?:from|out of) (?:my|our) collection\b|\b(?:add|addition) to (?:your|any|a) collection\b/g, '');
+  if (!floorToyFamily(product) && !floorIsHardware(product)
+    && /\bcollection\b/.test(collectionTitle) && !/\bcollection\b/i.test(name)) return 'Different collection or collector release';
+  const selectedEdition = name.match(/\[[^\]]*\b(?:edition|collection)\b[^\]]*\]|\([^)]*\b(?:edition|collection)\b[^)]*\)/gi) || [];
   if (selectedEdition.some((edition) => floorTitleWords(edition).some((word) => !floorTitleWords(title).includes(word)))) return 'Different named edition';
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
