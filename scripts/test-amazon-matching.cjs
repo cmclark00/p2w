@@ -77,13 +77,18 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const r = await e.fetch(); assert.equal(r.found, true); assert.equal(r.asin, good.asin); assert.equal(r.offers.length, 0); assert.equal(r.searched, true);
   });
   await test('ambiguous broad searches and partially failed offer checks do not publish an arbitrary price', async () => {
-    const many = engine(async () => ({ candidates: Array.from({length:13},(_,i)=>candidate('B'+String(i).padStart(9,'0'))) }));
-    await assert.rejects(many.fetch(), /too many candidates/);
+    const candidates = Array.from({length:26},(_,i)=>candidate('B'+String(i).padStart(9,'0')));
+    const many = engine(async (route, params) => route === 'amazon/catalog' ? {candidates}
+      : offer(candidates.find(c=>c.asin===params.asin),2500));
+    const partialMany = await many.fetch(); assert.equal(partialMany.incomplete, true);
+    many.ctx.result = partialMany;
+    assert.equal(many.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
+    assert.equal((await many.fetch()).incomplete, undefined, 'continue finishes remaining offers');
     const broken = engine(async (route, params) => {
       if (route === 'amazon/catalog') return { candidates: [candidate('B000000001'), candidate('B000000002')] };
       if (params.asin === 'B000000002') throw Error('Offer lookup failed'); return offer(candidate('B000000001'), 99900);
     });
-    await assert.rejects(broken.fetch(), /Offer lookup failed/);
+    const partial = await broken.fetch(); assert.equal(partial.incomplete,true); assert.match(partial.searchError,/Offer lookup failed/);
   });
   await test('Lollipop Chainsaw PS3 finds renewed offers only after regular listings are unpriced', async () => {
     const p = { ...product, 'product-name': 'Lollipop Chainsaw', 'console-name': 'Playstation 3' };
@@ -153,7 +158,9 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       if (route === 'amazon/catalog') return { candidates: [renewed] };
       if (params.cond === 'new') throw Error('Renewed lookup failed'); return offer(renewed, 9000);
     });
-    await assert.rejects(failed.fetch(), /Renewed lookup failed/);
+    const partial = await failed.fetch(); assert.equal(partial.incomplete,true); assert.match(partial.searchError,/Renewed lookup failed/);
+    failed.ctx.result=partial;
+    assert.equal(failed.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
   });
   await test('specific premiums remain applied after the renewed fallback baseline', async () => {
     const p = { ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
@@ -212,13 +219,53 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
   await test('truncated catalogs and failed later pages cannot silently claim the lowest Amazon match', async () => {
     const incomplete = engine(async (route, params) => route === 'amazon/catalog'
       ? {candidates:[candidate('B000000001')],more:true} : offer(candidate('B000000001'),2500));
-    await assert.rejects(incomplete.fetch(),/incomplete/);
+    const partial = await incomplete.fetch(); assert.equal(partial.incomplete,true); assert.match(partial.searchError,/incomplete/);
     const failed = engine(async (route, params) => {
       if (route !== 'amazon/catalog') return offer(candidate('B000000001'),2500);
       if (params.pageToken) throw Error('Later catalog page failed');
       return {candidates:[candidate('B000000001')],more:true,nextToken:'next'};
     });
-    await assert.rejects(failed.fetch(),/Later catalog page failed/);
+    const failedPartial = await failed.fetch(); assert.equal(failedPartial.incomplete,true); assert.match(failedPartial.searchError,/Later catalog page failed/);
+    failed.ctx.result=failedPartial; failed.run('amazonSet=true');
+    const cur='{product,condition:"loose",sales:{loose:[{title:"Final Fight SNES",price:2000}]},amazon:result}';
+    assert.equal(failed.run(`floorResult(${cur}).r.price`),2000, 'partial Amazon cannot silently raise baseline');
+    const html=failed.run(`floorAmazonHtml(${cur},{from:"sale"})`);
+    assert.ok(html.includes('$25.00') && html.includes('reference only') && html.includes('Continue Amazon search'));
+    assert.ok(!html.includes('lowest matching offer used'));
+  });
+  await test('searches beyond three pages and resumes larger batches without repeating completed requests', async () => {
+    const a=candidate('B000000001'), b=candidate('B000000002'), calls=[];
+    const e=engine(async(route,params)=>{
+      calls.push([route,params]);
+      if(route==='amazon/offers') return offer(params.asin===a.asin?a:b,params.asin===a.asin?5000:2000);
+      if(params.upc) return {candidates:[a]};
+      const page=Number(params.pageToken||1);
+      return {candidates:page===11?[b]:[],more:page<12,nextToken:page<12?String(page+1):''};
+    });
+    const partial=await e.fetch(); assert.equal(partial.incomplete,true); assert.equal(partial.asin,a.asin);
+    assert.ok(calls.some(([,p])=>p.pageToken==='4'), 'old three-page limit no longer stops search');
+    const before=calls.length, complete=await e.fetch();
+    assert.equal(complete.incomplete,undefined); assert.equal(complete.asin,b.asin); assert.equal(complete.offers[0].price,2000);
+    assert.equal(calls.length-before,4, 'resume requests only pages 10-12 and the new offer');
+    assert.equal(calls.filter(([r,p])=>r==='amazon/offers'&&p.asin===a.asin).length,1);
+    e.ctx.result=complete;
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2000);
+  });
+  await test('failed pages retry from saved progress and broken tokens are refetched', async () => {
+    const a=candidate('B000000001'); let fail=true, firstPages=0, offers=0;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers'){offers++;return offer(a,2500);}
+      if(params.upc) return {candidates:[]};
+      if(!params.pageToken){firstPages++;return {candidates:[a],more:true,nextToken:'next'};}
+      if(fail) throw Error('Temporary page failure'); return {candidates:[]};
+    });
+    assert.equal((await e.fetch()).incomplete,true); fail=false;
+    assert.equal((await e.fetch()).incomplete,undefined); assert.equal(firstPages,1); assert.equal(offers,1);
+    let calls=0;
+    const token=engine(async(route)=>route==='amazon/offers'?offer(a,2500)
+      : (++calls===1?{candidates:[a],more:true}:{candidates:[a]}));
+    assert.equal((await token.fetch()).incomplete,true);
+    assert.equal((await token.fetch()).incomplete,undefined); assert.equal(calls,3,'bad UPC page refetched, then title searched');
   });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

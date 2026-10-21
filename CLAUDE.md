@@ -991,10 +991,17 @@ The site's **only server-side code**. Everything else is static.
     compares known UPCs plus exact-title/platform and base-title/platform
     searches, even when the barcode already has an offer. Search candidates
     require positive platform evidence in the title or attributes. Catalog
-    searches follow pageToken for up to three pages; up to five known UPCs
-    and twelve matching ASINs are checked per product/condition. Missing
-    tokens, failures and larger sets require review rather than declaring a
-    verified minimum. Variant and standard-game Amazon matches stay separate;
+    searches follow pageToken in batches of up to ten new catalog pages and
+    24 new offer requests, with up to five known UPCs. Successful responses
+    are retained in memory for one hour while incomplete; Continue/Retry replays
+    those locally and resumes remaining requests. Complete results use the normal
+    result cache. Saving/removing credentials clears both caches. Missing/repeated
+    tokens are retried, not cached permanently; each query has a 50-page safety cap.
+    Failures/caps preserve verified offers as explicitly partial, reference-only
+    results; `floorAmazonLowest()` excludes them from pricing until complete.
+    Pins, offer tables, review notes and audits retain the incomplete status.
+    Partial Renewed offers cannot activate the fallback prematurely.
+    Variant and standard-game Amazon matches stay separate;
     the standard result participates in the variant's baseline comparison.
     These are searches in the configured US marketplace, not other countries'
     Amazon marketplaces. The

@@ -2055,6 +2055,7 @@ async function saveAmazonKeys() {
     amazonSandbox = !!r.amazonSandbox;
     ['#amzClientId', '#amzClientSecret', '#amzRefresh'].forEach((sel) => { $(sel).value = ''; });
     floorAmazonCache.clear();
+    floorAmazonProgress.clear();
     renderAmazonStatus(amazonSet ? 'Amazon keys saved ✓ Click “Test connection” to check them.' : 'Saved, but a key is still missing.');
   } catch (err) {
     toast(`Couldn't save the Amazon keys: ${err.message}`, 'error');
@@ -2081,6 +2082,7 @@ async function clearAmazonKeys() {
     amazonSet = false;
     amazonSandbox = false;
     floorAmazonCache.clear();
+    floorAmazonProgress.clear();
     renderAmazonStatus('Amazon keys removed.');
   } catch (err) {
     toast(err.message, 'error');
@@ -3368,6 +3370,7 @@ const saveFloorLocal = () => store.set('p2w-floor', floor);
 let floorCur = null;
 const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0, variantProduct: null, note: '' };
 const floorAmazonCache = new Map(); // product identity + condition -> verified Amazon lookup promise
+const floorAmazonProgress = new Map(); // successful request results retained only while a search is unfinished
 // Amazon has no Loose/CIB split: Loose and CIB games compare with its Used offers.
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
@@ -3550,18 +3553,40 @@ async function fetchFloorAmazonSingle(product, condition, request) {
   const upcs = [...new Set(String(product.upc || '').split(/[,\s]+/).filter(v => /^\d{8,14}$/.test(v)))], cond = amazonCond(condition);
   const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upcs, cond]);
   if (!floorAmazonCache.has(key)) {
+    let progress = floorAmazonProgress.get(key);
+    if (!progress || Date.now() - progress.started > 3600000) {
+      progress = { started: Date.now(), responses: new Map() };
+      floorAmazonProgress.set(key, progress);
+    }
     const pending = (async () => {
       const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
-      let searched = false, verifiedCandidates = 0;
+      let searched = false, newPages = 0, newOffers = 0, searchError = null;
+      const requestKey = (route, params) => JSON.stringify([route, params]);
+      async function resumeRequest(route, params) {
+        const k = requestKey(route, params);
+        if (progress.responses.has(k)) return progress.responses.get(k);
+        if (route === 'amazon/catalog' && newPages++ >= 10) throw Error('More Amazon results remain after this search batch. Continue to check the remaining pages.');
+        if (route === 'amazon/offers' && newOffers++ >= 24) throw Error('More matching Amazon offers remain. Continue to check the remaining listings.');
+        const result = await request(route, params);
+        progress.responses.set(k, result);
+        return result;
+      }
       async function catalog(params, renewed = false) {
         let pageToken;
-        for (let page = 0; page < 3; page++) {
-          const data = await request('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
+        const tokens = new Set();
+        for (let page = 0; page < 50; page++) {
+          const data = await resumeRequest('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
           await check(renewed ? { ...data, candidates: [...deferredRenewed.values(), ...(data.candidates || [])] } : data, !params.upc, renewed);
           if (!data.more) return;
-          if (!data.nextToken || data.nextToken === pageToken || page === 2) throw Error('Amazon catalog search incomplete; additional results need review.');
+          if (!data.nextToken || tokens.has(data.nextToken)) {
+            // Refetch this broken page on Retry instead of replaying a bad token forever.
+            progress.responses.delete(requestKey('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) }));
+            throw Error('Amazon did not provide a usable next-page token; search incomplete. Retry Amazon.');
+          }
+          tokens.add(data.nextToken);
           pageToken = data.nextToken;
         }
+        throw Error('Amazon search exceeds 50 pages; narrow the title or review remaining listings manually.');
       }
       async function check(catalog, fallback, renewedFallback = false) {
         const candidates = (catalog.candidates || []).filter((c) => /^[A-Z0-9]{10}$/.test(c.asin) && !seen.has(c.asin));
@@ -3577,13 +3602,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
           if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
           return !reason;
         });
-        verifiedCandidates += matching.length;
-        if (verifiedCandidates > 12) throw new Error('Several possible Amazon listings need review; too many candidates to verify automatically.');
         for (const c of matching) {
           // A renewed ASIN may carry New offers; that is still a renewed item,
           // never evidence for the original game's sealed condition.
           for (const offerCond of renewedFallback ? ['used', 'new'] : [cond]) {
-            const offer = { ...await request('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback };
+            const offer = { ...await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback };
             const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
               : floorAmazonCandidateMismatch(offer, product, condition, fallback);
@@ -3592,31 +3615,38 @@ async function fetchFloorAmazonSingle(product, condition, request) {
           }
         }
       }
-      if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
-      for (const upc of upcs) await catalog({ upc });
       const priced = () => verified.filter((a) => floorAmazonLowest({ product, condition, amazon: a }) > 0);
-      searched = true;
-      const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
-        .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
-      for (const q of queries) await catalog({ q });
-      if (!priced().length && condition !== 'new') {
-        const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
-        await catalog({ q }, true);
-      }
+      try {
+        if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
+        for (const upc of upcs) await catalog({ upc });
+        searched = true;
+        const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
+          .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
+        for (const q of queries) await catalog({ q });
+        if (!priced().length && condition !== 'new') {
+          const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
+          await catalog({ q }, true);
+        }
+      } catch (err) { searchError = err.message; }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b }) || a.asin.localeCompare(b.asin));
       const selected = choices[0] || verified[0];
       const matchNotes = [];
+      if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
-      if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; compared barcode and title/platform searches` : 'No verified Amazon listing found in the title/platform search; review manually');
+      if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; ${searchError ? 'search not finished' : 'compared barcode and title/platform searches'}` : searchError ? 'No verified Amazon match found yet; search not finished' : 'No verified Amazon listing found in the title/platform search; review manually');
       const listingCount = new Set(choices.map((a) => a.asin)).size;
-      if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer`);
-      if (selected?.renewedFallback) matchNotes.push(choices.length
+      if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer${searchError ? ' found so far' : ''}`);
+      if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
         ? 'Renewed fallback: no usable regular Amazon offer found. Using the lowest verified renewed offer as a used/CIB reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
-      return { ...(selected || { found: false }), rejected, matchNotes, searched };
+      if (searchError && !selected) throw Error(searchError);
+      return { ...(selected || { found: false }), rejected, matchNotes, searched, ...(searchError ? { incomplete: true, searchError } : {}) };
     })();
     floorAmazonCache.set(key, pending);
-    pending.catch(() => { if (floorAmazonCache.get(key) === pending) floorAmazonCache.delete(key); });
+    pending.then(result => {
+      if (result.incomplete) { if (floorAmazonCache.get(key) === pending) floorAmazonCache.delete(key); }
+      else if (floorAmazonProgress.get(key) === progress) floorAmazonProgress.delete(key);
+    }, () => { if (floorAmazonCache.get(key) === pending) floorAmazonCache.delete(key); });
   }
   return floorAmazonCache.get(key);
 }
@@ -4104,7 +4134,8 @@ function floorAutoSale(sales) {
 }
 
 // Offers include shipping. Never use the median or a higher offer; tolerate unsorted responses.
-function floorAmazonLowest(cur) {
+function floorAmazonLowest(cur, showPartial = false) {
+  if (cur.amazon?.incomplete && !showPartial) return null;
   if (!cur.amazon?.found || floorAmazonMismatch(cur)) return null;
   const prices = (cur.amazon.offers || []).map((o) => Number(o.price)).filter((p) => Number.isFinite(p) && p > 0);
   const lowest = prices.length ? Math.min(...prices) : Number(cur.amazon.lowest);
@@ -4258,7 +4289,7 @@ function floorStandardHtml(b) {
   return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} baseline${b.from === 'standard' ? ' · used' : ''}</summary>
     <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
     Specific premiums and deductions apply afterward.</p>
-    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur))} ↗</a></p>` : ''}
+    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur, true))}${cur.amazon.incomplete ? ' · partial, reference only' : ''} ↗</a>${cur.amazon.incomplete ? ' · <button type="button" class="link" data-floor-act="amazon">Continue Amazon search</button>' : ''}</p>` : ''}
     ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
     <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${esc(s.date || '')}</td></tr>`).join('')}</tbody></table>
     </details>`;
@@ -4301,7 +4332,7 @@ function renderFloorPricer() {
   const reviewNotes = [...new Set(b.checks)];
   const excluded = sales.filter((s) => s.mismatch).length + (cur.amazon?.rejected?.length || 0);
   const outliers = sales.filter((s) => s.outlier).length;
-  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.standard?.error);
+  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.incomplete || cur.amazon?.standard?.error || cur.amazon?.standard?.incomplete);
   el.innerHTML = `
     <div class="floor-pinned-header">
     <div class="floor-price-actions" role="group" aria-label="Game, condition, and price">
@@ -4330,7 +4361,7 @@ function renderFloorPricer() {
     <div class="floor-market-quick" aria-label="Market references">
       <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
-      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur))}</strong> ↗</a>
+      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur, true))}</strong>${cur.amazon?.incomplete ? ' · partial' : ''} ↗</a>
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
     </div>
@@ -4400,16 +4431,17 @@ function floorAmazonHtml(cur, b) {
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
-  const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur));
+  const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur, true));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
-  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${matchNote}`;
+  const partial = a.incomplete ? '<p class="muted"><span class="badge warn">Search incomplete · reference only</span> Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Continue Amazon search</button></p>' : '';
+  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${partial}${matchNote}`;
   const mismatch = floorAmazonMismatch(cur);
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">
-      <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === lowestAt ? 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Shipping included · lowest matching offer used.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+      <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === lowestAt ? a.incomplete ? 'lowest found so far' : 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="muted small-print">Shipping included · ${a.incomplete ? 'partial search; offers not used for automatic pricing' : 'lowest matching offer used'}.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {
