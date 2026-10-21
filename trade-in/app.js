@@ -3264,10 +3264,10 @@ function floorShelfRound(price) {
   return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
 }
 
-// Through $80, dollar endings 7/8/9 round up to the next $10; otherwise round down to $5.
-// Ignore cents for the ending: $16.99 -> $15, $17 -> $20, $26 -> $25.
+// Through $80, each $5 interval rounds up at $2 into the interval.
+// Ignore cents for the ending: $11.99 -> $10, $12 -> $15, $14.95 -> $15, $16.99 -> $15, $17 -> $20.
 function floorLowRound(price) {
-  return price % 1000 >= 700 ? Math.ceil(price / 1000) * 1000 : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
+  return price % FLOOR_STEP >= 200 ? Math.ceil(price / FLOOR_STEP) * FLOOR_STEP : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
 }
 
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
@@ -4187,7 +4187,7 @@ function renderFloorPricer() {
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
-            <li>Rounding: through $80, endings 7–9 go up to $10; other endings go down to $5. Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
+            <li>Rounding: through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
       </aside>
