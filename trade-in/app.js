@@ -406,6 +406,29 @@ async function api(route, { method = 'GET', body, params } = {}) {
   return data;
 }
 
+// Share overlapping catalog reads and short-lived results, without sharing mutable
+// product objects. This also reuses the search that staff just selected a game from.
+const pcReadCache = new Map();
+async function pcReadRequest(route, params) {
+  if (!['pc/product', 'pc/products', 'pc/sales'].includes(route)) return api(route, { params });
+  const key = JSON.stringify([route, Object.entries(params || {}).sort().map(([k, v]) =>
+    [k, k === 'q' ? String(v).trim().toLowerCase().replace(/\s+/g, ' ') : String(v)])]);
+  let entry = pcReadCache.get(key);
+  if (!entry || entry.expires <= Date.now()) {
+    entry = { expires: Infinity };
+    entry.promise = api(route, { params }).then(data => {
+      entry.expires = Date.now() + 5 * 60 * 1000;
+      return data;
+    }).catch(err => {
+      if (pcReadCache.get(key) === entry) pcReadCache.delete(key);
+      throw err;
+    });
+    pcReadCache.set(key, entry);
+    if (pcReadCache.size > 500) pcReadCache.delete(pcReadCache.keys().next().value);
+  }
+  return JSON.parse(JSON.stringify(await entry.promise));
+}
+
 const Demo = {
   async byUpc(upc) {
     await delay(350);
@@ -424,17 +447,17 @@ const Demo = {
 const PC = {
   async byUpc(upc) {
     if (!tokenSet) return Demo.byUpc(upc);
-    const d = await api('pc/product', { params: { upc } });
+    const d = await pcReadRequest('pc/product', { upc });
     if (!d?.id) throw new Error('No PriceCharting product matches that UPC.');
     return d;
   },
   async byId(id) {
     if (!tokenSet) return Demo.byId(id);
-    return api('pc/product', { params: { id } });
+    return pcReadRequest('pc/product', { id });
   },
   async search(q) {
     if (!tokenSet) return Demo.search(q);
-    const d = await api('pc/products', { params: { q } });
+    const d = await pcReadRequest('pc/products', { q });
     return d?.products || [];
   },
 };
@@ -2013,6 +2036,7 @@ async function saveToken() {
   }
   try {
     const r = await api('token', { method: 'PUT', body: { token } });
+    pcReadCache.clear();
     tokenSet = !!r.tokenSet;
     input.value = '';
     const lengthNote = token && token.length !== 40 ? ` Note: it's ${token.length} characters; PriceCharting tokens are usually 40.` : '';
@@ -3736,7 +3760,7 @@ async function fetchFloorGameSales(product, request) {
 
 // Related catalog pages often contain misplaced Skylander variants. Never use
 // their averages; verify every recovered title. Opened/CIB figures count as loose.
-async function fetchFloorProductSales(product, request = (route, params) => api(route, { params })) {
+async function fetchFloorProductSales(product, request = pcReadRequest) {
   if (!floorToyFamily(product) && !floorIsHardware(product)) return fetchFloorGameSales(product, request);
   const conditions = ['loose', 'cib', 'new'];
   const sales = Object.fromEntries(conditions.map((c) => [c, []]));
@@ -3757,9 +3781,21 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
       pages.push(...related.slice(0, 16));
     } catch (err) { errors.push(`Related-entry search unavailable: ${err.message}`); }
   }
-  for (const page of pages) {
+  const pageData = new Array(pages.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(3, pages.length) }, async () => {
+    while (next < pages.length) {
+      const i = next++, page = pages[i];
+      try { pageData[i] = await request('pc/sales', { id: page.id }); }
+      catch (err) { errors.push(`${page['product-name']}: ${err.message}`); }
+    }
+  }));
+  // Merge in catalog order regardless of response timing so duplicate ownership
+  // and source-condition handling remain stable.
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i], data = pageData[i];
+    if (!data) continue;
     try {
-      const data = await request('pc/sales', { id: page.id });
       // Related Skylander entries can contribute sales, never another variant's store link.
       if (String(page.id) === String(product.id)) gamestopUrl = data?.gamestopUrl || null;
       sources.push({ id: String(page.id), name: page['product-name'] });
@@ -3788,22 +3824,42 @@ async function fetchFloorProductSales(product, request = (route, params) => api(
 }
 
 async function loadFloorSales(product) {
+  const cur = floorCur;
   const id = String(product.id);
   if (!/^\d+$/.test(id)) { // demo products have no PriceCharting page
     floorCur.salesError = 'Demo mode: no recent sales until a PriceCharting token is added.';
     renderFloorPricer();
     return;
   }
+  cur.salesLoading = true;
+  const request = (route, params) => {
+    if (floorCur !== cur) return Promise.reject(new Error('Lookup replaced'));
+    return pcReadRequest(route, params);
+  };
+  // Start the selected page before sibling discovery. The completed lookup reuses
+  // this same request; stock checking and sales review can begin immediately.
+  const primary = request('pc/sales', { id }).then(data => {
+    if (floorCur !== cur) return;
+    cur.sales = data.sales;
+    cur.gamestopUrl = data.gamestopUrl || null;
+    loadFloorGameStopStock(cur);
+    renderFloorPricer();
+  }).catch(() => {}); // The full lookup below records/retries primary failures.
   try {
-    const sold = await fetchFloorProductSales(product);
-    if (floorCur?.product === product) {
-      Object.assign(floorCur, sold);
-      loadFloorGameStopStock(floorCur);
+    const sold = await fetchFloorProductSales(product, request);
+    await primary;
+    if (floorCur === cur) {
+      const selected = cur.pick == null ? null : floorSales(cur).find(s => s.i === cur.pick);
+      const oldUrl = cur.gamestopUrl;
+      Object.assign(cur, sold, { salesLoading: false });
+      // Additional pages can change row positions, especially normalized figures.
+      if (selected) cur.pick = floorSales(cur).find(s => floorSaleKey(s) === floorSaleKey(selected))?.i ?? null;
+      if (cur.gamestopUrl !== oldUrl || !cur.gamestopStock) loadFloorGameStopStock(cur);
     }
   } catch (err) {
-    if (floorCur?.product === product) floorCur.salesError = err.message;
+    if (floorCur === cur) { cur.salesError = err.message; cur.salesLoading = false; }
   }
-  if (floorCur?.product === product) renderFloorPricer();
+  if (floorCur === cur) renderFloorPricer();
 }
 
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
@@ -4194,7 +4250,7 @@ function floorOwnBasis(cur = floorCur) {
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
   if (floorGs(cur.product) && cur.gamestopStock?.state === 'loading') return { basis: null, sale, checks, waiting: true };
   // Never publish a fallback while the primary sold evidence or required checks are still loading.
-  if (cur.fullLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
+  if (cur.fullLoading || cur.salesLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
   if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop may be missing. Retry the search before labeling');
   if (cur.amazon?.error) checks.push(`Amazon check unavailable: ${cur.amazon.error}`);
   const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
@@ -4281,6 +4337,16 @@ function floorResult(cur) {
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
 
+// Display-only preview: never use this for Add to list, saved prices or audits.
+// Run the same pricing rules against available evidence, including premiums.
+function floorEstimate(cur) {
+  if (!floorResult(cur).b.waiting || !floorAutoSale(floorSales(cur)).sale) return null;
+  return floorResult({ ...cur, fullLoading: false, salesLoading: false,
+    amazon: !cur.amazon || cur.amazon.loading ? { found: false } : cur.amazon,
+    gamestopStock: cur.gamestopStock?.state === 'loading' ? { state: 'unknown' } : cur.gamestopStock,
+  }).r;
+}
+
 function floorStandardHtml(b) {
   const ref = b.standardReference;
   if (!ref || !(ref.basis > 0)) return '';
@@ -4304,6 +4370,7 @@ function renderFloorPricer() {
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
   const { b, r: result, shitbox, premium, hw, toy, toyGroup } = floorResult(cur);
+  const estimate = b.waiting ? floorEstimate(cur) : null;
   const rhythm = rhythmKind(p['product-name']);
   const belowGs = !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const conditions = Object.entries(GAME_CONDITIONS).filter(([c]) => !toy || c !== 'cib');
@@ -4346,7 +4413,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">Shelf price</span><strong>${result ? money(result.price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -4368,7 +4435,7 @@ function renderFloorPricer() {
     <div class="floor-price-context">
         ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
           ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}

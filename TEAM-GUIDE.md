@@ -907,7 +907,13 @@ Guide (the Google Sheet tab).
      Renewed matches still need the correct title, platform, language and
      edition; they do not confirm original packaging/inserts and cannot price
      a sealed copy. Specific premiums and deductions still apply.
-     The tool waits for sold evidence and reference checks before enabling **Add to list**.
+     The selected game's sales appear while related editions and references are
+     still being checked. A price labeled **Estimate** may change as those checks
+     finish; it includes the usual premiums and rounding. **Add to list** waits
+     for the required checks before the label becomes **Shelf price**. Recent
+     PriceCharting reads are reused for five minutes in the open page; refreshing
+     clears that browser cache. Large uncached Amazon searches can still take
+     longer because Amazon limits request speed.
    - **Specific rules take priority:** configured premiums and discounts
      apply to the baseline, and missing-manual deductions still apply.
      A specific discount can lower the price below the market references.

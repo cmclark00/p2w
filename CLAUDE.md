@@ -1001,6 +1001,19 @@ The site's **only server-side code**. Everything else is static.
     results; `floorAmazonLowest()` excludes them from pricing until complete.
     Pins, offer tables, review notes and audits retain the incomplete status.
     Partial Renewed offers cannot activate the fallback prematurely.
+    The interactive pricer starts the selected PriceCharting sales page before
+    related-entry discovery and begins GameStop stock checking as soon as its
+    link arrives. Games and Skylanders read at most three sales pages concurrently,
+    merging in catalog order. `pcReadRequest` shares in-flight catalog/sales reads
+    and caches successful responses for five minutes (500 entries, cloned per
+    caller; cleared on token changes). Superseded interactive lookups stop queuing
+    further PC requests. Server-side rate limits remain unchanged. Early sales
+    can show a display-only **Estimate** using the same premiums and rounding;
+    `salesLoading` keeps the authoritative result and Add to list blocked until
+    related evidence finishes, alongside existing Amazon/product/stock waits.
+    Typed overrides remain explicit. Sale selections are remapped by listing key
+    when merged evidence arrives. `scripts/test-pricing-loading.cjs` covers these
+    waits, cache isolation/retries, stale lookups and ordered concurrent merging.
     Variant and standard-game Amazon matches stay separate;
     the standard result participates in the variant's baseline comparison.
     These are searches in the configured US marketplace, not other countries'
