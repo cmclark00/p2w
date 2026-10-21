@@ -35,6 +35,7 @@ jobs:
         run: |
           node scripts/test-floor-pricing.cjs
           node scripts/test-floor-variants.cjs
+          node scripts/test-game-evidence.cjs
           node scripts/test-amazon-matching.cjs
           node scripts/test-skylander-sales.cjs
           node scripts/test-history-audit.cjs

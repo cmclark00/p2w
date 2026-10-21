@@ -532,7 +532,8 @@ function amazon_cache_file(array $keys, string $kind, array $query): string {
   return $dir . '/amz-v2-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
 }
 
-function amazon_catalog_items(array $keys, string $upc = '', string $q = '', string $asin = ''): array {
+function amazon_catalog_items(array $keys, string $upc = '', string $q = '', string $asin = '', string $pageToken = ''): array {
+  if (strlen($pageToken) > 2048 || preg_match('/[\x00-\x1F]/', $pageToken) || ($asin !== '' && $pageToken !== '')) fail(400, 'Invalid catalog page token.');
   if ($asin !== '' && !preg_match('/^[A-Z0-9]{10}$/', $asin)) fail(400, 'Pass a valid Amazon ASIN.');
   if ($asin === '' && $upc === '' && (strlen(trim($q)) < 2 || strlen($q) > 240)) fail(400, 'Pass a title/platform search (2–240 characters).');
   if ($upc !== '' && !preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a valid UPC.');
@@ -544,8 +545,9 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
     $query['pageSize'] = 20;
     if ($upc !== '') { $query['identifiers'] = $upc; $query['identifiersType'] = 'UPC'; }
     else { $query['keywords'] = trim($q); $query['keywordsLocale'] = 'en_US'; }
+    if ($pageToken !== '') $query['pageToken'] = $pageToken;
   }
-  $cacheFile = amazon_cache_file($keys, 'catalog', [$path, $query]);
+  $cacheFile = amazon_cache_file($keys, 'catalog-v3', [$path, $query]);
   if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) {
     $cached = json_decode((string)file_get_contents($cacheFile), true);
     if (is_array($cached)) return $cached;
@@ -558,15 +560,16 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
   foreach (array_slice($items, 0, 20) as $item) {
     if (is_array($item) && preg_match('/^[A-Z0-9]{10}$/', (string)($item['asin'] ?? ''))) $candidates[] = amazon_candidate($item);
   }
-  $out = ['status' => 'success', 'candidates' => $candidates, 'more' => !empty($data['pagination']['nextToken'])];
+  $out = ['status' => 'success', 'candidates' => $candidates, 'more' => !empty($data['pagination']['nextToken']),
+    'nextToken' => (string)($data['pagination']['nextToken'] ?? '')];
   @file_put_contents($cacheFile, json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
   return $out;
 }
 
-function amazon_catalog(string $upc, string $q): void {
+function amazon_catalog(string $upc, string $q, string $pageToken = ''): void {
   $keys = amazon_keys();
   if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
-  respond(200, amazon_catalog_items($keys, $upc, $q));
+  respond(200, amazon_catalog_items($keys, $upc, $q, '', $pageToken));
 }
 
 // Retrieve the title from Amazon again, never from caller-supplied text. The client
@@ -1002,7 +1005,7 @@ switch ("$method $route") {
 
   case 'GET amazon/catalog':
     require_role('staff');
-    amazon_catalog((string)($_GET['upc'] ?? ''), (string)($_GET['q'] ?? ''));
+    amazon_catalog((string)($_GET['upc'] ?? ''), (string)($_GET['q'] ?? ''), (string)($_GET['pageToken'] ?? ''));
 
   case 'GET amazon/offers':
     require_role('staff');

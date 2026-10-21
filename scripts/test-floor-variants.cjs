@@ -22,7 +22,7 @@ function engine(search = async () => [standard, complete]) {
   const e = engine(async q => { query = q; return [standard, complete, scanned, { ...standard, id: '3', 'console-name': 'Xbox One' },
     { ...standard, id: '4', 'console-name': 'PAL Playstation 4' }, { ...standard, id: '5', 'product-name': 'Witcher 2: Wild Hunt' },
     { ...standard, id: '6', 'product-name': 'Witcher 3: Wild Hunt Strategy Guide' }]; });
-  await e.run('floorScanUpc("883929530434")');
+  await e.run('runFloorVariants(scanned)');
   assert.equal(query, 'Witcher 3: Wild Hunt Playstation 4');
   assert.deepEqual(e.json('floorSearch.results.map(p => p.id)'), ['9909046', '1', '2']);
   assert.equal(e.run('typeof picked'), 'undefined', 'never auto-select another edition');
@@ -38,7 +38,7 @@ function engine(search = async () => [standard, complete]) {
   assert.equal(single.run('picked.id'), scanned.id);
 
   const failed = engine(async () => { throw Error('offline'); });
-  await failed.run('floorScanUpc("883929530434")');
+  await failed.run('runFloorVariants(scanned)');
   assert.deepEqual(failed.json('floorSearch.results.map(p => p.id)'), [scanned.id]);
   assert.ok(failed.element('#floorResults').innerHTML.includes('Other editions could not be checked'));
   assert.ok(failed.element('#floorResults').innerHTML.includes('Retry'));

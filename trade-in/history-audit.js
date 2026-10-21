@@ -66,7 +66,7 @@ async function auditOne(item) {
   if(item.allUnits<3) notes.push('Fewer than three historical units sold');
   if(item.latestDate<'2026-04-20') notes.push('Most recent store sale is over 180 days old');
   if(audit.config.amazonSandbox) notes.push('Amazon sandbox data: recommendation is not a real-market comparison');
-  const incomplete=!!(sold.salesError || amazon?.error || audit.config.amazonSandbox);
+  const incomplete=!!(sold.salesError || amazon?.error || amazon?.standard?.error || audit.config.amazonSandbox);
   return {...item,status:price==null?'No recommendation':incomplete?'Incomplete market check':result.b.from==='pricecharting'?'PriceCharting fallback':'Compared',
     recommended:price,...auditGap(item,price),lookedUpAt:new Date().toISOString(),
     pcId:product.id,matchedName:product['product-name'],matchedSystem:product['console-name'],

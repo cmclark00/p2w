@@ -828,13 +828,15 @@ Guide (the Google Sheet tab).
      Chrome must show helper version **1.1.2** or later for optional eBay checks.
      If old duplicate tabs keep opening, switch the helper off, refresh all open
      pricing pages, reload the extension, turn it on, and refresh the tool again.
-   - **Barcode editions:** if the same game has multiple PriceCharting entries
-     on your platform, scanning opens **Choose your edition**. Match the edition
-     to the copy in hand; the original barcode match is labeled. The displayed
-     CIB numbers are PriceCharting averages, not shelf recommendations. Select
-     an edition to run its pricing, or use **Other editions** to switch later.
-     Edition sales stay separate. If the search fails, use **Retry** or search
-     by title; the tool will label the original match as the only result checked.
+   - **Barcode editions:** scanning prices the matching edition and also checks
+     related PriceCharting entries for misplaced matching sales. It checks the
+     listing title, platform, region and condition; duplicates count once.
+     A variant also uses the standard game's same-condition price as a minimum:
+     if the variant is $20 and the standard game is $25, its baseline is $25.
+     Specific premiums and deductions still apply, followed by one rounding
+     step. Other special editions do not raise the standard game's price.
+     Expand **Standard game** to inspect that evidence, or use **Other editions**
+     to change the selected version. Failed or capped searches are flagged.
    - **Every system:** compare the **highest valid eBay sale**, the
      **lowest matching Amazon offer including shipping**, and **GameStop**.
      The highest of those three numbers sets the baseline. Specific rules
@@ -885,6 +887,11 @@ Guide (the Google Sheet tab).
    - **Amazon's offers show on every game**, listed under the sales
      (prices include shipping). Outside the high-value game rule, only the lowest matching offer affects
      the price. Expensive higher offers and having no offers add no markup.
+     The tool compares barcode and title/platform searches and follows additional
+     result pages, even when the barcode already found a price. For variants,
+     it also checks the standard game's matching listings separately. Searches
+     use Amazon US; other regions, languages and editions still need to match
+     your copy. Incomplete searches are flagged for review.
      For used/CIB items, if barcode and title/platform searches find no usable
      regular offer, the tool searches **Renewed** listings. A verified match
      is labeled **Amazon Renewed fallback offers** and its lowest offer sets

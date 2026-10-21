@@ -23,7 +23,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       assert.equal(params.asin, good.asin); return offer(good, 2500);
     });
     const result = await e.fetch(); assert.equal(result.asin, good.asin); assert.equal(result.rejected.length, 3);
-    assert.equal(calls.length, 2); assert.equal(result.searched, false);
+    assert.equal(calls.length, 3); assert.equal(result.searched, true);
   });
   await test('wrong barcode falls back to title/platform and links the cheapest verified ASIN', async () => {
     const a = candidate('B000000001'), b = candidate('B000000002', 'Final Fight SNES'); const calls = [];
@@ -58,7 +58,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       return route === 'amazon/catalog' ? { candidates: [candidate('B000000001')] } : offer(candidate('B000000001'), 2500); });
     await assert.rejects(e.fetch(), /Temporary/); fail = false;
     await e.fetch(); const after = calls; await e.fetch(product, 'cib'); assert.equal(calls, after);
-    await e.fetch(product, 'new'); assert.equal(calls, after + 2);
+    await e.fetch(product, 'new'); assert.equal(calls, after + 3);
     const other = await e.fetch({ ...product, id: '2', 'product-name': 'Final Fight Guy' });
     assert.equal(other.found, false); assert.ok(calls > after + 2);
   });
@@ -77,7 +77,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const r = await e.fetch(); assert.equal(r.found, true); assert.equal(r.asin, good.asin); assert.equal(r.offers.length, 0); assert.equal(r.searched, true);
   });
   await test('ambiguous broad searches and partially failed offer checks do not publish an arbitrary price', async () => {
-    const many = engine(async () => ({ candidates: Array.from({length:6},(_,i)=>candidate('B00000000'+i)) }));
+    const many = engine(async () => ({ candidates: Array.from({length:13},(_,i)=>candidate('B'+String(i).padStart(9,'0'))) }));
     await assert.rejects(many.fetch(), /too many candidates/);
     const broken = engine(async (route, params) => {
       if (route === 'amazon/catalog') return { candidates: [candidate('B000000001'), candidate('B000000002')] };
@@ -181,6 +181,44 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.result = { ...offer(candidate('B000000001', 'Final Fight SNES (Renewed)'), 9999), renewedFallback: true };
     const manual = e.run('floorResult({product,condition:"cib",manualMissing:true,sales:{cib:[{title:"Final Fight SNES complete",price:12999}]},amazon:result})');
     assert.equal(manual.b.basis, 9999); assert.ok(manual.r.price < 10000);
+  });
+  await test('priced barcode matches still compare title results, every known UPC, and subsequent catalog pages', async () => {
+    const calls = [], a = candidate('B000000001'), b = candidate('B000000002'), c = candidate('B000000003');
+    const e = engine(async (route, params) => {
+      calls.push([route, params]);
+      if (route === 'amazon/catalog') {
+        if (params.upc) return { candidates: [params.upc === '123456789012' ? a : b] };
+        return params.pageToken ? { candidates: [a, c] } : { candidates: [a], more: true, nextToken: 'page-two' };
+      }
+      const item = [a,b,c].find(x => x.asin === params.asin);
+      return offer(item, {B000000001:4000,B000000002:3000,B000000003:2500}[item.asin]);
+    });
+    const r = await e.fetch({...product,upc:'123456789012, 123456789013'});
+    assert.equal(r.asin,c.asin); assert.equal(r.offers[0].price,2500);
+    assert.equal(calls.filter(([route]) => route === 'amazon/offers').length,3, 'duplicate ASIN offers requested once');
+    assert.ok(calls.some(([,p]) => p.pageToken === 'page-two'));
+  });
+  await test('variant and standard Amazon prices stay separate while standard price can raise the baseline', async () => {
+    const p = {...product,'product-name':'Final Fight [Special Edition]'};
+    const special = candidate('B000000001','Final Fight Special Edition SNES'), regular = candidate('B000000002','Final Fight SNES');
+    const e = engine(async (route, params) => route === 'amazon/catalog' ? {candidates:[special,regular]}
+      : offer(params.asin === special.asin ? special : regular,params.asin === special.asin ? 2000 : 2500));
+    const r = await e.fetch(p,'cib');
+    assert.equal(r.asin,special.asin); assert.equal(r.offers[0].price,2000);
+    assert.equal(r.standard.asin,regular.asin); assert.equal(r.standard.offers[0].price,2500);
+    e.ctx.variant = p; e.ctx.result = r;
+    assert.equal(e.run('floorResult({product:variant,condition:"cib",sales:{cib:[]},amazon:result}).r.price'),2500);
+  });
+  await test('truncated catalogs and failed later pages cannot silently claim the lowest Amazon match', async () => {
+    const incomplete = engine(async (route, params) => route === 'amazon/catalog'
+      ? {candidates:[candidate('B000000001')],more:true} : offer(candidate('B000000001'),2500));
+    await assert.rejects(incomplete.fetch(),/incomplete/);
+    const failed = engine(async (route, params) => {
+      if (route !== 'amazon/catalog') return offer(candidate('B000000001'),2500);
+      if (params.pageToken) throw Error('Later catalog page failed');
+      return {candidates:[candidate('B000000001')],more:true,nextToken:'next'};
+    });
+    await assert.rejects(failed.fetch(),/Later catalog page failed/);
   });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

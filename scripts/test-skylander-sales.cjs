@@ -130,9 +130,9 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route) => { calls++; return route === 'pc/products' ? { products: Array.from({ length: 20 }, (_, i) => ({ ...standard, id: String(i + 2) })) } : { sales: {} }; });
     assert.match((await e.fetch()).salesError, /sixteen/); assert.equal(calls, 18);
   });
-  await test('ordinary games and Infinity do not search related character pages', async () => {
+  await test('Infinity retains its existing single-entry lookup', async () => {
     const e = engine(async (route) => { assert.equal(route, 'pc/sales'); return { sales: { new: [sale('Example', 2000)] } }; });
-    for (const system of ['Playstation 4', 'Disney Infinity']) { const r = await e.fetch({ ...product, 'console-name': system }); assert.equal(r.sales.new.length, 1); assert.equal(r.salesNotes.length, 0); }
+    const r = await e.fetch({ ...product, 'console-name': 'Disney Infinity' }); assert.equal(r.sales.new.length, 1); assert.equal(r.salesNotes.length, 0);
   });
   await test('every figure line normalizes CIB during fetch and keeps original condition provenance', async () => {
     const used = sale('Bash Complete In Box Not Sealed', 2200);

@@ -3407,8 +3407,7 @@ async function floorScanUpc(upc) {
   try {
     const product = await PC.byUpc(upc);
     if (seq !== floorSearch.seq) return;
-    if (floorToyFamily(product) || floorIsHardware(product)) pickFloorGame(product);
-    else await runFloorVariants(product, true);
+    pickFloorGame(product); // Related sold evidence and the standard-game floor load automatically.
   } catch (err) {
     if (seq !== floorSearch.seq) return;
     closeFloorResults();
@@ -3416,16 +3415,24 @@ async function floorScanUpc(upc) {
   }
 }
 
-// UPCs can point at a sparse edition entry. Offer the other catalog editions,
-// but never pool their sales or automatically choose a more expensive version.
+// UPCs can point at a sparse edition entry. Discover sibling entries while
+// preserving title/condition checks and a separate standard-game baseline.
 const floorVariantName = (product) => String(product?.['product-name'] || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
-function floorVariantCandidates(product, results) {
+const floorGamePlatform = (product) => norm(product?.['console-name']).replace(/^(?:pal|jp|asian english|asian|korean) /, '');
+function floorStandardGame(product) {
+  if (floorToyFamily(product) || floorIsHardware(product) || rhythmKind(product['product-name']) === 'bundle') return null;
+  const name = floorVariantName(product);
+  if (!name || name === product['product-name']) return null;
+  return { id: `standard:${product.id}`, 'product-name': name, 'console-name': product['console-name'], upc: product.upc || '' };
+}
+function floorVariantCandidates(product, results, allRegions = false) {
   const identity = (p) => floorTitleWords(floorVariantName(p)).join(' ');
-  const name = identity(product), platform = norm(product['console-name']);
+  const platformKey = (p) => allRegions ? floorGamePlatform(p) : norm(p['console-name']);
+  const name = identity(product), platform = platformKey(product);
   const seen = new Set();
   return [product, ...results].filter(p => {
     const id = String(p?.id || '');
-    if (!id || seen.has(id) || !name || identity(p) !== name || norm(p['console-name']) !== platform) return false;
+    if (!id || seen.has(id) || !name || identity(p) !== name || platformKey(p) !== platform) return false;
     seen.add(id);
     return true;
   });
@@ -3515,17 +3522,38 @@ async function loadFloorAmazon() {
   if (floorCur === cur) renderFloorPricer();
 }
 
-// UPC candidates first; a rejected/missing barcode match triggers one bounded
-// title + platform search. Every candidate AND offer response must pass the same
-// checks. Prices never decide whether a different game or variant is a match.
-const firstUpc = (upc) => String(upc || '').split(/[,\s]+/)[0];
+// Always compare barcode and title searches. A priced barcode match must not
+// hide a cheaper matching listing. Standard-game evidence is priced separately.
 async function fetchFloorAmazon(product, condition, request = (route, params) => api(route, { params })) {
-  const upc = firstUpc(product.upc), cond = amazonCond(condition);
-  const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upc, cond]);
+  const memo = new Map();
+  const shared = (route, params) => {
+    const key = JSON.stringify([route, params]);
+    if (!memo.has(key)) memo.set(key, Promise.resolve().then(() => request(route, params)));
+    return memo.get(key);
+  };
+  const base = floorStandardGame(product);
+  const own = await fetchFloorAmazonSingle(product, condition, shared).catch(err => ({ error: err.message }));
+  if (!base) { if (own.error) throw Error(own.error); return own; }
+  const standard = await fetchFloorAmazonSingle(base, condition, shared).catch(err => ({ error: err.message }));
+  return { ...own, standard, matchNotes: [...(own.matchNotes || []), ...(standard.error ? [`Standard-game Amazon check unavailable: ${standard.error}`] : [])] };
+}
+async function fetchFloorAmazonSingle(product, condition, request) {
+  const upcs = [...new Set(String(product.upc || '').split(/[,\s]+/).filter(v => /^\d{8,14}$/.test(v)))], cond = amazonCond(condition);
+  const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upcs, cond]);
   if (!floorAmazonCache.has(key)) {
     const pending = (async () => {
       const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
-      let searched = false;
+      let searched = false, verifiedCandidates = 0;
+      async function catalog(params, renewed = false) {
+        let pageToken;
+        for (let page = 0; page < 3; page++) {
+          const data = await request('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
+          await check(renewed ? { ...data, candidates: [...deferredRenewed.values(), ...(data.candidates || [])] } : data, !params.upc, renewed);
+          if (!data.more) return;
+          if (!data.nextToken || data.nextToken === pageToken || page === 2) throw Error('Amazon catalog search incomplete; additional results need review.');
+          pageToken = data.nextToken;
+        }
+      }
       async function check(catalog, fallback, renewedFallback = false) {
         const candidates = (catalog.candidates || []).filter((c) => /^[A-Z0-9]{10}$/.test(c.asin) && !seen.has(c.asin));
         const matching = candidates.filter((c) => {
@@ -3540,7 +3568,8 @@ async function fetchFloorAmazon(product, condition, request = (route, params) =>
           if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
           return !reason;
         });
-        if (matching.length > 5) throw new Error('Several possible Amazon listings need review; too many candidates to verify automatically.');
+        verifiedCandidates += matching.length;
+        if (verifiedCandidates > 12) throw new Error('Several possible Amazon listings need review; too many candidates to verify automatically.');
         for (const c of matching) {
           // A renewed ASIN may carry New offers; that is still a renewed item,
           // never evidence for the original game's sealed condition.
@@ -3554,23 +3583,22 @@ async function fetchFloorAmazon(product, condition, request = (route, params) =>
           }
         }
       }
-      if (/^\d{8,14}$/.test(upc)) await check(await request('amazon/catalog', { upc }), false);
+      if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
+      for (const upc of upcs) await catalog({ upc });
       const priced = () => verified.filter((a) => floorAmazonLowest({ product, condition, amazon: a }) > 0);
-      if (!priced().length) {
-        searched = true;
-        const q = `${product['product-name']} ${product['console-name']}`.trim();
-        await check(await request('amazon/catalog', { q }), true);
-      }
+      searched = true;
+      const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
+        .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
+      for (const q of queries) await catalog({ q });
       if (!priced().length && condition !== 'new') {
         const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
-        const catalog = await request('amazon/catalog', { q });
-        await check({ candidates: [...deferredRenewed.values(), ...(catalog.candidates || [])] }, true, true);
+        await catalog({ q }, true);
       }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b }) || a.asin.localeCompare(b.asin));
       const selected = choices[0] || verified[0];
       const matchNotes = [];
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
-      if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod} after searching title and platform` : 'No verified Amazon listing found in the title/platform search; review manually');
+      if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; compared barcode and title/platform searches` : 'No verified Amazon listing found in the title/platform search; review manually');
       const listingCount = new Set(choices.map((a) => a.asin)).size;
       if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer`);
       if (selected?.renewedFallback) matchNotes.push(choices.length
@@ -3591,9 +3619,86 @@ function floorAmazonCandidateMismatch(candidate, product, condition, requirePlat
   return null;
 }
 
+// Games recover matching sales from sibling entries and independently compute
+// the standard edition's evidence. Other special editions never become a floor.
+async function fetchFloorGameSales(product, request) {
+  const conditions = ['loose', 'cib', 'new'];
+  const emptySales = () => Object.fromEntries(conditions.map(c => [c, []]));
+  const sales = emptySales(), baseSales = emptySales(), errors = [], sources = [];
+  const seen = new Set(), baseSeen = new Set();
+  let pages = [product], standard = floorStandardGame(product), gamestopUrl = null, standardUrl = null;
+  try {
+    const found = await request('pc/products', { q: `${floorVariantName(product)} ${floorGamePlatform(product)}` });
+    const candidates = floorVariantCandidates(product, found.products || [], true)
+      .filter(p => /^\d+$/.test(String(p.id)));
+    const base = standard && candidates.find(p => norm(p['console-name']) === norm(product['console-name'])
+      && floorTitleWords(p['product-name']).join(' ') === floorTitleWords(standard['product-name']).join(' '));
+    if (base) {
+      standard = base;
+      try {
+        const full = await request('pc/product', { id: base.id });
+        if (String(full?.id) !== String(base.id)) throw Error('Product identity was not confirmed');
+        standard = { ...base, ...full };
+      } catch (err) { errors.push(`Standard-game details unavailable: ${err.message}`); }
+    }
+    // Keep the standard entry in the bounded batch, even if the search ranks it late.
+    const related = [base, ...candidates].filter(p => p && String(p.id) !== String(product.id));
+    const unique = [...new Map(related.map(p => [String(p.id), p])).values()];
+    if (unique.length > 16) errors.push('More than sixteen related game entries found; additional pages need manual review');
+    pages.push(...unique.slice(0, 16));
+  } catch (err) { errors.push(`Related-entry search unavailable: ${err.message}`); }
+  const pageData = new Array(pages.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(3, pages.length) }, async () => {
+    while (next < pages.length) {
+      const i = next++, page = pages[i];
+      try { pageData[i] = await request('pc/sales', { id: page.id }); }
+      catch (err) { errors.push(`${page['product-name']}: ${err.message}`); }
+    }
+  }));
+  const accepts = (sale, condition, target, page) => {
+    if (floorListingMismatch(sale.title, target) || floorOdd(sale, condition, rhythmKind(target['product-name']), target)) return false;
+    if (!floorAmazonPlatformConfirmed({ title: sale.title }, target)) return false;
+    // A sale recovered from another region must positively identify our region.
+    if (norm(page['console-name']) !== norm(target['console-name'])) {
+      const wanted = FLOOR_REGIONS.filter(([, re]) => re.test(norm(target['console-name'])));
+      const regions = wanted.length ? wanted : FLOOR_REGIONS.filter(([name]) => name === 'North America');
+      if (!regions.some(([, re]) => re.test(norm(sale.title)))) return false;
+    }
+    return condition !== 'new' || /\b(?:new|sealed|bnib|nib|unopened)\b/i.test(sale.title)
+      && !/\b(?:used|opened|unsealed|like new)\b/i.test(sale.title);
+  };
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i], data = pageData[i];
+    if (!data) continue;
+    const own = String(page.id) === String(product.id), baseOwn = standard && String(page.id) === String(standard.id);
+    if (own) gamestopUrl = data.gamestopUrl || null;
+    if (baseOwn) standardUrl = data.gamestopUrl || null;
+    sources.push({ id: String(page.id), name: page['product-name'] });
+    for (const condition of conditions) for (const sale of data.sales?.[condition] || []) {
+      const key = `${condition}|${floorSaleKey(sale)}`;
+      const row = { ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'] };
+      if (!seen.has(key) && (own || accepts(sale, condition, product, page))) {
+        seen.add(key); sales[condition].push({ ...row, recovered: !own });
+      }
+      if (standard && !baseSeen.has(key) && (baseOwn || accepts(sale, condition, standard, page))) {
+        baseSeen.add(key); baseSales[condition].push({ ...row, recovered: !baseOwn });
+      }
+    }
+  }
+  const recovered = conditions.reduce((n, c) => n + sales[c].filter(s => s.recovered).length, 0);
+  const salesNotes = [`Checked ${sources.length} related game entries; recovered ${recovered} matching sales. Other editions and regions must match the listing title; duplicate sales count once`];
+  const salesError = errors.length ? errors.join('; ') : null;
+  if (salesError) salesNotes.push(`Sold-evidence check incomplete: ${salesError}`);
+  const standardGame = standard ? { product: standard, sales: baseSales, salesError, gamestopUrl: standardUrl,
+    gamestopStock: await fetchFloorGameStopStock(standard, standardUrl, request) } : null;
+  return { sales, salesNotes, salesSources: sources, salesError, gamestopUrl, standardGame };
+}
+
 // Related catalog pages often contain misplaced Skylander variants. Never use
 // their averages; verify every recovered title. Opened/CIB figures count as loose.
 async function fetchFloorProductSales(product, request = (route, params) => api(route, { params })) {
+  if (!floorToyFamily(product) && !floorIsHardware(product)) return fetchFloorGameSales(product, request);
   const conditions = ['loose', 'cib', 'new'];
   const sales = Object.fromEntries(conditions.map((c) => [c, []]));
   const salesNotes = [], errors = [], sources = [], seen = new Set();
@@ -3780,7 +3885,8 @@ const EDITION_RES = [/\bsteel ?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game 
   /\bdeluxe\b/i, /\bpremium( online)? edition\b/i, /\bspecial edition\b/i, /\blaunch edition\b/i, /\bday one\b/i, /\bgold edition\b/i,
   /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i,
   /\bdefinitive edition\b/i, /\b(?:greatest|playstation) hits\b/i, /\bplayer'?s choice\b/i, /\bnintendo selects\b/i,
-  /\bplatinum hits\b/i, /\b(?:collector'?s|limited|special|deluxe|gold|ultimate) (?:edition|version)\b/i];
+  /\bplatinum hits\b/i, /\bbonus content\b/i, /\bnot for resale\b/i,
+  /\b(?:collector'?s|limited|special|deluxe|gold|ultimate) (?:edition|version)\b/i];
 const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || '') && !re.test(name));
 // A barcode or PriceCharting category is not enough: inspect the actual listing title too.
 // Language words need variant context so "French Revolution" is not mistaken for French packaging.
@@ -3918,7 +4024,8 @@ function floorListingMismatch(title, product) {
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
   if (floorExtraMismatch(title, name)) return 'Bundled extra item';
-  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(title) : title, !floorToyFamily(product) && !floorIsHardware(product))))
+  const bundleTitle = /\bbonus content\b/i.test(name) ? title.replace(/\bwith bonus content\b/gi, '') : title;
+  if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(bundleTitle) : bundleTitle, !floorToyFamily(product) && !floorIsHardware(product))))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
@@ -3998,6 +4105,22 @@ function floorAmazonLowest(cur) {
 // the eBay baseline while retaining GameStop's floor. Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorBasis(cur = floorCur) {
+  const own = floorOwnBasis(cur);
+  if (cur.typed != null || own.waiting || !floorStandardGame(cur.product)) return own;
+  const standard = cur.standardGame || { product: floorStandardGame(cur.product), sales: {}, salesError: 'Standard catalog entry not available' };
+  const baseCur = { ...standard, condition: cur.condition, pick: null, typed: null, manualMissing: false,
+    amazon: cur.amazon?.standard || (cur.amazon?.error ? { error: cur.amazon.error } : { found: false }) };
+  const base = floorOwnBasis(baseCur);
+  const checks = [...own.checks];
+  if (base.basis > 0) checks.push(`Standard-game baseline ${money(base.basis)} (${baseCur.product['product-name']}, ${GAME_CONDITIONS[cur.condition]}). The variant cannot use a lower baseline; specific premiums and deductions still apply`);
+  for (const note of base.checks.filter(n => /unavailable|incomplete|failed|fallback|out of stock/i.test(n))) checks.push(`Standard game: ${note}`);
+  const standardReference = { ...base, cur: baseCur };
+  if (base.basis > 0 && (own.basis == null || base.basis > own.basis)) {
+    return { ...base, from: 'standard', referenceMin: base.basis, checks, standardReference, variantBasis: own.basis };
+  }
+  return { ...own, checks, standardReference };
+}
+function floorOwnBasis(cur = floorCur) {
   cur = floorConditionCur(cur);
   const sales = floorSales(cur);
   const auto = floorAutoSale(sales);
@@ -4117,6 +4240,20 @@ function floorResult(cur) {
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
 
+function floorStandardHtml(b) {
+  const ref = b.standardReference;
+  if (!ref || !(ref.basis > 0)) return '';
+  const cur = ref.cur, p = cur.product;
+  const rows = floorSales(cur).filter(s => !s.odd && !s.outlier).slice(0, 8);
+  return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} baseline${b.from === 'standard' ? ' · used' : ''}</summary>
+    <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
+    Specific premiums and deductions apply afterward.</p>
+    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur))} ↗</a></p>` : ''}
+    ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
+    <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${esc(s.date || '')}</td></tr>`).join('')}</tbody></table>
+    </details>`;
+}
+
 function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
@@ -4136,7 +4273,7 @@ function renderFloorPricer() {
   const condBtns = conditions.map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
   const sales = floorSales(cur);
   let salesHtml;
-  const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || b.sale;
+  const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || (b.from === 'standard' ? floorAutoSale(sales).sale : b.sale);
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
   else if (cur.salesError && !sales.length) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
@@ -4154,7 +4291,7 @@ function renderFloorPricer() {
   const reviewNotes = [...new Set(b.checks)];
   const excluded = sales.filter((s) => s.mismatch).length + (cur.amazon?.rejected?.length || 0);
   const outliers = sales.filter((s) => s.outlier).length;
-  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error);
+  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.standard?.error);
   el.innerHTML = `
     <div class="floor-pinned-header">
     <div class="floor-price-actions" role="group" aria-label="Game, condition, and price">
@@ -4222,6 +4359,7 @@ function renderFloorPricer() {
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale — pricing stays available.' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}eBay check optional; select a sale to check it.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
+        ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
       </div>
       <aside class="floor-result" aria-label="Pricing details">
@@ -4361,7 +4499,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { standard: 'Standard-game baseline', sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => !!globalThis.P2WDeadGames && !deadGameHeld(it.name, it.platform)

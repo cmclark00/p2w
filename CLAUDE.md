@@ -547,14 +547,19 @@ The site's **only server-side code**. Everything else is static.
     on the dev machine; to add routes, get a copy from the shop PC.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
-  - UPC scans also search the base game title and platform for other catalog
-    editions. `floorVariantCandidates()` keeps the same title/platform/region,
-    deduplicates IDs and puts the UPC match first. If multiple entries exist,
-    staff choose one before pricing; sales and averages are never pooled.
-    **Other editions** reopens the chooser. Failed related searches show the
-    original match with a retry notice, and stale/dismissed lookups cannot
-    replace newer work. Toys-to-life and hardware keep their existing scan flow.
-    Regression: `node scripts/test-floor-variants.cjs`.
+  - UPC scans price the matched entry automatically. `fetchFloorGameSales()`
+    also searches the base title/platform and reads up to 16 sibling entries
+    with three concurrent sales requests. Recovered sales must match title,
+    edition, platform and condition; another region's page needs positive
+    evidence of the selected region. Duplicate sales count once. Failures and
+    caps flag incomplete checks. **Other editions** opens the optional chooser.
+    For a bracketed/parenthetical variant, `floorBasis()` separately compares
+    the standard game's same-condition baseline: a $20 variant with a $25
+    standard baseline starts at $25. Other special editions' prices never
+    become that floor. Specific premiums/deductions and rounding apply once
+    afterward; typed overrides still work. Standard evidence appears in its
+    own expandable section. Toys-to-life/hardware keep their existing rules.
+    Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's
     "eBay highest sold" reference at every price. The tool reads actual
@@ -976,11 +981,17 @@ The site's **only server-side code**. Everything else is static.
     validates the returned catalog title with the same variant checks as
     eBay before using any offers, including cached responses. Missing or
     mismatched titles and digital versions are excluded with a
-    visible review reason. A UPC match alone is not sufficient. If the
-    returned ASIN is excluded, `fetchFloorAmazon(product, condition)` tries
-    the title/platform search. Search replacements require positive platform
-    evidence in the title or attributes. At most five verified ASINs are
-    priced per candidate set; larger ambiguous sets require review. The
+    visible review reason. A UPC match alone is not sufficient. Every lookup
+    compares known UPCs plus exact-title/platform and base-title/platform
+    searches, even when the barcode already has an offer. Search candidates
+    require positive platform evidence in the title or attributes. Catalog
+    searches follow pageToken for up to three pages; up to five known UPCs
+    and twelve matching ASINs are checked per product/condition. Missing
+    tokens, failures and larger sets require review rather than declaring a
+    verified minimum. Variant and standard-game Amazon matches stay separate;
+    the standard result participates in the variant's baseline comparison.
+    These are searches in the configured US marketplace, not other countries'
+    Amazon marketplaces. The
     lowest offer among verified ASINs supplies both the price and displayed
     product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.

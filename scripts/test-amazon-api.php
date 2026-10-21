@@ -39,10 +39,19 @@ try {
     check($catalog['candidates'][0]['platforms'] === ['Super Nintendo'], 'Keep US structured platform');
     check($calls[0][1]['identifiersType'] === 'UPC' && !isset($calls[0][1]['keywords']), 'Identifier query');
     check($catalog['more'] === true, 'Preserve truncated-search indicator');
+    check($catalog['nextToken'] === 'more', 'Return pagination token');
     amazon_catalog_items(amazon_keys(), '123456789012'); check(count($calls) === 1, 'Catalog cache');
     amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo');
     check($calls[1][1]['keywords'] === 'Final Fight Super Nintendo' && !isset($calls[1][1]['identifiers']), 'Keyword fallback query');
     check($calls[1][1]['pageSize'] === 20 && $calls[1][1]['includedData'] === 'summaries,attributes', 'Bounded catalog evidence');
+    amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', 'more');
+    check($calls[2][1]['pageToken'] === 'more' && $calls[2][1]['pageSize'] === 20, 'Forward next token without changing page size');
+    $pageCalls = count($calls);
+    amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', 'more');
+    check(count($calls) === $pageCalls, 'Cache pages separately');
+    foreach ([str_repeat('x', 2049), "bad\ntoken"] as $token) {
+        check(response(fn() => amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', $token))->status === 400, 'Reject malformed page tokens');
+    }
     foreach ([['bad', '', ''], ['123456789012', 'search', ''], ['', '', '../secret'], ['', '', ''], ['', str_repeat('x', 241), '']] as $args) {
         check(response(fn() => amazon_catalog_items(amazon_keys(), ...$args))->status === 400, 'Reject malformed lookup parameters');
     }
