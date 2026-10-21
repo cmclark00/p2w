@@ -3357,7 +3357,7 @@ const floor = Object.assign({ id: null, name: '', staff: '', items: [], dirty: f
 const saveFloorLocal = () => store.set('p2w-floor', floor);
 // The game being priced right now: { product, condition, manualMissing, sales, salesError, pick, typed }.
 let floorCur = null;
-const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0 };
+const floorSearch = { q: '', results: null, loading: false, error: null, seq: 0, variantProduct: null, note: '' };
 const floorAmazonCache = new Map(); // product identity + condition -> verified Amazon lookup promise
 // Amazon has no Loose/CIB split: Loose and CIB games compare with its Used offers.
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
@@ -3377,13 +3377,13 @@ function showFloor() {
 
 function closeFloorResults() {
   floorSearch.seq += 1;
-  Object.assign(floorSearch, { results: null, loading: false, error: null });
+  Object.assign(floorSearch, { results: null, loading: false, error: null, variantProduct: null, note: '' });
   renderFloorResults();
 }
 
 async function runFloorSearch(q) {
   const seq = ++floorSearch.seq;
-  Object.assign(floorSearch, { q, results: null, loading: true, error: null });
+  Object.assign(floorSearch, { q, results: null, loading: true, error: null, variantProduct: null, note: '' });
   renderFloorResults();
   try {
     const results = await PC.search(q);
@@ -3399,11 +3399,54 @@ async function runFloorSearch(q) {
 
 async function floorScanUpc(upc) {
   closeFloorResults();
+  const seq = floorSearch.seq;
+  floorCur = null;
+  renderFloorPricer();
+  floorSearch.loading = true;
+  renderFloorResults();
   try {
-    pickFloorGame(await PC.byUpc(upc));
+    const product = await PC.byUpc(upc);
+    if (seq !== floorSearch.seq) return;
+    if (floorToyFamily(product) || floorIsHardware(product)) pickFloorGame(product);
+    else await runFloorVariants(product, true);
   } catch (err) {
+    if (seq !== floorSearch.seq) return;
+    closeFloorResults();
     toast(err.message, 'error');
   }
+}
+
+// UPCs can point at a sparse edition entry. Offer the other catalog editions,
+// but never pool their sales or automatically choose a more expensive version.
+const floorVariantName = (product) => String(product?.['product-name'] || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+function floorVariantCandidates(product, results) {
+  const identity = (p) => floorTitleWords(floorVariantName(p)).join(' ');
+  const name = identity(product), platform = norm(product['console-name']);
+  const seen = new Set();
+  return [product, ...results].filter(p => {
+    const id = String(p?.id || '');
+    if (!id || seen.has(id) || !name || identity(p) !== name || norm(p['console-name']) !== platform) return false;
+    seen.add(id);
+    return true;
+  });
+}
+async function runFloorVariants(product, pickSingle = false) {
+  const seq = ++floorSearch.seq;
+  const q = `${floorVariantName(product)} ${product['console-name']}`;
+  Object.assign(floorSearch, { q, results: null, loading: true, error: null, variantProduct: product, note: '' });
+  renderFloorResults();
+  try {
+    const results = floorVariantCandidates(product, await PC.search(q));
+    if (seq !== floorSearch.seq) return;
+    if (pickSingle && results.length === 1) { pickFloorGame(product); return; }
+    floorSearch.results = results;
+  } catch (err) {
+    if (seq !== floorSearch.seq) return;
+    floorSearch.results = [product];
+    floorSearch.note = 'Other editions could not be checked. Only the original match is shown; retry or search by title.';
+  }
+  floorSearch.loading = false;
+  renderFloorResults();
 }
 
 function renderFloorResults() {
@@ -3412,12 +3455,15 @@ function renderFloorResults() {
   if (floorSearch.loading) html = '<div class="results-note"><span class="spinner"></span>Searching PriceCharting…</div>';
   else if (floorSearch.error) html = `<div class="results-note error">${esc(floorSearch.error)}</div>`;
   else if (floorSearch.results) {
-    html = '<div class="results-group">PriceCharting <span>click a game to price it</span></div>';
+    html = floorSearch.variantProduct
+      ? '<div class="results-group">Choose your edition <span>same game and platform · prices stay separate</span></div>'
+      : '<div class="results-group">PriceCharting <span>click a game to price it</span></div>';
+    if (floorSearch.note) html += `<div class="results-note">${esc(floorSearch.note)} <button type="button" class="link" data-floor-variants-retry>Retry</button></div>`;
     if (!floorSearch.results.length) html += '<div class="results-note">No matches. Try fewer words.</div>';
     floorSearch.results.forEach((p, i) => {
       html += `<div class="result" data-i="${i}"><div class="r-main"><div class="r-name">${esc(p['product-name'])}${rhythmTag(p['product-name'])}</div>
-        <div class="sub">${esc(p['console-name'])}</div></div>
-        <div class="r-offer muted">CIB ${money(Number(p['cib-price']) || null)}</div></div>`;
+        <div class="sub">${esc(p['console-name'])}${floorSearch.variantProduct && String(p.id) === String(floorSearch.variantProduct.id) ? ' · Original match' : ''}</div></div>
+        <div class="r-offer muted">${floorSearch.variantProduct ? 'PC average · ' : ''}CIB ${money(Number(p['cib-price']) || null)}</div></div>`;
     });
   }
   el.innerHTML = html;
@@ -4115,6 +4161,7 @@ function renderFloorPricer() {
       <div class="floor-price-identity">
         <div class="item-name">${pcLink(p.id, p['product-name'])}</div>
         <div class="sub">${esc(p['console-name'])} · ${esc(GAME_CONDITIONS[cur.condition])}${cur.condition === 'cib' && cur.manualMissing && !hw ? ' · Manual missing' : ''}</div>
+        ${!toy && !hw ? '<button type="button" class="link" data-floor-act="variants">Other editions</button>' : ''}
       </div>
       <div class="floor-pinned-condition">
         <div class="segs" role="group" aria-label="Condition">${condBtns}</div>
@@ -4274,6 +4321,7 @@ function onFloorPricerClick(e) {
     return;
   }
   const act = e.target.closest('[data-floor-act]')?.dataset.floorAct;
+  if (act === 'variants') { runFloorVariants(floorCur.product); $('#floorScan').focus(); $('#floorScan').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
@@ -4620,13 +4668,14 @@ function wireFloor() {
     if (e.key === 'Enter') { e.preventDefault(); go(); }
     if (e.key === 'Escape') { scan.value = ''; closeFloorResults(); }
   });
-  scan.addEventListener('input', () => { if (floorSearch.results || floorSearch.error) closeFloorResults(); });
+  scan.addEventListener('input', () => { if (floorSearch.results || floorSearch.error || floorSearch.loading) closeFloorResults(); });
   $('#floorSearchBtn').addEventListener('click', () => { go(); scan.focus(); });
   $('#floorResults').addEventListener('click', (e) => {
+    if (e.target.closest('[data-floor-variants-retry]')) { if (floorSearch.variantProduct) runFloorVariants(floorSearch.variantProduct); return; }
     const r = e.target.closest('.result');
     if (r) pickFloorGame(floorSearch.results[Number(r.dataset.i)]);
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.floor-scan, [data-fulcrum-key]') && !$('#floorResults').hidden) closeFloorResults(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.floor-scan, [data-fulcrum-key], [data-floor-act="variants"]') && !$('#floorResults').hidden) closeFloorResults(); });
 
   const pricer = $('#floorPricer');
   pricer.addEventListener('click', onFloorPricerClick);

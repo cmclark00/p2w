@@ -547,6 +547,14 @@ The site's **only server-side code**. Everything else is static.
     on the dev machine; to add routes, get a copy from the shop PC.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
+  - UPC scans also search the base game title and platform for other catalog
+    editions. `floorVariantCandidates()` keeps the same title/platform/region,
+    deduplicates IDs and puts the UPC match first. If multiple entries exist,
+    staff choose one before pricing; sales and averages are never pooled.
+    **Other editions** reopens the chooser. Failed related searches show the
+    original match with a retry notice, and stale/dismissed lookups cannot
+    replace newer work. Toys-to-life and hardware keep their existing scan flow.
+    Regression: `node scripts/test-floor-variants.cjs`.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's
     "eBay highest sold" reference at every price. The tool reads actual

@@ -828,6 +828,13 @@ Guide (the Google Sheet tab).
      Chrome must show helper version **1.1.2** or later for optional eBay checks.
      If old duplicate tabs keep opening, switch the helper off, refresh all open
      pricing pages, reload the extension, turn it on, and refresh the tool again.
+   - **Barcode editions:** if the same game has multiple PriceCharting entries
+     on your platform, scanning opens **Choose your edition**. Match the edition
+     to the copy in hand; the original barcode match is labeled. The displayed
+     CIB numbers are PriceCharting averages, not shelf recommendations. Select
+     an edition to run its pricing, or use **Other editions** to switch later.
+     Edition sales stay separate. If the search fails, use **Retry** or search
+     by title; the tool will label the original match as the only result checked.
    - **Every system:** compare the **highest valid eBay sale**, the
      **lowest matching Amazon offer including shipping**, and **GameStop**.
      The highest of those three numbers sets the baseline. Specific rules
