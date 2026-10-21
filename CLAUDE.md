@@ -718,6 +718,14 @@ The site's **only server-side code**. Everything else is static.
     `trade-in/helper.html` offers manual connection checks without staff credentials,
     and `helper-privacy.html` describes the extension's scoped local data handling.
 
+  - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
+    sales and included cases/manuals from loose game evidence before outlier ranking,
+    with the visible reason "Box/manual included — not loose". Explicit absence
+    (no box/manual, box not included) remains eligible. Product names are removed
+    before checking packaging words. Original eBay verification uses the same check.
+    Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
+    catalog still does not imply a Loose/CIB split. Premiums remain downstream.
+
   - **Optional original eBay sale verification:** Market Helper 1.1.2 uses only
     ebay.com/itm/* content-script access. `ebay-background.js` validates sender,
     HTTPS host and item ID; queues at most eight jobs with two inactive tabs,

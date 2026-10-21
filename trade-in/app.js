@@ -3295,9 +3295,27 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
 const floorGs = (p) => (Number(p['gamestop-price']) > 0 ? Number(p['gamestop-price']) : null);
 
+function floorLoosePackagingMismatch(title, condition, product = null) {
+  if (condition !== 'loose' || floorToyFamily(product) || product && floorIsHardware(product)) return null;
+  // Remove the game name first: "The Orange Box" and "Complete Adventures" are identities, not condition claims.
+  let text = ` ${norm(title)} `;
+  const name = norm(product?.['product-name']);
+  if (name) text = text.replace(` ${name} `, ' ');
+  const part = String.raw`(?:(?:original|retail|instruction|jewel|game)\s+)*(?:box(?:es)?|cases?|manuals?|instructions?|booklets?|packaging)\b`;
+  const parts = `${part}(?:\\s+(?:(?:and|or|nor)\\s+)?${part})*`;
+  // Explicit absence is loose evidence. A remaining positive box/manual claim still excludes the sale.
+  text = text.replace(new RegExp(`\\b(?:no|without|missing)\\s+(?:the\\s+)?${parts}`, 'g'), ' ')
+    .replace(new RegExp(`\\b${parts}\\s+(?:(?:is|are)\\s+)?(?:not included|missing|absent)\\b`, 'g'), ' ')
+    .replace(/\bnot (?:in (?:the )?box|boxed|cib|complete)\b/g, ' ');
+  return /\b(?:box|boxed|case|manual|instructions|booklet|packaging|cib|c i b|mib|complete)\b/.test(text)
+    ? 'Box/manual included — not loose' : null;
+}
+
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
-function floorOdd(sale, condition, rhythm = null, product = null) {
+// Amazon Used catalogs do not distinguish Loose/CIB; apply packaging checks to sold-item evidence only.
+function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging = true) {
   const toy = floorToyFamily(product);
+  if (checkPackaging && floorLoosePackagingMismatch(sale.title, condition, product)) return true;
   // Opened packaging is valid used-figure evidence, not a sealed collectible.
   const t = toy ? floorFigureTitle(sale.title) : sale.title;
   const sealed = toy ? floorFigureSaleCondition(sale, condition) === 'new' : SEALED_RE.test(t);
@@ -3683,7 +3701,7 @@ function floorSales(cur = floorCur) {
     rows.filter((s) => floorFigureSaleCondition(s, condition) === cur.condition)) : cur.sales?.[cur.condition] || [];
   const unique = floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool;
   const sales = unique.map((s, i) => {
-    const mismatch = floorListingMismatch(s.title, cur.product);
+    const mismatch = floorListingMismatch(s.title, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
     const verification = !invalid ? cur.ebayChecks?.results[floorSaleKey(s)] : null;
     return { ...s, i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
@@ -3869,7 +3887,7 @@ function floorAmazonMismatch(cur) {
   if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);
   // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
-  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm, cur.product)
+  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm, cur.product, false)
     || HOME_CONSOLE_RE.test(cur.amazon.title))) return 'Non-comparable item, bundle, or condition';
   if (/\b(?:digital code|download code|digital download)\b/i.test(cur.amazon.title)
     && !/\bdigital\b/i.test(cur.product?.['product-name'] || '')) return 'Digital variant';

@@ -113,6 +113,37 @@ test('CIB disc, case and manual combinations are ordinary contents, including th
   assert.ok(invoke('floorListingMismatch', 'Nintendo Switch Console + Game Cartridge', { 'product-name': 'Nintendo Switch Console', 'console-name': 'Nintendo Switch', genre: 'Systems' }), 'A game bundled with hardware is still an extra');
 });
 
+test('boxed games cannot drive loose pricing, including the Splatterhouse 3 screenshot', () => {
+  const product = { 'product-name': 'Splatterhouse 3', 'console-name': 'Sega Genesis', 'loose-price': 8000, 'gamestop-price': 9499 };
+  const boxed = 'Splatterhouse 3 Sega Genesis Authentic Cartridge And Box- Tested+works';
+  const example = cur(product, { condition: 'loose', gamestopStock: { state: 'out', title: 'Splatterhouse 3 Sega Genesis' }, sales: { loose: [
+    { title: boxed + ' See Proof', price: 17999 }, { title: boxed, price: 14500 },
+    ...[11999, 10999].map(price => ({ title: 'Splatterhouse 3 Sega Genesis 1993 Authentic Game Cartridge Tested Working!', price })),
+    { title: 'Splatterhouse 3 (Sega Genesis, 1993)', price: 10500 },
+  ] } });
+  const rows = invoke('floorSales', example);
+  assert.ok(rows.slice(0, 2).every(row => row.odd && row.mismatch === 'Box/manual included — not loose' && !row.outlier));
+  assert.ok(rows.slice(2).every(row => !row.odd));
+  assert.equal(invoke('floorResult', example).b.basis, 11999);
+  assert.equal(invoke('floorResult', example).r.price, 12000);
+  for (const suffix of ['Cartridge And Box', 'Cart & Original Box', 'Cartridge + Box', 'Game w/Box', 'Game with original case',
+    'Boxed No Manual', 'Complete In Box', 'CIB', 'C.I.B.', 'Disc + Case + Manual', 'Cartridge with instruction booklet']) {
+    const title = 'Splatterhouse 3 ' + suffix;
+    assert.equal(invoke('floorOdd', { title }, 'loose', null, product), true, title);
+    assert.equal(invoke('floorOdd', { title }, 'cib', null, product), false, title);
+  }
+  for (const suffix of ['Cartridge Only', 'Cartridge No Box', 'Cart without original box or manual', 'Loose no box/manual',
+    'Cartridge Box and Manual Not Included', 'Game only box missing', 'Cartridge no case no manual', 'Cartridge Tested Working'])
+    assert.equal(invoke('floorOdd', { title: 'Splatterhouse 3 ' + suffix }, 'loose', null, product), false, suffix);
+  assert.equal(invoke('floorOdd', { title: 'Splatterhouse 3 No Manual With Original Box' }, 'loose', null, product), true);
+  for (const name of ['The Orange Box', 'LEGO Star Wars The Complete Saga'])
+    assert.equal(invoke('floorOdd', { title: name + ' Disc Only Tested' }, 'loose', null, { ...item, 'product-name': name }), false, name);
+  // Amazon's used catalog remains shared by Loose/CIB; explicit sale packaging does not redefine it.
+  assert.equal(invoke('floorAmazonLowest', cur(product, { condition: 'loose', amazon: { found: true, title: boxed, offers: [{ price: 13000 }] } })), 13000);
+  const ebaySale = { title: 'Splatterhouse 3', price: 14500, url: 'https://www.ebay.com/itm/123456789012' };
+  assert.equal(invoke('floorEbayResult', ebaySale, product, { id: '123456789012', title: boxed, state: 'sold', price: 14500 }, 'loose').state, 'mismatch');
+});
+
 test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
   const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
   for (const title of [
@@ -522,7 +553,7 @@ test('three-reference baseline applies across tiers and conditions before specif
       for (const manualMissing of [false, true]) {
         for (const [ebay, amazonLow, gs, from] of [[15000, 13400, 10000, 'sale'], [15000, 16400, 10000, 'amazon'], [15000, 13400, 17999, 'gamestop']]) {
           const product = { ...item, 'console-name': system, 'gamestop-price': gs };
-          const sales = { [condition]: [{ price: ebay, title: 'Example Game complete' }] };
+          const sales = { [condition]: [{ price: ebay, title: 'Example Game ' + ({ loose: 'disc only', cib: 'complete', new: 'sealed' })[condition] }] };
           const amazon = { found: true, lowest: amazonLow, offers: [{ price: 90000 }, { price: amazonLow }, { price: 50000 }] };
           const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
           assert.equal(r.b.from, from);
