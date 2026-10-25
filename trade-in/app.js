@@ -3960,12 +3960,30 @@ function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
 function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   const state = cur.targetedEbay;
-  const checking = !!(driver && state?.running);
+  const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
   const review = !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state?.attempts > 0));
   if (!review && !checking) return b;
-  const message = checking ? `Checking the price-driving eBay sale (${state.attempts}/3 maximum).`
+  const message = checking ? `Checking eBay candidates two at a time (${state.attempts}/3 maximum).`
     : 'Price needs review: the price-driving eBay sale is unverified. Check the original listing or Product Research before labeling.';
   return { ...b, ebayReview: review, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
+}
+// Predict only the next possible driver if the current one is rejected. All
+// hypothetical exclusions stay in a copy, never in the actual pricing evidence.
+function floorEbayCandidates(cur, limit) {
+  const copy = value => ({ ...value, ebayChecks: { ...value.ebayChecks, results: { ...value.ebayChecks?.results } } });
+  const shadow = copy(cur);
+  if (cur.standardGame) shadow.standardGame = copy(cur.standardGame);
+  const candidates = [], keys = new Set();
+  while (candidates.length < limit) {
+    const driver = floorEbayDriver(shadow);
+    if (!driver || ['sold', 'unknown', 'pending'].includes(driver.sale.verification?.state)) break;
+    const key = floorSaleKey(driver.sale);
+    if (!driver.sale.url || keys.has(key)) break;
+    keys.add(key);
+    candidates.push({ ...driver, holder: driver.holder === shadow ? cur : cur.standardGame, key });
+    driver.holder.ebayChecks.results[key] = { state: 'ended' };
+  }
+  return candidates;
 }
 async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
@@ -3977,21 +3995,28 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
   progress();
   try {
     if (!helper?.targetedAvailable || !await helper.targetedAvailable()) { state.unavailable = true; return; }
-    if (stopped()) return;
-    const adapter = { available: async () => true, check: url => helper.checkTargeted(url) };
     while (!stopped() && state.attempts < 3) {
+      const candidates = floorEbayCandidates(cur, Math.min(2, 3 - state.attempts));
+      if (!candidates.length) break;
+      state.attempts += candidates.length;
+      for (const { holder, key } of candidates) {
+        holder.ebayChecks = { ...holder.ebayChecks, results: { ...holder.ebayChecks?.results, [key]: { state: 'pending' } } };
+      }
+      progress();
+      await Promise.allSettled(candidates.map(async ({ target, holder, sale, key }) => {
+        let value;
+        try {
+          const result = await helper.checkTargeted(sale.url);
+          value = floorEbayResult(sale, target.product, result, floorCondition(target.product, target.condition));
+        } catch (_) { value = { state: 'unknown' }; }
+        if (stopped()) return;
+        holder.ebayChecks.results[key] = value;
+        progress();
+      }));
+      // A verified driver settles pricing immediately. An unknown driver needs
+      // review; neither result justifies starting a third, lower candidate.
       const driver = floorEbayDriver(cur);
-      if (!driver || driver.sale.verification?.state === 'sold') break;
-      // An unknown page gives no reason to replace the current driver with a lower sale.
-      if (driver.sale.verification?.state === 'unknown') break;
-      state.attempts++;
-      await verifyFloorEbaySale(driver.target, driver.sale.i, () => {
-        if (!stopped()) { driver.holder.ebayChecks = driver.target.ebayChecks; progress(); }
-      }, stopped, adapter);
-      if (stopped()) break;
-      driver.holder.ebayChecks = driver.target.ebayChecks;
-      const checked = driver.target.ebayChecks?.results[floorSaleKey(driver.sale)];
-      if (!floorEbayExcluded(checked)) break;
+      if (!driver || ['sold', 'unknown'].includes(driver.sale.verification?.state)) break;
     }
   } catch (_) { state.unavailable = true; } finally { state.running = false; if (!stopped()) progress(); }
 }
@@ -4526,7 +4551,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sale' : b.ebayReview ? 'Needs review' : estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : b.ebayReview ? 'Needs review' : estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -4579,7 +4604,7 @@ function renderFloorPricer() {
     <div class="floor-body">
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
-        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Targeted checks: up to 3 sales. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
+        <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Targeted checks: two at once, three maximum. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
@@ -4711,7 +4736,7 @@ function onFloorPricerClick(e) {
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
-  if (act === 'ebay') { if (!floorCur.ebayChecks?.loading) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
+  if (act === 'ebay') { if (!floorCur.ebayChecks?.loading && !floorCur.targetedEbay?.running) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;
     renderFloorPricer();

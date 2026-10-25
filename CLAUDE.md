@@ -763,8 +763,12 @@ The site's **only server-side code**. Everything else is static.
     after market loading, if it is over 90 days old or exceeds matching Amazon
     by both $10 and 30%. No checks for typed prices or other driving sources.
     Confirmed ended/offer/mismatch/price discrepancies exclude that sale, then
-    recompute and check the next driver, sequentially, at most three per lookup
-    and condition. Unknown stops immediately; unavailable/unknown/exhausted checks
+    recompute the next driver. Live lookups check the current and next possible
+    driver in parallel (maximum two tabs), at most three per lookup and condition.
+    Hypothetical exclusions used to plan a backup never mutate real evidence.
+    A verified highest driver unlocks pricing before a slower backup finishes.
+    Only rejected leading candidates justify a third check. An unknown driver
+    stops further scheduling; unavailable/unknown/exhausted checks
     show Needs review, preserving the provisional price and saved review notes.
     Add to list waits only while the targeted check runs; typed overrides remain.
     No browser work in bulk audits/rechecks. Specific premiums, minimums,

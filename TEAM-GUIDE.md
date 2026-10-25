@@ -818,8 +818,10 @@ Guide (the Google Sheet tab).
      eligible. Opened toys-to-life packaging still counts as loose.
    - **Targeted eBay checks:** with Chrome Market Helper **1.1.5+**, the tool
      checks the sale driving the price when it is over 90 days old or at least
-     $10 and 30% above Amazon. It checks one sale at a time, up to three if earlier
-     listings are confirmed unsuitable. Archived Ended summary cards are recognized
+     $10 and 30% above Amazon. It checks the current price-driving sale and its
+     next possible replacement **two at a time**, up to **three total** if earlier
+     listings are confirmed unsuitable. A verified highest sale makes the price
+     available immediately, even if the backup is still loading. Archived Ended summary cards are recognized
      even without a full price panel. Ended listings and hidden accepted-offer
      prices are excluded; blocked or unclear pages stop the check and show
      **Needs review**. Review the original sale or eBay Product Research before
