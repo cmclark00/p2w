@@ -756,7 +756,7 @@ The site's **only server-side code**. Everything else is static.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
 
-  - **Targeted original eBay verification:** Market Helper 1.1.4 advertises
+  - **Targeted original eBay verification:** Market Helper 1.1.5 advertises
     protocol 2 plus targeted capability 1. Old helpers never receive automatic
     tab requests; old all-sales sweep modes remain rejected. Live lookups check
     only the sale driving the baseline (including a standard-game baseline),
@@ -775,7 +775,9 @@ The site's **only server-side code**. Everything else is static.
     hidden accepted offers, strikethrough asking prices or blocked pages as sold.
     Temporary tabs close after each result or 12-second watchdog. Cache: known
     24h, unknown 60s. Protocol 2 manual checks still work on 1.1.2+.
-    Reload helper 1.1.4 and refresh the website for targeted checks. Build ZIP:
+    Archived original-item condensed ENDED cards are negative evidence without
+    requiring a visible full title/price panel. Condensed SOLD alone remains
+    insufficient. Reload helper 1.1.5 for this archive-layout fix. Build ZIP:
     python scripts/build-gamestop-helper.py. Tests: test-ebay-helper.cjs and
     test-ebay-verification.cjs (bounds, drivers, cancellation and premiums).
 

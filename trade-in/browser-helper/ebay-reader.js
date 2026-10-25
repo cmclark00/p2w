@@ -6,22 +6,33 @@ function readEbaySale(doc, id, href) {
   try { url = new URL(href); } catch (_) { return unknown; }
   if (url.protocol !== 'https:' || !/^\d{9,15}$/.test(id) || !['www.ebay.com', 'ebay.com'].includes(url.hostname) || !new RegExp(`/itm/(?:[^/]+/)?${id}/?$`).test(url.pathname)) return unknown;
   const visible = el => !!el && el.getClientRects().length > 0;
+  // Archived items can expose only the original condensed card: no visible h1
+  // or price panel. Its ENDED badge is sufficient negative evidence, but its
+  // SOLD badge/asking price alone must never verify a sold amount.
+  const card = doc.querySelector('.x-vi-evo-cvip-container--condensed .x-item-condensed-card');
+  const cardTitle = card?.querySelector('.x-item-condensed-card__title .ux-textspans');
+  const cardStatus = card?.querySelector('.x-item-condensed-card__banner .signal');
+  if ([card, cardTitle, cardStatus].every(visible)
+    && /^ended$/i.test(cardStatus.textContent.trim()) && cardTitle.textContent.trim()) {
+    return { state: 'ended', id, title: cardTitle.textContent.replace(/\s+/g, ' ').trim() };
+  }
   const main = doc.querySelector('#mainContent');
   const heading = main?.querySelector('h1.x-item-title__mainTitle');
   const section = main?.querySelector('.x-price-section');
   const primary = section?.querySelector('.x-price-primary');
-  if (![main, heading, section, primary].every(visible)) return unknown;
+  if (![main, heading].every(visible)) return unknown;
   const title = heading.textContent.replace(/\s+/g, ' ').trim();
   const statuses = [...doc.querySelectorAll('.ux-layout-section__textual-display--statusMessage')].filter(visible).map(e => e.textContent.replace(/\s+/g, ' ').trim());
   const sold = statuses.some(t => /^This (?:listing|item) (?:was )?sold\b/i.test(t));
   const ended = statuses.some(t => /^This (?:listing|item) (?:(?:was|has) )?ended\b/i.test(t));
+  if (!title || sold && ended) return unknown;
+  if (ended && !sold) return { state: 'ended', id, title };
+  if (![section, primary].every(visible)) return unknown;
   const offer = [...section.querySelectorAll('.x-additional-info')].filter(visible).some(e => /\bbest offer accepted\b|\baccepted (?:a )?best offer\b/i.test(e.textContent));
   const strike = [...primary.querySelectorAll('span, s, del')].filter(visible).some(e =>
     /\$\s*[\d,]+/.test(e.textContent) && (e.matches('s, del, .ux-textspans--STRIKETHROUGH')
       || /line-through/.test(doc.defaultView?.getComputedStyle(e).textDecorationLine || '')));
-  if (!title || sold && ended) return unknown;
   if (offer || strike) return { state: 'offer', id, title };
-  if (ended && !sold) return { state: 'ended', id, title };
   // The collapsed SOLD summary can show an asking price. Full item markup is required above.
   if (!sold) return unknown;
   const prices = [...primary.querySelectorAll('.x-price-primary__price')].filter(visible).map(e => e.textContent.trim());

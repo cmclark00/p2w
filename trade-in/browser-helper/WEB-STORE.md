@@ -6,7 +6,7 @@ Status: submission assets prepared; not yet submitted or published. No store ite
 
 Use the shop-owned Google account for the publisher. The owner completes developer registration, payment, terms, email verification, and two-step verification. Never put credentials or payment details in this repository or the ZIP.
 
-Run `python scripts/build-gamestop-helper.py --store-output <absolute-private-folder>/play2win-market-helper-1.1.4.zip`.
+Run `python scripts/build-gamestop-helper.py --store-output <absolute-private-folder>/play2win-market-helper-1.1.5.zip`.
 The store ZIP contains manifest.json at its root, six runtime files including the manifest, and four icons. It excludes installer notes, reviewer instructions, credentials, and store artwork. The ordinary downloadable ZIP retains its enclosing folder and manual installation guide.
 
 Render icons and the 440×280 promotional tile with `node scripts/build-helper-store-art.cjs <absolute-private-folder>` (requires sharp). Store screenshots must show the actual extension workflow or its connection-check page, without staff/customer records. Supply a 1280×800 or 640×400 screenshot.

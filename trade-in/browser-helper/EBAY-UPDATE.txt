@@ -1,4 +1,4 @@
-Play2Win Market Helper 1.1.4
+Play2Win Market Helper 1.1.5
 
 Chrome Web Store migration is being prepared; this ZIP is still the manual
 unpacked installation. It does not automatically update. Once the unlisted
@@ -18,7 +18,7 @@ contents before clicking Reload.
 
 If duplicate eBay product tabs are opening, switch the helper off first and
 refresh every open pricing-tool tab to stop an old sweep. Reload this extension,
-confirm Chrome shows version 1.1.4, turn it back on and refresh the pricing tool.
+confirm Chrome shows version 1.1.5, turn it back on and refresh the pricing tool.
 Close the unwanted duplicate product tabs. The website cannot reload an installed
 Chrome extension for you. Version 1.1.2 rejects old automatic sweep requests;
 the updated website refuses eBay checks through an older installed helper.
@@ -30,7 +30,7 @@ Each staff computer/profile needs its own installation. Remove the helper at
 chrome://extensions. It cannot run inside the Codex in-app browser.
 
 The helper reads matching GameStop product pages and eBay.com/itm/ item pages.
-Targeted checks require version 1.1.4. The live tool checks only the sale driving
+Targeted checks require version 1.1.5. The live tool checks only the sale driving
 pricing when older than 90 days or at least $10 and 30% above matching Amazon.
 Confirmed unsuitable sales lead to the next driver, at most three sequential
 checks. Unknown stops immediately and flags Needs review. Add to list waits
@@ -40,7 +40,9 @@ Checks retain the original-listing URL controls to avoid product-page redirects.
 The helper expands See original listing, reads
 the item's status/title/price, and close only those temporary tabs. It never
 buys, bids, submits offers, messages sellers, changes carts, or solves challenges.
-Blocked or unclear pages remain unverified, not confirmed sales.
+Archived original-item ENDED summary cards are excluded even without a price panel.
+Only explicit sold status plus the original visible, non-struck USD price can
+verify a sale. Blocked or unclear pages remain unverified, not confirmed sales.
 
 Ended listings and accepted-offer/struck-through prices are excluded. A sold
 price must be visible in USD and match the PriceCharting amount. Specific

@@ -19,7 +19,7 @@ function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', pri
   section.querySelectorAll = () => offer ? [el('Best offer accepted')] : [];
   main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : section;
   return { readyState: 'complete', defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) },
-    querySelector: () => summary ? null : main,
+    querySelector: selector => selector === '#mainContent' && !summary ? main : null,
     querySelectorAll: s => s === 'button' ? [] : [el(status, !hiddenSold), ...(conflict ? [el('This listing has ended.')] : [])] };
 }
 function parse(options, url = 'https://www.ebay.com/itm/404870222598') {
@@ -35,6 +35,28 @@ assert.equal(parse({ hiddenStrike: true }).state, 'sold', 'Hidden/unrelated old 
 for (const options of [{ summary: true }, { hiddenSold: true }, { conflict: true }, { hiddenPrice: true },
   { duplicatePrice: true }, { price: 'C $18.00' }, { price: 'US $0.00' }, { status: 'This listing is active' }]) assert.equal(parse(options).state, 'unknown');
 for (const url of ['https://evil.test/itm/404870222598', 'https://www.ebay.com/itm/999999999999']) assert.equal(parse({}, url).state, 'unknown');
+// Real Road Redemption archive layout (167370273675): visible condensed ENDED
+// card, hidden full item and no price panel. Ignore recommendations and SOLD summaries.
+function archivedCard(status = 'Ended', hidden = false, missingTitle = false) {
+  const card = el('', !hidden);
+  card.querySelector = selector => selector.includes('__title') ? (missingTitle ? null : el('Road Redemption - Sony PlayStation 4', !hidden)) : el(status, !hidden);
+  return { querySelector: selector => selector === '.x-vi-evo-cvip-container--condensed .x-item-condensed-card' ? card : null };
+}
+reader.doc = archivedCard(); reader.href = 'https://www.ebay.com/itm/167370273675?nordt=true&rt=nc';
+const archivedRead = () => vm.runInContext('readEbaySale(doc, "167370273675", href)', reader);
+assert.equal(archivedRead().state, 'ended');
+assert.equal(archivedRead().title, 'Road Redemption - Sony PlayStation 4');
+for (const [status, hidden, missingTitle] of [['Sold', false, false], ['Ended', true, false], ['Ended', false, true], ['123 sold', false, false]]) {
+  reader.doc = archivedCard(status, hidden, missingTitle);
+  assert.equal(archivedRead().state, 'unknown');
+}
+reader.doc = archivedCard(); reader.href = 'https://www.ebay.com/p/8617';
+assert.equal(archivedRead().state, 'unknown', 'A catalog redirect cannot identify an original ended sale');
+reader.doc = fixture({ status: 'This listing has ended.' });
+const endedMain = reader.doc.querySelector('#mainContent');
+endedMain.querySelector = selector => selector === 'h1.x-item-title__mainTitle' ? el('Road Redemption - Sony PlayStation 4') : null;
+reader.href = 'https://www.ebay.com/itm/167370273675';
+assert.equal(archivedRead().state, 'ended', 'Full ended page does not need a price');
 reader.location = { pathname: '/itm/404870222598', href: 'https://www.ebay.com/itm/404870222598' };
 reader.document = fixture({ summary: true });
 reader.document.querySelectorAll = s => s === 'button' ? [{ ...el('See original listingSee original listing'), click() { clicks++; reader.document = fixture({ offer: true }); } }] : [];

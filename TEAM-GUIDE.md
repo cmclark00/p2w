@@ -816,10 +816,11 @@ Guide (the Google Sheet tab).
    - **Loose games:** listings with a box, case, manual, or CIB description are
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
-   - **Targeted eBay checks:** with Chrome Market Helper **1.1.4+**, the tool
+   - **Targeted eBay checks:** with Chrome Market Helper **1.1.5+**, the tool
      checks the sale driving the price when it is over 90 days old or at least
      $10 and 30% above Amazon. It checks one sale at a time, up to three if earlier
-     listings are confirmed unsuitable. Ended listings and hidden accepted-offer
+     listings are confirmed unsuitable. Archived Ended summary cards are recognized
+     even without a full price panel. Ended listings and hidden accepted-offer
      prices are excluded; blocked or unclear pages stop the check and show
      **Needs review**. Review the original sale or eBay Product Research before
      labeling. Add to list waits during the check; you can still type your own
