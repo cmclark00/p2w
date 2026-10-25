@@ -4037,6 +4037,16 @@ const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi,
   .replace(/\b(two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[w]))
   .replace(/\bbrothers\b/g, 'bros').replace(/\bsystems?\b/g, 'console')
   .split(' ').filter((w) => w && !['a', 'an', 'the', 'of', 'for', 'and'].includes(w));
+// PriceCharting abbreviates this GBA release; Four Swords is included on the
+// same cartridge. Normalize only this known title/platform combination, keeping
+// other games, extras, condition words and edition qualifiers for the filters.
+function floorKnownGameTitle(title, product) {
+  const core = floorTitleWords(floorVariantName(product)).filter(w => w !== 'legend').join(' ');
+  if (!/^(?:game ?boy advance|gba)$/.test(floorGamePlatform(product))
+    || !/^zelda link to past(?: 4 swords)?$/.test(core)) return title;
+  return String(title || '').replace(/(?:\s*(?:\/|&|\+|\band\b|\bwith\b|\bw\/|\bincludes?\b)\s*)?\b(?:four|4)[\s-]+swords\b(?!\s+(?:adventures?|anniversary)\b)/gi, ' ');
+}
+
 // A title must identify the selected product, not merely share its franchise.
 // Unknown extensions directly after a game's name are held for review: "Final
 // Fight Guy" and "Halo 3 ODST" cannot price Final Fight and Halo 3 respectively.
@@ -4073,7 +4083,7 @@ const FLOOR_PLATFORMS = [
   /\bgamecube\b/, /\b(?:n64|nintendo 64)\b/,
   /\b(?:snes|super nintendo|super nes)\b/, /\b(?:nintendo nes|(?<!super )nes)\b/,
   /\b(?:sega cd|mega cd)\b/, /\b(?:sega genesis|genesis|mega drive)\b/,
-  /\b(?:gameboy|game boy) advance\b/, /\b(?:gameboy|game boy) color\b/,
+  /\b(?:gba|gameboy advance|game boy advance)\b/, /\b(?:gameboy|game boy) color\b/,
   /\b(?:gameboy|game boy)\b(?! (?:advance|color))/, /\bsega saturn\b/, /\bdreamcast\b/,
 ];
 function floorAmazonPlatformConfirmed(candidate, product) {
@@ -4084,6 +4094,9 @@ function floorAmazonPlatformConfirmed(candidate, product) {
 }
 function floorListingMismatch(title, product) {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
+  title = floorKnownGameTitle(title, product);
+  const knownName = floorKnownGameTitle(product?.['product-name'], product);
+  if (knownName !== product?.['product-name']) product = { ...product, 'product-name': knownName };
   const toyMismatch = floorToyListingMismatch(title, product);
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';

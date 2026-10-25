@@ -205,6 +205,44 @@ test('named collections cannot raise the standard game price, including the Valo
   run('settings.floorPremiums=savedCollectionTestPremiums');
 });
 
+test('GBA Link to the Past includes Four Swords without treating it as a sequel or bundle', () => {
+  const product = { ...item, 'product-name': 'Zelda Link to the Past', 'console-name': 'GameBoy Advance' };
+  const titles = [
+    'Legend of Zelda: A Link to the Past/Four Swords GBA',
+    'The Legend of Zelda: A Link to the Past Four Swords Gameboy Advance Game Tested',
+    'Legend of Zelda: A Link to the Past Four Swords (Game Boy Advance) GBA TESTED',
+    'The Legend of Zelda A Link to the Past/Four Swords GameBoy Advance - Tested',
+    'Zelda A Link to the Past + Four Swords GBA cartridge only',
+    'Zelda Link to the Past & 4 Swords Nintendo Game Boy Advance',
+    'Zelda Link to the Past and Four Swords GBA',
+  ];
+  for (const title of titles) {
+    const example = cur(product, { condition: 'loose', sales: { loose: [{ title, price: 5939 }] } });
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+    assert.equal(invoke('floorSales', example)[0].odd, false, title);
+    assert.equal(invoke('floorResult', example).b.basis, 5939, title);
+    assert.equal(invoke('floorAmazonCandidateMismatch', { title, platforms: ['GameBoy Advance'] }, product, 'loose', true), null, title);
+  }
+  const manual = 'Zelda A Link to the Past Four Swords GBA Game Boy Advance & Manual Tested';
+  assert.equal(invoke('floorListingMismatch', manual, product), null);
+  assert.ok(invoke('floorLoosePackagingMismatch', manual, 'loose', product), 'included manual is still not a loose comp');
+  for (const title of [
+    'Zelda Four Swords Adventures GameCube', 'Zelda Four Swords GBA',
+    'Zelda Link to the Past Four Swords Adventures GBA',
+    'Zelda Link to the Past + Four Swords + Minish Cap GBA',
+    'Zelda Link to the Past Four Swords Players Choice GBA',
+    'Zelda Link to the Past Four Swords French Version GBA',
+    'Zelda Link to the Past Four Swords Super Nintendo',
+  ]) assert.ok(invoke('floorListingMismatch', title, product), title);
+  assert.ok(invoke('floorListingMismatch', titles[0], { ...product, 'console-name': 'Super Nintendo' }), 'alias is GBA-specific');
+  assert.equal(invoke('floorListingMismatch', titles[0], { ...product, 'product-name': 'Zelda Link to the Past & Four Swords' }), null);
+  assert.equal(invoke('floorAmazonPlatformConfirmed', { title: titles[0] }, product), true, 'GBA abbreviation confirms platform');
+  const renewed = cur(product, { condition: 'loose', sales: { loose: [{ title: titles[0], price: 5939 }] },
+    amazon: { found: true, renewedFallback: true, title: 'The Legend of Zelda: A Link to the Past (Includes Four Swords Adventure) (Renewed)', offers: [{ price: 6399 }] } });
+  assert.equal(invoke('floorResult', renewed).b.basis, 6399);
+  assert.equal(invoke('floorResult', renewed).r.price, 6500, 'existing Renewed and rounding rules remain unchanged');
+});
+
 test('audit mismatches cannot drive eBay or Amazon baselines', () => {
   for (const [name, system, title, good, price] of [
     ['Final Fight', 'Super Nintendo', 'Final Fight Guy - Nintendo Super NES', 'Final Fight Super Nintendo cartridge tested', 2969],

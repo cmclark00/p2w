@@ -87,5 +87,15 @@ function engine(request) {
   assert.ok(valorEvidence.sales.cib.some(s => s.price === 10000), 'selected Valor retains its own sales');
   assert.equal(valorEvidence.standardGame.sales.cib.length, 1, 'Valor cannot contaminate its standard-game floor');
   assert.equal(valorEvidence.standardGame.sales.cib[0].price, 1200);
-  console.log('Game evidence passed: related sales, duplicates, region/platform/edition/collection filters, standard minimum, Amazon/GameStop, premiums, deductions, conditions and failures.');
+  const zelda = { ...base, id: '200', 'product-name': 'Zelda Link to the Past', 'console-name': 'GameBoy Advance' };
+  const choice = { ...zelda, id: '201', 'product-name': "Zelda Link to the Past [Player's Choice]" };
+  const fourSwords = sale('123456789024', 'Legend of Zelda: A Link to the Past/Four Swords GBA', 5939);
+  const gba = engine(async route => route === 'pc/products' ? { products: [zelda, choice] }
+    : { sales: { loose: [fourSwords, sale('123456789025', "Zelda Link to the Past Four Swords Player's Choice GBA", 9900)] } });
+  gba.ctx.zelda = zelda;
+  const recoveredGba = await gba.run('fetchFloorProductSales(zelda, async (route, params) => route === "pc/sales" && params.id === "200" ? {sales:{}} : request(route,params))');
+  assert.equal(recoveredGba.sales.loose.length, 1);
+  assert.equal(recoveredGba.sales.loose[0].price, 5939);
+  assert.equal(recoveredGba.sales.loose[0].recovered, true, 'GBA alias also recovers matching sales from sibling entries');
+  console.log('Game evidence passed: related sales, duplicates, region/platform/edition/collection filters, GBA title aliases, standard minimum, Amazon/GameStop, premiums, deductions, conditions and failures.');
 })().catch(err => { console.error(err); process.exitCode = 1; });

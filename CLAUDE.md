@@ -565,6 +565,12 @@ The site's **only server-side code**. Everything else is static.
     bracketed Collection releases require their qualifier words in the title.
     Actual compilation names and seller personal-collection descriptions stay
     eligible. Figure-specific variant matching remains separate.
+    `floorKnownGameTitle()` recognizes the GBA Link to the Past / Four Swords
+    title (including `4 Swords`, slash/and/plus spellings) before shared listing
+    matching. It is scoped to that game and platform, preserving other extras,
+    editions, languages and condition checks; Four Swords Adventures is not an
+    alias. GBA also confirms the Game Boy Advance platform in recovered/Amazon
+    titles. Original listing text remains displayed unchanged.
     Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's

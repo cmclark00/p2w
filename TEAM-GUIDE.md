@@ -838,6 +838,9 @@ Guide (the Google Sheet tab).
      This includes named collections such as **WWII Valor Collection**; choose
      that version only when pricing the collection itself. Ordinary compilation
      games and seller wording such as “from my personal collection” still qualify.
+     For **Link to the Past on GBA**, **Four Swords** is part of the same cartridge
+     and is accepted in listing titles. Other Zelda games and seller-added bundles
+     still need to be excluded.
      Expand **Standard game** to inspect that evidence, or use **Other editions**
      to change the selected version. Failed or capped searches are flagged.
    - **Every system:** compare the **highest valid eBay sale**, the
