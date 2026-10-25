@@ -6,7 +6,7 @@ Status: submission assets prepared; not yet submitted or published. No store ite
 
 Use the shop-owned Google account for the publisher. The owner completes developer registration, payment, terms, email verification, and two-step verification. Never put credentials or payment details in this repository or the ZIP.
 
-Run `python scripts/build-gamestop-helper.py --store-output <absolute-private-folder>/play2win-market-helper-1.1.3.zip`.
+Run `python scripts/build-gamestop-helper.py --store-output <absolute-private-folder>/play2win-market-helper-1.1.4.zip`.
 The store ZIP contains manifest.json at its root, six runtime files including the manifest, and four icons. It excludes installer notes, reviewer instructions, credentials, and store artwork. The ordinary downloadable ZIP retains its enclosing folder and manual installation guide.
 
 Render icons and the 440×280 promotional tile with `node scripts/build-helper-store-art.cjs <absolute-private-folder>` (requires sharp). Store screenshots must show the actual extension workflow or its connection-check page, without staff/customer records. Supply a 1280×800 or 640×400 screenshot.
@@ -32,7 +32,7 @@ Play2Win Market Helper connects market listing checks to the Play2Win Games floo
 • Check one selected original eBay listing for a confirmed sale, an ended listing, or an accepted offer with an undisclosed final price.
 • Return the listing evidence to the Play2Win page while keeping pricing available.
 
-The helper uses temporary background tabs and closes only the tabs it creates. GameStop checks can run during pricing; eBay checks run only when requested for a selected sale. Blocked or unclear listings remain unverified. The helper never buys, bids, submits offers, changes carts, or messages sellers.
+The helper uses temporary background tabs and closes only the tabs it creates. GameStop checks can run during pricing; eBay checks run for a selected sale or automatically for the price-driving sale when it is old or substantially above Amazon, with at most three sequential candidates per lookup and condition. Blocked or unclear listings remain unverified. The helper never buys, bids, submits offers, changes carts, or messages sellers.
 
 This is a companion for Play2Win staff. The staff pricing tool requires an authorized Play2Win login. A public connection-check page is available at https://play2wingames.com/trade-in/helper.html without a staff login.
 

@@ -56,6 +56,67 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     assert.equal(result(item).r.price, before, name + ' keeps premium/rounding');
     if (system === 'Skylanders') assert.equal(before, 2000);
   }
+  // Targeted checks examine only the actual driver, with a hard three-sale bound.
+  const old = rows => cur(product, rows.map((price, i) => ({ ...sale(price, String(111111111111 + i)), date: '2025-01-01' })));
+  const targeted = (c, responses, cancel = () => false) => {
+    const calls = [];
+    const helper = { targetedAvailable: async () => true, checkTargeted: async url => {
+      calls.push(url); const row = c.sales.cib.find(s => s.url === url);
+      return verified(invoke('floorSaleKey', row), row.price, row.title, responses[calls.length - 1] || 'sold');
+    } };
+    return invoke('runFloorTargetedEbay', c, () => {}, cancel, helper).then(() => calls);
+  };
+  const good = old([3000, 2900, 2800, 2700]); const original = result(good).r.price;
+  assert.equal((await targeted(good, ['sold'])).length, 1);
+  assert.equal(result(good).r.price, original); assert.equal(result(good).b.ebayReview, undefined);
+  const retries = old([3000, 2900, 2800, 2700]);
+  assert.equal((await targeted(retries, ['offer', 'ended', 'sold'])).length, 3);
+  assert.equal(result(retries).b.basis, 2800); assert.equal(result(retries).b.ebayReview, undefined);
+  const limited = old([3000, 2900, 2800, 2700]);
+  assert.equal((await targeted(limited, ['offer', 'ended', 'offer'])).length, 3);
+  assert.equal(result(limited).b.basis, 2700); assert.equal(result(limited).b.ebayReview, true);
+  assert.equal((await targeted(limited, ['sold'])).length, 0, 'Renders cannot restart the budget');
+  const unknown = old([3000, 2900]);
+  assert.equal((await targeted(unknown, ['unknown'])).length, 1, 'Unknown is flagged, not replaced with an unverified lower sale');
+  assert.equal(result(unknown).b.basis, 3000); assert.equal(result(unknown).b.ebayReview, true);
+  const absentTarget = old([3000]); await invoke('runFloorTargetedEbay', absentTarget, () => {}, () => false, null);
+  assert.equal(result(absentTarget).b.ebayReview, true); assert.equal(absentTarget.targetedEbay.running, false);
+  const cancelled = old([3000]); assert.equal((await targeted(cancelled, ['sold'], () => true)).length, 0);
+  const recent = cur(product, [sale(3000, '111111111111')]); recent.sales.cib[0].date = new Date().toISOString().slice(0, 10);
+  assert.equal((await targeted(recent, ['sold'])).length, 0, 'No broad automatic sweep of recent ordinary sales');
+  const gap = cur(product, [sale(6000, '111111111111')]); gap.sales.cib[0].date = new Date().toISOString().slice(0, 10);
+  gap.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 2300, shipping: 0 }] };
+  assert.equal((await targeted(gap, ['sold'])).length, 1, 'Large Amazon discrepancy triggers a recent sale');
+  const amazonDriver = old([3000]); amazonDriver.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 4000, shipping: 0 }] };
+  assert.equal((await targeted(amazonDriver, ['sold'])).length, 0, 'Do not check eBay when Amazon drives');
+  const typed = old([3000]); typed.typed = 4000; assert.equal((await targeted(typed, ['sold'])).length, 0);
+  const premiumItem = old([10000]); premiumItem.product = { 'product-name': 'Pokemon Red', 'console-name': 'GameBoy', 'loose-price': 6000 };
+  premiumItem.condition = 'loose'; premiumItem.sales.loose = premiumItem.sales.cib;
+  premiumItem.sales.loose[0].title = 'Pokemon Red GameBoy authentic';
+  const premiumBefore = result(premiumItem).r.price;
+  await targeted(premiumItem, ['sold']); assert.equal(result(premiumItem).r.price, premiumBefore, 'Targeted verification preserves premiums and rounding');
+  const variant = cur({ ...product, id: 'variant', 'product-name': 'Example Game [Deluxe Edition]' },
+    [sale(2000, '888888888888', 'Example Game Deluxe Edition PS4 CIB')]);
+  variant.standardGame = old([3000, 2900]);
+  let standardCalls = 0;
+  await invoke('runFloorTargetedEbay', variant, () => {}, () => false, {
+    targetedAvailable: async () => true, checkTargeted: async url => {
+      standardCalls++; const row = variant.standardGame.sales.cib.find(s => s.url === url);
+      return verified(invoke('floorSaleKey', row), row.price);
+    }
+  });
+  assert.equal(standardCalls, 1); assert.equal(result(variant).b.from, 'standard');
+  assert.equal(variant.standardGame.ebayChecks.results['111111111111'].state, 'sold');
+  assert.equal(result(variant).b.ebayReview, undefined, 'Standard baseline driver verification is retained');
+  const pendingTarget = old([3000, 2900]); let finishTarget;
+  const running = invoke('runFloorTargetedEbay', pendingTarget, () => {}, () => false, {
+    targetedAvailable: async () => true, checkTargeted: () => new Promise(r => { finishTarget = r; })
+  });
+  await new Promise(r => setImmediate(r)); assert.equal(result(pendingTarget).b.ebayChecking, true);
+  pendingTarget.targetedEbay = null; pendingTarget.ebayChecks = null;
+  finishTarget(verified('111111111111', null, undefined, 'ended')); await running;
+  assert.equal(pendingTarget.ebayChecks, null, 'An old condition run cannot restore results after a switch back');
+  assert.ok(invoke('floorBasisInfo', result(unknown).b).reviewNotes.some(n => n.includes('Price needs review')));
   // Real load path must never invoke the helper, even when available.
   const automatic = cur(); ctx.automatic = automatic;
   ctx.window = { P2WEbayHelper: forbidden };
@@ -64,5 +125,5 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const html = element('#floorPricer').innerHTML;
   assert.match(html, /Check selected sale/); assert.doesNotMatch(html, /Recheck sales|Verifying eBay sales/);
   assert.doesNotMatch(html, /data-floor-act="add" disabled/, 'Ordinary Add to list is available without eBay checking');
-  console.log('Optional eBay checks passed: one selected sale, no automatic queue or pricing wait, unknowns stay eligible, confirmed exclusions and premiums preserved.');
+  console.log('Targeted and optional eBay checks passed: bounded driver checks, condition cancellation, unknown review, standard baseline, helper compatibility and premiums preserved.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

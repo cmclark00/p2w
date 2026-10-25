@@ -1,4 +1,4 @@
-Play2Win Market Helper 1.1.3
+Play2Win Market Helper 1.1.4
 
 Chrome Web Store migration is being prepared; this ZIP is still the manual
 unpacked installation. It does not automatically update. Once the unlisted
@@ -18,7 +18,7 @@ contents before clicking Reload.
 
 If duplicate eBay product tabs are opening, switch the helper off first and
 refresh every open pricing-tool tab to stop an old sweep. Reload this extension,
-confirm Chrome shows version 1.1.2, turn it back on and refresh the pricing tool.
+confirm Chrome shows version 1.1.4, turn it back on and refresh the pricing tool.
 Close the unwanted duplicate product tabs. The website cannot reload an installed
 Chrome extension for you. Version 1.1.2 rejects old automatic sweep requests;
 the updated website refuses eBay checks through an older installed helper.
@@ -30,8 +30,12 @@ Each staff computer/profile needs its own installation. Remove the helper at
 chrome://extensions. It cannot run inside the Codex in-app browser.
 
 The helper reads matching GameStop product pages and eBay.com/itm/ item pages.
-Click Check selected sale for one optional eBay check. Normal lookups, saved
-rechecks and history audits do not open eBay tabs or wait for eBay verification.
+Targeted checks require version 1.1.4. The live tool checks only the sale driving
+pricing when older than 90 days or at least $10 and 30% above matching Amazon.
+Confirmed unsuitable sales lead to the next driver, at most three sequential
+checks. Unknown stops immediately and flags Needs review. Add to list waits
+while checking; typed reviewed prices remain available. Bulk rechecks and history
+audits do not open eBay tabs. Manual Check selected sale remains available.
 Checks retain the original-listing URL controls to avoid product-page redirects.
 The helper expands See original listing, reads
 the item's status/title/price, and close only those temporary tabs. It never
@@ -43,7 +47,7 @@ price must be visible in USD and match the PriceCharting amount. Specific
 premiums, rare-figure minimums and existing rounding still apply afterward.
 Without the helper or if a page cannot be read, the check is inconclusive:
 PriceCharting evidence stays eligible, labeled for manual review. A check takes
-at most 12 seconds with this version and does not block pricing or Add to list.
+at most 12 seconds with this version per listing. Targeted checks temporarily hold Add to list.
 
 Confirmed out-of-stock GameStop prices
 are reference-only and do not set a minimum. Specific premiums still apply.

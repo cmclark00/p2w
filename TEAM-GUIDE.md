@@ -816,18 +816,19 @@ Guide (the Google Sheet tab).
    - **Loose games:** listings with a box, case, manual, or CIB description are
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
-   - **Optional eBay check:** click **Check selected sale** to check just that
-     row with the Chrome Market Helper. There is no automatic queue, and pricing
-     remains available during the check. The helper opens the original listing;
-     confirmed ended listings, accepted offers and struck-through prices are
-     excluded from this lookup. Missing/blocked pages are marked unverified for
-     manual review and do not invalidate PriceCharting's price. A verified sale
-     must match the original item/condition and USD amount. Specific premiums
-     remain unchanged. Reload the updated helper at `chrome://extensions`, then
-     refresh the tool. Normal pricing and saved rechecks do not need the helper.
-     Chrome must show helper version **1.1.2** or later for optional eBay checks.
-     If old duplicate tabs keep opening, switch the helper off, refresh all open
-     pricing pages, reload the extension, turn it on, and refresh the tool again.
+   - **Targeted eBay checks:** with Chrome Market Helper **1.1.4+**, the tool
+     checks the sale driving the price when it is over 90 days old or at least
+     $10 and 30% above Amazon. It checks one sale at a time, up to three if earlier
+     listings are confirmed unsuitable. Ended listings and hidden accepted-offer
+     prices are excluded; blocked or unclear pages stop the check and show
+     **Needs review**. Review the original sale or eBay Product Research before
+     labeling. Add to list waits during the check; you can still type your own
+     reviewed price. Specific premiums stay intact. The review note follows saved
+     items. Bulk rechecks and history audits never open eBay tabs.
+     **Check selected sale** is still available for manual checks.
+     Reload the updated helper at `chrome://extensions`, then refresh the tool.
+     On other computers, replace the extension folder with the updated helper ZIP
+     first. Website deployment does not update an unpacked extension.
    - **Barcode editions:** scanning prices the matching edition and also checks
      related PriceCharting entries for misplaced matching sales. It checks the
      listing title, platform, region and condition; duplicates count once.

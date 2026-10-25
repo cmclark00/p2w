@@ -3937,6 +3937,58 @@ function loadFloorEbayCheck(cur, index) {
   return task;
 }
 
+// Only the live lookup schedules browser work; pure pricing and bulk audits never do.
+function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
+  if (basis.waiting || cur.typed != null) return null;
+  const standard = basis.from === 'standard';
+  const b = standard ? basis.standardReference : basis;
+  if (b?.from !== 'sale' || !b.sale) return null;
+  const target = standard ? b.cur : cur;
+  const amz = floorAmazonLowest(target);
+  const date = Date.parse(b.sale.date);
+  const stale = Number.isFinite(date) && Date.now() - date > 90 * 864e5;
+  const gap = amz > 0 && b.sale.price - amz >= 1000 && b.sale.price >= amz * 1.3;
+  return { target, holder: standard ? cur.standardGame : cur, sale: b.sale, risky: stale || gap };
+}
+function floorBasis(cur = floorCur) {
+  const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
+  const state = cur.targetedEbay;
+  const checking = !!(driver && state?.running);
+  const review = !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state?.attempts > 0));
+  if (!review && !checking) return b;
+  const message = checking ? `Checking the price-driving eBay sale (${state.attempts}/3 maximum).`
+    : 'Price needs review: the price-driving eBay sale is unverified. Check the original listing or Product Research before labeling.';
+  return { ...b, ebayReview: review, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
+}
+async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => false,
+  helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
+  if (cur.targetedEbay || cur.ebayChecks?.loading) return;
+  const first = floorEbayDriver(cur);
+  if (!first?.risky || first.sale.verification?.state === 'sold') return;
+  const state = cur.targetedEbay = { running: true, attempts: 0 };
+  const stopped = () => cancelled() || cur.targetedEbay !== state;
+  progress();
+  try {
+    if (!helper?.targetedAvailable || !await helper.targetedAvailable()) { state.unavailable = true; return; }
+    if (stopped()) return;
+    const adapter = { available: async () => true, check: url => helper.checkTargeted(url) };
+    while (!stopped() && state.attempts < 3) {
+      const driver = floorEbayDriver(cur);
+      if (!driver || driver.sale.verification?.state === 'sold') break;
+      // An unknown page gives no reason to replace the current driver with a lower sale.
+      if (driver.sale.verification?.state === 'unknown') break;
+      state.attempts++;
+      await verifyFloorEbaySale(driver.target, driver.sale.i, () => {
+        if (!stopped()) { driver.holder.ebayChecks = driver.target.ebayChecks; progress(); }
+      }, stopped, adapter);
+      if (stopped()) break;
+      driver.holder.ebayChecks = driver.target.ebayChecks;
+      const checked = driver.target.ebayChecks?.results[floorSaleKey(driver.sale)];
+      if (!floorEbayExcluded(checked)) break;
+    }
+  } catch (_) { state.unavailable = true; } finally { state.running = false; if (!stopped()) progress(); }
+}
+
 async function fetchFloorGameStopStock(product, url, request = (route, params) => api(route, { params })) {
   if (!url) return { state: 'unknown' };
   try {
@@ -4251,7 +4303,7 @@ function floorAmazonLowest(cur, showPartial = false) {
 // Regular references use the maximum; a verified Renewed fallback replaces
 // the eBay baseline while retaining GameStop's floor. Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
-function floorBasis(cur = floorCur) {
+function floorUnverifiedBasis(cur = floorCur) {
   const own = floorOwnBasis(cur);
   if (cur.typed != null || own.waiting || !floorStandardGame(cur.product)) return own;
   const standard = cur.standardGame || { product: floorStandardGame(cur.product), sales: {}, salesError: 'Standard catalog entry not available' };
@@ -4416,6 +4468,10 @@ function renderFloorPricer() {
   el.hidden = !floorCur;
   if (!floorCur) { el.innerHTML = ''; return; }
   const cur = floorCur = floorConditionCur(floorCur);
+  const condition = cur.condition;
+  void runFloorTargetedEbay(cur, () => {
+    if (floorCur === cur && cur.condition === condition) renderFloorPricer();
+  }, () => floorCur !== cur || cur.condition !== condition || cur.typed != null);
   const p = cur.product;
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
@@ -4463,7 +4519,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sale' : b.ebayReview ? 'Needs review' : estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -4472,7 +4528,7 @@ function renderFloorPricer() {
           ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>' : ''}
         </div>
       </div>
-      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
+      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && !b.ebayChecking && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
@@ -4488,6 +4544,7 @@ function renderFloorPricer() {
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
+          ${b.ebayReview ? '<span class="badge warn">Price needs review · eBay sale unverified</span>' : ''}
           ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
@@ -4515,7 +4572,7 @@ function renderFloorPricer() {
     <div class="floor-body">
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
-        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale — pricing stays available.' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}eBay check optional; select a sale to check it.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
+        <p class="small-print muted">${cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Targeted checks: up to 3 sales. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
@@ -4610,7 +4667,7 @@ function addFloorItem() {
   const cur = floorCur;
   const p = cur.product;
   const { b, r, hw } = floorResult(cur);
-  if (!r || b.waiting) return;
+  if (!r || b.waiting || b.ebayChecking) return;
   const manualMissing = !hw && cur.condition === 'cib' && !!cur.manualMissing;
   const same = floor.items.find((x) => x.pcId === String(p.id) && x.condition === cur.condition && !!x.manualMissing === manualMissing);
   if (same && !confirm(`${p['product-name']} (${GAME_CONDITIONS[cur.condition]}${manualMissing ? ', no manual' : ''}) is already on this list at ${money(same.price)}. Add it again?`)) return;
@@ -4634,7 +4691,8 @@ function onFloorPricerClick(e) {
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
     if (cond !== 'cib') floorCur.manualMissing = false;
     if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
-    floorCur.ebayChecks = null; floorCur.ebayRun = null;
+    floorCur.ebayChecks = null; floorCur.ebayRun = null; floorCur.targetedEbay = null;
+    if (floorCur.standardGame) floorCur.standardGame.ebayChecks = null;
     renderFloorPricer();
     return;
   }

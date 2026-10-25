@@ -920,18 +920,19 @@ Guide (the Google Sheet tab).</p>
    - <strong>Loose games:</strong> listings with a box, case, manual, or CIB description are
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
-   - <strong>Optional eBay check:</strong> click <strong>Check selected sale</strong> to check just that
-     row with the Chrome Market Helper. There is no automatic queue, and pricing
-     remains available during the check. The helper opens the original listing;
-     confirmed ended listings, accepted offers and struck-through prices are
-     excluded from this lookup. Missing/blocked pages are marked unverified for
-     manual review and do not invalidate PriceCharting's price. A verified sale
-     must match the original item/condition and USD amount. Specific premiums
-     remain unchanged. Reload the updated helper at <code>chrome://extensions</code>, then
-     refresh the tool. Normal pricing and saved rechecks do not need the helper.
-     Chrome must show helper version <strong>1.1.2</strong> or later for optional eBay checks.
-     If old duplicate tabs keep opening, switch the helper off, refresh all open
-     pricing pages, reload the extension, turn it on, and refresh the tool again.
+   - <strong>Targeted eBay checks:</strong> with Chrome Market Helper <strong>1.1.4+</strong>, the tool
+     checks the sale driving the price when it is over 90 days old or at least
+     $10 and 30% above Amazon. It checks one sale at a time, up to three if earlier
+     listings are confirmed unsuitable. Ended listings and hidden accepted-offer
+     prices are excluded; blocked or unclear pages stop the check and show
+     <strong>Needs review</strong>. Review the original sale or eBay Product Research before
+     labeling. Add to list waits during the check; you can still type your own
+     reviewed price. Specific premiums stay intact. The review note follows saved
+     items. Bulk rechecks and history audits never open eBay tabs.
+     <strong>Check selected sale</strong> is still available for manual checks.
+     Reload the updated helper at <code>chrome://extensions</code>, then refresh the tool.
+     On other computers, replace the extension folder with the updated helper ZIP
+     first. Website deployment does not update an unpacked extension.
    - <strong>Barcode editions:</strong> scanning prices the matching edition and also checks
      related PriceCharting entries for misplaced matching sales. It checks the
      listing title, platform, region and condition; duplicates count once.

@@ -99,6 +99,8 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   vm.runInContext(fs.readFileSync(root + 'bridge.js', 'utf8'), bridge);
   vm.runInContext(fs.readFileSync('trade-in/stock-helper-client.js', 'utf8'), bridge);
   assert.equal(await pageWindow.P2WEbayHelper.available(), true);
+  assert.equal(await pageWindow.P2WEbayHelper.targetedAvailable(), true);
+  assert.equal((await pageWindow.P2WEbayHelper.checkTargeted(url('404870222598'))).state, 'offer');
   assert.equal((await pageWindow.P2WEbayHelper.check(url('404870222598'))).state, 'offer');
   assert.equal(listeners.size, 2, 'Request listeners cleaned up');
   let oldRequests = 0;
@@ -108,6 +110,7 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   };
   assert.equal(await pageWindow.P2WEbayHelper.available(), false, 'Old helpers fail the capability handshake');
   assert.equal((await pageWindow.P2WEbayHelper.check(url('334736933439'))).reason, 'helper-update-required');
+  assert.equal((await pageWindow.P2WEbayHelper.checkTargeted(url('334736933439'))).reason, 'helper-update-required');
   assert.equal(oldRequests, 0, 'No tab-creating request is sent to an old helper, even through direct check()');
   assert.equal(listeners.size, 2);
   listeners.clear(); assert.equal(await pageWindow.P2WEbayHelper.available(), false); assert.equal(listeners.size, 0);
