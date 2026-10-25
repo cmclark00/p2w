@@ -3669,7 +3669,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       const listingCount = new Set(choices.map((a) => a.asin)).size;
       if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer${searchError ? ' found so far' : ''}`);
       if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
-        ? 'Renewed fallback: no usable regular Amazon offer found. Using the lowest verified renewed offer as a used/CIB reference; original packaging and inserts are not confirmed'
+        ? 'Renewed fallback: no usable regular used Amazon offer found. Compared matching new offers and selected the lowest verified reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
       if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: the lowest matching new offer is cheaper than the available used/Renewed reference, or no used/Renewed offer was found. Shipping included; other source rules, premiums and rounding still apply');
       if (searchError && !selected) throw Error(searchError);

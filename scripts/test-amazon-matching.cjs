@@ -159,6 +159,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       });
       const result=await e.fetch();assert.equal(renewedChecked,true);assert.equal(result.newReference,wantsNew);
       assert.equal(result.asin,wantsNew?regular.asin:renewed.asin);assert.equal(result.offers[0].price,wantsNew?newPrice:renewedPrice);
+      if(!wantsNew) assert.ok(result.matchNotes.some(n=>n.includes('no usable regular used Amazon offer found')&&n.includes('Compared matching new offers')));
     }
   });
   await test('new reference permits factory-sealed wording but rejects wrong editions and languages', async () => {
