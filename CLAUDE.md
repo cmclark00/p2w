@@ -1046,24 +1046,30 @@ The site's **only server-side code**. Everything else is static.
     lowest offer among verified ASINs supplies both the price and displayed
     product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.
-    For used/CIB only, after both regular lookups have no usable price,
+    Used/CIB checks both Used and New offers on every verified regular ASIN.
+    A cheaper New offer (shipping included) can supply the Amazon reference,
+    labeled `newReference` / Amazon New; ties prefer Used. A higher New offer
+    never raises a cheaper used reference. All title/platform/edition checks
+    still apply; factory-sealed wording is permitted only for the New reference.
+    For used/CIB only, after regular lookups have no usable Used price,
     deferred renewed/refurbished candidates plus a title/platform/renewed
     search get the same identity checks with positive platform evidence.
     Each verified renewed ASIN is checked under both Used and New offer
-    conditions; the lowest usable offer is tagged `renewedFallback` and
+    conditions; regular New offers are also compared so the cheaper one wins.
+    The lowest usable Renewed offer is tagged `renewedFallback` and
     visibly labeled. A usable Renewed fallback replaces the eBay baseline:
     `max(lowest Renewed, GameStop)`, before premiums/deductions and rounding.
     Its `referenceMin` excludes eBay so later rounding cannot restore the
     higher sold price. Regular Amazon retains the three-source maximum.
     New offers on a renewed ASIN do not establish original
-    sealed condition. A regular priced match always wins without running
+    sealed condition. A regular priced Used match avoids running
     this stage. No packaging/inserts are claimed; premiums stay intact.
     Match notes survive saved-item rechecks and history comparisons, which
     use the same engine helper. In-memory cache keys include product identity
     and condition; failed promises are evicted so retries work.
     The API supplies a shared catalog title, not each seller's description;
     hidden or mislabeled variants still require staff review. Loose/CIB compare
-    with **Used**, New with **New**. **Loaded automatically for every game.** Only the lowest matching
+    with **Used and New**, New with **New** only. **Loaded automatically for every game.** Only the lowest matching
     offer enters the three-reference maximum, for every system. Higher
     offers and missing offers add no markup. The game
     can now use the title/platform search without a UPC. `GET amazon/test` checks the

@@ -3626,15 +3626,16 @@ async function fetchFloorAmazonSingle(product, condition, request) {
           }
           if (renewedFallback && !AMAZON_RENEWED_RE.test(c.title)) return false;
           seen.add(c.asin);
-          const reason = floorAmazonCandidateMismatch({ ...c, renewedFallback }, product, condition, fallback);
+          const reason = floorAmazonCandidateMismatch({ ...c, renewedFallback, newReference: cond === 'used' && !renewedFallback }, product, condition, fallback);
           if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
           return !reason;
         });
         for (const c of matching) {
           // A renewed ASIN may carry New offers; that is still a renewed item,
           // never evidence for the original game's sealed condition.
-          for (const offerCond of renewedFallback ? ['used', 'new'] : [cond]) {
-            const offer = { ...await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback };
+          for (const offerCond of renewedFallback || cond === 'used' ? ['used', 'new'] : [cond]) {
+            const offer = { ...await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback,
+              newReference: cond === 'used' && !renewedFallback && offerCond === 'new' };
             const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
               : floorAmazonCandidateMismatch(offer, product, condition, fallback);
@@ -3651,12 +3652,15 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
         for (const q of queries) await catalog({ q });
-        if (!priced().length && condition !== 'new') {
+        // New offers cap the Amazon reference, but must not hide a cheaper
+        // Renewed fallback when there are no regular used offers.
+        if (!priced().some(a => !a.newReference) && condition !== 'new') {
           const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
           await catalog({ q }, true);
         }
       } catch (err) { searchError = err.message; }
-      const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b }) || a.asin.localeCompare(b.asin));
+      const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
+        || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
       const selected = choices[0] || verified[0];
       const matchNotes = [];
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
@@ -3667,6 +3671,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
         ? 'Renewed fallback: no usable regular Amazon offer found. Using the lowest verified renewed offer as a used/CIB reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
+      if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: the lowest matching new offer is cheaper than the available used/Renewed reference, or no used/Renewed offer was found. Shipping included; other source rules, premiums and rounding still apply');
       if (searchError && !selected) throw Error(searchError);
       return { ...(selected || { found: false }), rejected, matchNotes, searched, ...(searchError ? { incomplete: true, searchError } : {}) };
     })();
@@ -4161,7 +4166,7 @@ function floorAmazonMismatch(cur) {
   if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);
   // Amazon Used does not distinguish loose from CIB, so do not claim a manual/box is verified.
-  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' ? 'new' : 'loose', rhythm, cur.product, false)
+  if (!floorIsHardware(cur.product) && (floorOdd({ title: cur.amazon.title }, cur.condition === 'new' || cur.amazon.newReference ? 'new' : 'loose', rhythm, cur.product, false)
     || HOME_CONSOLE_RE.test(cur.amazon.title))) return 'Non-comparable item, bundle, or condition';
   if (/\b(?:digital code|download code|digital download)\b/i.test(cur.amazon.title)
     && !/\bdigital\b/i.test(cur.product?.['product-name'] || '')) return 'Digital variant';
@@ -4453,7 +4458,7 @@ function renderFloorPricer() {
     <div class="floor-market-quick" aria-label="Market references">
       <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
-      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur, true))}</strong>${cur.amazon?.incomplete ? ' · partial' : ''} ↗</a>
+      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : cur.amazon?.newReference ? ' New' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur, true))}</strong>${cur.amazon?.incomplete ? ' · partial' : ''} ↗</a>
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
     </div>
@@ -4516,7 +4521,7 @@ function renderFloorPricer() {
 function floorAmazonHtml(cur, b) {
   if (!amazonSet) return '';
   const a = cur.amazon;
-  const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
+  const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : a?.newReference ? 'Amazon new-copy reference offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
@@ -4531,7 +4536,7 @@ function floorAmazonHtml(cur, b) {
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">${a.incomplete
     ? 'No priced offer found yet; Amazon search is incomplete.'
-    : `No matching ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers returned by Amazon${a.renewedFallback ? ', including Renewed' : ''}.`}</p>`;
+    : `No matching ${amazonCond(cur.condition) === 'new' ? 'new' : 'used or new'} offers returned by Amazon${a.renewedFallback ? ', including Renewed' : ''}.`}</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === lowestAt ? a.incomplete ? 'lowest found so far' : 'lowest' : ''}</td></tr>`).join('')}</tbody></table>
