@@ -14,7 +14,7 @@ try {
   $send = function () use (&$calls): array { $calls++; return [429, 'throttled', '', []]; };
   $r = amazon_rate_request($file, 'offers', $send, $clock, $sleep);
   check($r[0] === 429 && $calls === 3 && $r[3]['retry-after'] === '16', 'Retries are bounded and return cooldown');
-  $r = amazon_rate_request($file, 'catalog', $send, $clock, $sleep);
+  $r = amazon_rate_request($file, 'catalog-search', $send, $clock, $sleep);
   check($r[0] === 429 && $calls === 3, 'Another request/device respects the persisted cooldown without hitting Amazon');
   file_put_contents($file, ''); $calls = 0; $waits = [];
   $send = function () use (&$calls): array { $calls++; return [429, '', '', ['retry-after' => '90']]; };
@@ -32,11 +32,42 @@ try {
   file_put_contents($file, ''); $calls = 0;
   foreach ([400, 401, 403, 500, 0] as $status) {
     $send = function () use (&$calls, $status): array { $calls++; return [$status, 'error', '', []]; };
-    $before = $calls; $r = amazon_rate_request($file, 'catalog', $send, $clock, $sleep);
+    $before = $calls; $r = amazon_rate_request($file, 'catalog-search', $send, $clock, $sleep);
     check($r[0] === $status && $calls === $before + 1, 'Non-429 errors are not blindly retried');
   }
   file_put_contents($file, (string)$now); $waits = [];
   amazon_rate_request($file, 'offers', fn() => [200, 'offers', '', []], $clock, $sleep);
   check(abs($waits[0] - 2.1) < 0.001, 'Existing numeric throttle state migrates without a burst');
+  file_put_contents($file, ''); $waits = []; $start = $now;
+  for ($i = 0; $i < 35; $i++) amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  $catalogWait = $now - $start;
+  check(count($waits) === 34 && abs($catalogWait - 34 * 0.6) < 0.001, 'All 35 catalog pages run with the catalog default, not the offer delay');
+  echo sprintf("35-page pacing benchmark: %.1fs wait, previously %.1fs (network time excluded).\n", $catalogWait, 34 * 2.1);
+  file_put_contents($file, ''); $waits = []; $start = $now;
+  amazon_rate_request($file, 'offers', fn() => [200, 'offers', '', []], $clock, $sleep);
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  check(!$waits, 'A catalog call does not wait on the independent offer clock');
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  amazon_rate_request($file, 'offers', fn() => [200, 'offers', '', []], $clock, $sleep);
+  check(abs($now - $start - 2.1) < 0.001 && abs($waits[1] - 1.5) < 0.001, 'Catalog calls do not reset offer pacing; offers still wait their full interval');
+  file_put_contents($file, ''); $waits = [];
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', ['x-amzn-ratelimit-limit' => '0.25']], $clock, $sleep);
+  amazon_rate_request($file, 'catalog-item', fn() => [200, 'item', '', ['x-amzn-ratelimit-limit' => '2']], $clock, $sleep);
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  check(count($waits) === 1 && abs($waits[0] - 4.1) < 0.001, 'Slower search quota survives faster item reads across calls/devices');
+  file_put_contents($file, json_encode(['last' => $now, 'gaps' => ['catalog' => 2.1, 'offers' => 4.1], 'cooldown' => 0])); $waits = [];
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', ['x-amzn-ratelimit-limit' => '2']], $clock, $sleep);
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  $state = json_decode(file_get_contents($file), true);
+  check(abs($waits[0] - 2.1) < 0.001 && abs($waits[1] - 0.6) < 0.001, 'Old JSON timing migrates conservatively, then adopts the advertised catalog rate');
+  check($state['gaps']['offers'] === 4.1, 'Catalog update does not erase a slower offer quota');
+  file_put_contents($file, ''); $waits = [];
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', ['x-amzn-ratelimit-limit' => '100']], $clock, $sleep);
+  amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+  check(abs($waits[0] - 0.6) < 0.001, 'Higher advertised rates retain the conservative catalog default');
+  file_put_contents($file, ''); $calls = 0; $waits = [];
+  amazon_rate_request($file, 'catalog-search', fn() => [429, '', '', ['retry-after' => '90']], $clock, $sleep);
+  $r = amazon_rate_request($file, 'offers', function () use (&$calls) { $calls++; return [200, 'offers', '', []]; }, $clock, $sleep);
+  check($r[0] === 429 && $calls === 0, 'Catalog cooldown also protects offer calls on every device');
   echo "Amazon throttling, recovery and shared cooldown checks passed.\n";
 } finally { unlink($file); }

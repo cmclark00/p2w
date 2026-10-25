@@ -704,7 +704,12 @@ The site's **only server-side code**. Everything else is static.
     odd, since a loose shelf copy doesn't have it (Hey You Pikachu).
   - **Amazon throttling:** `amazon-rate-limit.php` shares the private throttle lock
     across devices, honors Retry-After and per-operation x-amzn-RateLimit-Limit,
-    and retries 429 up to twice (4s/8s default backoff). Long cooldowns return 429
+    and tracks separate clocks for catalog search, catalog item reads and offers.
+    Catalog operations use a conservative 0.6s gap (Amazon default 2 requests/s);
+    offers retain 2.1s (0.5/s). Slower advertised limits override those defaults.
+    Old throttle timestamps/limits migrate conservatively until refreshed headers
+    arrive; 429 cooldowns still apply across every operation and device.
+    It retries 429 up to twice (4s/8s default backoff). Long cooldowns return 429
     without another upstream request; cooldown survives across HTTP requests.
     Waiting is bounded; non-429 failures are not retried. `http_send()` includes
     response headers as its fourth return value. Failed checks are never cached
@@ -1005,7 +1010,7 @@ The site's **only server-side code**. Everything else is static.
     require positive platform evidence in the title or attributes. Catalog
     searches automatically follow every pageToken and check matching offers
     sequentially, with up to five known UPCs; no manual batch continuation is
-    needed. Server throttling remains unchanged. Successful responses
+    needed. Server throttling uses each operation's quota. Successful responses
     are retained in memory for one hour while incomplete; Retry replays
     those locally and resumes remaining requests after a failure. Complete results use the normal
     result cache. Saving/removing credentials clears both caches. Missing/repeated
@@ -1032,7 +1037,10 @@ The site's **only server-side code**. Everything else is static.
     when merged evidence arrives. `scripts/test-pricing-loading.cjs` covers these
     waits, cache isolation/retries, stale lookups and ordered concurrent merging.
     Variant and standard-game Amazon matches stay separate;
-    the standard result participates in the variant's baseline comparison.
+    their searches run concurrently with shared request promises, so identical
+    catalog pages and offers are fetched once. Both must settle before the
+    lookup completes; each identity still gets its own matching and pricing checks.
+    The standard result participates in the variant's baseline comparison.
     These are searches in the configured US marketplace, not other countries'
     Amazon marketplaces. The
     lowest offer among verified ASINs supplies both the price and displayed

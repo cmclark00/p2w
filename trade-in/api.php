@@ -500,7 +500,8 @@ function amazon_get(array $keys, string $path, array $query): array {
   $token = amazon_access_token($keys);
   $host = getenv('P2W_AMAZON_HOST') ?: (!empty($keys['sandbox']) ? 'https://sandbox.sellingpartnerapi-na.amazon.com' : 'https://sellingpartnerapi-na.amazon.com');
   require_once __DIR__ . '/amazon-rate-limit.php';
-  $operation = strpos($path, '/catalog/') === 0 ? 'catalog' : 'offers';
+  $operation = strpos($path, '/catalog/') === 0
+    ? (preg_match('#/items/[^/]+$#', $path) ? 'catalog-item' : 'catalog-search') : 'offers';
   [$status, $body, $error, $headers] = amazon_rate_request(data_path('amazon-throttle.lock'), $operation,
     static fn() => http_send('GET', $host . $path . '?' . http_build_query($query), ['x-amz-access-token: ' . $token, 'Accept: application/json']));
   if ($status === 429) header('Retry-After: ' . max(1, (int)($headers['retry-after'] ?? 5)));

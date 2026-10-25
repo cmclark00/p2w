@@ -3568,9 +3568,13 @@ async function fetchFloorAmazon(product, condition, request = (route, params) =>
     return memo.get(key);
   };
   const base = floorStandardGame(product);
-  const own = await fetchFloorAmazonSingle(product, condition, shared).catch(err => ({ error: err.message }));
+  // Independent identities can search together; shared requests still run once.
+  // The server serializes and paces uncached Amazon calls across all devices.
+  const [own, standard] = await Promise.all([
+    fetchFloorAmazonSingle(product, condition, shared).catch(err => ({ error: err.message })),
+    base ? fetchFloorAmazonSingle(base, condition, shared).catch(err => ({ error: err.message })) : null,
+  ]);
   if (!base) { if (own.error) throw Error(own.error); return own; }
-  const standard = await fetchFloorAmazonSingle(base, condition, shared).catch(err => ({ error: err.message }));
   return { ...own, standard, matchNotes: [...(own.matchNotes || []), ...(standard.error ? [`Standard-game Amazon check unavailable: ${standard.error}`] : [])] };
 }
 async function fetchFloorAmazonSingle(product, condition, request) {

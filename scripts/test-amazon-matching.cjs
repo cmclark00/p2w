@@ -216,6 +216,27 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.variant = p; e.ctx.result = r;
     assert.equal(e.run('floorResult({product:variant,condition:"cib",sales:{cib:[]},amazon:result}).r.price'),2500);
   });
+  await test('variant and standard searches overlap, share requests and still wait for both prices', async () => {
+    const p={...product,upc:'','product-name':'Final Fight [Special Edition]'};
+    const special=candidate('B000000001','Final Fight Special Edition SNES'), regular=candidate('B000000002','Final Fight SNES');
+    const calls=[];let release,finished=false;
+    const gate=new Promise(resolve=>{release=resolve;});
+    const e=engine(async(route,params)=>{
+      calls.push([route,params]);
+      if(route==='amazon/offers') return offer(params.asin===special.asin?special:regular,params.asin===special.asin?2000:2500);
+      if(params.q.includes('Special Edition')) {await gate;return {candidates:[special]};}
+      return {candidates:[regular]};
+    });
+    const pending=e.fetch(p,'cib').then(r=>{finished=true;return r;});
+    await new Promise(setImmediate);
+    assert.ok(calls.some(([r,v])=>r==='amazon/offers'&&v.asin===regular.asin),'standard offer starts while specific edition is still searching');
+    assert.equal(finished,false,'cannot finish until both searches resolve');
+    release();const result=await pending;
+    assert.equal(result.asin,special.asin);assert.equal(result.standard.asin,regular.asin);
+    assert.equal(calls.filter(([r,v])=>r==='amazon/catalog'&&v.q==='Final Fight Super Nintendo').length,1,'overlapping base-title request is sent once');
+    e.ctx.result=result;e.ctx.p=p;
+    assert.equal(e.run('floorResult({product:p,condition:"cib",sales:{cib:[]},amazon:result}).r.price'),2500);
+  });
   await test('truncated catalogs and failed later pages cannot silently claim the lowest Amazon match', async () => {
     const incomplete = engine(async (route, params) => route === 'amazon/catalog'
       ? {candidates:[candidate('B000000001')],more:true} : offer(candidate('B000000001'),2500));
