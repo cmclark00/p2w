@@ -917,10 +917,12 @@ Guide (the Google Sheet tab).
      For example, Lollipop Chainsaw PS3 at $99.99 Renewed rounds to $100 even
      with a $129.99 eBay sale. Regular priced used listings take priority
      over Renewed and continue using the normal three-source maximum.
-     The tool also checks **new copies** for Loose/CIB: if a verified new offer
-     is cheaper than used (or the Renewed fallback), its shipping-inclusive
-     price becomes the Amazon reference, labeled **Amazon New**. Higher new
-     prices cannot raise a cheaper used/Renewed reference. Other source rules,
+     The tool checks **Used and New** for Loose/CIB, finds the lowest verified
+     shipping-inclusive offer in each, and uses **the higher of those two prices**
+     as its Amazon reference. For example, Used $40 and New $30 selects Used $40;
+     Used $30 and New $40 selects New $40. It does not pick the highest seller
+     within either condition. Ties prefer Used. Without a regular Used offer,
+     the existing Renewed fallback comparison remains. Other source rules,
      specific premiums, deductions and rounding still apply.
      **Amazon Used and New are shown separately** in the pinned row and each
      opens its matching listing. Renewed appears separately when checked.

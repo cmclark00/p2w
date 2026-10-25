@@ -1041,13 +1041,13 @@ The site's **only server-side code**. Everything else is static.
     The standard result participates in the variant's baseline comparison.
     These are searches in the configured US marketplace, not other countries'
     Amazon marketplaces. The
-    lowest offer among verified ASINs supplies both the price and displayed
-    product link. No verified match means no Amazon price, with an explicit
+    selected condition minimum among verified ASINs supplies both the price
+    and displayed product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.
     Used/CIB checks both Used and New offers on every verified regular ASIN.
-    A cheaper New offer (shipping included) can supply the Amazon reference,
-    labeled `newReference` / Amazon New; ties prefer Used. A higher New offer
-    never raises a cheaper used reference. All title/platform/edition checks
+    With both regular conditions priced, select max(lowest Used, lowest New),
+    shipping included; never select the most expensive seller within a condition.
+    A winning New offer is labeled `newReference` / Amazon New; ties prefer Used. All title/platform/edition checks
     still apply; factory-sealed wording is permitted only for the New reference.
     The result retains separate lowest `references.used`, `.new` and `.renewed`
     offers and links. Pinned prices show each condition and mark the selected

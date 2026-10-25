@@ -3653,8 +3653,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
         for (const q of queries) await catalog({ q });
-        // New offers cap the Amazon reference, but must not hide a cheaper
-        // Renewed fallback when there are no regular used offers.
+        // Keep the existing Renewed fallback when no regular Used offer exists.
         if (!priced().some(a => !a.newReference) && condition !== 'new') {
           renewedChecked = true;
           const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
@@ -3675,17 +3674,25 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
         || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
-      const selected = choices[0] || verified[0];
+      // Compare the cheapest verified offer in each regular condition, not the
+      // most expensive seller. Sealed inventory and Renewed fallback stay separate.
+      const regularUsed = choices.find(a => !a.renewedFallback && a.offerCondition === 'used');
+      const regularNew = choices.find(a => !a.renewedFallback && a.offerCondition === 'new');
+      const compareConditions = cond === 'used' && regularUsed && regularNew;
+      const selected = compareConditions
+        ? (floorAmazonLowest({ product, condition, amazon: regularNew }) > floorAmazonLowest({ product, condition, amazon: regularUsed }) ? regularNew : regularUsed)
+        : choices[0] || verified[0];
       const matchNotes = [];
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
       if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; ${searchError ? 'search not finished' : 'compared barcode and title/platform searches'}` : searchError ? 'No verified Amazon match found yet; search not finished' : 'No verified Amazon listing found in the title/platform search; review manually');
       const listingCount = new Set(choices.map((a) => a.asin)).size;
-      if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; linked the lowest matching offer${searchError ? ' found so far' : ''}`);
+      if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; compared the lowest matching offers by condition${searchError ? ' found so far' : ''}`);
       if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
         ? 'Renewed fallback: no usable regular used Amazon offer found. Compared matching new offers and selected the lowest verified reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
-      if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: the lowest matching new offer is cheaper than the available used/Renewed reference, or no used/Renewed offer was found. Shipping included; other source rules, premiums and rounding still apply');
+      if (compareConditions && !searchError) matchNotes.push('Amazon condition comparison: selected the higher of the lowest matching Used and New offers, including shipping. Equal prices prefer Used. Other source rules, premiums and rounding still apply');
+      else if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: no regular Used offer was found. The existing Renewed fallback comparison still applies. Shipping included; other source rules, premiums and rounding still apply');
       const references = {};
       for (const kind of ['used', 'new', 'renewed']) {
         const matches = verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind);
@@ -4584,6 +4591,7 @@ function renderFloorPricer() {
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
+            <li>Amazon: use the higher of the lowest matching Used and New offers, including shipping.</li>
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
