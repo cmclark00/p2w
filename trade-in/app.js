@@ -3584,13 +3584,13 @@ async function fetchFloorAmazonSingle(product, condition, request) {
     }
     const pending = (async () => {
       const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
-      let searched = false, newPages = 0, newOffers = 0, searchError = null;
+      let searched = false, searchError = null;
       const requestKey = (route, params) => JSON.stringify([route, params]);
       async function resumeRequest(route, params) {
         const k = requestKey(route, params);
         if (progress.responses.has(k)) return progress.responses.get(k);
-        if (route === 'amazon/catalog' && newPages++ >= 10) throw Error('More Amazon results remain after this search batch. Continue to check the remaining pages.');
-        if (route === 'amazon/offers' && newOffers++ >= 24) throw Error('More matching Amazon offers remain. Continue to check the remaining listings.');
+        // Finish all pages and matching offers sequentially. The server still
+        // throttles requests; only real errors or pagination guards stop a search.
         const result = await request(route, params);
         progress.responses.set(k, result);
         return result;
@@ -4376,7 +4376,7 @@ function floorStandardHtml(b) {
   return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} baseline${b.from === 'standard' ? ' · used' : ''}</summary>
     <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
     Specific premiums and deductions apply afterward.</p>
-    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur, true))}${cur.amazon.incomplete ? ' · partial, reference only' : ''} ↗</a>${cur.amazon.incomplete ? ' · <button type="button" class="link" data-floor-act="amazon">Continue Amazon search</button>' : ''}</p>` : ''}
+    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur, true))}${cur.amazon.incomplete ? ' · partial, reference only' : ''} ↗</a>${cur.amazon.incomplete ? ' · <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>' : ''}</p>` : ''}
     ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
     <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${esc(s.date || '')}</td></tr>`).join('')}</tbody></table>
     </details>`;
@@ -4521,11 +4521,13 @@ function floorAmazonHtml(cur, b) {
   const offers = a.offers || [];
   const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur, true));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
-  const partial = a.incomplete ? '<p class="muted"><span class="badge warn">Search incomplete · reference only</span> Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Continue Amazon search</button></p>' : '';
+  const partial = a.incomplete ? '<p class="muted"><span class="badge warn">Search incomplete · reference only</span> Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button></p>' : '';
   const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${partial}${matchNote}`;
   const mismatch = floorAmazonMismatch(cur);
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
-  if (!offers.length) return `${head}<p class="muted">No ${a.condition === 'New' ? 'new' : 'used'} offers on Amazon right now.</p>`;
+  if (!offers.length) return `${head}<p class="muted">${a.incomplete
+    ? 'No priced offer found yet; Amazon search is incomplete.'
+    : `No matching ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers returned by Amazon${a.renewedFallback ? ', including Renewed' : ''}.`}</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[o.sub] || o.sub || '')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${i === lowestAt ? a.incomplete ? 'lowest found so far' : 'lowest' : ''}</td></tr>`).join('')}</tbody></table>

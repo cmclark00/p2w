@@ -1003,15 +1003,20 @@ The site's **only server-side code**. Everything else is static.
     compares known UPCs plus exact-title/platform and base-title/platform
     searches, even when the barcode already has an offer. Search candidates
     require positive platform evidence in the title or attributes. Catalog
-    searches follow pageToken in batches of up to ten new catalog pages and
-    24 new offer requests, with up to five known UPCs. Successful responses
-    are retained in memory for one hour while incomplete; Continue/Retry replays
-    those locally and resumes remaining requests. Complete results use the normal
+    searches automatically follow every pageToken and check matching offers
+    sequentially, with up to five known UPCs; no manual batch continuation is
+    needed. Server throttling remains unchanged. Successful responses
+    are retained in memory for one hour while incomplete; Retry replays
+    those locally and resumes remaining requests after a failure. Complete results use the normal
     result cache. Saving/removing credentials clears both caches. Missing/repeated
     tokens are retried, not cached permanently; each query has a 50-page safety cap.
     Failures/caps preserve verified offers as explicitly partial, reference-only
     results; `floorAmazonLowest()` excludes them from pricing until complete.
     Pins, offer tables, review notes and audits retain the incomplete status.
+    An unpriced partial match says no priced offer has been found yet, never
+    that Amazon has no offers. Completed empty searches say no matching offers
+    were returned. Real failures and pagination guards require Retry, not an
+    automatic retry loop; partial prices remain excluded.
     Partial Renewed offers cannot activate the fallback prematurely.
     The interactive pricer starts the selected PriceCharting sales page before
     related-entry discovery and begins GameStop stock checking as soon as its

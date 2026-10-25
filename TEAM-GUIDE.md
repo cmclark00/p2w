@@ -897,12 +897,13 @@ Guide (the Google Sheet tab).
      result pages, even when the barcode already found a price. For variants,
      it also checks the standard game's matching listings separately. Searches
      use Amazon US; other regions, languages and editions still need to match
-     your copy. Large searches run in batches. **Continue Amazon search**
-     resumes the remaining results without repeating completed checks while
-     the page stays open. Offers already found remain visible and labeled
-     **partial/reference only**; they do not affect automatic pricing until
-     the search finishes. **Retry Amazon** also preserves completed progress
-     after a temporary failure. Unfinished progress expires after one hour.
+     your copy. Large searches finish automatically, including additional pages
+     and Renewed checks when needed; no Continue clicks are required. Keep the
+     page open while it checks. If a request fails, offers already found are
+     labeled **partial/reference only** and do not affect automatic pricing.
+     An unfinished search with no price says **No priced offer found yet**,
+     not that Amazon has no offers. **Retry Amazon** resumes after a failure
+     without repeating completed checks. Unfinished progress expires after one hour.
      For used/CIB items, if barcode and title/platform searches find no usable
      regular offer, the tool searches **Renewed** listings. A verified match
      is labeled **Amazon Renewed fallback offers** and its lowest offer sets

@@ -76,14 +76,14 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route, params) => route === 'amazon/catalog' ? { candidates: params.upc ? [good] : [] } : offer(good, null));
     const r = await e.fetch(); assert.equal(r.found, true); assert.equal(r.asin, good.asin); assert.equal(r.offers.length, 0); assert.equal(r.searched, true);
   });
-  await test('ambiguous broad searches and partially failed offer checks do not publish an arbitrary price', async () => {
+  await test('more than 24 matching offers finish automatically while failed offer checks remain partial', async () => {
     const candidates = Array.from({length:26},(_,i)=>candidate('B'+String(i).padStart(9,'0')));
     const many = engine(async (route, params) => route === 'amazon/catalog' ? {candidates}
-      : offer(candidates.find(c=>c.asin===params.asin),2500));
-    const partialMany = await many.fetch(); assert.equal(partialMany.incomplete, true);
-    many.ctx.result = partialMany;
-    assert.equal(many.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
-    assert.equal((await many.fetch()).incomplete, undefined, 'continue finishes remaining offers');
+      : offer(candidates.find(c=>c.asin===params.asin),params.asin===candidates.at(-1).asin?2000:2500));
+    const completeMany = await many.fetch(); assert.equal(completeMany.incomplete, undefined);
+    assert.equal(completeMany.asin,candidates.at(-1).asin, 'last offer can supply the lowest price without Continue');
+    many.ctx.result = completeMany;
+    assert.equal(many.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2000);
     const broken = engine(async (route, params) => {
       if (route === 'amazon/catalog') return { candidates: [candidate('B000000001'), candidate('B000000002')] };
       if (params.asin === 'B000000002') throw Error('Offer lookup failed'); return offer(candidate('B000000001'), 99900);
@@ -230,26 +230,67 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const cur='{product,condition:"loose",sales:{loose:[{title:"Final Fight SNES",price:2000}]},amazon:result}';
     assert.equal(failed.run(`floorResult(${cur}).r.price`),2000, 'partial Amazon cannot silently raise baseline');
     const html=failed.run(`floorAmazonHtml(${cur},{from:"sale"})`);
-    assert.ok(html.includes('$25.00') && html.includes('reference only') && html.includes('Continue Amazon search'));
+    assert.ok(html.includes('$25.00') && html.includes('reference only') && html.includes('Retry Amazon'));
     assert.ok(!html.includes('lowest matching offer used'));
   });
-  await test('searches beyond three pages and resumes larger batches without repeating completed requests', async () => {
+  await test('large searches finish every page automatically without repeating completed requests', async () => {
     const a=candidate('B000000001'), b=candidate('B000000002'), calls=[];
     const e=engine(async(route,params)=>{
       calls.push([route,params]);
       if(route==='amazon/offers') return offer(params.asin===a.asin?a:b,params.asin===a.asin?5000:2000);
       if(params.upc) return {candidates:[a]};
       const page=Number(params.pageToken||1);
-      return {candidates:page===11?[b]:[],more:page<12,nextToken:page<12?String(page+1):''};
+      return {candidates:page===35?[b]:[],more:page<35,nextToken:page<35?String(page+1):''};
     });
-    const partial=await e.fetch(); assert.equal(partial.incomplete,true); assert.equal(partial.asin,a.asin);
-    assert.ok(calls.some(([,p])=>p.pageToken==='4'), 'old three-page limit no longer stops search');
-    const before=calls.length, complete=await e.fetch();
+    const complete=await e.fetch();
     assert.equal(complete.incomplete,undefined); assert.equal(complete.asin,b.asin); assert.equal(complete.offers[0].price,2000);
-    assert.equal(calls.length-before,4, 'resume requests only pages 10-12 and the new offer');
+    assert.equal(calls.filter(([r])=>r==='amazon/catalog').length,36, 'barcode plus every title page checked once');
     assert.equal(calls.filter(([r,p])=>r==='amazon/offers'&&p.asin===a.asin).length,1);
+    const before=calls.length; await e.fetch(); assert.equal(calls.length,before,'completed result cached');
     e.ctx.result=complete;
     assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2000);
+  });
+  await test('WWE Deluxe reaches Renewed after large regular searches without a Continue click', async () => {
+    const p={...product,'product-name':'WWE 2K22 [Deluxe Edition]','console-name':'Playstation 4'};
+    const regular=candidate('B000000001','WWE 2K22 Deluxe Edition - PlayStation 4',['PlayStation 4']);
+    const renewed=candidate('B000000002','WWE 2K22 Deluxe Edition - PlayStation 4 (Renewed)',['PlayStation 4']);
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers') return offer(params.asin===regular.asin?regular:renewed,params.asin===regular.asin?null:7024);
+      if(params.upc) return {candidates:[regular]};
+      const page=Number(params.pageToken||1), isRenewed=params.q.endsWith('renewed');
+      return {candidates:isRenewed&&page===12?[renewed]:[],more:page<12,nextToken:page<12?String(page+1):''};
+    });
+    const result=await e.fetch(p,'cib');
+    assert.equal(result.incomplete,undefined); assert.equal(result.standard.incomplete,undefined);
+    assert.equal(result.asin,renewed.asin); assert.equal(result.renewedFallback,true);
+    e.ctx.result=result;e.ctx.p=p;
+    assert.equal(e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"WWE 2K22 Deluxe Edition PS4",price:3498}]},amazon:result}).r.price'),7000);
+  });
+  await test('unpriced partial matches do not claim Amazon has no offers', async () => {
+    const good=candidate('B000000001');let fail=true;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers') return offer(good,null);
+      if(params.upc) return {candidates:[good]};
+      if(fail) throw Error('Amazon temporarily unavailable');return {candidates:[]};
+    });
+    e.ctx.result=await e.fetch();e.run('amazonSet=true');
+    let html=e.run('floorAmazonHtml({product,condition:"cib",amazon:result},{from:"sale"})');
+    assert.match(html,/No priced offer found yet; Amazon search is incomplete/);
+    assert.doesNotMatch(html,/No used offers on Amazon right now|No matching used offers returned/);
+    fail=false;e.ctx.result=await e.fetch();
+    html=e.run('floorAmazonHtml({product,condition:"cib",amazon:result},{from:"sale"})');
+    assert.match(html,/No matching used offers returned by Amazon/);assert.doesNotMatch(html,/search is incomplete/);
+  });
+  await test('runaway pagination stops at the safety cap without an automatic retry loop', async () => {
+    const good=candidate('B000000001');let pages=0;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers') return offer(good,2500);
+      if(params.upc) return {candidates:[good]};
+      pages++;return {candidates:[],more:true,nextToken:String(pages+1)};
+    });
+    const result=await e.fetch();assert.equal(pages,50);assert.equal(result.incomplete,true);
+    assert.match(result.searchError,/50 pages/);e.ctx.result=result;
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
   });
   await test('failed pages retry from saved progress and broken tokens are refetched', async () => {
     const a=candidate('B000000001'); let fail=true, firstPages=0, offers=0;
