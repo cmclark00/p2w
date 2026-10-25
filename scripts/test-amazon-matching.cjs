@@ -42,9 +42,10 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const calls = [], good = candidate('B000000001', 'Final Fight - Super NES', []);
     const e = engine(async (route, params) => { calls.push([route, params]);
       if (route === 'amazon/catalog') return { candidates: [candidate('B000000002', 'Final Fight', []), good] };
-      assert.equal(params.cond, 'new'); return { ...offer(good, 4500), condition: 'New' };
+      return { ...offer(good, params.cond === 'new' ? 4500 : 2500), condition: params.cond === 'new' ? 'New' : 'Used' };
     });
-    const result = await e.fetch({ ...product, upc: '' }, 'new'); assert.equal(result.asin, good.asin); assert.equal(calls.length, 2);
+    const result = await e.fetch({ ...product, upc: '' }, 'new'); assert.equal(result.asin, good.asin); assert.equal(calls.length, 3);
+    assert.equal(result.offers[0].price,4500);assert.equal(result.references.used.offers[0].price,2500);
     assert.ok(result.rejected[0].reason.includes('platform'));
   });
   await test('offer response identity is rechecked even after a matching catalog result', async () => {
@@ -58,7 +59,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       return route === 'amazon/catalog' ? { candidates: [candidate('B000000001')] } : offer(candidate('B000000001'), 2500); });
     await assert.rejects(e.fetch(), /Temporary/); fail = false;
     await e.fetch(); const after = calls; await e.fetch(product, 'cib'); assert.equal(calls, after);
-    await e.fetch(product, 'new'); assert.equal(calls, after + 3);
+    await e.fetch(product, 'new'); assert.equal(calls, after + 4);
     const other = await e.fetch({ ...product, id: '2', 'product-name': 'Final Fight Guy' });
     assert.equal(other.found, false); assert.ok(calls > after + 2);
   });
@@ -147,6 +148,36 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       const good=candidate('B000000001');
       const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[good]}:offer(good,params.cond==='new'?newPrice:2500));
       const result=await e.fetch();assert.equal(result.offers[0].price,2500);assert.equal(result.newReference,false);
+    }
+  });
+  await test('separate Used/New links retain their prices and distinguish the selected reference from the shelf baseline', async () => {
+    const used=candidate('B000000001'),fresh=candidate('B000000002');
+    const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[used,fresh]}
+      : {...offer(params.asin===used.asin?used:fresh,params.cond==='used'?(params.asin===used.asin?4000:5000):(params.asin===fresh.asin?3000:6000)),condition:params.cond==='new'?'New':'Used'});
+    const result=await e.fetch();assert.equal(result.references.used.asin,used.asin);assert.equal(result.references.new.asin,fresh.asin);
+    e.ctx.result=result;e.run('amazonSet=true');
+    const html=e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"sale"})');
+    assert.ok(html.includes(used.url)&&html.includes(fresh.url));assert.match(html,/\$40\.00/);assert.match(html,/\$30\.00/);
+    assert.match(html,/Selected Amazon reference/);assert.doesNotMatch(html,/Sets baseline/);
+    assert.match(e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"amazon"})'),/Sets baseline/);
+    const pinned=e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"amazon"},true)');
+    assert.match(pinned,/Amazon Used/);assert.match(pinned,/Amazon New/);assert.match(pinned,/selected/);
+    e.ctx.result.incomplete=true;
+    assert.doesNotMatch(e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"sale"},true)'),/selected/);
+  });
+  await test('Used comparisons on a sealed item never price it and a display-only failure does not block New', async () => {
+    const good=candidate('B000000001');
+    for(const fail of [false,true]) {
+      const e=engine(async(route,params)=>{
+        if(route==='amazon/catalog')return {candidates:[good]};
+        if(params.cond==='used'&&fail)throw Error('Used unavailable');
+        return {...offer(good,params.cond==='new'?6000:1000),condition:params.cond==='new'?'New':'Used'};
+      });
+      const result=await e.fetch(product,'new');assert.equal(result.incomplete,undefined);assert.equal(result.offers[0].price,6000);
+      e.ctx.result=result;
+      assert.equal(e.run('floorAmazonLowest({product,condition:"new",amazon:result})'),6000);
+      const html=e.run('floorAmazonReferencesHtml({product,condition:"new",amazon:result},{from:"amazon"})');
+      if(fail)assert.match(html,/Check failed/);else assert.match(html,/\$10\.00/);
     }
   });
   await test('new-only regular listings still compare Renewed and choose the cheaper shipping-inclusive offer', async () => {

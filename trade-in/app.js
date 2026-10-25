@@ -3588,7 +3588,8 @@ async function fetchFloorAmazonSingle(product, condition, request) {
     }
     const pending = (async () => {
       const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
-      let searched = false, searchError = null;
+      let searched = false, searchError = null, renewedChecked = false;
+      const referenceErrors = {};
       const requestKey = (route, params) => JSON.stringify([route, params]);
       async function resumeRequest(route, params) {
         const k = requestKey(route, params);
@@ -3640,11 +3641,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
               : floorAmazonCandidateMismatch(offer, product, condition, fallback);
             if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); continue; }
-            if (offer.found) verified.push({ ...offer, matchMethod: fallback ? 'title/platform search' : 'barcode' });
+            if (offer.found) verified.push({ ...offer, offerCondition: offerCond, matchMethod: fallback ? 'title/platform search' : 'barcode' });
           }
         }
       }
-      const priced = () => verified.filter((a) => floorAmazonLowest({ product, condition, amazon: a }) > 0);
+      const priced = () => verified.filter((a) => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0);
       try {
         if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
         for (const upc of upcs) await catalog({ upc });
@@ -3655,10 +3656,23 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         // New offers cap the Amazon reference, but must not hide a cheaper
         // Renewed fallback when there are no regular used offers.
         if (!priced().some(a => !a.newReference) && condition !== 'new') {
+          renewedChecked = true;
           const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
           await catalog({ q }, true);
         }
       } catch (err) { searchError = err.message; }
+      // For sealed inventory, Used is a comparison only. It can neither price
+      // the sealed copy nor make an otherwise completed New lookup incomplete.
+      if (cond === 'new' && !searchError) {
+        for (const item of [...verified]) {
+          try {
+            const used = await resumeRequest('amazon/offers', { asin: item.asin, cond: 'used' });
+            if (used.asin === item.asin && used.found && !floorAmazonCandidateMismatch(used, product, 'cib', item.matchMethod !== 'barcode')) {
+              verified.push({ ...used, offerCondition: 'used', displayOnly: true, matchMethod: item.matchMethod });
+            }
+          } catch (err) { referenceErrors.used = err.message; }
+        }
+      }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
         || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
       const selected = choices[0] || verified[0];
@@ -3672,8 +3686,14 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         ? 'Renewed fallback: no usable regular used Amazon offer found. Compared matching new offers and selected the lowest verified reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
       if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: the lowest matching new offer is cheaper than the available used/Renewed reference, or no used/Renewed offer was found. Shipping included; other source rules, premiums and rounding still apply');
+      const references = {};
+      for (const kind of ['used', 'new', 'renewed']) {
+        const matches = verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind);
+        const value = a => floorAmazonLowest({ product, condition: a.displayOnly ? 'cib' : condition, amazon: a });
+        references[kind] = matches.filter(a => value(a) > 0).sort((a,b) => value(a) - value(b) || a.asin.localeCompare(b.asin))[0] || matches[0] || null;
+      }
       if (searchError && !selected) throw Error(searchError);
-      return { ...(selected || { found: false }), rejected, matchNotes, searched, ...(searchError ? { incomplete: true, searchError } : {}) };
+      return { ...(selected || { found: false }), rejected, matchNotes, searched, references, referenceErrors, renewedChecked, ...(searchError ? { incomplete: true, searchError } : {}) };
     })();
     floorAmazonCache.set(key, pending);
     pending.then(result => {
@@ -4458,7 +4478,7 @@ function renderFloorPricer() {
     <div class="floor-market-quick" aria-label="Market references">
       <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
-      <a href="${esc(cur.amazon?.url || links.amazon)}" target="_blank" rel="noopener noreferrer" title="${cur.amazon?.url ? 'Open the matched Amazon listing' : 'Search this game on Amazon'} (new tab)">Amazon${cur.amazon?.renewedFallback ? ' Renewed' : cur.amazon?.newReference ? ' New' : ''} <strong class="amazon-market-price">${cur.amazon?.loading ? 'Checking…' : money(cur.amazon?.error ? null : floorAmazonLowest(cur, true))}</strong>${cur.amazon?.incomplete ? ' · partial' : ''} ↗</a>
+      ${floorAmazonReferencesHtml(cur, b, true)}
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
     </div>
@@ -4517,6 +4537,25 @@ function renderFloorPricer() {
     </div>`;
 }
 
+// Separate condition references; only the engine-selected reference affects pricing.
+function floorAmazonReferencesHtml(cur, b, compact = false) {
+  const a = cur.amazon, selectedKind = a?.renewedFallback ? 'renewed' : a?.newReference || cur.condition === 'new' ? 'new' : 'used';
+  const refs = a?.references || { [selectedKind]: a };
+  const kinds = ['used', 'new', ...(a?.renewedChecked || refs.renewed ? ['renewed'] : [])];
+  const rows = kinds.map(kind => {
+    const ref = refs[kind], label = { used: 'Used', new: 'New', renewed: 'Renewed' }[kind];
+    const price = ref && !a?.error ? floorAmazonLowest({ ...cur, condition: ref.displayOnly ? 'cib' : cur.condition, amazon: ref }, true) : null;
+    const selected = price > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting;
+    const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
+      : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
+      : !a ? 'Not checked' : 'No matching offers';
+    const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
+    const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(status)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}` : ''} ↗</a>`;
+    return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(status)}</td></tr>`;
+  });
+  return compact ? rows.join('') : `<table class="floor-sales floor-amazon-references" aria-label="Amazon prices by condition"><tbody>${rows.join('')}</tbody></table><p class="muted small-print">Shipping included. “Selected” identifies the Amazon reference; other sources and specific pricing rules still apply.</p>`;
+}
+
 // Amazon's offers for the game, with only the lowest matching offer used for pricing.
 function floorAmazonHtml(cur, b) {
   if (!amazonSet) return '';
@@ -4526,12 +4565,12 @@ function floorAmazonHtml(cur, b) {
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
-  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
+  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
   const lowestAt = offers.findIndex((o) => Number(o.price) === floorAmazonLowest(cur, true));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
   const partial = a.incomplete ? '<p class="muted"><span class="badge warn">Search incomplete · reference only</span> Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button></p>' : '';
-  const head = `<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${partial}${matchNote}`;
+  const head = `${floorAmazonReferencesHtml(cur, b)}<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${partial}${matchNote}`;
   const mismatch = floorAmazonMismatch(cur);
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">${a.incomplete

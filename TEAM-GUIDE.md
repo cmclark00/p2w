@@ -920,6 +920,12 @@ Guide (the Google Sheet tab).
      price becomes the Amazon reference, labeled **Amazon New**. Higher new
      prices cannot raise a cheaper used/Renewed reference. Other source rules,
      specific premiums, deductions and rounding still apply.
+     **Amazon Used and New are shown separately** in the pinned row and each
+     opens its matching listing. Renewed appears separately when checked.
+     **Selected** marks the Amazon reference, while **Sets baseline** in the
+     comparison table means Amazon actually sets the shelf baseline. eBay,
+     GameStop or a specific rule can still take priority. For New inventory,
+     the Used price is comparison-only and cannot lower the sealed price.
      Renewed matches still need the correct title, platform, language and
      edition; they do not confirm original packaging/inserts and cannot price
      a sealed copy. Specific premiums and deductions still apply.

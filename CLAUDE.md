@@ -1051,6 +1051,13 @@ The site's **only server-side code**. Everything else is static.
     labeled `newReference` / Amazon New; ties prefer Used. A higher New offer
     never raises a cheaper used reference. All title/platform/edition checks
     still apply; factory-sealed wording is permitted only for the New reference.
+    The result retains separate lowest `references.used`, `.new` and `.renewed`
+    offers and links. Pinned prices show each condition and mark the selected
+    Amazon reference; the comparison table distinguishes that selection from
+    the source that actually sets the shelf baseline. Incomplete prices never
+    show as selected. New inventory also reads Used offers from the verified
+    ASINs for display only; those cannot price the sealed item, and an optional
+    Used-read failure is labeled unavailable without invalidating New pricing.
     For used/CIB only, after regular lookups have no usable Used price,
     deferred renewed/refurbished candidates plus a title/platform/renewed
     search get the same identity checks with positive platform evidence.
