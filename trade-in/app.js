@@ -51,8 +51,9 @@ const BOX_KEY = 'box-only-price';
 // ($0.25) flat.
 const CASE_ONLY = 'case';
 
-// PriceCharting console names for disc-based systems (the guide's "disc only" rules apply to these).
-const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|psp|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
+// Systems subject to the guide's "disc only" rules. Loose PSP UMD games sell
+// normally, so PSP (including PAL/JP) is intentionally excluded.
+const DISC_PLATFORM_RE = /^(pal |jp )?(playstation( [2-5])?|xbox( 360| one| series x)?|gamecube|wii( u)?|sega (cd|saturn|dreamcast)|turbografx cd|3do|neo geo cd|jaguar cd)$/;
 
 // Games: store credit = 105% of PriceCharting (Game Buying Guide), cash = 70% of PriceCharting,
 // so store credit is 50% more than cash.

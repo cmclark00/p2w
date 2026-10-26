@@ -1362,6 +1362,9 @@ The site's **only server-side code**. Everything else is static.
     `settings.cases.amount` ($0.25) flat. No deductions on case lines. Handled first in
     `priceWith()`, before the guide rules. The former v9 Killzone floor
     discount was retired in settings v11 after outlier detection was added.
+  - **Loose PSP trade-ins:** PSP, PAL PSP and JP PSP games bypass the disc-only
+    flat-price tiers and use the normal loose-game offer. Other disc systems,
+    CIB/New rules, manager overrides and Dead Games restrictions are unchanged.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

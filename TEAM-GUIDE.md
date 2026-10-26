@@ -695,6 +695,8 @@ Everyone in the store shares one internet address, so typos add up.
    **Custom %** under that line's store credit and type how much more
    than cash it pays in credit (e.g. 35 for +35%). Click the × on it to
    go back to normal.
+   **Loose PSP games use normal loose-game trade pricing**, including imports.
+   They do not get the disc-only flat offers used for other disc systems.
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".

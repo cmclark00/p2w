@@ -34,6 +34,30 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('loose PSP games use normal trade offers while other disc-only tiers stay intact', () => {
+  const settings = json('DEFAULT_SETTINGS');
+  const line = { source: 'pc', category: 'game', name: 'LocoRoco', platform: 'PSP', condition: 'loose',
+    prices: { 'loose-price': 1500, 'retail-loose-buy': 1000, 'cib-price': 1500, 'retail-cib-buy': 1200 }, deductions: [] };
+  for (const platform of ['PSP', 'PAL PSP', 'JP PSP']) {
+    for (const value of [500, 1000, 2000, 2500]) {
+      const psp = { ...line, platform, prices: { ...line.prices, 'loose-price': value } };
+      const price = invoke('priceLine', psp, settings);
+      assert.equal(price.guide, null); assert.equal(price.flat, false);
+      assert.equal(price.cash, 700); assert.equal(price.credit, 1050);
+    }
+    assert.equal(invoke('guideCheck', { ...line, platform, name: 'Madden NFL 07' }, settings), null);
+  }
+  for (const platform of ['Playstation', 'Playstation 2', 'Playstation 4', 'Xbox 360', 'Gamecube', 'Wii', 'Sega CD', 'PAL Playstation 2']) {
+    for (const [value, flat] of [[500, 50], [1000, 100], [2000, 100]]) {
+      const price = invoke('priceLine', { ...line, platform, prices: { ...line.prices, 'loose-price': value } }, settings);
+      assert.equal(price.cash, flat); assert.equal(price.credit, flat); assert.equal(price.guide.outlier, true);
+    }
+    assert.equal(invoke('guideCheck', { ...line, platform, name: 'Madden NFL 07' }, settings).flat, 10);
+  }
+  assert.equal(invoke('priceLine', { ...line, condition: 'cib' }, settings).cash, 840);
+  assert.equal(invoke('guideCheck', { ...line, name: 'Madden NFL 07', condition: 'cib' }, settings).flat, 25);
+});
+
 test('eBay and Amazon exclude language, region, edition, extras and platform mismatches before pricing', () => {
   const titles = ['Example Game (French Version) PS4', 'Example Game - Version Française',
     'Example Game [Spanish]', 'Example Game Edición Española PS4', 'Example Game - French - PS4', 'Example Game French PS4',
