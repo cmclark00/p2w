@@ -3413,12 +3413,12 @@ function floorHelperStatusInfo(helper) {
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
-      : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Store updates arrive after Google approval; keep only one helper enabled.` };
+      : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Managed computers receive Play2Win updates automatically; manual copies need a download. Keep only one helper enabled.` };
 }
 let floorHelperChecking = false;
 function floorHelperStatusHtml(info) {
   if (info.state !== 'update') return esc(info.text);
-  return `${esc(info.text.replace(/ · Update needed$/, ''))} · <a href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" aria-describedby="floorHelperUpdateHelp" title="Open the Chrome Web Store and show update steps">Update needed ↗</a>`;
+  return `${esc(info.text.replace(/ · Update needed$/, ''))} · <a href="helper-setup.html#updates" target="_blank" rel="noopener noreferrer" aria-describedby="floorHelperUpdateHelp" title="Open helper setup and update steps">Update needed ↗</a>`;
 }
 async function refreshFloorHelperStatus() {
   const status = $('#floorHelperStatus'), button = $('#floorHelperCheck');
@@ -4690,7 +4690,7 @@ function renderFloorPricer() {
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
-        ${cur.targetedEbay?.unavailable || cur.ebayChecks?.unavailable ? '<p class="small-print"><a href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer">Install Chrome helper ↗</a> · Keep only one helper enabled, then refresh.</p>' : ''}
+        ${cur.targetedEbay?.unavailable || cur.ebayChecks?.unavailable ? '<p class="small-print"><a href="helper-setup.html" target="_blank" rel="noopener noreferrer">Helper setup ↗</a> · Keep only one helper enabled, then refresh.</p>' : ''}
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}

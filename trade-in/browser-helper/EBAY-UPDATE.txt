@@ -1,11 +1,10 @@
 Play2Win Market Helper 1.1.5
 
-Chrome Web Store migration is being prepared; this ZIP is still the manual
-unpacked installation. It does not automatically update. Once the unlisted
-store link is available, remove the unpacked copy and install from that link
-once per Chrome profile. Later published store releases update through Chrome.
-Do not keep both copies enabled. Website deployment alone does not publish a
-new extension version to the Chrome Web Store.
+This ZIP is the manual unpacked installation. It does not automatically update.
+Automatic updates from Play2Win require one-time managed-browser enrollment.
+Manager setup: https://play2wingames.com/trade-in/helper-setup.html
+After the managed helper is installed, disable the old manual or Store copy.
+Keep only one helper enabled. Ordinary website changes need only a page refresh.
 
 Connection checks: https://play2wingames.com/trade-in/helper.html
 Privacy: https://play2wingames.com/trade-in/helper-privacy.html

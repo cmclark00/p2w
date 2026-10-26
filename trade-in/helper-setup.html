@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Helper setup | Play2Win Games</title>
+  <link rel="icon" href="../favicon.ico">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#111217;color:#f4f4f6;font:16px/1.6 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:32px 24px}h1{line-height:1.2}h2{font-size:21px}a{color:#83bcff}.card{background:#1b1d25;border:1px solid #343743;border-radius:12px;padding:20px;margin:20px 0}.notice{border-left:4px solid #f4cd51}.muted{color:#b7bbc6}li{margin:8px 0}code{overflow-wrap:anywhere}summary{cursor:pointer;font-weight:650}label{display:block;margin-top:14px}input{width:100%;padding:10px;color:inherit;background:#111217;border:1px solid #555b6b;border-radius:6px;font:14px monospace}a:focus-visible,summary:focus-visible{outline:2px solid #f4cd51;outline-offset:3px}
+  </style>
+</head>
+<body><main>
+  <p><a href="./">← Pricing tool</a> · <a href="helper.html">Connection checks</a></p>
+  <h1>Helper setup</h1>
+  <p>Receive signed helper updates directly from Play2Win, without waiting for a Web Store review.</p>
+  <section class="card notice"><h2>One-time setup required</h2>
+    <p>A manager must enroll each shop computer in Chrome Enterprise Core and assign the helper. Signing in with the same Gmail account is not enrollment. The download below remains manual until this setup is complete.</p>
+  </section>
+  <section class="card"><h2>For staff</h2>
+    <ol><li>Ask a manager to enroll this computer using the steps below.</li>
+      <li>Once the managed Play2Win helper appears at <code>chrome://extensions</code>, disable any older manual or Store copy. Keep only one enabled.</li>
+      <li>Refresh the pricing tool and check <strong>Connected</strong> plus its version. Chrome checks for future managed releases automatically while running; updates are not instantaneous.</li></ol>
+    <p class="muted">A Connected message confirms the helper responds. It does not by itself prove the computer is enrolled or that automatic updates are configured.</p>
+  </section>
+  <details class="card"><summary>Manager: enroll computers and assign the helper</summary>
+    <ol>
+      <li>Use the shop's Google Admin account with <strong>Chrome Enterprise Core</strong>. If needed, <a href="https://support.google.com/chrome/a/answer/9301420" target="_blank" rel="noopener noreferrer">set up Core</a> with a shop-controlled work email and complete Google's verification and terms.</li>
+      <li>Create a dedicated shop-computer organizational unit. In <strong>Chrome browser → Managed browsers → Enroll</strong> (or <strong>Devices → Chrome</strong>), obtain its Windows enrollment file. Follow <a href="https://support.google.com/chrome/a/answer/9301891" target="_blank" rel="noopener noreferrer">Google's enrollment instructions</a> on one test computer first. Enrollment applies browser policies across that computer's Chrome profiles. Keep the enrollment file private.</li>
+      <li>Restart Chrome when staff can safely close it. Confirm the computer appears in Managed browsers and <code>chrome://management</code> shows it is managed.</li>
+      <li>For that organizational unit, open <strong>Apps &amp; extensions → Users &amp; browsers</strong>. Choose <strong>Add Chrome app or extension by ID → From a custom URL</strong>, enter the values below, and set <strong>Force install</strong>. Save. <a href="https://support.google.com/chrome/a/answer/6177447" target="_blank" rel="noopener noreferrer">Google's policy instructions</a>.</li>
+      <li>At <code>chrome://policy</code> on the test computer, click <strong>Reload policies</strong> and check the helper's policy has no errors. At <code>chrome://extensions</code>, confirm the helper ID below is installed. Disable other Play2Win copies, refresh pricing, and run the <a href="helper.html">connection checks</a>.</li>
+      <li>After the test succeeds, enroll the remaining shop computers into the same organizational unit. Do not enroll personal computers or change unrelated browser policies.</li>
+    </ol>
+    <label for="managed-id">Managed helper extension ID</label><input id="managed-id" readonly value="kmjnkeabmpcibanlailmcblbjmjibonl">
+    <label for="managed-url">Custom update URL</label><input id="managed-url" readonly value="https://play2wingames.com/trade-in/helper-updates/updates.xml">
+    <p class="muted">These two values are public. Never paste an enrollment token, password, or signing key into the pricing tool.</p>
+  </details>
+  <section id="updates" class="card"><h2>Updates and troubleshooting</h2>
+    <p><strong>Managed copy:</strong> Chrome checks Play2Win's update feed automatically. If a version stays old, a manager should check enrollment, the assigned policy and any version pin. Refresh the pricing page after the extension updates.</p>
+    <p><strong>Manual copy:</strong> <a href="gamestop-stock-helper.zip" download>Download the latest helper ZIP</a>. Extract to a permanent folder. At <code>chrome://extensions</code>, disable other Play2Win copies, enable Developer mode, then choose <strong>Load unpacked</strong> and select the folder containing <code>manifest.json</code>. Keep the folder. For later updates, replace its files and click <strong>Reload</strong> on the extension card.</p>
+    <p><strong>Not connected:</strong> Check that the helper is enabled in the same Chrome profile, then refresh the pricing page. Manual installs do not gain automatic updates just by downloading this ZIP.</p>
+  </section>
+  <footer class="muted"><p>Pricing rules and premiums are unchanged. The helper checks market pages; it never buys, bids, submits offers, or changes carts. <a href="helper-privacy.html">Extension privacy</a>.</p></footer>
+</main></body></html>

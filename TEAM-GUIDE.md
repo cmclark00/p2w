@@ -783,29 +783,29 @@ Guide (the Google Sheet tab).
    normal minimum. A priced GameStop stock check finishes before publishing the
    automatic recommendation. Specific premiums, deductions and rounding still apply.
    Saved-list rechecks and history comparisons also check availability.
-   **Install from the Chrome Web Store:** click **Install Chrome helper** at
-   the top of Floor Pricing (also shown when an eBay helper check is unavailable),
-   or open [Play2Win Market Helper](https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd).
-   In each staff Chrome profile, disable the old unpacked copy, install the Store
-   copy, and reload the pricing tool. Keep only one helper enabled. Chrome delivers
-   future approved and published Store updates automatically. Website deploys and
-   Web Store releases are separate. [Connection check and support](trade-in/helper.html)
-   · [Extension privacy](trade-in/helper-privacy.html).
-   Beside the install link, **Connected · v1.1.5** shows the responding version.
-   **Update needed** means an older or incompatible helper; **Not connected**
-   means this page received no usable reply. Enable the helper and refresh the
-   pricing page after installing/updating. **Recheck** checks the connection
-   without opening listings. Returning to Floor Pricing also checks it again.
-   Click **Update needed** to open the Store and expand **How to update**.
-   Those steps cover switching from unpacked installs, checking Store updates
-   through Chrome's extensions page, and refreshing the pricing tool afterward.
-   **Need the latest helper before Google approves it?** Use **Manual helper download**
-   beside the Store link and expand **Manual install instructions**. Extract the ZIP
-   to a permanent folder, disable other Play2Win copies at `chrome://extensions`,
-   enable Developer mode, and use **Load unpacked** on the folder containing
-   `manifest.json`. Refresh the pricing tool to check the connected version.
-   Manual copies require manual updates; once the latest Store version is published,
-   disable the manual copy and install the Store copy for automatic updates.
+   **Helper setup and automatic updates:** click **Helper setup** at the top of
+   Floor Pricing (also shown when an eBay helper check is unavailable), or open the
+   [setup page](trade-in/helper-setup.html). A manager must enroll each shop computer
+   in Chrome Enterprise Core and assign Play2Win's signed helper using the custom
+   update URL shown there. Start with one test computer. A shared Gmail sign-in alone
+   is not enrollment. After setup, Chrome periodically receives releases directly
+   from Play2Win without a Web Store review. Keep only one Play2Win helper enabled.
+   The setup page includes the current enrollment and policy instructions; account
+   creation, enrollment and a real Chrome update test must finish before rollout
+   can be called complete. Never share enrollment tokens in the pricing tool.
+
+   **Connected · v1.1.5** shows the responding version, not management status.
+   **Update needed** opens the setup/update steps. **Not connected** means this page
+   received no usable reply; enable the helper and refresh. **Recheck** tests the
+   connection without opening listings. A manager verifies the managed extension ID
+   in Chrome before disabling the old manual or Store copy.
+
+   **Temporary manual option:** use **Manual helper download** and expand **Manual
+   install instructions**. Extract to a permanent folder, disable other Play2Win
+   copies, enable Developer mode at `chrome://extensions`, and **Load unpacked**
+   from the folder containing `manifest.json`. Refresh pricing. Manual copies need
+   manual downloads and Reload for updates; they do not automatically become managed.
+   [Connection checks](trade-in/helper.html) · [Extension privacy](trade-in/helper-privacy.html).
 
    **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose

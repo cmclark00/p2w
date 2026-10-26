@@ -1,5 +1,10 @@
 # Chrome Web Store release
 
+October 26: the shop requested self-hosted managed updates instead. New setup is
+documented in MANAGED-RELEASES.md. Store prompts have been removed from floor pricing;
+the existing published listing and pending review have not been withdrawn. This file
+retains release history, not the current staff installation instructions.
+
 Status checked October 26, 2026: version **1.1.3 is published, unlisted** (Store listing updated October 22). Version **1.1.5 was uploaded and submitted for review on October 26**, with **automatic publication after approval enabled**; the dashboard confirmed **Pending review**. Do not describe 1.1.5 as published until the Store confirms it.
 
 - Existing item ID: `dchnmineieolpjoldnilnemppeplddkd`. Upload future updates to this same item.

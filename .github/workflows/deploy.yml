@@ -71,6 +71,8 @@ jobs:
             --exclude='_site' \
             --exclude='.gitignore' \
             --exclude='.env*' \
+            --exclude='*.pem' \
+            --exclude='*.key' \
             --exclude='*.md' \
             --exclude='team-guide-print.html' \
             --exclude='WEBSITE-AGREEMENT.md' \

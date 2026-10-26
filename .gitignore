@@ -14,3 +14,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Extension signing material is private and must live outside this checkout.
+*.pem
+*.key

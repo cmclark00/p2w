@@ -743,26 +743,33 @@ The site's **only server-side code**. Everything else is static.
     display Check stock, never out-of-stock. Chrome installation is per profile;
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
-    Chrome Web Store releases are documented in `trade-in/browser-helper/WEB-STORE.md`.
-    Floor Pricing has an **Install Chrome helper** Store link in its header and
-    beside unavailable eBay helper checks. It opens the existing unlisted item
-    `dchnmineieolpjoldnilnemppeplddkd` in a new tab; keep one helper enabled per profile.
-    The header also pings the existing capability bridge for connection and installed
-    version on entering Floor Pricing, window focus, or Recheck. This opens no tabs.
-    Ready requires version 1.1.5+ and protocol 2/targeted capability; older or unknown
-    versions say Update needed. No response says Not connected, not uninstalled.
-    Update needed links directly to the Store and expands the adjacent How to
-    update instructions (unpacked migration, Store update check, page reload).
-    The same header offers the packaged ZIP via Manual helper download and collapsed
-    Manual install instructions for pending Store releases. Staff extract to a permanent
-    folder, disable other copies, Load unpacked, and refresh; later switch back to the
-    Store copy for automatic updates. Keep the downloadable ZIP current with helper releases.
-    Helper 1.1.3 adds icons/homepage and reads its capability version from the manifest;
-    permissions and pricing behavior are unchanged. The builder's `--store-output`
-    option emits a separate root-manifest ZIP for upload. Store publication is separate
-    from website deployment; unpacked copies do not gain automatic updates. Public
-    `trade-in/helper.html` offers manual connection checks without staff credentials,
-    and `helper-privacy.html` describes the extension's scoped local data handling.
+    Managed self-hosted releases are documented in
+    `trade-in/browser-helper/MANAGED-RELEASES.md`; the old Store release history stays
+    in WEB-STORE.md. Floor Pricing's Helper setup / Update needed links open
+    `trade-in/helper-setup.html`, with manager enrollment, custom update URL and
+    staff troubleshooting instructions. Manual ZIP remains a temporary fallback.
+    Windows automatic installation requires Chrome Enterprise Core enrollment (or
+    qualifying AD/Entra management), plus an assigned policy. A Gmail sign-in alone
+    does not qualify. Do not claim enrollment or automatic rollout from a deploy alone.
+    The header pings the existing bridge for connection/version on entering Floor
+    Pricing, window focus or Recheck. Ready requires 1.1.5+ and protocol 2/targeted
+    capability; older/unknown versions say Update needed. No response says Not connected,
+    not uninstalled. Connected does not prove managed installation; verify the managed
+    extension ID and Chrome policies. Keep only one helper enabled per profile.
+    `scripts/build-managed-helper.cjs --key <private-outside-repo.pem>` signs a CRX3
+    with a stable P-256 key and emits versioned package, updates.xml and release.json
+    under `trade-in/helper-updates/`. The managed ID is
+    `kmjnkeabmpcibanlailmcblbjmjibonl`, separate from the Store ID. Only the signed
+    package adds update_url; runtime/permissions and pricing behavior are unchanged.
+    The signing key and enrollment tokens never enter the repository or public site.
+    The builder prevents identity/version changes without a new release. CI verifies
+    signatures, tamper rejection, feed metadata and byte-for-byte source parity using
+    `scripts/test-managed-helper.cjs`. Keep prior versioned CRXs for in-flight downloads.
+    `package.php` serves only validated versioned CRXs with the required MIME type;
+    the update feed revalidates with no-cache. Website deployment publishes signed
+    releases, not enrollment. Manual ZIPs do not gain automatic updates.
+    `trade-in/helper.html` offers connection checks without staff credentials,
+    and `helper-privacy.html` describes scoped local data handling.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,

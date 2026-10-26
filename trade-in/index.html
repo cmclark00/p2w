@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261026-helper-update-link">
+  <link rel="stylesheet" href="styles.css?v=20261026-managed-helper">
 </head>
 <body>
   <header class="topbar">
@@ -183,27 +183,27 @@
         <div class="floor-helper-tools" aria-label="Chrome helper">
           <span id="floorHelperStatus" class="floor-helper-status" role="status" aria-live="polite">Checking helper…</span>
           <button id="floorHelperCheck" type="button" class="link" title="Recheck helper connection and installed version">Recheck</button>
-          <a class="btn small" href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" title="Open in Chrome. Disable the old unpacked helper before using the Store copy; keep only one enabled.">Install Chrome helper ↗</a>
+          <a class="btn small" href="helper-setup.html" target="_blank" rel="noopener noreferrer">Helper setup ↗</a>
           <a href="gamestop-stock-helper.zip" download>Manual helper download</a>
           <details class="floor-helper-help">
             <summary>Manual install instructions</summary>
-            <p>Use the latest helper while a Store update is awaiting approval.</p>
+            <p>Temporary option until this computer is enrolled for automatic updates.</p>
             <ol>
               <li>Download the ZIP above and extract it into a permanent folder. Keep that folder after installing.</li>
               <li>Open <code>chrome://extensions</code> in the Chrome profile you use for pricing. Disable any existing Play2Win helper.</li>
               <li>Turn on <strong>Developer mode</strong>, click <strong>Load unpacked</strong>, and select the extracted folder containing <code>manifest.json</code>.</li>
               <li>Keep only one helper enabled. Refresh the pricing tool and check the connected version beside the download link.</li>
             </ol>
-            <p>Manual copies do not update automatically. For a later manual update, replace the files in that folder, click <strong>Reload</strong> on the extension card, then refresh the pricing tool. Once the latest version is published, disable the manual copy and install the Store copy for automatic updates.</p>
+            <p>Manual copies do not update automatically. Replace the files in that folder, click <strong>Reload</strong> on the extension card, then refresh the pricing tool. For automatic updates, follow <a href="helper-setup.html" target="_blank" rel="noopener noreferrer">Helper setup</a>.</p>
           </details>
           <details id="floorHelperUpdateHelp" class="floor-helper-help">
             <summary>How to update</summary>
             <ol>
-              <li><strong>Old unpacked copy?</strong> Disable it at <code>chrome://extensions</code>, then choose <strong>Add to Chrome</strong> on the Store listing.</li>
-              <li><strong>Already using the Store copy?</strong> Chrome updates it automatically. To check now, open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, then click <strong>Update</strong>. You can turn Developer mode off afterward.</li>
+              <li><strong>Managed helper?</strong> Chrome checks Play2Win for updates automatically after this computer is enrolled. If it stays outdated, ask a manager to check the setup and policy.</li>
+              <li><strong>Manual copy?</strong> Download and extract the latest ZIP, replace its files, then click <strong>Reload</strong> at <code>chrome://extensions</code>.</li>
               <li>Keep only one helper enabled. Reload the pricing tool and check the version beside this link.</li>
             </ol>
-            <p>The Store only provides approved updates. If it still shows an older version, use <strong>Manual helper download</strong> and <strong>Manual install instructions</strong> above while waiting for approval.</p>
+            <p><a href="helper-setup.html" target="_blank" rel="noopener noreferrer">Set up automatic updates</a> · Requires one-time browser enrollment by a manager.</p>
           </details>
         </div>
       </div>
@@ -622,6 +622,6 @@
 
   <script src="stock-helper-client.js?v=20261026-helper-status"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-  <script src="app.js?v=20261026-helper-update-link"></script>
+  <script src="app.js?v=20261026-managed-helper"></script>
 </body>
 </html>
