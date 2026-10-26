@@ -3961,7 +3961,7 @@ function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   const state = cur.targetedEbay;
   const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
-  const skipped = [cur, cur.standardGame].some(c => Object.values(c?.ebayChecks?.results || {}).some(v => v.skipped));
+  const skipped = [cur, cur.standardGame].some(c => Object.values(c?.ebayChecks?.results || {}).some(v => v.skipped && (!b.basis || v.price >= b.basis)));
   const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
   if (cur.typed != null) return b;
   const review = skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
@@ -4035,7 +4035,7 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
         if (stopped()) return;
         // Unknown is not proof of an ended sale. Keep its honest label and review
         // note, but do not let it block the search or set the automatic baseline.
-        holder.ebayChecks.results[key] = value.state === 'unknown' ? { ...value, skipped: true } : value;
+        holder.ebayChecks.results[key] = value.state === 'unknown' ? { ...value, price: sale.price, skipped: true } : value;
         progress();
       }));
       // Re-plan after every pair. Verified drivers and other market sources stop

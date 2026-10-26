@@ -114,8 +114,8 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   pendingEarly[0](verified('111111111111', null, undefined, 'ended')); await new Promise(r => setImmediate(r));
   pendingEarly[1](verified('111111111112', 2900)); await new Promise(r => setImmediate(r));
   assert.equal(result(early).b.ebayChecking, undefined, 'Verified highest driver unlocks without waiting for its pair');
-  pendingEarly[2](verified('111111111113', 2800)); await earlyTask;
-  assert.equal(result(early).b.basis, 2900); assert.equal(result(early).b.ebayReview, undefined);
+  pendingEarly[2](null); await earlyTask;
+  assert.equal(result(early).b.basis, 2900); assert.equal(result(early).b.ebayReview, undefined, 'Unreadable lower backup cannot cast doubt on a verified higher price');
   const loading = old([3000, 2900, 2800]);
   loading.salesLoading = true; loading.gamestopStock = { state: 'loading' }; loading.product = { ...product, 'gamestop-price': 4000 };
   assert.equal((await targeted(loading, ['ended'])).length, 1, 'First sale starts while stock and sibling sales are loading');
