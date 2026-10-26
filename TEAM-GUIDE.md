@@ -872,6 +872,9 @@ Guide (the Google Sheet tab).
      title, not every seller's description, so open the listing when unsure.
      Normal contents such as **Disc + Case + Manual** are CIB, not a bundle;
      separate games, controllers, bonus discs and other extras remain excluded.
+     Numbered sequel pairs such as **Kingdom Hearts 1 & 2** and **God of War
+     I + II** count as game bundles even without the word "bundle." A genuine
+     selected compilation and multi-disc games keep their normal matching.
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
@@ -884,6 +887,10 @@ Guide (the Google Sheet tab).
      include it if warranted. **Back to the automatic price** excludes it
      again. The flag is a pricing warning, not proof that a listing was unsold.
      Review notes remain visible on saved lists and price re-checks.
+     **Kingdom Hearts, standard North American PS2:** use the highest matching
+     single-game sale without the price-only outlier exclusion. A $34.95 sale
+     supports $35 under normal rounding. Wrong editions, bundles, wrong
+     conditions and failed sold checks are still excluded; premiums remain.
    - **High-value games (sold or lowest verified Amazon at $500+):** when a valid sale exists, use the highest
      eligible PriceCharting sale, with the GameStop minimum. Amazon and
      Renewed offers remain visible but do not set the price. For example,

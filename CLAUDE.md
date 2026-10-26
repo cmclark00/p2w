@@ -642,6 +642,10 @@ The site's **only server-side code**. Everything else is static.
     Standard/platform editions and selected extras remain eligible; named
     collections can advertise their included games. These filters run before
     source selection and do not modify premium settings or rounding rules.
+    Numbered sequel pairs anchored to the selected game series (such as
+    "Kingdom Hearts 1 & 2" or "God of War I + II") are multi-game bundles
+    for both eBay and Amazon. Platform compatibility, disc numbers and a
+    selected compilation's own name do not trigger that bundle rule.
     Rows display the reason, and saved/re-check review notes retain the
     mismatch warning. Staff can deliberately include a marked eBay row;
     the warning records that override. Rhythm-game cap calculations also
@@ -658,6 +662,11 @@ The site's **only server-side code**. Everything else is static.
     Nearby high sales support one another, and fewer than four comparables
     keep the ordinary sparse-data behavior. This is a review heuristic,
     not verification that a listing did or did not sell.
+    Owner exception: standard North American **Kingdom Hearts on PS2** uses
+    its highest otherwise eligible single-game sale without the statistical
+    price-outlier exclusion (`floorHighestSalePriority`). This is not a fixed
+    shelf-price floor: edition, bundle, condition and sold-status checks still
+    apply, as do the normal source maximum, premiums and one final rounding.
     The flagged row stays visible with a badge and a review explanation.
     Staff can click it to include it explicitly; the warning remains.
     Back to the automatic price clears both the selected sale and typed override.

@@ -3242,6 +3242,10 @@ const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
 const FLOOR_SALE_CLUSTER_MIN = 8; // broader distribution needs more evidence than the single-gap check
 const FLOOR_SALE_CLUSTER_SEPARATION = 1.2; // nearby high sales still support one another
+// Owner rule: the standard North American PS2 Kingdom Hearts uses its highest
+// matching sale, not a price-cluster exclusion. Identity/condition/sold checks still apply.
+const floorHighestSalePriority = (product) => norm(product?.['console-name']) === 'playstation 2'
+  && floorTitleWords(product?.['product-name']).join(' ') === 'kingdom hearts';
 // Skylanders/Infinity are priced toward their high sales. Only a much larger
 // isolated spike is excluded; the ordinary upper-quartile test does not apply.
 const FLOOR_TOY_OUTLIER_RATIO = 3;
@@ -4104,7 +4108,7 @@ function floorSales(cur = floorCur) {
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
-  if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
+  if (normal.length >= FLOOR_SALE_OUTLIER_MIN && !floorHighestSalePriority(cur.product)) {
     const [top, next] = normal;
     const isolatedGap = top.price >= next.price * (relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO)
       && top.price - next.price >= (relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP);
@@ -4186,6 +4190,21 @@ const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi,
   .replace(/\b(two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[w]))
   .replace(/\bbrothers\b/g, 'bros').replace(/\bsystems?\b/g, 'console')
   .split(' ').filter((w) => w && !['a', 'an', 'the', 'of', 'for', 'and'].includes(w));
+// Sellers often list numbered sequels together without saying "bundle" or "lot".
+// Anchor the number pair to the selected series, so PS1/PS2 compatibility and
+// "discs 1 & 2" do not masquerade as extra games. A selected numbered compilation
+// retains its own full name and does not match a single-title series prefix.
+function floorNumberedGameBundle(title, product) {
+  if (floorToyFamily(product) || floorIsHardware(product)) return false;
+  const words = floorTitleWords(floorVariantName(product));
+  if (/^\d+$/.test(words.at(-1))) words.pop();
+  if (!words.length) return false;
+  const series = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\W+(?:(?:a|an|the|of|for|and)\\W+)*');
+  const number = '(?:[1-9]|1[0-6]|XVI|XV|XIV|XIII|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)';
+  const pair = new RegExp(`\\b${series}\\s+(${number})\\s*(?:&|\\+|/|,|\\band\\b)\\s*(${number})\\b`, 'i').exec(String(title || ''));
+  return !!pair && floorTitleWords(pair[1]).join(' ') !== floorTitleWords(pair[2]).join(' ');
+}
+
 // PriceCharting abbreviates this GBA release; Four Swords is included on the
 // same cartridge. Normalize only this known title/platform combination, keeping
 // other games, extras, condition words and edition qualifiers for the filters.
@@ -4251,6 +4270,7 @@ function floorListingMismatch(title, product) {
   const name = product?.['product-name'] || '';
   const expected = `${name} ${product?.['console-name'] || ''}`;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
+  if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
   const wantedCounts = floorGameCounts(name);
   if (/\btrilogy\b/i.test(name)) wantedCounts.push('3');
   const collection = /\b(?:collection|compilation|anthology)\b/i.test(name);
@@ -4395,6 +4415,7 @@ function floorOwnBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
+  if (floorHighestSalePriority(cur.product)) checks.push('Kingdom Hearts PS2: use the highest matching single-game sale; price-only outlier filtering does not override this title rule. Edition, condition and original sold-listing checks still apply');
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));

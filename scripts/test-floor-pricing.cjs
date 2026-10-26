@@ -288,6 +288,27 @@ test('audit mismatches cannot drive eBay or Amazon baselines', () => {
   }
 });
 
+test('numbered sequel pairs are bundles for single games on both eBay and Amazon', () => {
+  const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2' };
+  for (const title of ['Kingdom Hearts 1 & 2 (I & II) PS2 - Sony PlayStation 2, 2005 Greatest Hits CIB',
+    'Kingdom Hearts I + II PS2 CIB', 'Kingdom Hearts 1 and 2 PS2 Complete',
+    'Kingdom Hearts I/II PS2', 'Kingdom Hearts 1, 2 Playstation 2']) {
+    assert.equal(invoke('floorListingMismatch', title, product), 'Multiple-game lot or bundle', title);
+    assert.equal(invoke('floorAmazonMismatch', { product, condition: 'cib', amazon: { found: true, title, offers: [{ price: 9999 }] } }), 'Multiple-game lot or bundle', title);
+    assert.equal(invoke('floorListingMismatch', title, { ...product, 'product-name': 'Kingdom Hearts 2' }), 'Multiple-game lot or bundle');
+  }
+  for (const [name, title] of [['God of War', 'God of War 1 & 2 PS2 CIB'], ['God of War II', 'God of War I and II PS2'],
+    ['Star Wars Battlefront', 'Star Wars Battlefront 1/2 PS2']]) {
+    assert.equal(invoke('floorListingMismatch', title, { ...product, 'product-name': name }), 'Multiple-game lot or bundle');
+  }
+  for (const title of ['Kingdom Hearts PS2 compatible PS1 & PS2', 'Kingdom Hearts PS2 discs 1 & 2',
+    'Black Label Kingdom Hearts PlayStation 2 PS2 Complete CIB w/ Reg Card']) {
+    assert.equal(invoke('floorNumberedGameBundle', title, product), false, title);
+  }
+  assert.equal(invoke('floorListingMismatch', 'Kingdom Hearts 1 & 2 PS2 CIB', { ...product, 'product-name': 'Kingdom Hearts 1 & 2' }), null);
+  assert.equal(invoke('floorListingMismatch', 'Final Fantasy X/X-2 HD Remaster PS4', { ...item, 'product-name': 'Final Fantasy X/X-2 HD Remaster' }), null);
+});
+
 test('preorders, multi-game lots and unknown named editions are held for review', () => {
   for (const title of ['Example Game pre-order', 'Example Game presale', 'Example Game PRE SALE',
     'Example Game Zelda 40th Edition', 'Example Game Mario Red Edition', 'Two PlayStation 4 Games Example Game',
@@ -443,6 +464,30 @@ test('a single high outlier cannot drive the price and odd editions do not suppo
 
 const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
+});
+
+test('Kingdom Hearts PS2 highest single-game sale outranks price-only outlier detection', () => {
+  const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2', 'gamestop-price': 999 };
+  const example = highSaleCur([3495, 2600, 2495, 2399, 2000, 1900, 1800, 1700, 1600, 1500], product,
+    { amazon: { found: true, title: 'Kingdom Hearts PS2 (Renewed)', renewedFallback: true, offers: [{ price: 1548 }] } });
+  example.sales.cib[0] = { price: 3495, title: 'Black Label Kingdom Hearts PlayStation 2 PS2 Complete CIB w/ Reg Card', url: 'https://www.ebay.com/itm/111111111111' };
+  example.sales.cib.push({ price: 9999, title: 'Kingdom Hearts 1 & 2 PS2 CIB' });
+  const result = invoke('floorResult', example);
+  assert.equal(result.b.basis, 3495); assert.equal(result.r.price, 3500);
+  assert.equal(invoke('floorSales', example).find(s => s.price === 3495).outlier, undefined);
+  assert.ok(result.b.checks.some(s => s.includes('Kingdom Hearts PS2')));
+  assert.equal(invoke('floorEbayCandidates', example, 1)[0].sale.price, 3495, 'Highest sale still gets verified');
+  for (const state of ['ended', 'offer', 'mismatch', 'price']) {
+    example.ebayChecks = { results: { '111111111111': { state } } };
+    assert.equal(invoke('floorResult', example).b.basis, 2600, state);
+  }
+  example.ebayChecks = { results: { '111111111111': { state: 'unknown', skipped: true, price: 3495 } } };
+  assert.equal(invoke('floorResult', example).b.basis, 2600);
+  assert.equal(invoke('floorResult', example).b.ebayReview, true);
+  for (const [name, platform] of [['Kingdom Hearts 2', 'Playstation 2'], ['Kingdom Hearts [Greatest Hits]', 'Playstation 2'],
+    ['Kingdom Hearts', 'PAL Playstation 2'], ['Another Game', 'Playstation 2']]) {
+    assert.equal(invoke('floorHighestSalePriority', { 'product-name': name, 'console-name': platform }), false);
+  }
 });
 
 test('Killzone uses the supported baseline without a special discount while other premiums stay active', () => {
