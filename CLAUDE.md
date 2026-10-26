@@ -705,6 +705,9 @@ The site's **only server-side code**. Everything else is static.
     Explicit extra items, standalone parts, other games/accessories, wrong editions,
     region/language, condition and sold-status checks remain. Standard-game matches
     do not get this special-edition allowance; pricing premiums are unchanged.
+    Bare Steelbook/Steel Book wording also describes packaging for a confirmed
+    special edition, not an automatic edition mismatch. The listing must still
+    name that selected edition; explicit extra/empty/only steelbooks stay excluded.
     `ODD_SALE_RE` also catches signed/autographed copies and "N
     more games" lots. **"Disc/cart/cartridge/game only" is only odd for
     CIB and New** (`NOT_COMPLETE_RE`): it's what a loose game is (it used
@@ -1068,6 +1071,11 @@ The site's **only server-side code**. Everything else is static.
     catalog pages and offers are fetched once. Both must settle before the
     lookup completes; each identity still gets its own matching and pricing checks.
     The standard result participates in the variant's baseline comparison.
+    When the edition has no usable Amazon price, completed standard-game Amazon
+    prices appear as Standard Amazon in the pinned row and as a labeled fallback
+    above the offers. Standard-game details show separate Used/New/Renewed prices.
+    The standard match remains separate from the edition; partial checks cannot
+    become a usable fallback, and premiums/deductions still apply afterward.
     These are searches in the configured US marketplace, not other countries'
     Amazon marketplaces. The
     selected condition minimum among verified ASINs supplies both the price

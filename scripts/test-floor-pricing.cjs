@@ -124,6 +124,17 @@ test('matching special editions keep plausible pack-ins without accepting other 
   assert.equal(invoke('floorOdd', { title: "Example Game Collector's Edition PS4 disc only + poster" }, 'cib', null, product), true);
   const deluxe = { ...item, 'product-name': 'Example Game [Deluxe Edition]' };
   assert.equal(invoke('floorListingMismatch', 'Example Game Deluxe Edition PS4 + bonus poster', deluxe), null);
+  for (const title of ['Example Game Deluxe Edition Steelbook PS4 CIB',
+    'Example Game Deluxe Edition PS4 Steel Book Case + bonus poster',
+    'Example Game Deluxe Edition Steelbook Edition PS4 CIB']) {
+    assert.equal(invoke('floorListingMismatch', title, deluxe), null, title);
+    assert.equal(invoke('floorAmazonLowest', cur(deluxe, { amazon: { found: true, title, offers: [{ price: 5000 }] } })), 5000, title);
+    assert.ok(invoke('floorListingMismatch', title, item), 'Plain games still reject steelbook editions');
+  }
+  for (const title of ['Example Game Steelbook PS4', 'Example Game Collector\'s Edition Steelbook PS4',
+    'Example Game Deluxe Edition PS4 + extra steelbook', 'Example Game Deluxe Edition PS4 Steelbook only']) {
+    assert.ok(invoke('floorListingMismatch', title, deluxe), title);
+  }
 });
 
 test('original paper pack-ins remain CIB evidence for eBay and Amazon', () => {

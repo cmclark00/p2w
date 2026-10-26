@@ -4211,7 +4211,12 @@ function floorEditionContentsTitle(title, product) {
     || !/\b(?:collector'?s|limited|special|deluxe|premium|ultimate|legendary|anniversary|signature|launch|day one|bonus content)\b|\[[^\]]*\b(?:edition|collection)\b[^\]]*\]/i.test(name)) return title;
   const item = String.raw`(?:posters?|maps?|art[ -]?books?|art[ -]?cards?|post[ -]?cards?|lithographs?|sound[ -]?tracks?(?:\s+(?:cds?|discs?))?|music cds?|steel[ -]?books?(?:\s+cases?)?|figurines?|figures?|statues?|pins?|patches|key[ -]?chains?|bonus discs?)\b`;
   const modifier = String.raw`(?:(?:original|official|included|pack[ -]?in|factory|bonus|exclusive|collectible|limited|mini|fold[ -]?out)\s+)*`;
-  return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:(?:the|a|an)\\s+)?${modifier}${item}(?!\\s+(?:(?:cds?|discs?|cases?)\\s+)?(?:only|edition|of|from|for)\\b)`, 'gi'), ' ');
+  let contentsTitle = String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:(?:the|a|an)\\s+)?${modifier}${item}(?!\\s+(?:(?:cds?|discs?|cases?)\\s+)?(?:only|edition|of|from|for)\\b)`, 'gi'), ' ');
+  // Sellers also put "Steelbook" directly beside the edition, without "with".
+  // Keep it when it defines the selected edition, or describes an extra/empty case.
+  if (!/\bsteel[ -]?book\b/i.test(name)) contentsTitle = contentsTitle.replace(/\bsteel[ -]?books?(?:\s+cases?)?\b(?!\s+(?:only|of|from|for)\b)/gi,
+    (match, offset, text) => /\b(?:extra|additional|spare|empty|custom|aftermarket|seller[ -]added)\s*$/i.test(text.slice(0, offset)) ? match : ' ');
+  return contentsTitle;
 }
 function floorExtraMismatch(title, name) {
   return FLOOR_EXTRA_ITEMS.some((item) => {
@@ -4617,7 +4622,7 @@ function floorStandardHtml(b) {
   return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} baseline${b.from === 'standard' ? ' · used' : ''}</summary>
     <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
     Specific premiums and deductions apply afterward.</p>
-    ${cur.amazon?.url ? `<p class="muted small-print"><a href="${esc(cur.amazon.url)}" target="_blank" rel="noopener noreferrer">Standard-game Amazon ${money(floorAmazonLowest(cur, true))}${cur.amazon.incomplete ? ' · partial, reference only' : ''} ↗</a>${cur.amazon.incomplete ? ' · <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>' : ''}</p>` : ''}
+    ${cur.amazon ? `<div class="eyebrow">Standard-game Amazon</div>${floorAmazonReferencesHtml(cur, ref)}${cur.amazon.incomplete || cur.amazon.error ? '<button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>' : ''}` : ''}
     ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
     <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${esc(s.date || '')}</td></tr>`).join('')}</tbody></table>
     </details>`;
@@ -4769,7 +4774,13 @@ function renderFloorPricer() {
 }
 
 // Separate condition references; only the engine-selected reference affects pricing.
-function floorAmazonReferencesHtml(cur, b, compact = false) {
+function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = false) {
+  const standard = b.standardReference;
+  if (!standardFallback && !(floorAmazonLowest(cur) > 0) && standard?.cur && floorAmazonLowest(standard.cur) > 0) {
+    const refs = floorAmazonReferencesHtml(standard.cur, { ...standard, waiting: b.waiting,
+      from: b.from === 'standard' ? standard.from : 'reference' }, compact, true);
+    return compact ? refs : `<div class="eyebrow floor-amz-head">Standard-game Amazon fallback</div>${refs}`;
+  }
   const a = cur.amazon, selectedKind = a?.renewedFallback ? 'renewed' : a?.newReference || cur.condition === 'new' ? 'new' : 'used';
   const refs = a?.references || { [selectedKind]: a };
   const kinds = ['used', 'new', ...(a?.renewedChecked || refs.renewed ? ['renewed'] : [])];
@@ -4784,7 +4795,7 @@ function floorAmazonReferencesHtml(cur, b, compact = false) {
       : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
     const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
-    const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(status)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}` : ''} ↗</a>`;
+    const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(status)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}` : ''} ↗</a>`;
     return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(status)}</td></tr>`;
   });
   return compact ? rows.join('') : `<table class="floor-sales floor-amazon-references" aria-label="Amazon prices by condition"><tbody>${rows.join('')}</tbody></table><p class="muted small-print">Shipping included. “Selected” identifies the Amazon reference; other sources and specific pricing rules still apply.</p>`;
@@ -4797,9 +4808,9 @@ function floorAmazonHtml(cur, b) {
   const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : a?.newReference ? 'Amazon new-copy reference offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
-  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
+  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
-  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match. Check the title, platform and edition before using another listing.</p>${matchNote}`;
+  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match${floorStandardGame(cur.product) ? ' for this edition' : ''}. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
   const eligible = floorAmazonEligibleOffers(cur);
   const lowestAt = offers.findIndex((o) => eligible.includes(o) && Number(o.price) === floorAmazonLowest(cur, true));

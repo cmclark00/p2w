@@ -371,6 +371,31 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.variant = p; e.ctx.result = r;
     assert.equal(e.run('floorResult({product:variant,condition:"cib",sales:{cib:[]},amazon:result}).r.price'),2500);
   });
+  await test('missing edition uses standard Amazon fallback and exposes its condition prices without relabeling the match', async () => {
+    const p = {...product, 'product-name':'Witcher 3: Wild Hunt [With Bonus Content]', 'console-name':'Playstation 4'};
+    const regular = candidate('B000000002', 'Witcher 3 Wild Hunt PS4', ['Playstation 4']);
+    const calls = [];
+    const e = engine(async (route, params) => {
+      calls.push([route, params]);
+      return route === 'amazon/catalog' ? {candidates:[regular]} : offer(regular, params.cond === 'used' ? 4000 : 5000);
+    });
+    const r = await e.fetch(p,'cib');
+    assert.equal(r.found,false,'standard listing does not become a false edition match');
+    assert.equal(r.standard.asin,regular.asin);
+    assert.ok(calls.some(([route,p]) => route === 'amazon/catalog' && p.q === 'Witcher 3: Wild Hunt Playstation 4'));
+    e.ctx.result=r;e.ctx.variant=p;
+    e.run('amazonSet=true; example={product:variant,condition:"cib",sales:{cib:[]},amazon:result}; basis=floorResult(example).b;');
+    assert.equal(e.run('floorResult(example).r.price'),4000);
+    assert.equal(e.run('basis.from'),'standard');
+    const pin=e.run('floorAmazonReferencesHtml(example,basis,true)'), body=e.run('floorAmazonHtml(example,basis)');
+    assert.match(pin,/Standard Amazon Used/); assert.match(pin,/\$40\.00/); assert.match(pin,/\$50\.00/);
+    assert.ok(pin.includes(regular.url));
+    assert.match(body,/Standard-game Amazon fallback/); assert.match(body,/Sets baseline/);
+    assert.match(body,/No verified Amazon match for this edition/);
+    assert.match(e.run('floorStandardHtml(basis)'),/Used · Very good/);
+    e.run('example.amazon.standard.incomplete=true; basis=floorResult(example).b');
+    assert.doesNotMatch(e.run('floorAmazonReferencesHtml(example,basis,true)'),/Standard Amazon/,'incomplete checks cannot become a usable fallback');
+  });
   await test('variant and standard searches overlap, share requests and still wait for both prices', async () => {
     const p={...product,upc:'','product-name':'Final Fight [Special Edition]'};
     const special=candidate('B000000001','Final Fight Special Edition SNES'), regular=candidate('B000000002','Final Fight SNES');

@@ -879,6 +879,8 @@ Guide (the Google Sheet tab).
      posters, art books, soundtracks, steelbook cases, figures and bonus discs
      are allowed. The title must confirm the selected edition; explicitly added
      extras and parts-only listings still do not qualify. Check contents when unsure.
+     Steelbook wording is also allowed when the listing confirms your selected
+     special edition; it does not qualify a steelbook listing for the standard game.
      Numbered sequel pairs such as **Kingdom Hearts 1 & 2** and **God of War
      I + II** count as game bundles even without the word "bundle." A genuine
      selected compilation and multi-disc games keep their normal matching.
@@ -941,6 +943,9 @@ Guide (the Google Sheet tab).
      notes when exact contents matter. Hardware and figures keep their existing
      offer rules. The Amazon Used reference shows the selected grade. Open
      **Amazon condition guide** above the Amazon offers for a quick explanation.
+     If an edition has no usable Amazon price, **Standard Amazon** in the pinned
+     row shows the standard game's verified fallback prices. Its match stays
+     separate from your edition; specific premiums still apply.
      The tool checks **Used and New** for Loose/CIB, finds the lowest eligible
      shipping-inclusive offer in each, and uses **the lower of those two prices**
      as its Amazon reference. For example, Used $40 and New $30 selects New $30;
