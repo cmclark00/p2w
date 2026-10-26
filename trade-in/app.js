@@ -4650,6 +4650,7 @@ function renderFloorPricer() {
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
+        ${cur.targetedEbay?.unavailable || cur.ebayChecks?.unavailable ? '<p class="small-print"><a href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer">Install Chrome helper ↗</a> · Keep only one helper enabled, then refresh.</p>' : ''}
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
