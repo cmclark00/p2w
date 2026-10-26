@@ -1,0 +1,6 @@
+# Keep Chrome's update feed fresh without changing caching elsewhere.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(xml|json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
