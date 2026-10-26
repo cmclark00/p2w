@@ -1,6 +1,11 @@
 # Chrome Web Store release
 
-Status: submission assets prepared; not yet submitted or published. No store item ID has been assigned. Do not tell staff that unpacked installations update automatically.
+Status checked October 26, 2026: version **1.1.3 is published, unlisted** (Store listing updated October 22). Version **1.1.5 was uploaded and submitted for review on October 26**, with **automatic publication after approval enabled**; the dashboard confirmed **Pending review**. Do not describe 1.1.5 as published until the Store confirms it.
+
+- Existing item ID: `dchnmineieolpjoldnilnemppeplddkd`. Upload future updates to this same item.
+- Installation: https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd
+- The 1.1.5 release passed GameStop helper, eBay helper, targeted verification, site and JavaScript checks. Its listing description now includes automatic targeted checks.
+- Store-installed copies can receive future published updates automatically. Unpacked installations still require a one-time switch to the Store copy; keep only one helper enabled per profile.
 
 ## Build and ownership
 
