@@ -654,19 +654,13 @@ The site's **only server-side code**. Everything else is static.
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
     single highest sale is excluded; no recursive removal or median cap.
-    A second distribution check needs at least eight comparables: the top
-    must be at least 20% above the next sale AND at least 50% and $5 above
-    the upper quartile of the remaining sales (nearest-rank percentile).
-    This catches Killzone's isolated $16 even with a few $12-$13 sales
-    above the main cluster. The review note explains that distribution.
+    Compare only to the next valid sale, not the upper quartile of cheaper
+    sales. The broad cluster exclusion and Kingdom Hearts title exception
+    were removed: $34.95 beside $26 stays eligible for any title, while
+    an isolated $16 beside $10 still meets the exclusion thresholds.
     Nearby high sales support one another, and fewer than four comparables
     keep the ordinary sparse-data behavior. This is a review heuristic,
     not verification that a listing did or did not sell.
-    Owner exception: standard North American **Kingdom Hearts on PS2** uses
-    its highest otherwise eligible single-game sale without the statistical
-    price-outlier exclusion (`floorHighestSalePriority`). This is not a fixed
-    shelf-price floor: edition, bundle, condition and sold-status checks still
-    apply, as do the normal source maximum, premiums and one final rounding.
     The flagged row stays visible with a badge and a review explanation.
     Staff can click it to include it explicitly; the warning remains.
     Back to the automatic price clears both the selected sale and typed override.
@@ -830,8 +824,8 @@ The site's **only server-side code**. Everything else is static.
     uncommon figures and rare Skylanders use the highest eligible sale with
     existing variant checks. Skylanders/Infinity use a looser outlier rule:
     only an isolated sale at least 3x the next valid sale AND $25 higher is
-    excluded, with at least three lower valid comparables. Their upper-quartile
-    test is disabled; Amiibo, other toy lines and games retain strict detection.
+    excluded, with at least three lower valid comparables. Amiibo, other toy
+    lines and games use the ordinary 50% and $5 next-sale gap thresholds.
     When a verified, priced Amazon match exists for the selected condition,
     Skylanders/Infinity instead use the normal maximum of highest eligible
     sale, lowest matching Amazon offer and GameStop. Unpriced, mismatched or

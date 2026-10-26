@@ -466,7 +466,7 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
 });
 
-test('Kingdom Hearts PS2 highest single-game sale outranks price-only outlier detection', () => {
+test('Kingdom Hearts uses the general gap rule while bundles and failed sold checks stay excluded', () => {
   const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2', 'gamestop-price': 999 };
   const example = highSaleCur([3495, 2600, 2495, 2399, 2000, 1900, 1800, 1700, 1600, 1500], product,
     { amazon: { found: true, title: 'Kingdom Hearts PS2 (Renewed)', renewedFallback: true, offers: [{ price: 1548 }] } });
@@ -475,8 +475,11 @@ test('Kingdom Hearts PS2 highest single-game sale outranks price-only outlier de
   const result = invoke('floorResult', example);
   assert.equal(result.b.basis, 3495); assert.equal(result.r.price, 3500);
   assert.equal(invoke('floorSales', example).find(s => s.price === 3495).outlier, undefined);
-  assert.ok(result.b.checks.some(s => s.includes('Kingdom Hearts PS2')));
+  assert.ok(!result.b.checks.some(s => s.includes('Kingdom Hearts PS2')));
   assert.equal(invoke('floorEbayCandidates', example, 1)[0].sale.price, 3495, 'Highest sale still gets verified');
+  example.sales.cib[0].price = 10000;
+  assert.equal(invoke('floorResult', example).b.basis, 2600, 'Kingdom Hearts has no exception for an extreme spike');
+  example.sales.cib[0].price = 3495;
   for (const state of ['ended', 'offer', 'mismatch', 'price']) {
     example.ebayChecks = { results: { '111111111111': { state } } };
     assert.equal(invoke('floorResult', example).b.basis, 2600, state);
@@ -484,10 +487,6 @@ test('Kingdom Hearts PS2 highest single-game sale outranks price-only outlier de
   example.ebayChecks = { results: { '111111111111': { state: 'unknown', skipped: true, price: 3495 } } };
   assert.equal(invoke('floorResult', example).b.basis, 2600);
   assert.equal(invoke('floorResult', example).b.ebayReview, true);
-  for (const [name, platform] of [['Kingdom Hearts 2', 'Playstation 2'], ['Kingdom Hearts [Greatest Hits]', 'Playstation 2'],
-    ['Kingdom Hearts', 'PAL Playstation 2'], ['Another Game', 'Playstation 2']]) {
-    assert.equal(invoke('floorHighestSalePriority', { 'product-name': name, 'console-name': platform }), false);
-  }
 });
 
 test('Killzone uses the supported baseline without a special discount while other premiums stay active', () => {
@@ -511,15 +510,15 @@ test('outlier thresholds require both a large relative gap and a $5 gap with thr
   assert.equal(invoke('floorResult', example).b.basis, 1600);
 });
 
-test('Killzone real CIB price distribution excludes $16 and rounds the remaining $13 to $15', () => {
+test('Killzone distribution keeps $16 supported by $13 without a broad cluster exclusion', () => {
   // Public PriceCharting CIB table, fetched Oct 17, 2026; the $1.50 Greatest Hits edition is omitted.
   const prices = [300, 750, 598, 1237, 601, 899, 999, 554, 799, 750, 900, 240, 1299, 1179,
     700, 399, 528, 1600, 499, 883, 444, 799, 695, 729, 500, 574, 995, 971, 1300];
   const product = { ...item, 'product-name': 'Killzone Shadow Fall', 'gamestop-price': 999 };
   const example = highSaleCur(prices, product, { amazon: { found: true, lowest: 1000, offers: [{ price: 1000 }] } });
   const result = invoke('floorResult', example);
-  assert.equal(result.b.basis, 1300); assert.equal(result.r.price, 1500);
-  assert.ok(result.b.checks.some((s) => s.includes('75%')));
+  assert.equal(result.b.basis, 1600); assert.equal(result.r.price, 1500);
+  assert.ok(!invoke('floorSales', example).some(s => s.outlier));
   assert.equal(invoke('floorResult', { ...example, pick: prices.indexOf(1600) }).r.price, 1500);
   // A second nearby high sale supports the high price rather than being discarded recursively.
   example.sales.cib.push({ price: 1550, title: 'Killzone Shadow Fall complete' });
@@ -527,13 +526,16 @@ test('Killzone real CIB price distribution excludes $16 and rounds the remaining
   assert.equal(invoke('floorResult', example).r.price, 1500);
 });
 
-test('distribution-based flags need eight comparables, a 20% top gap, and a $5 / 50% quartile gap', () => {
+test('a cheaper sales cluster cannot exclude a supported high sale for any title', () => {
   for (const [prices, expected] of [
     [[1600, 1300, 1000, 1000, 999, 950, 900], 1600],
-    [[1600, 1300, 1000, 1000, 999, 950, 900, 800], 1300],
+    [[1600, 1300, 1000, 1000, 999, 950, 900, 800], 1600],
     [[1600, 1400, 1000, 1000, 999, 950, 900, 800], 1600],
     [[1400, 1150, 1000, 1000, 999, 950, 900, 800], 1400],
     [[1200, 950, 800, 800, 799, 750, 700, 600], 1200],
+    [[3495, 2600, 2495, 2399, 2000, 1900, 1800, 1700, 1600, 1500], 3495],
+    [[8000, 6000, 4000, 3000, 2999, 2900, 2800, 2700], 8000],
+    [[20000, 6000, 4000, 3000, 2999, 2900, 2800, 2700], 6000],
   ]) assert.equal(invoke('floorResult', highSaleCur(prices)).b.basis, expected);
 });
 
@@ -1045,8 +1047,9 @@ test('Skylanders and Infinity accept higher comparable sales while other categor
     for (const prices of [[4000, 2000, 1900, 1800], [3200, 2600, 2000, 1900, 1800, 1700, 1600, 1500]]) {
       const example = cur(product, { condition: 'loose', sales: { loose: prices.map((price) => ({ title: 'Example Figure', price })) } });
       const r = invoke('floorResult', example);
-      assert.equal(r.b.basis, relaxed ? prices[0] : prices[1], system);
-      assert.equal(!!invoke('floorSales', example)[0].outlier, !relaxed, system);
+      const excluded = !relaxed && prices[0] === 4000;
+      assert.equal(r.b.basis, excluded ? prices[1] : prices[0], system);
+      assert.equal(!!invoke('floorSales', example)[0].outlier, excluded, system);
     }
   }
 });

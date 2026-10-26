@@ -3240,14 +3240,8 @@ const FLOOR_AMAZON_OUTLIER = 2;
 const FLOOR_SALE_OUTLIER_MIN = 4;
 const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
-const FLOOR_SALE_CLUSTER_MIN = 8; // broader distribution needs more evidence than the single-gap check
-const FLOOR_SALE_CLUSTER_SEPARATION = 1.2; // nearby high sales still support one another
-// Owner rule: the standard North American PS2 Kingdom Hearts uses its highest
-// matching sale, not a price-cluster exclusion. Identity/condition/sold checks still apply.
-const floorHighestSalePriority = (product) => norm(product?.['console-name']) === 'playstation 2'
-  && floorTitleWords(product?.['product-name']).join(' ') === 'kingdom hearts';
 // Skylanders/Infinity are priced toward their high sales. Only a much larger
-// isolated spike is excluded; the ordinary upper-quartile test does not apply.
+// isolated spike is excluded; other categories use the ordinary gap thresholds.
 const FLOOR_TOY_OUTLIER_RATIO = 3;
 const FLOOR_TOY_OUTLIER_GAP = 2500;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
@@ -4108,20 +4102,14 @@ function floorSales(cur = floorCur) {
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
-  if (normal.length >= FLOOR_SALE_OUTLIER_MIN && !floorHighestSalePriority(cur.product)) {
+  if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
     const isolatedGap = top.price >= next.price * (relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO)
       && top.price - next.price >= (relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP);
-    // Compare with the upper quartile of the remaining sales, not their median or cheapest copy.
-    // This catches a lone $16 among mostly $7-$10 sales even with a few $12-$13 sales.
-    const lower = normal.slice(1).map((s) => s.price).sort((a, b) => a - b);
-    const upperQuartile = lower[Math.ceil(lower.length * 0.75) - 1];
-    const isolatedCluster = !relaxedToys && normal.length >= FLOOR_SALE_CLUSTER_MIN
-      && top.price >= next.price * FLOOR_SALE_CLUSTER_SEPARATION
-      && top.price >= upperQuartile * FLOOR_SALE_OUTLIER_RATIO
-      && top.price - upperQuartile >= FLOOR_SALE_OUTLIER_GAP;
-    if (isolatedGap || isolatedCluster) {
-      top.outlier = { nextPrice: next.price, lowerCount: lower.length, clusterPrice: isolatedGap ? null : upperQuartile };
+    // Compare to the next valid sale, not the broader lower-price cluster.
+    // Higher legitimate copies should not be discarded just because most sales are cheaper.
+    if (isolatedGap) {
+      top.outlier = { nextPrice: next.price, lowerCount: normal.length - 1 };
     }
   }
   return sales;
@@ -4415,7 +4403,6 @@ function floorOwnBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
-  if (floorHighestSalePriority(cur.product)) checks.push('Kingdom Hearts PS2: use the highest matching single-game sale; price-only outlier filtering does not override this title rule. Edition, condition and original sold-listing checks still apply');
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
@@ -4431,7 +4418,7 @@ function floorOwnBasis(cur = floorCur) {
   const amazonMismatch = floorAmazonMismatch(cur);
   if (amazonMismatch) checks.push(`Amazon excluded from pricing: ${amazonMismatch}. Review the linked listing`);
   for (const s of sales.filter((s) => s.outlier)) {
-    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales${s.outlier.clusterPrice != null ? `; at least 75% of those are ${money(s.outlier.clusterPrice)} or less` : ''}. Open the listing and verify it actually sold before using it`);
+    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales. Open the listing and verify it actually sold before using it`);
   }
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
