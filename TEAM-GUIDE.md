@@ -791,6 +791,11 @@ Guide (the Google Sheet tab).
    future approved and published Store updates automatically. Website deploys and
    Web Store releases are separate. [Connection check and support](trade-in/helper.html)
    · [Extension privacy](trade-in/helper-privacy.html).
+   Beside the install link, **Connected · v1.1.5** shows the responding version.
+   **Update needed** means an older or incompatible helper; **Not connected**
+   means this page received no usable reply. Enable the helper and refresh the
+   pricing page after installing/updating. **Recheck** checks the connection
+   without opening listings. Returning to Floor Pricing also checks it again.
 
    **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose

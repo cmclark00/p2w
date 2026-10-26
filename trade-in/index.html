@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261019-normal-play-2">
+  <link rel="stylesheet" href="styles.css?v=20261026-helper-status">
 </head>
 <body>
   <header class="topbar">
@@ -180,7 +180,11 @@
           <h1>Floor pricing</h1>
           <p class="muted">Price games for the shelf with the Game Pricing Guide. Scan or search a game, check the suggested price, and add it to the list. Save the list as a named session to come back to it.</p>
         </div>
-        <a class="btn small" href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" title="Open in Chrome. Disable the old unpacked helper before using the Store copy; keep only one enabled.">Install Chrome helper ↗</a>
+        <div class="floor-helper-tools" aria-label="Chrome helper">
+          <span id="floorHelperStatus" class="floor-helper-status" role="status" aria-live="polite">Checking helper…</span>
+          <button id="floorHelperCheck" type="button" class="link" title="Recheck helper connection and installed version">Recheck</button>
+          <a class="btn small" href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" title="Open in Chrome. Disable the old unpacked helper before using the Store copy; keep only one enabled.">Install Chrome helper ↗</a>
+        </div>
       </div>
 
       <div class="panel floor-session">
@@ -595,8 +599,8 @@
   <div id="printArea" aria-hidden="true"></div>
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="stock-helper-client.js?v=20261025-targeted-ebay"></script>
+  <script src="stock-helper-client.js?v=20261026-helper-status"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-  <script src="app.js?v=20261026-helper-store-link"></script>
+  <script src="app.js?v=20261026-helper-status"></script>
 </body>
 </html>

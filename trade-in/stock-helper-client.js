@@ -36,6 +36,7 @@ function ebayHelperRequest(type, url, mode = 'manual') {
   });
 }
 window.P2WEbayHelper = {
+  status: () => ebayHelperRequest('P2W_EBAY_PING'), // Capability/version only; never opens a listing tab.
   targetedAvailable: async () => { const h = await ebayHelperRequest('P2W_EBAY_PING'); return !!h?.available && h.protocol === 2 && h.targeted === 1; },
   async checkTargeted(url) {
     if (!await window.P2WEbayHelper.targetedAvailable()) return { state: 'unknown', reason: 'helper-update-required' };

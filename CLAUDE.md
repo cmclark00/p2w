@@ -747,6 +747,10 @@ The site's **only server-side code**. Everything else is static.
     Floor Pricing has an **Install Chrome helper** Store link in its header and
     beside unavailable eBay helper checks. It opens the existing unlisted item
     `dchnmineieolpjoldnilnemppeplddkd` in a new tab; keep one helper enabled per profile.
+    The header also pings the existing capability bridge for connection and installed
+    version on entering Floor Pricing, window focus, or Recheck. This opens no tabs.
+    Ready requires version 1.1.5+ and protocol 2/targeted capability; older or unknown
+    versions say Update needed. No response says Not connected, not uninstalled.
     Helper 1.1.3 adds icons/homepage and reads its capability version from the manifest;
     permissions and pricing behavior are unchanged. The builder's `--store-output`
     option emits a separate root-manifest ZIP for upload. Store publication is separate

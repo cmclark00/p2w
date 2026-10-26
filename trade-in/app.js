@@ -3398,7 +3398,43 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
+const FLOOR_HELPER_RECOMMENDED = '1.1.5';
+function floorHelperStatusInfo(helper) {
+  if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
+  const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
+  const parts = version?.split('.').map(Number) || [];
+  const required = FLOOR_HELPER_RECOMMENDED.split('.').map(Number);
+  let comparison = 0;
+  for (let i = 0; i < Math.max(parts.length, required.length); i++) {
+    comparison = (parts[i] || 0) - (required[i] || 0);
+    if (comparison) break;
+  }
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1;
+  return { state: ready ? 'connected' : 'update',
+    text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
+    hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
+      : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Store updates arrive after Google approval; keep only one helper enabled.` };
+}
+let floorHelperChecking = false;
+async function refreshFloorHelperStatus() {
+  const status = $('#floorHelperStatus'), button = $('#floorHelperCheck');
+  if (!status || floorHelperChecking) return;
+  floorHelperChecking = true;
+  if (button) button.disabled = true;
+  status.textContent = 'Checking helper…';
+  status.className = 'floor-helper-status';
+  let helper = null;
+  try { helper = await window.P2WEbayHelper?.status?.(); } catch (_) { /* No usable connection. */ }
+  const info = floorHelperStatusInfo(helper);
+  status.textContent = info.text;
+  status.title = info.hint;
+  status.className = `floor-helper-status ${info.state}`;
+  if (button) button.disabled = false;
+  floorHelperChecking = false;
+}
+
 function showFloor() {
+  refreshFloorHelperStatus();
   $('#floorName').value = floor.name;
   $('#floorStaff').value = floor.staff;
   renderFloorList();
@@ -5098,6 +5134,8 @@ async function deleteFloorSession() {
 }
 
 function wireFloor() {
+  $('#floorHelperCheck')?.addEventListener('click', refreshFloorHelperStatus);
+  window.addEventListener('focus', () => { if (currentView === 'floor') refreshFloorHelperStatus(); });
   $('#fulcrumFiles').addEventListener('change', importFulcrumFiles);
   $('#fulcrumClear').addEventListener('click', clearFulcrum);
   $('#fulcrumFilter').addEventListener('input', renderFulcrum);
