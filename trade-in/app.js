@@ -3413,18 +3413,17 @@ function floorHelperStatusInfo(helper) {
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
-      : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Managed computers receive Play2Win updates automatically; manual copies need a download. Keep only one helper enabled.` };
+      : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Download the latest ZIP and reload the extension. Keep only one helper enabled.` };
 }
 let floorHelperChecking = false;
 function floorHelperStatusHtml(info) {
   if (info.state !== 'update') return esc(info.text);
-  return `${esc(info.text.replace(/ · Update needed$/, ''))} · <a href="helper-setup.html#updates" target="_blank" rel="noopener noreferrer" aria-describedby="floorHelperUpdateHelp" title="Open helper setup and update steps">Update needed ↗</a>`;
+  return `${esc(info.text.replace(/ · Update needed$/, ''))} · <a href="#floorHelperUpdateHelp" aria-describedby="floorHelperUpdateHelp" title="Show manual update steps">Update needed</a>`;
 }
 async function refreshFloorHelperStatus() {
-  const status = $('#floorHelperStatus'), button = $('#floorHelperCheck');
+  const status = $('#floorHelperStatus');
   if (!status || floorHelperChecking) return;
   floorHelperChecking = true;
-  if (button) button.disabled = true;
   status.textContent = 'Checking helper…';
   status.className = 'floor-helper-status';
   let helper = null;
@@ -3433,7 +3432,6 @@ async function refreshFloorHelperStatus() {
   status.innerHTML = floorHelperStatusHtml(info);
   status.title = info.hint;
   status.className = `floor-helper-status ${info.state}`;
-  if (button) button.disabled = false;
   floorHelperChecking = false;
 }
 
@@ -4690,7 +4688,6 @@ function renderFloorPricer() {
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
-        ${cur.targetedEbay?.unavailable || cur.ebayChecks?.unavailable ? '<p class="small-print"><a href="helper-setup.html" target="_blank" rel="noopener noreferrer">Helper setup ↗</a> · Keep only one helper enabled, then refresh.</p>' : ''}
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
@@ -5141,7 +5138,6 @@ function wireFloor() {
   $('#floorHelperStatus')?.addEventListener('click', (event) => {
     if (event.target.closest('a')) $('#floorHelperUpdateHelp').open = true;
   });
-  $('#floorHelperCheck')?.addEventListener('click', refreshFloorHelperStatus);
   window.addEventListener('focus', () => { if (currentView === 'floor') refreshFloorHelperStatus(); });
   $('#fulcrumFiles').addEventListener('change', importFulcrumFiles);
   $('#fulcrumClear').addEventListener('click', clearFulcrum);

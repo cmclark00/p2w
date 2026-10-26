@@ -743,33 +743,20 @@ The site's **only server-side code**. Everything else is static.
     display Check stock, never out-of-stock. Chrome installation is per profile;
     the Codex in-app browser cannot load this extension. Rebuild the ZIP after
     extension edits. Offline tests: test-gamestop-helper.cjs, test-gamestop-stock.cjs.
-    Managed self-hosted releases are documented in
-    `trade-in/browser-helper/MANAGED-RELEASES.md`; the old Store release history stays
-    in WEB-STORE.md. Floor Pricing's Helper setup / Update needed links open
-    `trade-in/helper-setup.html`, with manager enrollment, custom update URL and
-    staff troubleshooting instructions. Manual ZIP remains a temporary fallback.
-    Windows automatic installation requires Chrome Enterprise Core enrollment (or
-    qualifying AD/Entra management), plus an assigned policy. A Gmail sign-in alone
-    does not qualify. Do not claim enrollment or automatic rollout from a deploy alone.
-    The header pings the existing bridge for connection/version on entering Floor
-    Pricing, window focus or Recheck. Ready requires 1.1.5+ and protocol 2/targeted
-    capability; older/unknown versions say Update needed. No response says Not connected,
-    not uninstalled. Connected does not prove managed installation; verify the managed
-    extension ID and Chrome policies. Keep only one helper enabled per profile.
-    `scripts/build-managed-helper.cjs --key <private-outside-repo.pem>` signs a CRX3
-    with a stable P-256 key and emits versioned package, updates.xml and release.json
-    under `trade-in/helper-updates/`. The managed ID is
-    `kmjnkeabmpcibanlailmcblbjmjibonl`, separate from the Store ID. Only the signed
-    package adds update_url; runtime/permissions and pricing behavior are unchanged.
-    The signing key and enrollment tokens never enter the repository or public site.
-    The builder prevents identity/version changes without a new release. CI verifies
-    signatures, tamper rejection, feed metadata and byte-for-byte source parity using
-    `scripts/test-managed-helper.cjs`. Keep prior versioned CRXs for in-flight downloads.
-    `package.php` serves only validated versioned CRXs with the required MIME type;
-    the update feed revalidates with no-cache. Website deployment publishes signed
-    releases, not enrollment. Manual ZIPs do not gain automatic updates.
-    `trade-in/helper.html` offers connection checks without staff credentials,
-    and `helper-privacy.html` describes scoped local data handling.
+    Staff use the manual ZIP only. The Floor Pricing header has Download helper,
+    a compact connection/version indicator, and one collapsed Install / update
+    guide. No separate Recheck button, duplicate sales-row install prompt, Store
+    promotion or managed-enrollment flow. Update needed expands the same guide.
+    Connection checks run on entering Floor Pricing and window focus; ready requires
+    1.1.5+ and protocol 2/targeted capability. No response says Not connected, not
+    uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
+    files and Reload the extension for later updates. Keep only one copy enabled.
+    `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
+    connection checks. Rebuild the ZIP whenever runtime or installer notes change.
+    The managed rollout was cancelled before enrollment on Oct. 26; its public feed,
+    packages and build/test tooling were removed. Historical Store/managed notes remain
+    in browser-helper Markdown; no account or Store listing was deleted. Private signing
+    material stays outside the repo. Pricing rules and premiums are independent.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,

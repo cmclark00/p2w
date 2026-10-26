@@ -783,29 +783,16 @@ Guide (the Google Sheet tab).
    normal minimum. A priced GameStop stock check finishes before publishing the
    automatic recommendation. Specific premiums, deductions and rounding still apply.
    Saved-list rechecks and history comparisons also check availability.
-   **Helper setup and automatic updates:** click **Helper setup** at the top of
-   Floor Pricing (also shown when an eBay helper check is unavailable), or open the
-   [setup page](trade-in/helper-setup.html). A manager must enroll each shop computer
-   in Chrome Enterprise Core and assign Play2Win's signed helper using the custom
-   update URL shown there. Start with one test computer. A shared Gmail sign-in alone
-   is not enrollment. After setup, Chrome periodically receives releases directly
-   from Play2Win without a Web Store review. Keep only one Play2Win helper enabled.
-   The setup page includes the current enrollment and policy instructions; account
-   creation, enrollment and a real Chrome update test must finish before rollout
-   can be called complete. Never share enrollment tokens in the pricing tool.
-
-   **Connected · v1.1.5** shows the responding version, not management status.
-   **Update needed** opens the setup/update steps. **Not connected** means this page
-   received no usable reply; enable the helper and refresh. **Recheck** tests the
-   connection without opening listings. A manager verifies the managed extension ID
-   in Chrome before disabling the old manual or Store copy.
-
-   **Temporary manual option:** use **Manual helper download** and expand **Manual
-   install instructions**. Extract to a permanent folder, disable other Play2Win
-   copies, enable Developer mode at `chrome://extensions`, and **Load unpacked**
-   from the folder containing `manifest.json`. Refresh pricing. Manual copies need
-   manual downloads and Reload for updates; they do not automatically become managed.
-   [Connection checks](trade-in/helper.html) · [Extension privacy](trade-in/helper-privacy.html).
+   **Install/update the helper:** click **Download helper** at the top of Floor
+   Pricing. **Install / update** expands the short instructions. First time: extract
+   to a permanent folder, enable Developer mode at `chrome://extensions`, then
+   **Load unpacked** from the folder containing `manifest.json`. Later: replace the
+   files in that folder with the new download and click **Reload** on the helper card.
+   Keep only one Play2Win helper enabled and refresh the pricing tool afterward.
+   **Connected · v1.1.5** shows the responding version; **Update needed** opens the
+   instructions. **Not connected** means the page received no usable reply. Returning
+   to the pricing window rechecks automatically. Manual copies do not auto-update.
+   [Manual guide](trade-in/helper-setup.html) · [Connection checks](trade-in/helper.html).
 
    **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose
