@@ -796,6 +796,9 @@ Guide (the Google Sheet tab).
    means this page received no usable reply. Enable the helper and refresh the
    pricing page after installing/updating. **Recheck** checks the connection
    without opening listings. Returning to Floor Pricing also checks it again.
+   Click **Update needed** to open the Store and expand **How to update**.
+   Those steps cover switching from unpacked installs, checking Store updates
+   through Chrome's extensions page, and refreshing the pricing tool afterward.
 
    **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose

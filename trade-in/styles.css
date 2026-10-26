@@ -308,6 +308,12 @@ tr.flash td { animation: flash 1.2s ease-out; }
 .floor-helper-status { color: var(--muted); font-size: 0.85rem; }
 .floor-helper-status.connected { color: var(--green); }
 .floor-helper-status.update { color: #ffcc66; }
+.floor-helper-status.update a { color: inherit; }
+.floor-helper-help { font-size: 0.85rem; max-width: 440px; }
+.floor-helper-help[open] { flex-basis: 100%; }
+.floor-helper-help summary { cursor: pointer; text-decoration: underline; }
+.floor-helper-help ol { padding-left: 20px; margin: 10px 0; }
+.floor-helper-help li { margin-bottom: 7px; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
 .toolbar input { width: 200px; }
 /* TCG bulk tab */

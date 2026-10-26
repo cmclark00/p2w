@@ -3416,6 +3416,10 @@ function floorHelperStatusInfo(helper) {
       : `Use helper ${FLOOR_HELPER_RECOMMENDED} or newer, then refresh this page. Store updates arrive after Google approval; keep only one helper enabled.` };
 }
 let floorHelperChecking = false;
+function floorHelperStatusHtml(info) {
+  if (info.state !== 'update') return esc(info.text);
+  return `${esc(info.text.replace(/ · Update needed$/, ''))} · <a href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" aria-describedby="floorHelperUpdateHelp" title="Open the Chrome Web Store and show update steps">Update needed ↗</a>`;
+}
 async function refreshFloorHelperStatus() {
   const status = $('#floorHelperStatus'), button = $('#floorHelperCheck');
   if (!status || floorHelperChecking) return;
@@ -3426,7 +3430,7 @@ async function refreshFloorHelperStatus() {
   let helper = null;
   try { helper = await window.P2WEbayHelper?.status?.(); } catch (_) { /* No usable connection. */ }
   const info = floorHelperStatusInfo(helper);
-  status.textContent = info.text;
+  status.innerHTML = floorHelperStatusHtml(info);
   status.title = info.hint;
   status.className = `floor-helper-status ${info.state}`;
   if (button) button.disabled = false;
@@ -5134,6 +5138,9 @@ async function deleteFloorSession() {
 }
 
 function wireFloor() {
+  $('#floorHelperStatus')?.addEventListener('click', (event) => {
+    if (event.target.closest('a')) $('#floorHelperUpdateHelp').open = true;
+  });
   $('#floorHelperCheck')?.addEventListener('click', refreshFloorHelperStatus);
   window.addEventListener('focus', () => { if (currentView === 'floor') refreshFloorHelperStatus(); });
   $('#fulcrumFiles').addEventListener('change', importFulcrumFiles);

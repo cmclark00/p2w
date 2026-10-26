@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261026-helper-status">
+  <link rel="stylesheet" href="styles.css?v=20261026-helper-update-link">
 </head>
 <body>
   <header class="topbar">
@@ -184,6 +184,15 @@
           <span id="floorHelperStatus" class="floor-helper-status" role="status" aria-live="polite">Checking helper…</span>
           <button id="floorHelperCheck" type="button" class="link" title="Recheck helper connection and installed version">Recheck</button>
           <a class="btn small" href="https://chromewebstore.google.com/detail/play2win-market-helper/dchnmineieolpjoldnilnemppeplddkd" target="_blank" rel="noopener noreferrer" title="Open in Chrome. Disable the old unpacked helper before using the Store copy; keep only one enabled.">Install Chrome helper ↗</a>
+          <details id="floorHelperUpdateHelp" class="floor-helper-help">
+            <summary>How to update</summary>
+            <ol>
+              <li><strong>Old unpacked copy?</strong> Disable it at <code>chrome://extensions</code>, then choose <strong>Add to Chrome</strong> on the Store listing.</li>
+              <li><strong>Already using the Store copy?</strong> Chrome updates it automatically. To check now, open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, then click <strong>Update</strong>. You can turn Developer mode off afterward.</li>
+              <li>Keep only one helper enabled. Reload the pricing tool and check the version beside this link.</li>
+            </ol>
+            <p>Only published updates are available. If the Store still shows an older version, wait for Google’s approval.</p>
+          </details>
         </div>
       </div>
 
@@ -601,6 +610,6 @@
 
   <script src="stock-helper-client.js?v=20261026-helper-status"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-  <script src="app.js?v=20261026-helper-status"></script>
+  <script src="app.js?v=20261026-helper-update-link"></script>
 </body>
 </html>

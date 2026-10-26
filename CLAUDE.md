@@ -751,6 +751,8 @@ The site's **only server-side code**. Everything else is static.
     version on entering Floor Pricing, window focus, or Recheck. This opens no tabs.
     Ready requires version 1.1.5+ and protocol 2/targeted capability; older or unknown
     versions say Update needed. No response says Not connected, not uninstalled.
+    Update needed links directly to the Store and expands the adjacent How to
+    update instructions (unpacked migration, Store update check, page reload).
     Helper 1.1.3 adds icons/homepage and reads its capability version from the manifest;
     permissions and pricing behavior are unchanged. The builder's `--store-output`
     option emits a separate root-manifest ZIP for upload. Store publication is separate
