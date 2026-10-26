@@ -929,7 +929,14 @@ Guide (the Google Sheet tab).
      $25 before any specific adjustment. Renewed does not replace a higher sale.
      Regular priced used listings still take priority over Renewed in Amazon's
      search. Specific premiums, deductions and the high-value exception remain.
-     The tool checks **Used and New** for Loose/CIB, finds the lowest verified
+     **Amazon Used conditions for games:** Loose prefers **Good**, falling back
+     to **Acceptable** if no matching Good offer is returned. CIB uses the cheaper
+     of **Very Good** and **Like New** (Amazon may report it as Mint); either works
+     alone. Good/Acceptable are treated as loose, not CIB. Very Good/Like New are
+     treated as CIB, not loose. These are our pricing categories; check seller
+     notes when exact contents matter. Hardware and figures keep their existing
+     offer rules. The Amazon Used reference shows the selected grade.
+     The tool checks **Used and New** for Loose/CIB, finds the lowest eligible
      shipping-inclusive offer in each, and uses **the lower of those two prices**
      as its Amazon reference. For example, Used $40 and New $30 selects New $30;
      Used $30 and New $40 selects Used $30. It does not pick the highest seller

@@ -1066,7 +1066,19 @@ The site's **only server-side code**. Everything else is static.
     selected condition minimum among verified ASINs supplies both the price
     and displayed product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.
-    Used/CIB checks both Used and New offers on every verified regular ASIN.
+    Loose/CIB games split Used offers by subcondition before choosing a price:
+    Loose prefers Good across all matching ASINs, falling back to Acceptable only
+    if no usable Good offer is returned. CIB uses the cheaper of Very Good and
+    Like New (SP-API Mint), with either eligible alone. Good/Acceptable are not CIB;
+    Very Good/Like New are not Loose. Unknown grades and ungraded summary minima
+    cannot price Used games. This is the shop's packaging policy, not a guarantee
+    about a seller's contents. Hardware/figures retain their existing offer rules.
+    Used offers on Renewed ASINs use the same game grade filter; New offers there
+    retain the established Renewed fallback behavior. Good preference is separate
+    for regular and Renewed channels. Pins show the selected Used grade, and offer
+    rows identify ineligible grades. Loose/CIB result caches are separate; switching
+    condition reloads selection and stale requests cannot replace the new condition.
+    Loose/CIB checks both Used and New offers on every verified regular ASIN.
     With both regular conditions priced, select min(lowest Used, lowest New),
     shipping included; never select the most expensive seller within a condition.
     A winning New offer is labeled `newReference` / Amazon New; ties prefer Used. All title/platform/edition checks

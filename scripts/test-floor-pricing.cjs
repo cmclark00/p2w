@@ -31,7 +31,8 @@ const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 
 const cur = (product = item, extra = {}) => {
   const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: `${product['product-name']} complete`, price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
   // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
-  if (result.amazon?.found) result.amazon = { title: product['product-name'], ...result.amazon };
+  if (result.amazon?.found) result.amazon = { title: product['product-name'], ...result.amazon,
+    offers: result.amazon.offers?.map(o => ({ sub: result.condition === 'loose' ? 'good' : 'very_good', ...o })) };
   return result;
 };
 

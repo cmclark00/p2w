@@ -8,6 +8,13 @@ const offer = (c, price) => ({ ...c, found: true, condition: 'Used', offers: pri
 function engine(request) {
   const ctx = vm.createContext({ console, Date, setTimeout, clearTimeout, request, product,
     localStorage: { getItem: () => null, setItem() {} }, document: { querySelector: () => ({ addEventListener() {} }), addEventListener() {} } });
+  // Legacy identity/pagination fixtures omit grade; give their synthetic offers
+  // a matching grade. Grade-policy regressions below supply explicit sub values.
+  ctx.request = async (route, params) => {
+    const result = await request(route, params);
+    return result.offers ? { ...result, offers: result.offers.map(o => ({
+      sub: params.cond === 'new' ? 'new' : ctx.condition === 'loose' ? 'good' : 'very_good', ...o })) } : result;
+  };
   vm.runInContext(source, ctx);
   return { ctx, run: (js) => vm.runInContext(js, ctx), fetch: (p = product, condition = 'loose') => {
     ctx.p = p; ctx.condition = condition; return vm.runInContext('fetchFloorAmazon(p, condition, request)', ctx);
@@ -16,6 +23,65 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('game grades separate Loose and CIB; unknown grades and ungraded lowest cannot price used games', () => {
+    const e=engine(async()=>{});
+    e.ctx.cur={product,condition:'loose',amazon:{...candidate('B000000001'),found:true,condition:'Used',lowest:100,offers:[
+      {price:1000,sub:'Acceptable'},{price:1800,sub:'Good'},{price:1400,sub:'Very Good'},
+      {price:1200,sub:'LikeNew'},{price:1300,sub:'mint'},{price:100,sub:null}]}};
+    assert.equal(e.run('floorAmazonLowest(cur)'),1800);
+    e.run('cur.condition="cib"');assert.equal(e.run('floorAmazonLowest(cur)'),1200);
+    for(const offers of [[{price:1400,sub:'very_good'}],[{price:1300,sub:'like_new'}],[{price:1300,sub:'Mint'}]]) {
+      e.ctx.cur.amazon.offers=offers;assert.equal(e.run('floorAmazonLowest(cur)'),offers[0].price);
+    }
+    for(const offers of [[],[{price:1000,sub:'good'}],[{price:1000,sub:'acceptable'}],[{price:1000}],[{price:1000,sub:'other'}]]) {
+      e.ctx.cur.amazon.offers=offers;assert.equal(e.run('floorAmazonLowest(cur)'),null);
+    }
+    e.run('cur.condition="loose"');e.ctx.cur.amazon.offers=[{price:1400,sub:'very_good'},{price:1200,sub:'acceptable'}];
+    assert.equal(e.run('floorAmazonLowest(cur)'),1200);
+    for(const product of [{'product-name':'Bash','console-name':'Skylanders'},{'product-name':'Playstation 4 Console','console-name':'Playstation 4'}]) {
+      e.ctx.cur.product=product;e.ctx.cur.amazon.title=product['product-name'];e.ctx.cur.amazon.platforms=[product['console-name']];
+      e.ctx.cur.amazon.offers=[{price:1000,sub:'acceptable'}];e.ctx.cur.condition='cib';
+      assert.equal(e.run('floorAmazonLowest(cur)'),1000,'Game packaging policy leaves figures and hardware unchanged');
+    }
+  });
+  await test('Loose prefers Good across every verified ASIN, with Acceptable fallback and cheaper New comparison intact', async () => {
+    const first=candidate('B000000001'),second=candidate('B000000002');
+    for(const [grade,newPrice,want] of [['good',6000,4500],['acceptable',6000,1000],['good',3000,3000]]) {
+      const e=engine(async(route,p)=>route==='amazon/catalog'?{candidates:[first,second]}:{...offer(p.asin===first.asin?first:second,null),
+        condition:p.cond==='new'?'New':'Used',offers:p.cond==='new'?[{price:newPrice,sub:'new'}]:[{price:p.asin===first.asin?1000:4500,sub:p.asin===first.asin?'acceptable':grade}]});
+      const result=await e.fetch();e.ctx.result=result;
+      assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),want);
+      assert.equal(result.references.used.asin,grade==='good'?second.asin:first.asin);
+      assert.equal(result.newReference,newPrice===3000);
+      assert.match(e.run('floorAmazonReferencesHtml({product,condition:"loose",amazon:result},{from:"amazon"},true)'),grade==='good'?/Used · Good/:/Used · Acceptable/);
+    }
+  });
+  await test('CIB picks cheaper Very Good or Like New across listings and keeps each condition cache separate', async () => {
+    const first=candidate('B000000001'),second=candidate('B000000002');let calls=0;
+    const e=engine(async(route,p)=>{calls++;return route==='amazon/catalog'?{candidates:[first,second]}:{...offer(p.asin===first.asin?first:second,null),
+      condition:p.cond==='new'?'New':'Used',offers:p.cond==='new'?[{price:10000,sub:'new'}]:[
+        {price:4500,sub:'good'},{price:800,sub:'acceptable'},{price:p.asin===first.asin?3000:2000,sub:p.asin===first.asin?'very_good':'like_new'}]};});
+    const loose=await e.fetch(product,'loose'),cib=await e.fetch(product,'cib');
+    e.ctx.loose=loose;e.ctx.cib=cib;
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:loose})'),4500);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:cib})'),2000);
+    assert.equal(cib.asin,second.asin);const count=calls;await e.fetch(product,'loose');await e.fetch(product,'cib');assert.equal(calls,count);
+    e.run('amazonSet=true');
+    const html=e.run('floorAmazonHtml({product,condition:"cib",amazon:cib},{from:"amazon"})');
+    assert.match(html,/Used · Like new/);assert.match(html,/Not used for this condition/);assert.match(html,/lowest eligible/);
+  });
+  await test('condition switches reload Amazon and stale Loose responses cannot overwrite CIB', async () => {
+    const e=engine(async()=>{}),jobs=[];
+    e.ctx.fetchGrades=(_p,condition)=>new Promise(resolve=>jobs.push({condition,resolve}));
+    e.run('amazonSet=true; renderFloorPricer=()=>{}; fetchFloorAmazon=fetchGrades; floorCur={product,condition:"loose",amazon:null};');
+    const old=e.run('loadFloorAmazon()');
+    e.ctx.event={target:{closest:selector=>selector==='[data-floor-cond]'?{dataset:{floorCond:'cib'}}:null}};
+    e.run('onFloorPricerClick(event)');assert.equal(jobs.length,2);assert.equal(jobs[1].condition,'cib');
+    jobs[1].resolve({found:false,marker:'cib'});await new Promise(setImmediate);
+    jobs[0].resolve({found:false,marker:'loose'});await old;
+    assert.equal(e.run('floorCur.amazon.marker'),'cib');
+  });
+
   await test('all UPC candidates are checked before offers; wrong game, platform and French variant cannot win', async () => {
     const good = candidate('B000000001'), calls = [];
     const e = engine(async (route, params) => { calls.push([route, params]);
@@ -58,7 +124,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e = engine(async (route, params) => { calls++; if (fail) throw Error('Temporary API failure');
       return route === 'amazon/catalog' ? { candidates: [candidate('B000000001')] } : offer(candidate('B000000001'), 2500); });
     await assert.rejects(e.fetch(), /Temporary/); fail = false;
-    await e.fetch(); const after = calls; await e.fetch(product, 'cib'); assert.equal(calls, after);
+    await e.fetch(); const looseCalls = calls; await e.fetch(product, 'cib'); assert.ok(calls > looseCalls, 'Loose and CIB have separate result caches'); const after = calls; await e.fetch(product, 'cib'); assert.equal(calls, after);
     await e.fetch(product, 'new'); assert.equal(calls, after + 4);
     const other = await e.fetch({ ...product, id: '2', 'product-name': 'Final Fight Guy' });
     assert.equal(other.found, false); assert.ok(calls > after + 2);
@@ -154,7 +220,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const used=candidate('B000000001'),fresh=candidate('B000000002');
     const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[used,fresh]}
       : {...offer(params.asin===used.asin?used:fresh,params.cond==='used'?(params.asin===used.asin?4000:5000):(params.asin===fresh.asin?3000:6000)),condition:params.cond==='new'?'New':'Used'});
-    const result=await e.fetch();assert.equal(result.references.used.asin,used.asin);assert.equal(result.references.new.asin,fresh.asin);
+    const result=await e.fetch(product,'cib');assert.equal(result.references.used.asin,used.asin);assert.equal(result.references.new.asin,fresh.asin);
     assert.equal(result.asin,fresh.asin);assert.equal(result.offers[0].price,3000, "Choose min(condition minima), with separate prices still visible");
     e.ctx.result=result;e.run('amazonSet=true');
     const html=e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"sale"})');

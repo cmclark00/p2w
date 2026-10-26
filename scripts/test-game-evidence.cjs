@@ -62,7 +62,7 @@ function engine(request) {
   assert.match(partial.salesError, /catalog offline/);
   assert.equal(partial.sales.cib.length, 1, 'selected page survives failed related search');
 
-  e.run('example={product:variant,condition:"cib",sales:{cib:[{title:"Example Game Special Edition PS4 CIB",price:2000}]},standardGame:{product:base,sales:{cib:[{title:"Example Game PS4 CIB",price:2500}]}},amazon:{found:false,standard:{found:true,title:"Example Game PS4",offers:[{price:3000}]}}}');
+  e.run('example={product:variant,condition:"cib",sales:{cib:[{title:"Example Game Special Edition PS4 CIB",price:2000}]},standardGame:{product:base,sales:{cib:[{title:"Example Game PS4 CIB",price:2500}]}},amazon:{found:false,standard:{found:true,title:"Example Game PS4",offers:[{price:3000,sub:"very_good"}]}}}');
   assert.equal(e.run('floorResult(example).r.price'), 3000, 'base Amazon can set variant floor');
   e.run('example.standardGame.product={...base,"gamestop-price":4000}; example.standardGame.gamestopStock={state:"out",title:"Example Game PS4"}');
   assert.equal(e.run('floorResult(example).r.price'), 3000, 'out-of-stock base GameStop does not set floor');

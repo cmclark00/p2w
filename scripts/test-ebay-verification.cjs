@@ -139,12 +139,12 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const recent = cur(product, [sale(3000, '111111111111')]); recent.sales.cib[0].date = new Date().toISOString().slice(0, 10);
   assert.equal((await targeted(recent, ['sold'])).length, 1, 'Recent price-driving sales are checked too');
   const gap = cur(product, [sale(6000, '111111111111')]); gap.sales.cib[0].date = new Date().toISOString().slice(0, 10);
-  gap.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 2300, shipping: 0 }] };
+  gap.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 2300, shipping: 0, sub: 'very_good' }] };
   assert.equal((await targeted(gap, ['sold'])).length, 1, 'Large Amazon discrepancy triggers a recent sale');
-  const amazonDriver = old([3000]); amazonDriver.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 4000, shipping: 0 }] };
+  const amazonDriver = old([3000]); amazonDriver.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 4000, shipping: 0, sub: 'very_good' }] };
   assert.equal((await targeted(amazonDriver, ['sold'])).length, 0, 'Do not check eBay when Amazon drives');
   const limitedByAmazon = old([4000, 2500]);
-  limitedByAmazon.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 3000, shipping: 0 }] };
+  limitedByAmazon.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 3000, shipping: 0, sub: 'very_good' }] };
   assert.equal((await targeted(limitedByAmazon, ['ended'])).length, 1, 'No speculative check below the Amazon baseline');
   assert.equal(result(limitedByAmazon).b.from, 'amazon');
   const typed = old([3000]); typed.typed = 4000; assert.equal((await targeted(typed, ['sold'])).length, 0);
