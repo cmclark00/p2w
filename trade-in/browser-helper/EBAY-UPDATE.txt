@@ -30,13 +30,17 @@ Each staff computer/profile needs its own installation. Remove the helper at
 chrome://extensions. It cannot run inside the Codex in-app browser.
 
 The helper reads matching GameStop product pages and eBay.com/itm/ item pages.
-Targeted checks require version 1.1.5. The live tool checks only the sale driving
-pricing when older than 90 days or at least $10 and 30% above matching Amazon.
-The current price-driving sale and its next possible replacement check two at
-a time, at most three total. A verified highest driver unlocks pricing without
-waiting for its backup. Unknown stops further scheduling and flags Needs review. Add to list waits
+Targeted checks require version 1.1.5. The live tool starts GameStop and the
+first potential price-driving eBay sale together, then checks further eBay sales
+in pairs while Amazon/catalog loading continues. There is no total check cap.
+It stops at a verified price-driving sale, when another source determines the
+price, or when eligible listings run out. Each item ID is checked once per
+condition. Unreadable checked pages are skipped and flagged Needs review, never
+called sold or ended. A verified highest driver settles eBay without waiting for
+its backup; the final price still waits for the other sources. Add to list waits
 while checking; typed reviewed prices remain available. Bulk rechecks and history
 audits do not open eBay tabs. Manual Check selected sale remains available.
+This scheduling update is on the website; installed helper 1.1.5 needs no update.
 Checks retain the original-listing URL controls to avoid product-page redirects.
 The helper expands See original listing, reads
 the item's status/title/price, and close only those temporary tabs. It never
@@ -48,8 +52,9 @@ verify a sale. Blocked or unclear pages remain unverified, not confirmed sales.
 Ended listings and accepted-offer/struck-through prices are excluded. A sold
 price must be visible in USD and match the PriceCharting amount. Specific
 premiums, rare-figure minimums and existing rounding still apply afterward.
-Without the helper or if a page cannot be read, the check is inconclusive:
-PriceCharting evidence stays eligible, labeled for manual review. A check takes
+Without the helper, provisional PriceCharting evidence stays eligible and needs
+review. Unreadable automatically checked listings are skipped while searching
+for a verified sale; they remain visible for manual review. A check takes
 at most 12 seconds with this version per listing. Targeted checks temporarily hold Add to list.
 
 Confirmed out-of-stock GameStop prices

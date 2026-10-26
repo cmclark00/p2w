@@ -921,17 +921,18 @@ Guide (the Google Sheet tab).</p>
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
    - <strong>Targeted eBay checks:</strong> with Chrome Market Helper <strong>1.1.5+</strong>, the tool
-     checks the sale driving the price when it is over 90 days old or at least
-     $10 and 30% above Amazon. It checks the current price-driving sale and its
-     next possible replacement <strong>two at a time</strong>, up to <strong>three total</strong> if earlier
-     listings are confirmed unsuitable. A verified highest sale makes the price
-     available immediately, even if the backup is still loading. Archived Ended summary cards are recognized
-     even without a full price panel. Ended listings and hidden accepted-offer
-     prices are excluded; blocked or unclear pages stop the check and show
-     <strong>Needs review</strong>. Review the original sale or eBay Product Research before
-     labeling. Add to list waits during the check; you can still type your own
-     reviewed price. Specific premiums stay intact. The review note follows saved
-     items. Bulk rechecks and history audits never open eBay tabs.
+     checks GameStop and the first potential price-driving eBay sale together,
+     then checks further eBay sales <strong>in pairs</strong>. There is <strong>no three-sale cap</strong>:
+     it stops at a verified price-driving sale, when another source determines the
+     price, or when eligible listings run out. Amazon can finish in parallel.
+     A verified highest sale settles the eBay check without waiting for its backup;
+     the final price still waits for the other sources. Ended listings and hidden
+     accepted-offer prices are excluded. Unreadable checked listings are skipped
+     and flagged <strong>Needs review</strong>, never called sold or ended. If no usable sale
+     is found, review the fallback before labeling. Without a connected helper,
+     the provisional price also needs review. Add to list waits during the check;
+     you can still type your own reviewed price. Specific premiums stay intact.
+     Review notes follow saved items. Bulk rechecks and audits never open eBay tabs.
      <strong>Check selected sale</strong> is still available for manual checks.
      Reload the updated helper at <code>chrome://extensions</code>, then refresh the tool.
      On other computers, replace the extension folder with the updated helper ZIP

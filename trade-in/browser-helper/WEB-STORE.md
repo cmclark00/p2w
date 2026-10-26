@@ -32,7 +32,7 @@ Play2Win Market Helper connects market listing checks to the Play2Win Games floo
 • Check one selected original eBay listing for a confirmed sale, an ended listing, or an accepted offer with an undisclosed final price.
 • Return the listing evidence to the Play2Win page while keeping pricing available.
 
-The helper uses temporary background tabs and closes only the tabs it creates. GameStop checks can run during pricing; eBay checks run for a selected sale or automatically for the price-driving sale when it is old or substantially above Amazon, with at most three candidates per lookup and condition, two at a time. Blocked or unclear listings remain unverified. The helper never buys, bids, submits offers, changes carts, or messages sellers.
+The helper uses temporary background tabs and closes only the tabs it creates. GameStop checks can run during pricing; eBay checks run for a selected sale or automatically for the price-driving sale alongside GameStop, followed by eBay candidates in pairs until a verified price-driving sale is found, another source sets the price, or eligible listings run out. Blocked or unclear listings remain unverified. The helper never buys, bids, submits offers, changes carts, or messages sellers.
 
 This is a companion for Play2Win staff. The staff pricing tool requires an authorized Play2Win login. A public connection-check page is available at https://play2wingames.com/trade-in/helper.html without a staff login.
 

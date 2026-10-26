@@ -49,13 +49,47 @@ function engine(request) {
   e.run('floorCur.amazon={found:false};renderFloorPricer()');
   assert.equal(e.run('floorResult(floorCur).r.price'), 3000);
   html = e.element('#floorPricer').innerHTML;
-  assert.match(html, /Shelf price<\/span><strong>\$30.00/);
+  assert.match(html, /Needs review<\/span><strong>\$30.00/);
   assert.match(html, /data-floor-act="add">/);
   assert.equal(e.run('floorEstimate({...floorCur,sales:{},salesLoading:true})'), null, 'no estimate without valid evidence');
   assert.equal(e.run('floorResult({...floorCur,salesLoading:true,typed:4000}).r.price'), 4000, 'explicit typed override remains available');
   e.run('floorCur={...floorCur,product:{...product,"product-name":"Concord"},salesLoading:true,sales:{cib:[{...sale,title:"Concord PS5 CIB"}]}}');
   assert.equal(e.run('floorEstimate(floorCur)'), null, 'Dead Games hold also blocks estimates');
   console.log('PASS early selected sales, parallel stock, premium-aware estimate, final-price safeguards and Dead Games hold');
+
+  // Exercise the actual source callbacks/render loop: GameStop plus one eBay,
+  // then pairs without waiting for Amazon; late catalog evidence is re-evaluated.
+  const gsGate = deferred(), saleGate = deferred(), catalogGate = deferred(), ebayJobs = [];
+  const live = engine((route) => {
+    if (route === 'pc/sales') return saleGate.promise;
+    if (route === 'pc/products') return catalogGate.promise;
+    throw Error(route);
+  });
+  let gsStarted = false;
+  live.ctx.window = {
+    P2WGameStopHelper: { check: () => { gsStarted = true; return gsGate.promise; } },
+    P2WEbayHelper: { targetedAvailable: async () => true, checkTargeted: url => {
+      const job = deferred(); ebayJobs.push({ ...job, url }); return job.promise;
+    } }
+  };
+  live.run('amazonSet=true;floorCur={product,condition:"cib",sales:null,amazon:{loading:true},pick:null}');
+  const liveLoad = live.run('loadFloorSales(product)');
+  const rows = [2500, 2400, 2300, 2200].map((price, i) => ({ ...sale, price, url: `https://www.ebay.com/itm/${123456789012 + i}` }));
+  saleGate.resolve({ sales: { cib: rows }, gamestopUrl: 'https://www.gamestop.com/products/example/123.html' });
+  await tick(); assert.equal(gsStarted, true); assert.equal(ebayJobs.length, 1, 'First eBay starts before GameStop completes');
+  ebayJobs[0].resolve({ id: '123456789012', state: 'ended', title: sale.title }); await tick();
+  assert.equal(ebayJobs.length, 1, 'GameStop retains the second slot');
+  gsGate.resolve({ state: 'out', title: 'Example Game PS4' }); await tick();
+  assert.equal(ebayJobs.length, 3, 'Next pair starts before Amazon and catalog finish');
+  ebayJobs[1].resolve({ id: '123456789013', state: 'sold', title: sale.title, price: 2400 });
+  ebayJobs[2].resolve({ id: '123456789014', state: 'ended', title: sale.title }); await tick();
+  assert.equal(live.run('floorResult(floorCur).r'), null, 'Final price still waits for all sources');
+  catalogGate.resolve({ products: [] }); await liveLoad;
+  live.run('floorCur.amazon={found:false};renderFloorPricer()'); await tick();
+  assert.equal(ebayJobs.length, 3, 'Source completion does not repeat checks');
+  assert.equal(live.run('floorResult(floorCur).b.basis'), 2400);
+  assert.equal(live.run('floorCur.ebayChecks.results["123456789013"].state'), 'sold');
+  console.log('PASS GameStop/first-sale overlap, subsequent pairs during Amazon loading and final source gating');
 
   let count = 0; const catalog = deferred();
   const cached = engine(() => { count++; return catalog.promise; });

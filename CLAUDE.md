@@ -759,17 +759,24 @@ The site's **only server-side code**. Everything else is static.
   - **Targeted original eBay verification:** Market Helper 1.1.5 advertises
     protocol 2 plus targeted capability 1. Old helpers never receive automatic
     tab requests; old all-sales sweep modes remain rejected. Live lookups check
-    only the sale driving the baseline (including a standard-game baseline),
-    after market loading, if it is over 90 days old or exceeds matching Amazon
-    by both $10 and 30%. No checks for typed prices or other driving sources.
-    Confirmed ended/offer/mismatch/price discrepancies exclude that sale, then
-    recompute the next driver. Live lookups check the current and next possible
-    driver in parallel (maximum two tabs), at most three per lookup and condition.
+    the potential price-driving sale (including a standard-game baseline).
+    The first eBay check starts alongside GameStop from the selected page's sales;
+    after stock finishes, further candidates run in pairs. Amazon and catalog
+    loading can continue concurrently, but the final price still waits for sources.
+    Every source-completion render re-evaluates the driver, including higher sales
+    recovered from related pages. No checks for typed prices or other driving sources.
+    There is no per-lookup count cap: stop when the highest eligible driver is
+    verified, another source sets the baseline, or eligible evidence is exhausted.
+    Confirmed ended/offer/mismatch/price discrepancies exclude that sale. Unreadable
+    checked listings retain state unknown, with skipped:true excluding them from
+    the automatic baseline and a Needs review flag. Missing links behave the same.
+    They are never labeled ended or sold. Without the helper, provisional evidence
+    remains unchanged with Needs review. A market-average fallback after exhausting
+    sales also needs review. Manual optional checks retain their original behavior.
     Hypothetical exclusions used to plan a backup never mutate real evidence.
     A verified highest driver unlocks pricing before a slower backup finishes.
-    Only rejected leading candidates justify a third check. An unknown driver
-    stops further scheduling; unavailable/unknown/exhausted checks
-    show Needs review, preserving the provisional price and saved review notes.
+    Each original item ID is checked once per condition; changing item/condition
+    invalidates the run. No repeated attempts on unreadable pages or render loops.
     Add to list waits only while the targeted check runs; typed overrides remain.
     No browser work in bulk audits/rechecks. Specific premiums, minimums,
     deductions and rounding stay in the shared downstream pricing engine.
@@ -783,7 +790,8 @@ The site's **only server-side code**. Everything else is static.
     requiring a visible full title/price panel. Condensed SOLD alone remains
     insufficient. Reload helper 1.1.5 for this archive-layout fix. Build ZIP:
     python scripts/build-gamestop-helper.py. Tests: test-ebay-helper.cjs and
-    test-ebay-verification.cjs (bounds, drivers, cancellation and premiums).
+    test-ebay-verification.cjs (paired scheduling, drivers, cancellation and premiums),
+    plus test-pricing-loading.cjs (actual GameStop/eBay overlap and source gating).
 
   - **GameStop in the baseline** (every system): GameStop's
     pre-owned price (`floorGs()`, PriceCharting `gamestop-price`; 0 = not

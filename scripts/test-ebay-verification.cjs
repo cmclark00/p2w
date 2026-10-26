@@ -56,7 +56,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     assert.equal(result(item).r.price, before, name + ' keeps premium/rounding');
     if (system === 'Skylanders') assert.equal(before, 2000);
   }
-  // Targeted checks examine only the actual driver, with a hard three-sale bound.
+  // First check overlaps stock; later candidates run in pairs without a total cap.
   const old = rows => cur(product, rows.map((price, i) => ({ ...sale(price, String(111111111111 + i)), date: '2025-01-01' })));
   const targeted = (c, responses, cancel = () => false) => {
     const calls = [];
@@ -67,19 +67,28 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     return invoke('runFloorTargetedEbay', c, () => {}, cancel, helper).then(() => calls);
   };
   const good = old([3000, 2900, 2800, 2700]); const original = result(good).r.price;
-  assert.equal((await targeted(good, ['sold'])).length, 2);
+  assert.equal((await targeted(good, ['sold'])).length, 1);
   assert.equal(result(good).r.price, original); assert.equal(result(good).b.ebayReview, undefined);
   const retries = old([3000, 2900, 2800, 2700]);
   assert.equal((await targeted(retries, ['offer', 'ended', 'sold'])).length, 3);
   assert.equal(result(retries).b.basis, 2800); assert.equal(result(retries).b.ebayReview, undefined);
-  const limited = old([3000, 2900, 2800, 2700]);
-  assert.equal((await targeted(limited, ['offer', 'ended', 'offer'])).length, 3);
-  assert.equal(result(limited).b.basis, 2700); assert.equal(result(limited).b.ebayReview, true);
-  assert.equal((await targeted(limited, ['sold'])).length, 0, 'Renders cannot restart the budget');
+  const unlimited = old([3000, 2900, 2800, 2700, 2600, 2500, 2400]);
+  assert.equal((await targeted(unlimited, ['offer', 'ended', 'offer', 'unknown', 'ended', 'sold', 'ended'])).length, 7);
+  assert.equal(result(unlimited).b.basis, 2500); assert.equal(result(unlimited).b.ebayReview, true);
+  assert.equal((await targeted(unlimited, ['sold'])).length, 0, 'Renders cannot repeat completed checks');
+  const exhausted = old([3000, 2900, 2800, 2700, 2600]);
+  assert.equal((await targeted(exhausted, Array(5).fill('ended'))).length, 5);
+  assert.equal(result(exhausted).b.from, 'pricecharting'); assert.equal(result(exhausted).b.ebayReview, true);
+  assert.equal((await targeted(exhausted, ['sold'])).length, 0);
   const unknown = old([3000, 2900]);
-  assert.equal((await targeted(unknown, ['unknown'])).length, 2, 'Unknown is flagged, not replaced with an unverified lower sale');
-  assert.equal(result(unknown).b.basis, 3000); assert.equal(result(unknown).b.ebayReview, true);
-  const parallel = old([3000, 2900, 2800, 2700]); const pendingParallel = []; let active = 0, peak = 0;
+  assert.equal((await targeted(unknown, ['unknown', 'sold'])).length, 2);
+  assert.equal(result(unknown).b.basis, 2900); assert.equal(result(unknown).b.ebayReview, true);
+  assert.equal(unknown.ebayChecks.results['111111111111'].state, 'unknown', 'Unreadable is not mislabeled ended');
+  const blocked = old([3000, 2900, 2800, 2700]);
+  assert.equal((await targeted(blocked, Array(4).fill('unknown'))).length, 4);
+  assert.equal(result(blocked).b.ebayReview, true);
+  assert.equal((await targeted(blocked, ['sold'])).length, 0, 'No unreadable retry loop');
+  const parallel = old([3000, 2900, 2800, 2700, 2600]); const pendingParallel = []; let active = 0, peak = 0;
   const parallelTask = invoke('runFloorTargetedEbay', parallel, () => {}, () => false, {
     targetedAvailable: async () => true, checkTargeted: url => new Promise(resolve => {
       active++; peak = Math.max(peak, active);
@@ -87,23 +96,40 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     })
   });
   await new Promise(r => setImmediate(r));
-  assert.equal(pendingParallel.length, 2, 'Two requests start before either finishes');
-  assert.equal(peak, 2); assert.equal(parallel.targetedEbay.attempts, 2);
-  pendingParallel[1].finish(verified('111111111112', 2900));
-  await new Promise(r => setImmediate(r));
-  assert.equal(result(parallel).b.ebayChecking, true, 'Lower verified result cannot settle a pending higher driver');
+  assert.equal(pendingParallel.length, 1, 'Only one first-sale request');
   pendingParallel[0].finish(verified('111111111111', null, undefined, 'ended'));
+  await new Promise(r => setImmediate(r));
+  assert.equal(pendingParallel.length, 3, 'The next pair starts together'); assert.equal(peak, 2);
+  pendingParallel[2].finish(verified('111111111113', 2800));
+  await new Promise(r => setImmediate(r));
+  assert.equal(result(parallel).b.ebayChecking, true, 'Lower sold result cannot settle a pending higher driver');
+  pendingParallel[1].finish(verified('111111111112', null, undefined, 'ended'));
   await parallelTask;
-  assert.equal(result(parallel).b.basis, 2900); assert.equal(pendingParallel.length, 2, 'No unnecessary third check');
-  const early = old([3000, 2900]); const pendingEarly = [];
+  assert.equal(result(parallel).b.basis, 2800); assert.equal(pendingParallel.length, 3, 'No later pair after verified driver');
+  const early = old([3000, 2900, 2800]); const pendingEarly = [];
   const earlyTask = invoke('runFloorTargetedEbay', early, () => {}, () => false, {
     targetedAvailable: async () => true, checkTargeted: () => new Promise(resolve => pendingEarly.push(resolve))
   });
   await new Promise(r => setImmediate(r));
-  pendingEarly[0](verified('111111111111', 3000)); await new Promise(r => setImmediate(r));
-  assert.equal(result(early).b.ebayChecking, undefined, 'A verified highest driver unlocks pricing without waiting for backup');
-  pendingEarly[1](null); await earlyTask;
-  assert.equal(result(early).b.basis, 3000); assert.equal(result(early).b.ebayReview, undefined);
+  pendingEarly[0](verified('111111111111', null, undefined, 'ended')); await new Promise(r => setImmediate(r));
+  pendingEarly[1](verified('111111111112', 2900)); await new Promise(r => setImmediate(r));
+  assert.equal(result(early).b.ebayChecking, undefined, 'Verified highest driver unlocks without waiting for its pair');
+  pendingEarly[2](verified('111111111113', 2800)); await earlyTask;
+  assert.equal(result(early).b.basis, 2900); assert.equal(result(early).b.ebayReview, undefined);
+  const loading = old([3000, 2900, 2800]);
+  loading.salesLoading = true; loading.gamestopStock = { state: 'loading' }; loading.product = { ...product, 'gamestop-price': 4000 };
+  assert.equal((await targeted(loading, ['ended'])).length, 1, 'First sale starts while stock and sibling sales are loading');
+  assert.equal(result(loading).b.waiting, true, 'Provisional planning never publishes a final price');
+  assert.equal((await targeted(loading, ['sold'])).length, 0, 'No pair until sources finish');
+  loading.salesLoading = false; loading.gamestopStock = { state: 'out', title: 'Example Game PS4' };
+  assert.equal((await targeted(loading, ['sold'])).length, 2, 'Completion resumes with a pair, not the first sale again');
+  assert.equal(result(loading).b.basis, 2900);
+  // Late related-page evidence can introduce a higher driver even after an early sold result.
+  const late = old([3000]); late.salesLoading = true;
+  await targeted(late, ['sold']);
+  late.sales.cib.unshift({ ...sale(3100, '999999999999'), date: '2025-01-01' }); late.salesLoading = false;
+  assert.equal((await targeted(late, ['sold'])).length, 1);
+  assert.equal(result(late).b.basis, 3100);
   const priceUnchanged = old([3000, 2900]); const planned = invoke('floorEbayCandidates', priceUnchanged, 2);
   assert.equal(planned.length, 2); assert.equal(priceUnchanged.ebayChecks, undefined, 'Planning cannot exclude real sales');
   assert.equal(result(priceUnchanged).b.basis, 3000);
@@ -111,7 +137,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   assert.equal(result(absentTarget).b.ebayReview, true); assert.equal(absentTarget.targetedEbay.running, false);
   const cancelled = old([3000]); assert.equal((await targeted(cancelled, ['sold'], () => true)).length, 0);
   const recent = cur(product, [sale(3000, '111111111111')]); recent.sales.cib[0].date = new Date().toISOString().slice(0, 10);
-  assert.equal((await targeted(recent, ['sold'])).length, 0, 'No broad automatic sweep of recent ordinary sales');
+  assert.equal((await targeted(recent, ['sold'])).length, 1, 'Recent price-driving sales are checked too');
   const gap = cur(product, [sale(6000, '111111111111')]); gap.sales.cib[0].date = new Date().toISOString().slice(0, 10);
   gap.amazon = { found: true, title: 'Example Game PS4', platforms: ['Playstation 4'], offers: [{ price: 2300, shipping: 0 }] };
   assert.equal((await targeted(gap, ['sold'])).length, 1, 'Large Amazon discrepancy triggers a recent sale');
@@ -137,7 +163,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
       return verified(invoke('floorSaleKey', row), row.price);
     }
   });
-  assert.equal(standardCalls, 2); assert.equal(result(variant).b.from, 'standard');
+  assert.equal(standardCalls, 1); assert.equal(result(variant).b.from, 'standard');
   assert.equal(variant.standardGame.ebayChecks.results['111111111111'].state, 'sold');
   assert.equal(result(variant).b.ebayReview, undefined, 'Standard baseline driver verification is retained');
   const pendingTarget = old([3000, 2900]); const finishTarget = [];
@@ -148,8 +174,21 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   pendingTarget.targetedEbay = null; pendingTarget.ebayChecks = null;
   for (const finish of finishTarget) finish(verified('111111111111', null, undefined, 'ended')); await running;
   assert.equal(pendingTarget.ebayChecks, null, 'An old condition run cannot restore results after a switch back');
+  const override = old([3000, 2900]); let finishOverride;
+  const overriding = invoke('runFloorTargetedEbay', override, () => {}, () => override.typed != null, {
+    targetedAvailable: async () => true, checkTargeted: () => new Promise(r => { finishOverride = r; })
+  });
+  await new Promise(r => setImmediate(r)); override.typed = 5000;
+  finishOverride(verified('111111111111', 3000)); await overriding;
+  assert.equal(result(override).b.from, 'typed'); assert.equal(result(override).b.ebayReview, undefined);
+  assert.equal(override.ebayChecks.results['111111111111'], undefined, 'Cancelled rows do not stay pending');
+  override.typed = null; await targeted(override, ['sold']);
+  assert.equal(result(override).b.basis, 3000); assert.equal(result(override).b.ebayChecking, undefined);
+  const missing = old([3000, 2900]); missing.sales.cib[0].url = null;
+  assert.equal((await targeted(missing, ['sold'])).length, 1, 'Missing links are skipped without opening a tab');
+  assert.equal(result(missing).b.basis, 2900); assert.equal(result(missing).b.ebayReview, true);
   assert.ok(invoke('floorBasisInfo', result(unknown).b).reviewNotes.some(n => n.includes('Price needs review')));
-  // Real load path must never invoke the helper, even when available.
+  // A legacy helper without the targeted capability never receives automatic tabs.
   const automatic = cur(); ctx.automatic = automatic;
   ctx.window = { P2WEbayHelper: forbidden };
   vm.runInContext('floorCur = automatic; fetchFloorProductSales = async () => ({ sales: automatic.sales }); loadFloorGameStopStock = () => {};', ctx);
@@ -157,5 +196,5 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const html = element('#floorPricer').innerHTML;
   assert.match(html, /Check selected sale/); assert.doesNotMatch(html, /Recheck sales|Verifying eBay sales/);
   assert.doesNotMatch(html, /data-floor-act="add" disabled/, 'Ordinary Add to list is available without eBay checking');
-  console.log('Targeted and optional eBay checks passed: bounded driver checks, condition cancellation, unknown review, standard baseline, helper compatibility and premiums preserved.');
+  console.log('Targeted and optional eBay checks passed: uncapped paired driver checks, condition cancellation, unknown review, standard baseline, helper compatibility and premiums preserved.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

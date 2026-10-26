@@ -3900,7 +3900,7 @@ async function loadFloorSales(product) {
 
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
   price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
-const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state);
+const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state) || !!verification?.skipped;
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
@@ -3961,24 +3961,37 @@ function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   const state = cur.targetedEbay;
   const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
-  const review = !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state?.attempts > 0));
+  const skipped = [cur, cur.standardGame].some(c => Object.values(c?.ebayChecks?.results || {}).some(v => v.skipped));
+  const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
+  if (cur.typed != null) return b;
+  const review = skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
-  const message = checking ? `Checking eBay candidates two at a time (${state.attempts}/3 maximum).`
-    : 'Price needs review: the price-driving eBay sale is unverified. Check the original listing or Product Research before labeling.';
+  const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); stopping at a verified price-driving sale.`
+    : 'Price needs review: some eBay evidence could not be verified. Unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
   return { ...b, ebayReview: review, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
 }
 // Predict only the next possible driver if the current one is rejected. All
 // hypothetical exclusions stay in a copy, never in the actual pricing evidence.
-function floorEbayCandidates(cur, limit) {
+function floorEbayCandidates(cur, limit, early = false) {
   const copy = value => ({ ...value, ebayChecks: { ...value.ebayChecks, results: { ...value.ebayChecks?.results } } });
   const shadow = copy(cur);
   if (cur.standardGame) shadow.standardGame = copy(cur.standardGame);
+  // Plan from available evidence while stock/Amazon/siblings load.
+  // These provisional changes never publish a price or alter real source status.
+  if (early && floorUnverifiedBasis(cur).waiting) {
+    shadow.salesLoading = false; shadow.fullLoading = false;
+    if (!shadow.amazon || shadow.amazon.loading) shadow.amazon = { found: false };
+    if (shadow.gamestopStock?.state === 'loading') {
+      shadow.product = { ...shadow.product, 'gamestop-price': 0 };
+      shadow.gamestopStock = { state: 'unknown' };
+    }
+  }
   const candidates = [], keys = new Set();
   while (candidates.length < limit) {
     const driver = floorEbayDriver(shadow);
-    if (!driver || ['sold', 'unknown', 'pending'].includes(driver.sale.verification?.state)) break;
+    if (!driver || ['sold', 'pending'].includes(driver.sale.verification?.state)) break;
     const key = floorSaleKey(driver.sale);
-    if (!driver.sale.url || keys.has(key)) break;
+    if (keys.has(key)) break;
     keys.add(key);
     candidates.push({ ...driver, holder: driver.holder === shadow ? cur : cur.standardGame, key });
     driver.holder.ebayChecks.results[key] = { state: 'ended' };
@@ -3987,16 +4000,22 @@ function floorEbayCandidates(cur, limit) {
 }
 async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
-  if (cur.targetedEbay || cur.ebayChecks?.loading) return;
-  const first = floorEbayDriver(cur);
-  if (!first?.risky || first.sale.verification?.state === 'sold') return;
-  const state = cur.targetedEbay = { running: true, attempts: 0 };
+  if (cur.targetedEbay?.running || cur.targetedEbay?.unavailable || cur.ebayChecks?.loading || cancelled() || cur.typed != null) return;
+  const previous = cur.targetedEbay;
+  // Reserve one slot for GameStop initially. Amazon/catalog work can keep loading
+  // alongside the checks; each new source render re-evaluates the actual driver.
+  const ready = () => cur.gamestopStock?.state !== 'loading';
+  const next = () => previous?.attempts && !ready() ? [] : floorEbayCandidates(cur, previous?.attempts ? 2 : 1, true);
+  if (!next().length) return;
+  const state = cur.targetedEbay = previous || { attempts: 0, checked: new Map() };
+  state.running = true;
   const stopped = () => cancelled() || cur.targetedEbay !== state;
   progress();
   try {
     if (!helper?.targetedAvailable || !await helper.targetedAvailable()) { state.unavailable = true; return; }
-    while (!stopped() && state.attempts < 3) {
-      const candidates = floorEbayCandidates(cur, Math.min(2, 3 - state.attempts));
+    while (!stopped()) {
+      if (state.attempts && !ready()) break; // A later source-completion render resumes this run.
+      const candidates = floorEbayCandidates(cur, state.attempts ? 2 : 1, true);
       if (!candidates.length) break;
       state.attempts += candidates.length;
       for (const { holder, key } of candidates) {
@@ -4006,19 +4025,35 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
       await Promise.allSettled(candidates.map(async ({ target, holder, sale, key }) => {
         let value;
         try {
-          const result = await helper.checkTargeted(sale.url);
+          if (!state.checked.has(key)) {
+            // Same eBay item can appear under both the variant and standard page.
+            state.checked.set(key, sale.url ? Promise.resolve().then(() => helper.checkTargeted(sale.url)).catch(() => null) : Promise.resolve(null));
+          }
+          const result = await state.checked.get(key);
           value = floorEbayResult(sale, target.product, result, floorCondition(target.product, target.condition));
         } catch (_) { value = { state: 'unknown' }; }
         if (stopped()) return;
-        holder.ebayChecks.results[key] = value;
+        // Unknown is not proof of an ended sale. Keep its honest label and review
+        // note, but do not let it block the search or set the automatic baseline.
+        holder.ebayChecks.results[key] = value.state === 'unknown' ? { ...value, skipped: true } : value;
         progress();
       }));
-      // A verified driver settles pricing immediately. An unknown driver needs
-      // review; neither result justifies starting a third, lower candidate.
-      const driver = floorEbayDriver(cur);
-      if (!driver || ['sold', 'unknown'].includes(driver.sale.verification?.state)) break;
+      // Re-plan after every pair. Verified drivers and other market sources stop
+      // the search; excluded IDs cannot be scheduled again on subsequent renders.
     }
-  } catch (_) { state.unavailable = true; } finally { state.running = false; if (!stopped()) progress(); }
+  } catch (_) { state.unavailable = true; } finally {
+    state.running = false;
+    // Typing a price cancels scheduling; returning to automatic must not leave
+    // abandoned pending rows blocking the next run. Condition changes own new state.
+    if (stopped() && cur.targetedEbay === state) {
+      for (const holder of [cur, cur.standardGame]) {
+        for (const [key, value] of Object.entries(holder?.ebayChecks?.results || {})) {
+          if (value.state === 'pending') delete holder.ebayChecks.results[key];
+        }
+      }
+    }
+    if (!stopped()) progress();
+  }
 }
 
 async function fetchFloorGameStopStock(product, url, request = (route, params) => api(route, { params })) {
@@ -4363,7 +4398,8 @@ function floorOwnBasis(cur = floorCur) {
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
   if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Reload Chrome Market Helper 1.1.2 or later and refresh the tool, or review the listing manually; normal pricing continues');
-  if (sales.some(s => s.verification?.state === 'unknown')) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
+  if (sales.some(s => s.verification?.skipped)) checks.push('Unreadable eBay listings were skipped from automatic pricing and need manual review; they are not confirmed sold or ended');
+  if (sales.some(s => s.verification?.state === 'unknown' && !s.verification.skipped)) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
   for (const state of ['ended', 'offer', 'price', 'mismatch']) {
     const count = sales.filter(s => s.verification?.state === state).length;
     if (count) checks.push(`${count} eBay listing${count === 1 ? '' : 's'} excluded: ${FLOOR_EBAY_LABELS[state]}`);
@@ -4604,7 +4640,7 @@ function renderFloorPricer() {
     <div class="floor-body">
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
-        <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Targeted checks: two at once, three maximum. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
+        <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${floorAmazonHtml(cur, b)}
