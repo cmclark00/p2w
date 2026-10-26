@@ -1057,7 +1057,7 @@ The site's **only server-side code**. Everything else is static.
     and displayed product link. No verified match means no Amazon price, with an explicit
     review note; a failed offer request is not treated as a completed check.
     Used/CIB checks both Used and New offers on every verified regular ASIN.
-    With both regular conditions priced, select max(lowest Used, lowest New),
+    With both regular conditions priced, select min(lowest Used, lowest New),
     shipping included; never select the most expensive seller within a condition.
     A winning New offer is labeled `newReference` / Amazon New; ties prefer Used. All title/platform/edition checks
     still apply; factory-sealed wording is permitted only for the New reference.

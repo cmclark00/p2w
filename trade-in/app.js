@@ -3680,7 +3680,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       const regularNew = choices.find(a => !a.renewedFallback && a.offerCondition === 'new');
       const compareConditions = cond === 'used' && regularUsed && regularNew;
       const selected = compareConditions
-        ? (floorAmazonLowest({ product, condition, amazon: regularNew }) > floorAmazonLowest({ product, condition, amazon: regularUsed }) ? regularNew : regularUsed)
+        ? (floorAmazonLowest({ product, condition, amazon: regularNew }) < floorAmazonLowest({ product, condition, amazon: regularUsed }) ? regularNew : regularUsed)
         : choices[0] || verified[0];
       const matchNotes = [];
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
@@ -3691,7 +3691,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
         ? 'Renewed fallback: no usable regular used Amazon offer found. Compared matching new offers and selected the lowest verified reference; original packaging and inserts are not confirmed'
         : 'Renewed listing verified, but no usable offer found; no Amazon price used');
-      if (compareConditions && !searchError) matchNotes.push('Amazon condition comparison: selected the higher of the lowest matching Used and New offers, including shipping. Equal prices prefer Used. Other source rules, premiums and rounding still apply');
+      if (compareConditions && !searchError) matchNotes.push('Amazon condition comparison: selected the lower of the lowest matching Used and New offers, including shipping. Equal prices prefer Used. Other source rules, premiums and rounding still apply');
       else if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: no regular Used offer was found. The existing Renewed fallback comparison still applies. Shipping included; other source rules, premiums and rounding still apply');
       const references = {};
       for (const kind of ['used', 'new', 'renewed']) {
@@ -4652,7 +4652,7 @@ function renderFloorPricer() {
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
-            <li>Amazon: use the higher of the lowest matching Used and New offers, including shipping.</li>
+            <li>Amazon: use the lower of the lowest matching Used and New offers, including shipping.</li>
             <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
