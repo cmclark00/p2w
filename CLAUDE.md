@@ -1076,7 +1076,9 @@ The site's **only server-side code**. Everything else is static.
     Used offers on Renewed ASINs use the same game grade filter; New offers there
     retain the established Renewed fallback behavior. Good preference is separate
     for regular and Renewed channels. Pins show the selected Used grade, and offer
-    rows identify ineligible grades. Loose/CIB result caches are separate; switching
+    rows identify ineligible grades. A collapsed Amazon condition guide above
+    game offers explains the grades and the cheaper-New comparison for staff.
+    Loose/CIB result caches are separate; switching
     condition reloads selection and stale requests cannot replace the new condition.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
     With both regular conditions priced, select min(lowest Used, lowest New),

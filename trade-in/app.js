@@ -4723,6 +4723,19 @@ function renderFloorPricer() {
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
+        ${amazonSet && !floorIsHardware(cur.product) && !toy ? `<details class="floor-details floor-amazon-details">
+          <summary>Amazon condition guide</summary>
+          <p class="muted small-print">How we price game conditions:</p>
+          <ul>
+            <li><strong>Good:</strong> loose / disc only. First choice for Loose.</li>
+            <li><strong>Acceptable:</strong> loose / disc only. Fallback when no Good offer is available.</li>
+            <li><strong>Very Good:</strong> game with case / cover art and/or manual. Treated as CIB.</li>
+            <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; either works alone.</li>
+            <li><strong>New:</strong> new-copy offer. For Loose/CIB, a cheaper New offer wins over eligible Used.</li>
+            <li><strong>Renewed:</strong> separate fallback when no eligible regular Used offer is found; not proof of original sealed condition.</li>
+          </ul>
+          <p class="muted small-print">These are our pricing categories; check seller notes for exact contents. Prices include shipping. Specific pricing rules and premiums still apply.</p>
+        </details>` : ''}
         ${floorAmazonHtml(cur, b)}
       </div>
       <aside class="floor-result" aria-label="Pricing details">

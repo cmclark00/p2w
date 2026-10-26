@@ -935,7 +935,8 @@ Guide (the Google Sheet tab).
      alone. Good/Acceptable are treated as loose, not CIB. Very Good/Like New are
      treated as CIB, not loose. These are our pricing categories; check seller
      notes when exact contents matter. Hardware and figures keep their existing
-     offer rules. The Amazon Used reference shows the selected grade.
+     offer rules. The Amazon Used reference shows the selected grade. Open
+     **Amazon condition guide** above the Amazon offers for a quick explanation.
      The tool checks **Used and New** for Loose/CIB, finds the lowest eligible
      shipping-inclusive offer in each, and uses **the lower of those two prices**
      as its Amazon reference. For example, Used $40 and New $30 selects New $30;
