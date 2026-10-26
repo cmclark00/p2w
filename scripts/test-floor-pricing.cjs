@@ -96,6 +96,36 @@ test('matching variants and ordinary packaging remain eligible while unconfirmed
   assert.ok(invoke('floorListingMismatch', 'Example Game PS4', { ...item, 'product-name': 'Example Game [Special Edition]' }));
 });
 
+test('matching special editions keep plausible pack-ins without accepting other editions or seller bundles', () => {
+  const product = { ...item, 'product-name': "Example Game [Collector's Edition]" };
+  for (const contents of ['with bonus poster', '+ collectible poster + mini art book',
+    'includes original soundtrack CD and art cards', 'with steelbook case + statue',
+    '+ bonus disc + exclusive pin', 'with original map + patches + keychain']) {
+    const title = `Example Game Collector's Edition PS4 CIB ${contents}`;
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+    assert.equal(invoke('floorOdd', { title }, 'cib', null, product), false, title);
+    assert.equal(invoke('floorResult', cur(product, { sales: { cib: [{ title, price: 5000 }] } })).b.basis, 5000, title);
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title, offers: [{ price: 5000 }] } })), 5000, title);
+    assert.ok(invoke('floorListingMismatch', title, item), 'Collector edition must not price the standard game');
+  }
+  for (const title of [
+    "Example Game PS4 + bonus poster", // no confirmation of the selected edition
+    "Example Game Limited Edition PS4 + poster",
+    "Example Game Collector's Edition PS4 + poster + another game",
+    "Example Game Collector's Edition PS4 + artbook + controller",
+    "Example Game Collector's Edition PS4 + poster + extra soundtrack",
+    "Example Game Collector's Edition PS4 + figurine from another game",
+    "Example Game Collector's Edition PS4 + artbook only",
+    "Example Game Collector's Edition PS4 + soundtrack CD only",
+    "Example Game Collector's Edition PS4 + poster French Version",
+    "Example Game Collector's Edition PS4 bundle with extras",
+  ]) assert.ok(invoke('floorListingMismatch', title, product), title);
+  assert.equal(invoke('floorOdd', { title: "Example Game Collector's Edition PS4 CIB + signed poster" }, 'cib', null, product), true);
+  assert.equal(invoke('floorOdd', { title: "Example Game Collector's Edition PS4 disc only + poster" }, 'cib', null, product), true);
+  const deluxe = { ...item, 'product-name': 'Example Game [Deluxe Edition]' };
+  assert.equal(invoke('floorListingMismatch', 'Example Game Deluxe Edition PS4 + bonus poster', deluxe), null);
+});
+
 test('original paper pack-ins remain CIB evidence for eBay and Amazon', () => {
   const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
   for (const title of [

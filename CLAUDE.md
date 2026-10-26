@@ -698,6 +698,13 @@ The site's **only server-side code**. Everything else is static.
     variants, incomplete conditions and high-price outliers still get checked.
     In particular, "Complete Disc + Case + Manual" is normal CIB, in any order;
     adding a controller, bonus disc, another game or special edition still excludes it.
+    For a selected special edition, `floorEditionContentsTitle()` also permits
+    plausible original contents named after with/includes/+/and: bonus posters,
+    art books/cards, soundtracks, steelbook cases, figures/statues, pins, patches,
+    keychains and bonus discs. The listing must still confirm the selected edition.
+    Explicit extra items, standalone parts, other games/accessories, wrong editions,
+    region/language, condition and sold-status checks remain. Standard-game matches
+    do not get this special-edition allowance; pricing premiums are unchanged.
     `ODD_SALE_RE` also catches signed/autographed copies and "N
     more games" lots. **"Disc/cart/cartridge/game only" is only odd for
     CIB and New** (`NOT_COMPLETE_RE`): it's what a loose game is (it used

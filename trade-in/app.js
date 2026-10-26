@@ -4202,6 +4202,17 @@ function floorBundleTitle(title, gameContents = false) {
   const contents = gameContents ? `${FLOOR_PACK_IN}|${FLOOR_GAME_CONTENTS}` : FLOOR_PACK_IN;
   return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:the\\s+|a\\s+|an\\s+)?(?:${contents})`, 'gi'), ' ');
 }
+// A matching special edition can contain more than the standard box contents.
+// Remove only named, plausible pack-ins joined to the game; preserve explicit
+// seller-added extras, standalone parts and unrelated games/accessories.
+function floorEditionContentsTitle(title, product) {
+  const name = product?.['product-name'] || '';
+  if (floorToyFamily(product) || floorIsHardware(product)
+    || !/\b(?:collector'?s|limited|special|deluxe|premium|ultimate|legendary|anniversary|signature|launch|day one|bonus content)\b|\[[^\]]*\b(?:edition|collection)\b[^\]]*\]/i.test(name)) return title;
+  const item = String.raw`(?:posters?|maps?|art[ -]?books?|art[ -]?cards?|post[ -]?cards?|lithographs?|sound[ -]?tracks?(?:\s+(?:cds?|discs?))?|music cds?|steel[ -]?books?(?:\s+cases?)?|figurines?|figures?|statues?|pins?|patches|key[ -]?chains?|bonus discs?)\b`;
+  const modifier = String.raw`(?:(?:original|official|included|pack[ -]?in|factory|bonus|exclusive|collectible|limited|mini|fold[ -]?out)\s+)*`;
+  return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:(?:the|a|an)\\s+)?${modifier}${item}(?!\\s+(?:(?:cds?|discs?|cases?)\\s+)?(?:only|edition|of|from|for)\\b)`, 'gi'), ' ');
+}
 function floorExtraMismatch(title, name) {
   return FLOOR_EXTRA_ITEMS.some((item) => {
     const bundled = new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\bincludes?\\b|\\band\\b|&)\\s*(?:(?:a|an|the|bonus|extra|exclusive|collectible|limited|art|mini)\\s+)*(?:${item})\\b`, 'i');
@@ -4318,8 +4329,9 @@ function floorListingMismatch(title, product) {
   if (/\bimport(?:ed)?\b/i.test(title) && !/\bimport(?:ed)?\b/i.test(expected) && !wantedRegions.length) return 'Import variant needs review';
   // Marketing "limited edition" on an already verified special figure is not
   // a separate game edition. Other edition names still require confirmation.
+  const packInTitle = floorEditionContentsTitle(title, product);
   const editionCheckTitle = floorToyFamily(product) === 'skylanders' && floorToyVariant(product).rare
-    ? floorSkyMarketingTitle(title) : title;
+    ? floorSkyMarketingTitle(title) : packInTitle;
   if (otherEdition(editionCheckTitle, name)) return 'Different special edition or reprint';
   let editionTitle = norm(editionCheckTitle).replace(/\b(?:standard|regular|base) edition\b/g, '');
   for (const platform of FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])))) {
@@ -4338,15 +4350,15 @@ function floorListingMismatch(title, product) {
   const selectedEdition = name.match(/\[[^\]]*\b(?:edition|collection)\b[^\]]*\]|\([^)]*\b(?:edition|collection)\b[^)]*\)/gi) || [];
   if (selectedEdition.some((edition) => floorTitleWords(edition).some((word) => !floorTitleWords(title).includes(word)))) return 'Different named edition';
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
-  if (/\b(?:bonus|demo) disc\b/i.test(title) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
-  if (floorExtraMismatch(title, name)) return 'Bundled extra item';
-  const bundleTitle = /\bbonus content\b/i.test(name) ? title.replace(/\bwith bonus content\b/gi, '') : title;
+  if (/\b(?:bonus|demo) disc\b/i.test(packInTitle) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
+  if (floorExtraMismatch(packInTitle, name)) return 'Bundled extra item';
+  const bundleTitle = /\bbonus content\b/i.test(name) ? packInTitle.replace(/\bwith bonus content\b/gi, '') : packInTitle;
   if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(bundleTitle) : bundleTitle, !floorToyFamily(product) && !floorIsHardware(product))))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
   if (wantedPlatforms.length && listedPlatforms.length && !wantedPlatforms.some((re) => re.test(norm(title)))) return 'Different platform';
-  return floorTitleIdentityMismatch(title, product);
+  return floorTitleIdentityMismatch(packInTitle, product);
 }
 
 function floorAmazonMismatch(cur) {

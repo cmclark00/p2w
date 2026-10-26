@@ -875,6 +875,10 @@ Guide (the Google Sheet tab).
      title, not every seller's description, so open the listing when unsure.
      Normal contents such as **Disc + Case + Manual** are CIB, not a bundle;
      separate games, controllers, bonus discs and other extras remain excluded.
+     For a matching **special edition**, likely original contents such as bonus
+     posters, art books, soundtracks, steelbook cases, figures and bonus discs
+     are allowed. The title must confirm the selected edition; explicitly added
+     extras and parts-only listings still do not qualify. Check contents when unsure.
      Numbered sequel pairs such as **Kingdom Hearts 1 & 2** and **God of War
      I + II** count as game bundles even without the word "bundle." A genuine
      selected compilation and multi-disc games keep their normal matching.
