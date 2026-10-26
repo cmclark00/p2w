@@ -753,6 +753,10 @@ The site's **only server-side code**. Everything else is static.
     versions say Update needed. No response says Not connected, not uninstalled.
     Update needed links directly to the Store and expands the adjacent How to
     update instructions (unpacked migration, Store update check, page reload).
+    The same header offers the packaged ZIP via Manual helper download and collapsed
+    Manual install instructions for pending Store releases. Staff extract to a permanent
+    folder, disable other copies, Load unpacked, and refresh; later switch back to the
+    Store copy for automatic updates. Keep the downloadable ZIP current with helper releases.
     Helper 1.1.3 adds icons/homepage and reads its capability version from the manifest;
     permissions and pricing behavior are unchanged. The builder's `--store-output`
     option emits a separate root-manifest ZIP for upload. Store publication is separate

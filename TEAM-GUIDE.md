@@ -799,6 +799,13 @@ Guide (the Google Sheet tab).
    Click **Update needed** to open the Store and expand **How to update**.
    Those steps cover switching from unpacked installs, checking Store updates
    through Chrome's extensions page, and refreshing the pricing tool afterward.
+   **Need the latest helper before Google approves it?** Use **Manual helper download**
+   beside the Store link and expand **Manual install instructions**. Extract the ZIP
+   to a permanent folder, disable other Play2Win copies at `chrome://extensions`,
+   enable Developer mode, and use **Load unpacked** on the folder containing
+   `manifest.json`. Refresh the pricing tool to check the connected version.
+   Manual copies require manual updates; once the latest Store version is published,
+   disable the manual copy and install the Store copy for automatic updates.
 
    **Automatic stock checks with the Chrome helper:** download [the helper ZIP](trade-in/gamestop-stock-helper.zip),
    extract it, then open `chrome://extensions`, enable Developer mode, and choose
