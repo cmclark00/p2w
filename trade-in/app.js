@@ -4081,6 +4081,9 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
       }));
       // Re-plan after every pair. Verified drivers and other market sources stop
       // the search; excluded IDs cannot be scheduled again on subsequent renders.
+      // Cached helper results can resolve immediately. Give clicks, scrolling and
+      // painting a turn instead of draining every sale in one microtask chain.
+      await delay(0);
     }
   } catch (_) { state.unavailable = true; } finally {
     state.running = false;
@@ -4306,7 +4309,18 @@ function floorAmazonPlatformConfirmed(candidate, product) {
   const evidence = [candidate.title, ...(candidate.platforms || [])].map(norm);
   return wanted.length ? wanted.some((re) => evidence.some((s) => re.test(s))) : evidence.some((s) => hasPhrase(s, system));
 }
+// Matching depends on identity, not price or verification state. Background
+// checks render the same titles repeatedly; retain bounded, immutable answers.
+const floorListingMatchCache = new Map();
 function floorListingMismatch(title, product) {
+  const key = JSON.stringify([title, product?.['product-name'], product?.['console-name'], product?.genre, floorIsHardware(product || {})]);
+  if (floorListingMatchCache.has(key)) return floorListingMatchCache.get(key);
+  const result = floorComputeListingMismatch(title, product);
+  floorListingMatchCache.set(key, result);
+  if (floorListingMatchCache.size > 2000) floorListingMatchCache.delete(floorListingMatchCache.keys().next().value);
+  return result;
+}
+function floorComputeListingMismatch(title, product) {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   title = floorKnownGameTitle(title, product);
   const knownName = floorKnownGameTitle(product?.['product-name'], product);
@@ -4628,6 +4642,14 @@ function floorStandardHtml(b) {
     </details>`;
 }
 
+let floorRenderTimer = null;
+function queueFloorPricerRender(cur, condition) {
+  if (floorRenderTimer !== null) clearTimeout(floorRenderTimer);
+  floorRenderTimer = setTimeout(() => {
+    floorRenderTimer = null;
+    if (floorCur === cur && cur.condition === condition) renderFloorPricer();
+  }, 0);
+}
 function renderFloorPricer() {
   const el = $('#floorPricer');
   el.hidden = !floorCur;
@@ -4635,7 +4657,7 @@ function renderFloorPricer() {
   const cur = floorCur = floorConditionCur(floorCur);
   const condition = cur.condition;
   void runFloorTargetedEbay(cur, () => {
-    if (floorCur === cur && cur.condition === condition) renderFloorPricer();
+    if (floorCur === cur && cur.condition === condition) queueFloorPricerRender(cur, condition);
   }, () => floorCur !== cur || cur.condition !== condition || cur.typed != null);
   const p = cur.product;
   const tier = floorTier(p['console-name']);

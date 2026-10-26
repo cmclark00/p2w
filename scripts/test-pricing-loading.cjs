@@ -17,6 +17,32 @@ function engine(request) {
   return { ctx, element, run: js => vm.runInContext(js, ctx) };
 }
 (async () => {
+  const matching = engine();
+  matching.run(`computeCalls=0; const originalCompute=floorComputeListingMismatch;
+    floorComputeListingMismatch=(...args)=>{computeCalls++;return originalCompute(...args);};
+    for(let i=0;i<100;i++) floorListingMismatch('Example Game PS4 CIB',product);`);
+  assert.equal(matching.run('computeCalls'),1,'unchanged titles do not repeat expensive matching on every render');
+  assert.equal(matching.run(`floorListingMismatch('Example Game PS4 CIB',{...product,'product-name':'Other Game'})`), 'Listing does not confirm the selected game or product');
+  assert.equal(matching.run(`floorListingMismatch('Example Game PS4 CIB',{...product,'console-name':'Playstation 5'})`), 'Different platform');
+  matching.run(`floorListingMismatch('Example Game PS4 CIB',{...product,genre:'Systems'});
+    floorListingMismatch('Example Game PS4 + Controller',product);`);
+  assert.equal(matching.run('computeCalls'),5,'identity, platform, genre and title changes invalidate matching');
+  matching.run(`floorListingMismatch('Example Game PS4 CIB',product);
+    settings.flatItems={keywords:['Example Game']};
+    floorListingMismatch('Example Game PS4 CIB',product);`);
+  assert.equal(matching.run('computeCalls'),6,'changed hardware classification cannot reuse a game match');
+  matching.run(`for(let i=0;i<2010;i++) floorListingMismatch('Other Game '+i,product);`);
+  assert.equal(matching.run('floorListingMatchCache.size'),2000,'cache stays bounded throughout a long shift');
+  const redraw = engine();
+  redraw.run(`renderCount=0; renderFloorPricer=()=>{renderCount++;}; floorCur={product,condition:'cib'};
+    for(let i=0;i<10;i++)queueFloorPricerRender(floorCur,'cib');`);
+  assert.equal(redraw.run('renderCount'),0,'background progress cannot render recursively');
+  await new Promise(r=>setTimeout(r,10));
+  assert.equal(redraw.run('renderCount'),1,'one paint for a burst of progress updates');
+  redraw.run(`queueFloorPricerRender(floorCur,'cib');floorCur={product,condition:'loose'};`);
+  await new Promise(r=>setTimeout(r,10));
+  assert.equal(redraw.run('renderCount'),1,'queued old-game updates cannot overwrite a new lookup');
+  console.log('PASS bounded matching reuse and coalesced background redraws preserve identity and cancellation');
   const primary = deferred(), related = deferred(), stock = deferred(), calls = [];
   const e = engine((route, params) => {
     calls.push([route, params]);

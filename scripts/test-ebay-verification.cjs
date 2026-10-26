@@ -17,7 +17,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
 (async () => {
   const c = cur(); let requests = [], release;
   const helper = { available: async () => true, check: url => { requests.push(url); return new Promise(r => { release = r; }); } };
-  const task = check(c, 0, helper); await new Promise(r => setImmediate(r));
+  const task = check(c, 0, helper); await new Promise(r => setTimeout(r, 10));
   assert.equal(requests.length, 1); assert.equal(result(c).r.price, 3000, 'Pending optional check does not hold pricing');
   await check(c, 1, helper); assert.equal(requests.length, 1, 'Second clicks do not queue work');
   release(verified('111111111111', null, undefined, 'offer')); await task;
@@ -73,6 +73,17 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   assert.equal((await targeted(retries, ['offer', 'ended', 'sold'])).length, 3);
   assert.equal(result(retries).b.basis, 2800); assert.equal(result(retries).b.ebayReview, undefined);
   const unlimited = old([3000, 2900, 2800, 2700, 2600, 2500, 2400]);
+  const responsive = old([3000,2900,2800]); let browserTurn=false, responsiveCalls=0;
+  await invoke('runFloorTargetedEbay', responsive, () => {}, () => false, {
+    targetedAvailable: async()=>true,
+    checkTargeted: async url=>{
+      if (++responsiveCalls===1) setTimeout(()=>{browserTurn=true;},0);
+      else assert.equal(browserTurn,true,'browser timers/input get a turn before the next cached batch');
+      const row=responsive.sales.cib.find(s=>s.url===url);
+      return verified(invoke('floorSaleKey',row),row.price,row.title,responsiveCalls===1?'ended':'sold');
+    }
+  });
+  assert.equal(result(responsive).b.basis,2900,'yielding does not change the winning sale');
   assert.equal((await targeted(unlimited, ['offer', 'ended', 'offer', 'unknown', 'ended', 'sold', 'ended'])).length, 7);
   assert.equal(result(unlimited).b.basis, 2500); assert.equal(result(unlimited).b.ebayReview, true);
   assert.equal((await targeted(unlimited, ['sold'])).length, 0, 'Renders cannot repeat completed checks');
@@ -95,13 +106,13 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
       pendingParallel.push({ url, finish: value => { active--; resolve(value); } });
     })
   });
-  await new Promise(r => setImmediate(r));
+  await new Promise(r => setTimeout(r, 10));
   assert.equal(pendingParallel.length, 1, 'Only one first-sale request');
   pendingParallel[0].finish(verified('111111111111', null, undefined, 'ended'));
-  await new Promise(r => setImmediate(r));
+  await new Promise(r => setTimeout(r, 10));
   assert.equal(pendingParallel.length, 3, 'The next pair starts together'); assert.equal(peak, 2);
   pendingParallel[2].finish(verified('111111111113', 2800));
-  await new Promise(r => setImmediate(r));
+  await new Promise(r => setTimeout(r, 10));
   assert.equal(result(parallel).b.ebayChecking, true, 'Lower sold result cannot settle a pending higher driver');
   pendingParallel[1].finish(verified('111111111112', null, undefined, 'ended'));
   await parallelTask;
@@ -110,9 +121,9 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const earlyTask = invoke('runFloorTargetedEbay', early, () => {}, () => false, {
     targetedAvailable: async () => true, checkTargeted: () => new Promise(resolve => pendingEarly.push(resolve))
   });
-  await new Promise(r => setImmediate(r));
-  pendingEarly[0](verified('111111111111', null, undefined, 'ended')); await new Promise(r => setImmediate(r));
-  pendingEarly[1](verified('111111111112', 2900)); await new Promise(r => setImmediate(r));
+  await new Promise(r => setTimeout(r, 10));
+  pendingEarly[0](verified('111111111111', null, undefined, 'ended')); await new Promise(r => setTimeout(r, 10));
+  pendingEarly[1](verified('111111111112', 2900)); await new Promise(r => setTimeout(r, 10));
   assert.equal(result(early).b.ebayChecking, undefined, 'Verified highest driver unlocks without waiting for its pair');
   pendingEarly[2](null); await earlyTask;
   assert.equal(result(early).b.basis, 2900); assert.equal(result(early).b.ebayReview, undefined, 'Unreadable lower backup cannot cast doubt on a verified higher price');
@@ -170,7 +181,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const running = invoke('runFloorTargetedEbay', pendingTarget, () => {}, () => false, {
     targetedAvailable: async () => true, checkTargeted: () => new Promise(r => { finishTarget.push(r); })
   });
-  await new Promise(r => setImmediate(r)); assert.equal(result(pendingTarget).b.ebayChecking, true);
+  await new Promise(r => setTimeout(r, 10)); assert.equal(result(pendingTarget).b.ebayChecking, true);
   pendingTarget.targetedEbay = null; pendingTarget.ebayChecks = null;
   for (const finish of finishTarget) finish(verified('111111111111', null, undefined, 'ended')); await running;
   assert.equal(pendingTarget.ebayChecks, null, 'An old condition run cannot restore results after a switch back');
@@ -178,7 +189,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   const overriding = invoke('runFloorTargetedEbay', override, () => {}, () => override.typed != null, {
     targetedAvailable: async () => true, checkTargeted: () => new Promise(r => { finishOverride = r; })
   });
-  await new Promise(r => setImmediate(r)); override.typed = 5000;
+  await new Promise(r => setTimeout(r, 10)); override.typed = 5000;
   finishOverride(verified('111111111111', 3000)); await overriding;
   assert.equal(result(override).b.from, 'typed'); assert.equal(result(override).b.ebayReview, undefined);
   assert.equal(override.ebayChecks.results['111111111111'], undefined, 'Cancelled rows do not stay pending');

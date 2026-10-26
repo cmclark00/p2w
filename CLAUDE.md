@@ -1066,6 +1066,14 @@ The site's **only server-side code**. Everything else is static.
     Typed overrides remain explicit. Sale selections are remapped by listing key
     when merged evidence arrives. `scripts/test-pricing-loading.cjs` covers these
     waits, cache isolation/retries, stale lookups and ordered concurrent merging.
+    Title/edition mismatch results use a bounded 2,000-entry cache keyed by title,
+    product name, platform, genre and current hardware classification. It caches
+    only identity checks, never prices, conditions or eBay verification results.
+    Helper progress queues one background render per event-loop turn instead of
+    rendering recursively. Automatic eBay batches yield to browser input/painting
+    between pairs, including cached results; the uncapped search and stop rules
+    remain unchanged. Loading/eBay regression checks cover these responsiveness
+    protections, cancellation and fresh matching after identity changes.
     Variant and standard-game Amazon matches stay separate;
     their searches run concurrently with shared request promises, so identical
     catalog pages and offers are fetched once. Both must settle before the
