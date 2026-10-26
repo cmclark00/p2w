@@ -4163,7 +4163,7 @@ function floorSales(cur = floorCur) {
 // A sale of another edition filed under this game: PriceCharting lists those separately, but sellers' sales land on
 // the plain game too (The Last Guardian, PS4, CIB, Oct 2026: its top two sales were the Steelbook Edition at
 // $40 / $39.60; the game sells for ~$20). Odd when the title names an edition that this product's name doesn't.
-const EDITION_RES = [/\bsteel ?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game of the year)\b/i, /\bcollector'?s\b/i, /\blimited edition\b/i,
+const EDITION_RES = [/\bsteel[ -]?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game of the year)\b/i, /\bcollector'?s\b/i, /\blimited edition\b/i,
   /\bdeluxe\b/i, /\bpremium( online)? edition\b/i, /\bspecial edition\b/i, /\blaunch edition\b/i, /\bday one\b/i, /\bgold edition\b/i,
   /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i,
   /\bdefinitive edition\b/i, /\b(?:greatest|playstation) hits\b/i, /\bplayer'?s choice\b/i, /\bnintendo selects\b/i,
@@ -4234,7 +4234,7 @@ const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreorder
 const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)\s+){0,4}(?:games|titles)\b/gi;
 const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT)].map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
 const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi, '').replace(/['’]/g, '').replace(/\b([IVX]+)\b/gi, (v) => ({ I: '1', II: '2', III: '3', IV: '4', V: '5', VI: '6', VII: '7', VIII: '8', IX: '9', X: '10', XI: '11', XII: '12', XIII: '13', XIV: '14', XV: '15', XVI: '16' }[v.toUpperCase()] || v)))
-  .replace(/\bgame boy\b/g, 'gameboy').replace(/\bstar fox\b/g, 'starfox').replace(/\bspider man\b/g, 'spiderman')
+  .replace(/\bgame boy\b/g, 'gameboy').replace(/\bstar fox\b/g, 'starfox').replace(/\bspider man\b/g, 'spiderman').replace(/\bsteel book\b/g, 'steelbook')
   .replace(/\bworld wide\b/g, 'worldwide').replace(/\bdragon ball\b/g, 'dragonball').replace(/\bu s\b/g, 'us')
   .replace(/\b(two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[w]))
   .replace(/\bbrothers\b/g, 'bros').replace(/\bsystems?\b/g, 'console')
@@ -4367,7 +4367,11 @@ function floorComputeListingMismatch(title, product) {
   if (!floorToyFamily(product) && !floorIsHardware(product)
     && /\bcollection\b/.test(collectionTitle) && !/\bcollection\b/i.test(name)) return 'Different collection or collector release';
   const selectedEdition = name.match(/\[[^\]]*\b(?:edition|collection)\b[^\]]*\]|\([^)]*\b(?:edition|collection)\b[^)]*\)/gi) || [];
-  if (selectedEdition.some((edition) => floorTitleWords(edition).some((word) => !floorTitleWords(title).includes(word)))) return 'Different named edition';
+  // "Edition" is a catalog label, not distinguishing evidence. A seller's
+  // "Steelbook" confirms [Steelbook Edition]; retain every actual qualifier.
+  const listedEditionWords = floorTitleWords(title);
+  if (selectedEdition.some((edition) => floorTitleWords(edition).filter(word => word !== 'edition')
+    .some((word) => !listedEditionWords.includes(word)))) return 'Different named edition';
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(packInTitle) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
   if (floorExtraMismatch(packInTitle, name)) return 'Bundled extra item';

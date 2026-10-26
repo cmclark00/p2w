@@ -708,6 +708,9 @@ The site's **only server-side code**. Everything else is static.
     Bare Steelbook/Steel Book wording also describes packaging for a confirmed
     special edition, not an automatic edition mismatch. The listing must still
     name that selected edition; explicit extra/empty/only steelbooks stay excluded.
+    Named-edition comparisons ignore the generic word "Edition" and normalize
+    Steelbook / Steel Book / Steel-Book. The distinguishing qualifier still has
+    to be present, so a standard listing cannot price [Steelbook Edition].
     `ODD_SALE_RE` also catches signed/autographed copies and "N
     more games" lots. **"Disc/cart/cartridge/game only" is only odd for
     CIB and New** (`NOT_COMPLETE_RE`): it's what a loose game is (it used

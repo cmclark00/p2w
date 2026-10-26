@@ -137,6 +137,31 @@ test('matching special editions keep plausible pack-ins without accepting other 
   }
 });
 
+test('Steelbook Edition accepts steelbook titles without the generic Edition word', () => {
+  const product = { ...item, 'product-name': 'The Order: 1886 [Steelbook Edition]' };
+  for (const title of [
+    'PLAYSTATION 4 - THE ORDER 1886 Game STEELBOOK w/Stickers PS4',
+    'The Order 1886 Steelbook Case PlayStation 4 PS4 Game Clean Disc + Manual',
+    'The Order 1886 PS4 Steelbook CIB (Sony PlayStation 4, 2015) Complete w/ Stickers',
+    'PS4 Playstation The Order 1886 Steelbook with Stickers',
+    'The Order 1886 (Sony Playstation 4, 2015) Steelbook + Original Case CIB Complete',
+    'The Order 1886 PS4 Steel Book CIB',
+    'The Order 1886 PS4 Steel-Book CIB',
+  ]) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+    assert.equal(invoke('floorOdd', {title}, 'cib', null, product), false, title);
+    assert.equal(invoke('floorAmazonLowest', cur(product, {amazon:{found:true,title,offers:[{price:4000}]}})),4000,title);
+    assert.equal(invoke('floorResult', cur(product,{sales:{cib:[{title,price:4000}]}})).b.basis,4000,title);
+    assert.ok(invoke('floorListingMismatch',title,{...product,'product-name':'The Order: 1886'}),'standard copy still rejects steelbooks');
+  }
+  for (const title of ['The Order 1886 PS4 CIB', 'The Order 1886 Collectors Edition PS4 Steelbook',
+    'The Order 1886 Steelbook PS4 French Version', 'The Order 1886 Steelbook Xbox One']) {
+    assert.ok(invoke('floorListingMismatch',title,product),title);
+  }
+  assert.equal(invoke('floorOdd',{title:'The Order 1886 PS4 Steelbook case only'},'cib',null,product),true);
+  assert.equal(invoke('floorListingMismatch','The Order 1886 Steelbook PS4 CIB',{...product,'product-name':'The Order: 1886 [Steel Book Edition]'}),null);
+});
+
 test('original paper pack-ins remain CIB evidence for eBay and Amazon', () => {
   const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
   for (const title of [
