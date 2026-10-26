@@ -917,11 +917,12 @@ Guide (the Google Sheet tab).
      in place; busy periods or Amazon throttling can still take longer.
      For used/CIB items, if barcode and title/platform searches find no usable
      regular used offer, the tool searches **Renewed** listings. A verified match
-     is labeled **Amazon Renewed fallback offers** and its lowest offer sets
-     the baseline instead of a higher eBay sale, retaining the GameStop minimum.
-     For example, Lollipop Chainsaw PS3 at $99.99 Renewed rounds to $100 even
-     with a $129.99 eBay sale. Regular priced used listings take priority
-     over Renewed and continue using the normal three-source maximum.
+     is labeled **Amazon Renewed fallback offers**. Compare its lowest offer
+     with the highest eligible eBay sale and applicable GameStop price; use the
+     highest. For example, $15.48 Renewed with a $24.95 eligible sale points to
+     $25 before any specific adjustment. Renewed does not replace a higher sale.
+     Regular priced used listings still take priority over Renewed in Amazon's
+     search. Specific premiums, deductions and the high-value exception remain.
      The tool checks **Used and New** for Loose/CIB, finds the lowest verified
      shipping-inclusive offer in each, and uses **the lower of those two prices**
      as its Amazon reference. For example, Used $40 and New $30 selects New $30;

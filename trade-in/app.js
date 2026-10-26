@@ -4368,8 +4368,8 @@ function floorAmazonLowest(cur, showPartial = false) {
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
 }
 
-// Regular references use the maximum; a verified Renewed fallback replaces
-// the eBay baseline while retaining GameStop's floor. Games with sold evidence and a $500+ sale or Amazon offer
+// Regular and verified Renewed references use the same three-source maximum.
+// Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorUnverifiedBasis(cur = floorCur) {
   const own = floorOwnBasis(cur);
@@ -4428,7 +4428,7 @@ function floorOwnBasis(cur = floorCur) {
   if (waiting) return { basis: null, sale, checks, waiting };
   const amz = cur.amazon?.error ? null : floorAmazonLowest(cur);
   const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) >= FLOOR_EXPENSIVE_GAME;
-  const renewedBasis = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
+  const renewedReference = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
   const toyGroup = floorToyGroup(cur);
   // A verified, priced Amazon match switches figures to the usual three-source
   // baseline. Without one, retain their common-average / uncommon-sale rules.
@@ -4442,7 +4442,7 @@ function floorOwnBasis(cur = floorCur) {
     if (sale) return { basis: sale.price, from: 'sale', sale, checks, toyGroup };
     return { basis: null, sale: null, checks, need: 'No usable sold evidence for this figure and condition. Review the listings or type a price.' };
   }
-  if (amz && !renewedBasis && ['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
+  if (amz && ['review', 'common', 'uncommon', 'rare'].includes(toyGroup)) {
     checks.push('Verified Amazon offer found: using the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop; figure premiums, minimums and rounding still apply');
   }
   // A loose rhythm-game bundle (the disc plus its instruments, no box): PriceCharting sometimes files mostly
@@ -4467,13 +4467,13 @@ function floorOwnBasis(cur = floorCur) {
     checks.push(`Amazon's lowest offer is ${money(amz)}; compare it with the sold evidence before labeling`);
   }
   if (!sale) checks.push('No usable eBay sold evidence for this condition; fallback price — verify before labeling');
-  if (renewedBasis) checks.push('Renewed baseline: use the lowest verified Amazon Renewed offer instead of a higher eBay sale, retaining the GameStop minimum. Specific premiums, deductions and rounding still apply');
-  const options = [[renewedBasis ? null : sale?.price, 'sale'], [expensiveGameBasis ? null : amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
+  if (renewedReference) checks.push('Renewed reference: compare the lowest verified Amazon Renewed offer with the highest eligible eBay sale and applicable GameStop price; use the highest. Specific premiums, deductions and rounding still apply');
+  const options = [[sale?.price, 'sale'], [expensiveGameBasis ? null : amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
   const referenceMin = options.length ? Math.max(...options.map(([v]) => v)) : null;
   if (!options.length && pc > 0) options.push([pc, 'pricecharting']);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
-    return { basis, from, sale, checks, waiting, referenceMin, renewedBasis, expensiveGameBasis };
+    return { basis, from, sale, checks, waiting, referenceMin, renewedReference, expensiveGameBasis };
   }
   if (waiting) return { basis: null, sale, checks, waiting };
   return { basis: null, sale, checks, need: 'No usable sold evidence or fallback price. Check the links and type a price.' };
@@ -4614,7 +4614,7 @@ function renderFloorPricer() {
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
           ${b.ebayReview ? '<span class="badge warn">Price needs review · eBay sale unverified</span>' : ''}
-          ${b.renewedBasis ? '<span class="badge info">Renewed baseline</span>' : ''}
+          ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
           ${outliers ? `<span class="badge warn">${outliers} possible outlier${outliers === 1 ? '' : 's'} · review notes</span>` : ''}
@@ -4649,12 +4649,12 @@ function renderFloorPricer() {
       <aside class="floor-result" aria-label="Pricing details">
         ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
         <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
-        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : b.renewedBasis ? esc("Renewed baseline: lowest verified Amazon Renewed offer, with the GameStop minimum. Specific premiums, deductions and rounding take priority") : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
+        <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lower of the lowest matching Used and New offers, including shipping.</li>
-            <li>Renewed fallback: lowest verified Renewed offer, retaining GameStop's minimum.</li>
+            <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
             <li>Rounding: through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>

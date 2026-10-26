@@ -109,8 +109,8 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal(calls.filter(([route]) => route === 'amazon/offers').length, 4);
     e.ctx.result = result; e.ctx.p = p;
     const priced = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Lollipop Chainsaw PS3 complete",price:12999}]},amazon:result})');
-    assert.equal(priced.b.basis, 9999); assert.equal(priced.b.from, 'amazon');
-    assert.equal(priced.b.referenceMin, 9999); assert.equal(priced.r.price, 10000);
+    assert.equal(priced.b.basis, 12999); assert.equal(priced.b.from, 'sale');
+    assert.equal(priced.b.referenceMin, 12999); assert.equal(priced.r.price, 13000);
     assert.ok(priced.b.checks.some(n => n.includes('Renewed fallback')));
     e.run('amazonSet=true');
     assert.match(e.run('floorAmazonHtml({product:p,condition:"cib",amazon:result},{from:"amazon"})'), /Amazon Renewed fallback offers/);
@@ -249,19 +249,21 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     failed.ctx.result=partial;
     assert.equal(failed.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
   });
-  await test('specific premiums remain applied after the renewed fallback baseline', async () => {
+  await test('specific premiums remain applied after the three-source maximum with Renewed', async () => {
     const p = { ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
     const renewed = candidate('B000000001', 'Pokemon Shield Nintendo Switch (Renewed)', ['Nintendo Switch']);
     const e = engine(async (route) => route === 'amazon/catalog' ? { candidates: [renewed] } : offer(renewed, 6000));
     e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;
     const result = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch",price:9000}]},amazon:result})');
-    assert.equal(result.b.basis, 6000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 6500);
+    assert.equal(result.b.basis, 9000); assert.equal(result.premium.pct, 10); assert.equal(result.r.price, 10000);
   });
-  await test('renewed baseline retains GameStop minimum, while regular Amazon still uses the three-source maximum', () => {
+  await test('Renewed and regular Amazon both use the three-source maximum', () => {
     const e = engine(async () => { throw Error('No network needed'); });
     e.ctx.result = { ...offer(candidate('B000000001', 'Final Fight SNES (Renewed)'), 9999), renewedFallback: true };
     let priced = e.run('floorResult({product:{...product,"gamestop-price":11000},condition:"cib",sales:{cib:[{title:"Final Fight SNES complete",price:12999}]},amazon:result})');
-    assert.equal(priced.b.basis, 11000); assert.equal(priced.b.from, 'gamestop'); assert.equal(priced.r.price, 11000);
+    assert.equal(priced.b.basis, 12999); assert.equal(priced.b.from, 'sale'); assert.equal(priced.r.price, 13000);
+    priced = e.run('floorResult({product:{...product,"gamestop-price":14000},condition:"cib",sales:{cib:[{title:"Final Fight SNES complete",price:12999}]},amazon:result})');
+    assert.equal(priced.b.from, 'gamestop'); assert.equal(priced.b.basis, 14000);
     e.ctx.result = offer(candidate('B000000001'), 9999);
     priced = e.run('floorResult({product,condition:"cib",sales:{cib:[{title:"Final Fight SNES complete",price:12999}]},amazon:result})');
     assert.equal(priced.b.basis, 12999); assert.equal(priced.r.price, 13000);
@@ -271,10 +273,10 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.p = { ...product, 'product-name': 'Pokemon Black', 'console-name': 'Nintendo DS', 'gamestop-price': 14500 };
     e.ctx.result = { ...offer(candidate('B000000001', 'Pokemon Black Nintendo DS (Renewed)', ['Nintendo DS']), 15000), renewedFallback: true };
     const discounted = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Black Nintendo DS complete",price:20000}]},amazon:result})');
-    assert.equal(discounted.b.basis, 15000); assert.equal(discounted.premium.pct, -14); assert.equal(discounted.r.price, 13000);
+    assert.equal(discounted.b.basis, 20000); assert.equal(discounted.premium.pct, -14); assert.equal(discounted.r.price, 17000);
     e.ctx.result = { ...offer(candidate('B000000001', 'Final Fight SNES (Renewed)'), 9999), renewedFallback: true };
     const manual = e.run('floorResult({product,condition:"cib",manualMissing:true,sales:{cib:[{title:"Final Fight SNES complete",price:12999}]},amazon:result})');
-    assert.equal(manual.b.basis, 9999); assert.ok(manual.r.price < 10000);
+    assert.equal(manual.b.basis, 12999); assert.ok(manual.r.price < 12999);
   });
   await test('priced barcode matches still compare title results, every known UPC, and subsequent catalog pages', async () => {
     const calls = [], a = candidate('B000000001'), b = candidate('B000000002'), c = candidate('B000000003');

@@ -1074,10 +1074,11 @@ The site's **only server-side code**. Everything else is static.
     Each verified renewed ASIN is checked under both Used and New offer
     conditions; regular New offers are also compared so the cheaper one wins.
     The lowest usable Renewed offer is tagged `renewedFallback` and
-    visibly labeled. A usable Renewed fallback replaces the eBay baseline:
-    `max(lowest Renewed, GameStop)`, before premiums/deductions and rounding.
-    Its `referenceMin` excludes eBay so later rounding cannot restore the
-    higher sold price. Regular Amazon retains the three-source maximum.
+    visibly labeled. Renewed uses the normal three-source maximum:
+    `max(highest eligible eBay sale, lowest Renewed, applicable GameStop)`, before
+    specific premiums/deductions and rounding. A higher eBay sale remains eligible
+    for targeted verification. The high-value game exception still makes Amazon
+    reference-only. `renewedReference` labels the source, not a separate price rule.
     New offers on a renewed ASIN do not establish original
     sealed condition. A regular priced Used match avoids running
     this stage. No packaging/inserts are claimed; premiums stay intact.

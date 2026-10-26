@@ -377,7 +377,7 @@ test('games with sold evidence and a $500+ reference use sales instead of regula
         assert.equal(result.b.basis, price);
         assert.equal(result.r.price, price === 49999 ? 50000 : price);
         assert.equal(result.b.referenceMin, price);
-        assert.equal(result.b.renewedBasis, false);
+        assert.equal(result.b.renewedReference, false);
       }
     }
   }
@@ -599,6 +599,25 @@ test('lowest Amazon offer can win and unusually high minimums are flagged instea
 test('older systems use the same maximum rule without an Amazon midpoint adjustment', () => {
   const r = invoke('floorResult', cur({ ...item, 'console-name': 'Playstation 2', 'cib-price': 9900 }, { amazon: { found: true, lowest: 6000, offers: [{ price: 6000 }] } }));
   assert.equal(r.b.from, 'amazon'); assert.equal(r.b.basis, 6000); assert.equal(r.r.price, 6000);
+});
+
+test('Kingdom Hearts uses its higher eligible sale over Renewed and retains eBay verification', () => {
+  const product = { 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2', 'cib-price': 1915, 'gamestop-price': 999 };
+  const example = cur(product, { sales: { cib: [
+    { title: 'Kingdom Hearts PS2 Complete', price: 2600, url: 'https://www.ebay.com/itm/111111111111' },
+    { title: 'Kingdom Hearts PS2 CIB Complete', price: 2495, url: 'https://www.ebay.com/itm/222222222222' },
+    { title: 'Kingdom Hearts PS2 CIB Complete Tested', price: 2399, url: 'https://www.ebay.com/itm/333333333333' }
+  ] }, ebayChecks: { results: { '111111111111': { state: 'unknown', price: 2600, skipped: true } } },
+  amazon: { found: true, title: 'Kingdom Hearts PS2 (Renewed)', renewedFallback: true, offers: [{ price: 1548 }] } });
+  const r = invoke('floorResult', example);
+  assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 2495); assert.equal(r.r.price, 2500);
+  assert.equal(invoke('floorEbayCandidates', example, 1)[0].sale.price, 2495, 'Renewed cannot stop checks of the higher sale');
+  assert.equal(r.b.ebayReview, true, 'Skipped higher evidence still needs review');
+  example.ebayChecks.results['222222222222'] = { state: 'ended' };
+  assert.equal(invoke('floorResult', example).b.basis, 2399, 'Rejected listings stay excluded');
+  example.amazon.offers[0].price = 3000;
+  assert.equal(invoke('floorResult', example).b.from, 'amazon');
+  assert.equal(invoke('floorResult', example).r.price, 3000, 'Renewed can win when it is actually highest');
 });
 
 test('confirmed out-of-stock GameStop is reference-only across regular, Renewed and high-value pricing', () => {
