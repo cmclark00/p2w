@@ -68,7 +68,7 @@ function engine(request) {
   assert.equal(e.run('floorResult(example).r.price'), 3000, 'out-of-stock base GameStop does not set floor');
   e.run('example.standardGame.gamestopStock={state:"in",title:"Example Game PS4"}');
   assert.equal(e.run('floorResult(example).r.price'), 4000);
-  e.run('example.standardGame.product=base; example.standardGame.sales.cib[0].price=45000; example.amazon.standard.offers[0].price=70000');
+  e.run('example.standardGame.product={...base,"cib-price":30000}; example.standardGame.sales.cib[0].price=45000; example.amazon.standard.offers[0].price=70000');
   assert.equal(e.run('floorResult(example).r.price'), 45000, 'high-value Amazon protection survives base comparison');
   const cod = { ...base, id: '100', 'product-name': 'Call of Duty WWII' };
   const valor = { ...cod, id: '101', 'product-name': 'Call of Duty WWII [Valor Collection]' };

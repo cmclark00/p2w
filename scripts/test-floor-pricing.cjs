@@ -27,7 +27,9 @@ function test(name, fn) { fn(); checks++; console.log(`PASS ${name}`); }
 const stockHeader = 'stock_code,item_name,category,item_type,condition,sub_condition,quantity,sell_price,pc_retail_loose_sell,pc_retail_cib_sell,pc_retail_new_sell';
 const lineHeader = 'transaction_number,date_local,transaction_type,line_mode,item_name,category,item_type,condition,sub_condition,quantity,line_subtotal';
 const txHeader = 'transaction_number,date_local,transaction_type,purchases_total,line_count';
-const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': 1500, 'gamestop-price': 0 };
+// Matching/rounding fixtures do not invent a market value. Reference-based
+// tests provide an explicit condition-specific PriceCharting value below.
+const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': null, 'gamestop-price': 0 };
 const cur = (product = item, extra = {}) => {
   const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: `${product['product-name']} complete`, price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
   // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
@@ -223,7 +225,8 @@ test('Overseas sales are excluded while North American shipping and premiums rem
     assert.equal(invoke('floorResult',example).r.price,2500,'Specific premium applies after evidence filtering');
   } finally {context.restorePremiums=oldPremiums;run('settings.floorPremiums=restorePremiums');}
   direct[0].sellerCountry='Canada';
-  assert.equal(invoke('floorResult',example).r.price,3500,'High Canadian shipping remains eligible, not capped by amount');
+  assert.equal(invoke('floorResult',example).r.price,1500,'Canadian sale is eligible by location but exceeds 3x this game market value');
+  assert.equal(invoke('floorResult',{...example,product:{...product,'cib-price':1200}}).r.price,3500,'Canadian shipping still counts when total is below the market threshold');
   direct[0].sellerCountry=null;
   assert.equal(invoke('floorSaleLocation',direct[0]),'unknown','Do not infer location from high shipping');
   for(const country of ['United States','Canada','Mexico','Toronto, Canada','Puerto Rico'])
@@ -703,8 +706,59 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
 });
 
+test('3x PriceCharting excludes every sale at the boundary using only the selected condition market', () => {
+  const product={...item,'product-name':'Final Fantasy IX','loose-price':1000,'cib-price':3000,'new-price':10000,'retail-cib-sell':99999};
+  for(const [condition,market,title] of [['loose',1000,'Final Fantasy IX disc only'],['cib',3000,'Final Fantasy IX CIB'],['new',10000,'Final Fantasy IX Brand New Sealed']]) {
+    const example=cur(product,{condition,sales:{[condition]:[market*4,market*3,market*3-1].map(price=>({title,price}))}});
+    const before=JSON.stringify(example), rows=invoke('floorSales',example);
+    assert.equal(rows.filter(s=>s.outlier).length,2,condition);
+    assert.equal(rows[0].outlier.pcMarket,market);
+    assert.equal(rows[1].outlier.pcLimit,market*3);
+    assert.equal(invoke('floorSaleGroup',rows[0]),'outlier');
+    assert.equal(invoke('floorResult',example).b.basis,market*3-1);
+    assert.ok(invoke('floorResult',example).b.checks.some(s=>s.includes('3× PriceCharting')));
+    assert.equal(JSON.stringify(example),before);
+  }
+});
+
+test('PriceCharting guard works with one sale, preserves fallbacks, premiums and staff overrides', () => {
+  const product={...item,'product-name':'Final Fantasy IX','cib-price':3000,'gamestop-price':2000};
+  const example=highSaleCur([12000,10000,9000,6000,5500,5000],product);
+  assert.equal(invoke('floorResult',example).b.basis,6000);
+  const old=json('settings.floorPremiums');
+  try {
+    run('settings.floorPremiums=[{phrase:"Final Fantasy IX",pct:100}]');
+    assert.equal(invoke('floorResult',example).r.price,12000,'Premium can exceed the general evidence threshold');
+    run('settings.floorPremiums=[]');
+    assert.equal(invoke('floorResult',{...example,pick:0}).b.basis,12000);
+    assert.equal(invoke('floorResult',{...example,typed:13000}).b.from,'typed');
+  } finally {run(`settings.floorPremiums=${JSON.stringify(old)}`);}
+  const sparse=highSaleCur([9000],{...product,'gamestop-price':0});
+  assert.equal(invoke('floorResult',sparse).b.from,'pricecharting');
+  assert.equal(invoke('floorResult',sparse).r.price,3000);
+  assert.equal(invoke('floorResult',{...sparse,amazon:{found:true,title:'Final Fantasy IX',offers:[{price:4000,sub:'very_good'}]}}).b.from,'amazon');
+  for(const market of [undefined,null,0,-1,'unavailable']) {
+    const noMarket=highSaleCur([9000],{...product,'cib-price':market});
+    assert.equal(invoke('floorResult',noMarket).b.basis,9000,'Missing/invalid market must not create a zero threshold');
+  }
+});
+
+test('market guard uses each edition reference and leaves special figure policies intact', () => {
+  const standard={...item,id:'100','cib-price':1000};
+  const variant={...standard,id:'101','product-name':'Example Game [Deluxe Edition]','cib-price':4000};
+  const example=highSaleCur([11000],variant,{standardGame:{product:standard,sales:{cib:[{title:'Example Game CIB',price:10000},{title:'Example Game CIB',price:2500}]}}});
+  const result=invoke('floorResult',example);
+  assert.equal(result.b.basis,11000,'Use selected edition market, not the cheaper standard game');
+  assert.equal(result.b.standardReference.basis,2500,'Standard fallback independently rejects its own high sale');
+  for(const system of ['Skylanders','Disney Infinity']) {
+    const p={...item,'product-name':'Example Figure','console-name':system,'loose-price':1500};
+    const toy=cur(p,{condition:'loose',toyGroup:'uncommon',sales:{loose:[{title:'Example Figure',price:5000}]}});
+    assert.equal(invoke('floorResult',toy).b.basis,5000,'Specific toys-to-life policy keeps its own thresholds');
+  }
+});
+
 test('median check excludes a small high cluster without changing premiums or manual review', () => {
-  const product = { ...item, 'product-name': 'Final Fantasy VIII', 'console-name': 'Playstation', 'gamestop-price': 1999, 'cib-price': 2980 };
+  const product = { ...item, 'product-name': 'Final Fantasy VIII', 'console-name': 'Playstation', 'gamestop-price': 1999 };
   const example = highSaleCur([17500,14995,4499,4400,4299,3800,3599,3500], product,
     { amazon: { found: true, offers: [{price:2799}] } });
   const before = JSON.stringify(example);
@@ -934,7 +988,7 @@ test('fallback waits for sold evidence and Amazon before using PriceCharting', (
   run('amazonSet = true;');
   assert.equal(invoke('floorResult', cur(item, { sales: { cib: [] }, amazon: { loading: true } })).r, null);
   run('amazonSet = false;');
-  const r = invoke('floorResult', cur(item, { sales: { cib: [] } }));
+  const r = invoke('floorResult', cur({ ...item, 'cib-price': 1500 }, { sales: { cib: [] } }));
   assert.equal(r.b.from, 'pricecharting'); assert.equal(r.r.price, 1500);
   assert.ok(r.b.checks.some((s) => s.includes('fallback')));
 });
@@ -949,7 +1003,7 @@ test('missing references require a typed price and failed sales are visibly flag
   const empty = { ...item, 'cib-price': 0, 'retail-cib-sell': 9900 };
   const r = invoke('floorResult', cur(empty, { sales: null, salesError: 'Service unavailable' }));
   assert.equal(r.r, null); assert.ok(r.b.need);
-  const fallback = invoke('floorResult', cur(item, { sales: null, salesError: 'Service unavailable' }));
+  const fallback = invoke('floorResult', cur({ ...item, 'cib-price': 1500 }, { sales: null, salesError: 'Service unavailable' }));
   assert.equal(fallback.b.from, 'pricecharting'); assert.ok(fallback.b.checks.some((s) => s.includes('fallback')));
 });
 test('lowest Amazon offer can win and unusually high minimums are flagged instead of discarded', () => {

@@ -128,14 +128,21 @@ const sender = { frameId: 0, tab: { id: 1 }, url: 'https://play2wingames.com/tra
 const send = (query, from = sender, protocol = 2, page = 1) => new Promise(resolve => { if (!listeners[1]({ type: 'P2W_EBAY_SEARCH', query, protocol, page }, from, resolve)) resolve(null); });
 const flush = () => new Promise(r => setImmediate(r));
 (async () => {
-  const searchCur=()=>({...base(),product:wwe,sales:{cib:[]},directEbay:undefined});
+  const searchCur=()=>({...base(),product:{...wwe,'cib-price':3000},sales:{cib:[]},directEbay:undefined});
   const comp=(n,grade,title)=>({...sold,id:String(100000000000+n),url:`https://www.ebay.com/itm/${100000000000+n}`,title,conditionText:grade,price:5000-n*100,shipping:0});
   const pageCalls=[];const paged=searchCur();
   await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{
     pageCalls.push(page);return {...ready(page===1?[comp(1,'Brand New','WWE 2K20 PS4 Brand New'),comp(2,'Pre-Owned','WWE 2K20 & WWE 2K19 PS4 Bundle')]:[comp(3,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
   }});
   assert.deepEqual(pageCalls,[1,2]);assert.equal(paged.directEbay.result.stoppedAtMatch,true);assert.equal(paged.directEbay.result.partial,false,'Unread lower pages are not a failure after a sorted match');
-  const sao = {...searchCur(), product:{...wwe,'product-name':'Sword Art Online: Lost Song'}};
+  const marketLimited={...searchCur(),product:wwe}, marketPages=[];
+  await invoke(ctx,'runFloorEbaySearch',marketLimited,()=>{},()=>false,{search:async(q,page)=>{
+    marketPages.push(page);return {...ready([{...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),price:page===1?2500:1500,shipping:page===1?500:0}]),page,more:true};
+  }});
+  assert.deepEqual(marketPages,[1,2],'A sold price plus shipping at 3x market cannot stop pagination');
+  assert.equal(result(marketLimited).b.basis,1500);
+  assert.equal(rows(marketLimited)[0].outlier.pcLimit,3000);
+  const sao = {...searchCur(), product:{...wwe,'cib-price':3000,'product-name':'Sword Art Online: Lost Song'}};
   const saoPages=[];
   await invoke(ctx,'runFloorEbaySearch',sao,()=>{},()=>false,{search:async(q,page)=>{
     saoPages.push(page);return {...ready([comp(page,'New (Other)',page===1
@@ -145,7 +152,7 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.deepEqual(saoPages,[1,2],'Named bundle must not stop the sold search');
   assert.equal(invoke(ctx,'floorSales',sao)[0].mismatch,'Multiple-game title list — review');
   assert.equal(invoke(ctx,'floorAutoSale',invoke(ctx,'floorSales',sao)).sale.title,'Sword Art Online: Lost Song PS4 CIB');
-  const lastOfUs = {...searchCur(),product:{...wwe,'product-name':'The Last of Us Remastered'}};
+  const lastOfUs = {...searchCur(),product:{...wwe,'cib-price':3000,'product-name':'The Last of Us Remastered'}};
   const languagePages=[];
   await invoke(ctx,'runFloorEbaySearch',lastOfUs,()=>{},()=>false,{search:async(q,page)=>{
     languagePages.push(page);return {...ready(page===1
@@ -155,7 +162,7 @@ const flush = () => new Promise(r => setImmediate(r));
   }});
   assert.deepEqual(languagePages,[1,2],'Foreign variants cannot stop pagination');
   assert.equal(invoke(ctx,'floorAutoSale',invoke(ctx,'floorSales',lastOfUs)).sale.title,'The Last Of Us Remastered PS4 CIB USA');
-  const gundam={...searchCur(),product:{...wwe,'product-name':'Dynasty Warriors: Gundam','console-name':'Playstation 3'}};
+  const gundam={...searchCur(),product:{...wwe,'cib-price':3000,'product-name':'Dynasty Warriors: Gundam','console-name':'Playstation 3'}};
   const gundamPages=[];
   await invoke(ctx,'runFloorEbaySearch',gundam,()=>{},()=>false,{search:async(q,page)=>{
     gundamPages.push(page);return {...ready([comp(page,'Pre-Owned',page===1

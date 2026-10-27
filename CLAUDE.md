@@ -670,7 +670,19 @@ The site's **only server-side code**. Everything else is static.
     collapse. `onFloorSalesToggle()` retains open groups across pricing renders,
     resets on condition changes, and keeps original row indices/links so review
     actions still work. A manually included price-driving row stays visible.
-    `floorSales()` flags an isolated highest sale when
+    `floorSales()` first excludes non-figure sold evidence at or above **3x
+    the selected product/condition's PriceCharting market value** (not retail
+    sell, another condition or the standard edition). This guard applies even
+    with one sale and includes known shipping in direct eBay totals. Missing,
+    zero or invalid market values disable this guard; no fabricated threshold.
+    Keep rows under possible outliers with the exact reference/threshold in
+    review notes. Standard-game evidence checks its own condition/edition market.
+    Automatic direct searches continue past these rows; staff may still select
+    a reviewed row or type a price. This excludes evidence, not a final shelf
+    price cap: eligible Amazon/GameStop and specific premiums still apply.
+    Toys-to-life keep their specific pricing and looser outlier policies.
+    PC-rejected rows do not support recent-sales counts or median/gap checks.
+    It then flags an isolated highest sale when
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
     single highest sale is excluded by the isolated-sale check. A separate

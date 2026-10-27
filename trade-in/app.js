@@ -3265,6 +3265,7 @@ const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
 const FLOOR_SALE_CLUSTER_MEDIAN_RATIO = 3;
 const FLOOR_SALE_CLUSTER_MAX = 3;
+const FLOOR_SALE_PC_LIMIT_RATIO = 3;
 // Skylanders/Infinity are priced toward their high sales. Only a much larger
 // isolated spike is excluded; other categories use the ordinary gap thresholds.
 const FLOOR_TOY_OUTLIER_RATIO = 3;
@@ -4357,8 +4358,20 @@ function floorSales(cur = floorCur) {
       sale.exclusion = 'Seller outside North America'; sale.odd = true;
     }
   }
+  // This reference guard does not require a large sample. Use the selected
+  // product/condition's market value, never retail estimates or another edition.
+  const pcMarket = Number(cur.product?.[PC_FIELDS.market[cur.condition]]);
+  // Toys-to-life retain their specific common-average / uncommon-high-sale policy.
+  if (!floorToyFamily(cur.product) && Number.isFinite(pcMarket) && pcMarket > 0) {
+    const pcLimit = pcMarket * FLOOR_SALE_PC_LIMIT_RATIO;
+    for (const sale of sales) {
+      if (!sale.odd && Number.isFinite(sale.price) && sale.price >= pcLimit) {
+        sale.outlier = { pcMarket, pcLimit };
+      }
+    }
+  }
   const { today, cutoff } = floorSaleAgeWindow();
-  const dated = sales.filter(s => !s.odd && /^\d{4}-\d{2}-\d{2}$/.test(s.date || '')
+  const dated = sales.filter(s => !s.odd && !s.outlier && /^\d{4}-\d{2}-\d{2}$/.test(s.date || '')
     && Number.isFinite(Date.parse(s.date)) && new Date(s.date).toISOString().slice(0, 10) === s.date);
   const recentCount = new Set(dated.filter(s => s.date >= cutoff && s.date <= today).map(floorSaleKey)).size;
   const sparse = recentCount < FLOOR_RECENT_SALE_MIN;
@@ -4373,7 +4386,7 @@ function floorSales(cur = floorCur) {
       sale.odd = true;
     }
   }
-  const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
+  const normal = sales.filter((s) => !s.odd && !s.outlier && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
@@ -4812,10 +4825,12 @@ function floorOwnBasis(cur = floorCur) {
   const amazonMismatch = floorAmazonMismatch(cur);
   if (amazonMismatch) checks.push(`Amazon excluded from pricing: ${amazonMismatch}. Review the linked listing`);
   for (const s of sales.filter((s) => s.outlier)) {
-    const comparison = s.outlier.groupCount
+    const comparison = s.outlier.pcMarket
+      ? `at or above ${FLOOR_SALE_PC_LIMIT_RATIO}× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(s.outlier.pcMarket)} (threshold ${money(s.outlier.pcLimit)})`
+      : s.outlier.groupCount
       ? `group of ${s.outlier.groupCount} high sales; eligible-sales median ${money(s.outlier.median)}, next sale below group ${money(s.outlier.nextPrice)}`
       : `next comparable sale ${money(s.outlier.nextPrice)}`;
-    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: ${comparison}, with ${s.outlier.lowerCount} lower sales. Verify the sale, condition and whether the price is representative before including it`);
+    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: ${comparison}${s.outlier.lowerCount != null ? `, with ${s.outlier.lowerCount} lower sales` : ''}. Verify the sale, condition and whether the price is representative before including it`);
   }
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);

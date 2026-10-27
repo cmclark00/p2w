@@ -7,7 +7,7 @@ const ctx = vm.createContext({ console, Date, URL, setTimeout, clearTimeout,
 vm.runInContext(fs.readFileSync('trade-in/dead-games.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('trade-in/app.js', 'utf8').replace(/\binit\(\);\s*$/, ''), ctx);
 const invoke = (name, ...args) => { ctx.args = args; return vm.runInContext(`${name}(...args)`, ctx); };
-const product = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'cib-price': 1000 };
+const product = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'cib-price': 3000 };
 const sale = (price, id, title = 'Example Game PS4 CIB') => ({ title, price, date: '2026-10-19', url: `https://www.ebay.com/itm/${id}` });
 const cur = (p = product, rows = [sale(3000, '111111111111'), sale(2000, '222222222222'), sale(1000, '333333333333')]) =>
   ({ product: p, condition: 'cib', sales: { cib: rows }, pick: null, typed: null, amazon: { found: false } });
@@ -49,7 +49,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     ['Pokemon Red', 'GameBoy', 'Pokemon Red GameBoy authentic', 10000],
     ['Sonic Boom - Giants, Glow in the Dark', 'Skylanders', 'Skylanders Giants Glow in the Dark Sonic Boom CIB Not Sealed', 1800],
   ]) {
-    const p = { 'product-name': name, 'console-name': system, 'loose-price': 977 };
+    const p = { 'product-name': name, 'console-name': system, 'loose-price': Math.ceil(price / 2) };
     const item = { product: p, condition: 'loose', sales: { loose: [sale(price, '333333333333', title)] }, typed: null, pick: null, amazon: { found: false } };
     const before = result(item).r.price;
     await check(item, 0, { available: async () => true, check: async () => verified('333333333333', price, title) });

@@ -915,6 +915,16 @@ Guide (the Google Sheet tab).
      Numbered sequel pairs such as **Kingdom Hearts 1 & 2** and **God of War
      I + II** count as game bundles even without the word "bundle." A genuine
      selected compilation and multi-disc games keep their normal matching.
+   - **PriceCharting reference limit:** sales at **3× or more** of the selected
+     game's condition-specific PriceCharting value are excluded from automatic
+     pricing, even if only one sale was found. A $30 CIB value excludes sales
+     of $90 or more; the tool uses the next eligible sale and continues eBay
+     pages if needed. Known shipping counts toward the sale total. No valid
+     PriceCharting value means no reference limit. Excluded rows remain available
+     for review with the reference and threshold in the notes. This is an
+     evidence filter, not a final price ceiling: specific premiums, other market
+     references, rounding and deliberate staff overrides still apply.
+     Toys-to-life keep their separate rules.
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
