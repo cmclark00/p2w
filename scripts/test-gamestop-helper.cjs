@@ -3,6 +3,7 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const root = 'trade-in/browser-helper/';
 const manifest = JSON.parse(fs.readFileSync(root + 'manifest.json', 'utf8'));
 assert.equal(manifest.manifest_version, 3);
+assert.ok(manifest.description.length <= 132, "Chrome manifest description length");
 assert.equal(manifest.permissions, undefined);
 assert.equal(manifest.host_permissions, undefined);
 assert.deepEqual(manifest.content_scripts.flatMap(s => s.matches), ['https://play2wingames.com/trade-in/*', 'https://www.gamestop.com/*products/*', 'https://gamestop.com/*products/*', 'https://www.ebay.com/itm/*', 'https://ebay.com/itm/*', 'https://www.ebay.com/sch/i.html*', 'https://ebay.com/sch/i.html*']);
