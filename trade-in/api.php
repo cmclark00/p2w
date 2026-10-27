@@ -29,6 +29,7 @@
  *   DELETE floor-sessions (id)   delete a saved session
  *   GET  amazon/catalog (upc|q)   Amazon catalog candidates for identity verification
  *   GET  amazon/offers (asin|upc, cond) Amazon's lowest offers for a verified catalog item
+ *   POST amazon/offers-batch     up to 20 independent ASIN/condition offer checks
  *   PUT  amazon / GET amazon/test  manager: save / check the Amazon SP-API keys
  */
 
@@ -495,19 +496,22 @@ function amazon_access_token(array $keys): string {
   return $d['access_token'];
 }
 
-// GET from the SP-API (production or sandbox), one call at a time across every device.
-function amazon_get(array $keys, string $path, array $query): array {
+// Catalog, individual offers and offer batches have independent paced queues.
+function amazon_transport(array $keys, string $path, array $query = [], ?array $body = null): array {
   $token = amazon_access_token($keys);
   $host = getenv('P2W_AMAZON_HOST') ?: (!empty($keys['sandbox']) ? 'https://sandbox.sellingpartnerapi-na.amazon.com' : 'https://sellingpartnerapi-na.amazon.com');
   require_once __DIR__ . '/amazon-rate-limit.php';
   $operation = strpos($path, '/catalog/') === 0
-    ? (preg_match('#/items/[^/]+$#', $path) ? 'catalog-item' : 'catalog-search') : 'offers';
-  [$status, $body, $error, $headers] = amazon_rate_request(data_path('amazon-throttle.lock'), $operation,
-    static fn() => http_send('GET', $host . $path . '?' . http_build_query($query), ['x-amz-access-token: ' . $token, 'Accept: application/json']));
+    ? (preg_match('#/items/[^/]+$#', $path) ? 'catalog-item' : 'catalog-search') : ($body !== null ? 'offers-batch' : 'offers');
+  [$status, $response, $error, $headers] = amazon_rate_request(data_path('amazon-throttle.lock'), $operation,
+    static fn() => http_send($body === null ? 'GET' : 'POST', $host . $path . ($query ? '?' . http_build_query($query) : ''),
+      ['x-amz-access-token: ' . $token, 'Accept: application/json', 'Content-Type: application/json'], $body === null ? null : json_encode($body)));
   if ($status === 429) header('Retry-After: ' . max(1, (int)($headers['retry-after'] ?? 5)));
   if ($status === 0) fail(502, 'Could not reach Amazon: ' . $error);
-  return [$status, $body];
+  return [$status, $response];
 }
+function amazon_get(array $keys, string $path, array $query): array { return amazon_transport($keys, $path, $query); }
+function amazon_post(array $keys, string $path, array $body): array { return amazon_transport($keys, $path, [], $body); }
 
 // Keep full titles and structured platforms: a shared UPC alone cannot identify a game.
 function amazon_candidate(array $item): array {
@@ -533,6 +537,25 @@ function amazon_cache_file(array $keys, string $kind, array $query): string {
   return $dir . '/amz-v2-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
 }
 
+function amazon_cached(string $file): ?array {
+  clearstatcache(true, $file);
+  if (!is_file($file) || time() - filemtime($file) >= AMZ_CACHE_SECONDS) return null;
+  $value = json_decode((string)file_get_contents($file), true);
+  return is_array($value) ? $value : null;
+}
+// Coalesce the same cold lookup across computers. Locks contain no credentials.
+function amazon_cache_lock(string $file) {
+  $lock = fopen($file . '.lock', 'c+');
+  $start = microtime(true);
+  if (!$lock) fail(503, 'Amazon cache queue unavailable.');
+  while (!flock($lock, LOCK_EX | LOCK_NB)) {
+    if (microtime(true) - $start > 25) { fclose($lock); fail(429, 'The same Amazon lookup is still running. Retry shortly.'); }
+    usleep(50000);
+  }
+  return $lock;
+}
+function amazon_unlock($lock): void { flock($lock, LOCK_UN); fclose($lock); }
+
 function amazon_catalog_items(array $keys, string $upc = '', string $q = '', string $asin = '', string $pageToken = ''): array {
   if (strlen($pageToken) > 2048 || preg_match('/[\x00-\x1F]/', $pageToken) || ($asin !== '' && $pageToken !== '')) fail(400, 'Invalid catalog page token.');
   if ($asin !== '' && !preg_match('/^[A-Z0-9]{10}$/', $asin)) fail(400, 'Pass a valid Amazon ASIN.');
@@ -549,22 +572,30 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
     if ($pageToken !== '') $query['pageToken'] = $pageToken;
   }
   $cacheFile = amazon_cache_file($keys, 'catalog-v3', [$path, $query]);
-  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) {
-    $cached = json_decode((string)file_get_contents($cacheFile), true);
-    if (is_array($cached)) return $cached;
-  }
-  [$status, $body] = amazon_get($keys, $path, $query);
-  if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
-  $data = json_decode($body, true);
-  $items = $asin !== '' ? [$data] : (array)($data['items'] ?? []);
-  $candidates = [];
-  foreach (array_slice($items, 0, 20) as $item) {
-    if (is_array($item) && preg_match('/^[A-Z0-9]{10}$/', (string)($item['asin'] ?? ''))) $candidates[] = amazon_candidate($item);
-  }
-  $out = ['status' => 'success', 'candidates' => $candidates, 'more' => !empty($data['pagination']['nextToken']),
-    'nextToken' => (string)($data['pagination']['nextToken'] ?? '')];
-  @file_put_contents($cacheFile, json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
-  return $out;
+  if (($cached = amazon_cached($cacheFile)) !== null) return $cached;
+  $lock = amazon_cache_lock($cacheFile);
+  try {
+    if (($cached = amazon_cached($cacheFile)) !== null) return $cached;
+    [$status, $body] = amazon_get($keys, $path, $query);
+    if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
+    $data = json_decode($body, true);
+    $items = $asin !== '' ? [$data] : (array)($data['items'] ?? []);
+    $candidates = [];
+    foreach (array_slice($items, 0, 20) as $item) {
+      if (is_array($item) && preg_match('/^[A-Z0-9]{10}$/', (string)($item['asin'] ?? ''))) $candidates[] = amazon_candidate($item);
+    }
+    $out = ['status' => 'success', 'candidates' => $candidates, 'more' => !empty($data['pagination']['nextToken']),
+      'nextToken' => (string)($data['pagination']['nextToken'] ?? '')];
+    @file_put_contents($cacheFile, json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    // Search already returned Amazon's own title/platform attributes. Reuse that
+    // identity in offer checks instead of fetching the same ASIN metadata again.
+    foreach ($candidates as $candidate) {
+      $identityFile = amazon_cache_file($keys, 'catalog-v3', ['/catalog/2022-04-01/items/' . $candidate['asin'],
+        ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes']]);
+      @file_put_contents($identityFile, json_encode(['status' => 'success', 'candidates' => [$candidate], 'more' => false, 'nextToken' => '']), LOCK_EX);
+    }
+    return $out;
+  } finally { amazon_unlock($lock); }
 }
 
 function amazon_catalog(string $upc, string $q, string $pageToken = ''): void {
@@ -573,8 +604,20 @@ function amazon_catalog(string $upc, string $q, string $pageToken = ''): void {
   respond(200, amazon_catalog_items($keys, $upc, $q, '', $pageToken));
 }
 
-// Retrieve the title from Amazon again, never from caller-supplied text. The client
-// revalidates this response as well as the search candidate before using its price.
+// Both transports use this same output shape; title/platform always come from
+// Amazon's server-side catalog cache, never caller-supplied evidence.
+function amazon_offer_output(array $item, string $condition, array $payload): array {
+  $offers = [];
+  foreach ((array)($payload['Offers'] ?? []) as $o) {
+    $price = (float)($o['ListingPrice']['Amount'] ?? 0) + (float)($o['Shipping']['Amount'] ?? 0);
+    if ($price <= 0) continue;
+    $offers[] = ['price' => (int)round($price * 100), 'sub' => (string)($o['SubCondition'] ?? ''), 'fba' => !empty($o['IsFulfilledByAmazon'])];
+  }
+  usort($offers, static fn($a, $b) => $a['price'] <=> $b['price']);
+  return ['status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $item['asin'],
+    'title' => $item['title'], 'platforms' => $item['platforms'], 'url' => 'https://www.amazon.com/dp/' . rawurlencode($item['asin']),
+    'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)), 'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers];
+}
 function amazon_offers(string $upc, string $cond, string $asin = ''): void {
   $keys = amazon_keys();
   if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
@@ -582,34 +625,104 @@ function amazon_offers(string $upc, string $cond, string $asin = ''): void {
   if ($asin !== '' && !preg_match('/^[A-Z0-9]{10}$/', $asin)) fail(400, 'Pass a valid Amazon ASIN.');
   $condition = $cond === 'new' ? 'New' : 'Used';
   $cacheFile = amazon_cache_file($keys, 'offers', [$upc, $asin, $condition]);
-  if (is_file($cacheFile) && time() - filemtime($cacheFile) < AMZ_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
-  $item = amazon_catalog_items($keys, $asin === '' ? $upc : '', '', $asin)['candidates'][0] ?? null;
-  $out = ['status' => 'success', 'found' => false, 'condition' => $condition];
-  if ($item && !empty($item['asin'])) {
-    $asin = (string)$item['asin'];
-    [$status, $body] = amazon_get($keys, '/products/pricing/v0/items/' . rawurlencode($asin) . '/offers', [
-      'MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $condition, 'CustomerType' => 'Consumer',
-    ]);
-    if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
-    $payload = json_decode($body, true)['payload'] ?? [];
-    $offers = [];
-    foreach ((array)($payload['Offers'] ?? []) as $o) {
-      $price = (float)($o['ListingPrice']['Amount'] ?? 0) + (float)($o['Shipping']['Amount'] ?? 0);
-      if ($price <= 0) continue;
-      $offers[] = ['price' => (int)round($price * 100), 'sub' => (string)($o['SubCondition'] ?? ''), 'fba' => !empty($o['IsFulfilledByAmazon'])];
+  if (($cached = amazon_cached($cacheFile)) !== null) respond(200, $cached);
+  $lock = amazon_cache_lock($cacheFile);
+  try {
+    if (($out = amazon_cached($cacheFile)) === null) {
+      $item = amazon_catalog_items($keys, $asin === '' ? $upc : '', '', $asin)['candidates'][0] ?? null;
+      $out = ['status' => 'success', 'found' => false, 'condition' => $condition];
+      if ($item && !empty($item['asin'])) {
+        [$status, $body] = amazon_get($keys, '/products/pricing/v0/items/' . rawurlencode($item['asin']) . '/offers',
+          ['MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $condition, 'CustomerType' => 'Consumer']);
+        if ($status !== 200) fail($status === 429 ? 429 : 502, amazon_error($status, $body));
+        $data = json_decode($body, true);
+        if (!is_array($data['payload']['Offers'] ?? null) || !empty($data['errors'])) fail(502, 'Amazon offer response was incomplete.');
+        $out = amazon_offer_output($item, $condition, $data['payload']);
+      }
+      @file_put_contents($cacheFile, json_encode($out), LOCK_EX);
     }
-    usort($offers, function ($a, $b) { return $a['price'] <=> $b['price']; });
-    $out = [
-      'status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $asin,
-      'title' => $item['title'], 'platforms' => $item['platforms'],
-      'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin),
-      'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)),
-      'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers, // Amazon returns up to its 20 lowest
-    ];
+  } finally { amazon_unlock($lock); }
+  respond(200, $out);
+}
+
+// Return individual failures without turning them into "no offers". The browser
+// retains successful members and marks the whole search incomplete until retry.
+function amazon_offers_batch(array $requests): void {
+  if (!$requests || count($requests) > 20) fail(400, 'Pass between one and twenty offer checks.');
+  $wanted = [];
+  foreach ($requests as $r) {
+    if (!is_array($r) || !is_string($r['asin'] ?? null) || !preg_match('/^[A-Z0-9]{10}$/', $r['asin']) || !in_array($r['cond'] ?? null, ['used', 'new'], true)) fail(400, 'Invalid Amazon offer check.');
+    $wanted[$r['asin'] . ':' . $r['cond']] = ['asin' => $r['asin'], 'condition' => $r['cond'] === 'new' ? 'New' : 'Used'];
   }
-  $json = (string)json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-  @file_put_contents($cacheFile, $json, LOCK_EX);
-  respond_raw(200, $json);
+  $keys = amazon_keys();
+  if (!$keys) fail(400, 'Amazon is not set up. A manager can add the keys in Settings.');
+  ksort($wanted); // Consistent lock order prevents overlapping batches deadlocking.
+  $out = []; $pending = []; $locks = [];
+  try {
+    foreach ($wanted as $key => $r) {
+      $file = amazon_cache_file($keys, 'offers', ['', $r['asin'], $r['condition']]);
+      if (($cached = amazon_cached($file)) !== null) { $out[$key] = ['data' => $cached]; continue; }
+      $locks[] = amazon_cache_lock($file);
+      if (($cached = amazon_cached($file)) !== null) { $out[$key] = ['data' => $cached]; continue; }
+      $item = amazon_catalog_items($keys, '', '', $r['asin'])['candidates'][0] ?? null;
+      if (!$item || $item['asin'] !== $r['asin']) { $out[$key] = ['error' => 'Amazon catalog identity was not confirmed.', 'status' => 502]; continue; }
+      $pending[$key] = $r + ['item' => $item, 'file' => $file];
+    }
+    $responses = []; $batchStatus = null;
+    // Small warm-cache misses stay on individual offers' faster cadence. Six
+    // or more uncached members benefit from the 20-member batch operation.
+    if (count($pending) >= 6) {
+      $body = ['requests' => array_values(array_map(static fn($r) => [
+        'uri' => '/products/pricing/v0/items/' . $r['asin'] . '/offers', 'method' => 'GET',
+        'MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $r['condition'], 'CustomerType' => 'Consumer'], $pending))];
+      [$batchStatus, $batchBody] = amazon_post($keys, '/batches/products/pricing/v0/itemOffers', $body);
+      // No dependence on response order; duplicate identities make that member invalid.
+      foreach ((array)(json_decode($batchBody, true)['responses'] ?? []) as $response) {
+        if (!is_array($response) || !is_array($response['request'] ?? null)) continue;
+        $request = $response['request'] ?? [];
+        $key = (string)($request['Asin'] ?? '') . ':' . strtolower((string)($request['ItemCondition'] ?? ''));
+        if (($request['MarketplaceId'] ?? '') !== AMZ_MARKETPLACE || !isset($pending[$key])) continue;
+        $responses[$key] = array_key_exists($key, $responses) ? null : $response;
+      }
+    }
+    foreach ($pending as $key => $r) {
+      if ($batchStatus === null || in_array($batchStatus, [403, 404, 405, 501], true)) {
+        // Older accounts/servers can still use the existing single-offer endpoint.
+        [$status, $body] = amazon_get($keys, '/products/pricing/v0/items/' . $r['asin'] . '/offers',
+          ['MarketplaceId' => AMZ_MARKETPLACE, 'ItemCondition' => $r['condition'], 'CustomerType' => 'Consumer']);
+        $data = json_decode($body, true);
+      } else {
+        $response = $responses[$key] ?? [];
+        $status = $batchStatus === 200 ? (int)($response['status']['statusCode'] ?? 502) : $batchStatus;
+        $data = $response['body'] ?? [];
+        if ($status === 429) {
+          require_once __DIR__ . '/amazon-rate-limit.php';
+          $headers = array_change_key_case((array)($response['headers'] ?? []), CASE_LOWER);
+          amazon_rate_state(data_path('amazon-throttle.lock'), static function (&$state) use ($headers) {
+            $now = microtime(true); $retry = (string)($headers['retry-after'] ?? '');
+            $delay = is_numeric($retry) ? (float)$retry : max(0, (strtotime($retry) ?: 0) - $now);
+            $state['cooldown'] = max((float)($state['cooldown'] ?? 0), $now + max(4, $delay));
+          });
+        }
+      }
+      $payload = $data['payload'] ?? [];
+      $identity = $payload['Identifier'] ?? [];
+      $identityOk = (!isset($payload['ASIN']) || $payload['ASIN'] === $r['asin'])
+        && (!isset($identity['ASIN']) || $identity['ASIN'] === $r['asin'])
+        && (!isset($payload['ItemCondition']) || strcasecmp($payload['ItemCondition'], $r['condition']) === 0)
+        && (!isset($identity['ItemCondition']) || strcasecmp($identity['ItemCondition'], $r['condition']) === 0)
+        && (!isset($payload['marketplaceId']) || $payload['marketplaceId'] === AMZ_MARKETPLACE)
+        && (!isset($identity['MarketplaceId']) || $identity['MarketplaceId'] === AMZ_MARKETPLACE);
+      if ($status !== 200 || !is_array($payload['Offers'] ?? null) || !empty($data['errors']) || !$identityOk) {
+        $out[$key] = ['error' => 'Amazon offer check failed or returned incomplete/mismatched evidence.', 'status' => $status === 200 ? 502 : $status];
+        continue;
+      }
+      $value = amazon_offer_output($r['item'], $r['condition'], $payload);
+      @file_put_contents($r['file'], json_encode($value), LOCK_EX);
+      $out[$key] = ['data' => $value];
+    }
+  } finally { foreach (array_reverse($locks) as $lock) amazon_unlock($lock); }
+  respond(200, ['status' => 'success', 'results' => $out]);
 }
 
 // Every save of settings / hardware prices also goes in <name>-history.jsonl (newest last, the last
@@ -1007,6 +1120,12 @@ switch ("$method $route") {
   case 'GET amazon/catalog':
     require_role('staff');
     amazon_catalog((string)($_GET['upc'] ?? ''), (string)($_GET['q'] ?? ''), (string)($_GET['pageToken'] ?? ''));
+
+  case 'POST amazon/offers-batch':
+    require_role('staff');
+    $batch = json_body();
+    if (!is_array($batch['requests'] ?? null)) fail(400, 'Pass a list of Amazon offer checks.');
+    amazon_offers_batch($batch['requests']);
 
   case 'GET amazon/offers':
     require_role('staff');

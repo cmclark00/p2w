@@ -69,5 +69,32 @@ try {
   amazon_rate_request($file, 'catalog-search', fn() => [429, '', '', ['retry-after' => '90']], $clock, $sleep);
   $r = amazon_rate_request($file, 'offers', function () use (&$calls) { $calls++; return [200, 'offers', '', []]; }, $clock, $sleep);
   check($r[0] === 429 && $calls === 0, 'Catalog cooldown also protects offer calls on every device');
-  echo "Amazon throttling, recovery and shared cooldown checks passed.\n";
-} finally { unlink($file); }
+  file_put_contents($file, ''); $waits = [];
+  amazon_rate_request($file, 'offers-batch', function () use ($file, $clock, $sleep) {
+    $nested = amazon_rate_request($file, 'catalog-search', fn() => [200, 'catalog', '', []], $clock, $sleep);
+    check($nested[0] === 200, 'Catalog can finish while batch network request is still running');
+    return [200, 'batch', '', []];
+  }, $clock, $sleep);
+  amazon_rate_request($file, 'offers', fn() => [200, 'single', '', []], $clock, $sleep);
+  check(!$waits, 'Independent operations do not block behind the batch clock');
+  amazon_rate_request($file, 'offers-batch', fn() => [200, 'batch', '', []], $clock, $sleep);
+  check(count($waits) === 1 && abs($waits[0] - 10.1) < 0.001, 'Batches respect their slower independent quota');
+  file_put_contents($file, '');
+  amazon_rate_request($file, 'offers', function () use ($file, $clock, $sleep) {
+    amazon_rate_request($file, 'catalog-search', fn() => [429, '', '', ['retry-after' => '90']], $clock, $sleep);
+    return [200, 'offers', '', []];
+  }, $clock, $sleep);
+  $state = json_decode(file_get_contents($file), true);
+  check($state['cooldown'] >= $now + 90, 'An in-flight success cannot erase another operation cooldown');
+  file_put_contents($file, json_encode(['lastByOperation' => ['offers' => $now]])); $calls = 0; $waits = [];
+  $raceSleep = function ($seconds) use ($file, &$now, &$waits) {
+    $now += $seconds; $waits[] = $seconds;
+    amazon_rate_state($file, function (&$state) use (&$now) { $state['cooldown'] = $now + 90; });
+  };
+  $r = amazon_rate_request($file, 'offers', function () use (&$calls) { $calls++; return [200, '', '', []]; }, $clock, $raceSleep);
+  check($r[0] === 429 && !$calls, 'Cooldown published during pacing sleep is rechecked before sending');
+  echo "Amazon throttling, independent queues, recovery and shared cooldown checks passed.\n";
+} finally {
+  unlink($file);
+  foreach (['catalog-search', 'catalog-item', 'offers', 'offers-batch'] as $op) if (is_file($file . '.' . $op)) unlink($file . '.' . $op);
+}

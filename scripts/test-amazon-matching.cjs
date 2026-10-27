@@ -509,5 +509,21 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal((await token.fetch()).incomplete,true);
     assert.equal((await token.fetch()).incomplete,undefined); assert.equal(calls,3,'bad UPC page refetched, then title searched');
   });
+  await test('catalog pages continue during offer I/O and final pricing waits for every matching member', async () => {
+    const a=candidate('B000000001'), b=candidate('B000000002');
+    let release, reachedLater;
+    const gate=new Promise(r=>release=r), later=new Promise(r=>reachedLater=r);
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers'){await gate;return offer(params.asin===a.asin?a:b,params.asin===a.asin?3000:2500);}
+      if(params.pageToken){reachedLater();return {candidates:[b]};}
+      if(params.upc)return {candidates:[a],more:true,nextToken:'later'};
+      return {candidates:[a,b]};
+    });
+    let finished=false;const pending=e.fetch().then(r=>{finished=true;return r;});
+    await later;assert.equal(finished,false);release();
+    const result=await pending;e.ctx.result=result;
+    assert.equal(result.incomplete,undefined);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2500);
+  });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

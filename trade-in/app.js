@@ -3598,7 +3598,52 @@ async function loadFloorAmazon() {
 
 // Always compare barcode and title searches. A priced barcode match must not
 // hide a cheaper matching listing. Standard-game evidence is priced separately.
-async function fetchFloorAmazon(product, condition, request = (route, params) => api(route, { params })) {
+// Coalesce simultaneous offer reads into batches without changing their results.
+// One batch HTTP request at a time per page; server queues/cache are shared by staff.
+function createAmazonBatchRequest(send = (route, options) => api(route, options)) {
+  const pending = new Map();
+  let timer = null, running = false;
+  async function flush() {
+    timer = null;
+    if (running) return;
+    running = true;
+    try {
+      while (pending.size) {
+        const group = [...pending.values()].slice(0, 20);
+        try {
+          const response = await send('amazon/offers-batch', { method: 'POST', body: { requests: group.map(r => r.params) } });
+          for (const row of group) {
+            const member = response?.results?.[row.key];
+            if (member?.data) row.resolve(member.data);
+            else row.reject(Object.assign(new Error(member?.error || 'Amazon omitted an offer check; search incomplete.'), { status: member?.status || 502 }));
+          }
+        } catch (error) {
+          // Deployment overlap/older local servers retain the existing endpoint.
+          if ([404, 405].includes(error.status)) {
+            for (const row of group) {
+              try { row.resolve(await send('amazon/offers', { params: row.params })); }
+              catch (e) { row.reject(e); }
+            }
+          } else for (const row of group) row.reject(error);
+        } finally { for (const row of group) pending.delete(row.key); }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    } finally { running = false; }
+  }
+  return (route, params) => {
+    if (route !== 'amazon/offers' || !params.asin) return send(route, { params });
+    const key = `${params.asin}:${params.cond}`;
+    if (!pending.has(key)) {
+      let resolve, reject;
+      const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+      pending.set(key, { key, params: { asin: params.asin, cond: params.cond }, promise, resolve, reject });
+    }
+    if (!running && timer === null) timer = setTimeout(flush, 0);
+    return pending.get(key).promise;
+  };
+}
+const floorAmazonRequest = createAmazonBatchRequest();
+async function fetchFloorAmazon(product, condition, request = floorAmazonRequest) {
   const memo = new Map();
   const shared = (route, params) => {
     const key = JSON.stringify([route, params]);
@@ -3625,15 +3670,14 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       floorAmazonProgress.set(key, progress);
     }
     const pending = (async () => {
-      const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map();
+      const rejected = [], seen = new Set(), verified = [], deferredRenewed = new Map(), offerChecks = [];
       let searched = false, searchError = null, renewedChecked = false;
       const referenceErrors = {};
       const requestKey = (route, params) => JSON.stringify([route, params]);
       async function resumeRequest(route, params) {
         const k = requestKey(route, params);
         if (progress.responses.has(k)) return progress.responses.get(k);
-        // Finish all pages and matching offers sequentially. The server still
-        // throttles requests; only real errors or pagination guards stop a search.
+        // Retain every successful page/member; server pacing still applies.
         const result = await request(route, params);
         progress.responses.set(k, result);
         return result;
@@ -3643,7 +3687,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const tokens = new Set();
         for (let page = 0; page < 50; page++) {
           const data = await resumeRequest('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
-          await check(renewed ? { ...data, candidates: [...deferredRenewed.values(), ...(data.candidates || [])] } : data, !params.upc, renewed);
+          // Identity decisions stay in catalog order (barcodes before title queries).
+          // Offer I/O runs alongside subsequent catalog pages on its independent queue.
+          const work = check(renewed ? { ...data, candidates: [...deferredRenewed.values(), ...(data.candidates || [])] } : data, !params.upc, renewed);
+          work.catch(() => {}); // Collected below; never an unhandled rejection while pages load.
+          offerChecks.push(work);
           if (!data.more) return;
           if (!data.nextToken || tokens.has(data.nextToken)) {
             // Refetch this broken page on Retry instead of replaying a bad token forever.
@@ -3669,19 +3717,25 @@ async function fetchFloorAmazonSingle(product, condition, request) {
           if (reason) rejected.push({ asin: c.asin, title: c.title, reason });
           return !reason;
         });
-        for (const c of matching) {
+        const tasks = matching.flatMap(c => (renewedFallback || cond === 'used' ? ['used', 'new'] : [cond]).map(offerCond => ({ c, offerCond })));
+        const results = await Promise.allSettled(tasks.map(async ({ c, offerCond }) => {
           // A renewed ASIN may carry New offers; that is still a renewed item,
           // never evidence for the original game's sealed condition.
-          for (const offerCond of renewedFallback || cond === 'used' ? ['used', 'new'] : [cond]) {
             const offer = { ...await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback,
               newReference: cond === 'used' && !renewedFallback && offerCond === 'new' };
             const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
               : floorAmazonCandidateMismatch(offer, product, condition, fallback);
-            if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); continue; }
+            if (reason) { rejected.push({ asin: c.asin, title: offer.title, reason }); return; }
             if (offer.found) verified.push({ ...offer, offerCondition: offerCond, matchMethod: fallback ? 'title/platform search' : 'barcode' });
-          }
-        }
+        }));
+        const failure = results.find(r => r.status === 'rejected');
+        if (failure) throw failure.reason;
+      }
+      async function finishOffers() {
+        const results = await Promise.allSettled(offerChecks);
+        const failure = results.find(r => r.status === 'rejected');
+        if (failure) throw failure.reason;
       }
       const priced = () => floorAmazonPrioritizeUsed({ product, condition }, verified.filter((a) => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0));
       try {
@@ -3691,13 +3745,15 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
         for (const q of queries) await catalog({ q });
+        await finishOffers();
         // Keep the existing Renewed fallback when no regular Used offer exists.
         if (!priced().some(a => !a.newReference) && condition !== 'new') {
           renewedChecked = true;
           const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
           await catalog({ q }, true);
+          await finishOffers();
         }
-      } catch (err) { searchError = err.message; }
+      } catch (err) { await Promise.allSettled(offerChecks); searchError = err.message; }
       // For sealed inventory, Used is a comparison only. It can neither price
       // the sealed copy nor make an otherwise completed New lookup incomplete.
       if (cond === 'new' && !searchError) {

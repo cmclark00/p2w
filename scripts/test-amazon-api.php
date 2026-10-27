@@ -21,12 +21,16 @@ function amazon_get(array $keys, string $path, array $query): array {
     $GLOBALS['calls'][] = [$path, $query];
     return ($GLOBALS['fake'])($path, $query);
 }
+function amazon_post(array $keys, string $path, array $body): array {
+    $GLOBALS['calls'][] = [$path, $body];
+    return ($GLOBALS['fakePost'])($path, $body);
+}
 function check(bool $yes, string $why): void { if (!$yes) throw new RuntimeException($why); }
 function response(callable $f): TestResponse { try { $f(); } catch (TestResponse $r) { return $r; } throw new RuntimeException('Expected response'); }
 $source = file_get_contents(__DIR__ . '/../trade-in/api.php');
 $start = strpos($source, 'function amazon_candidate(');
 $end = strpos($source, '// Every save of settings', $start);
-eval(substr($source, $start, $end - $start));
+eval(str_replace('__DIR__', var_export(dirname(__DIR__) . '/trade-in', true), substr($source, $start, $end - $start)));
 try {
     $item = ['asin' => 'B000000001', 'summaries' => [
         ['marketplaceId' => 'OTHER', 'itemName' => 'Wrong marketplace title'],
@@ -73,9 +77,54 @@ try {
     check(amazon_cache_file(amazon_keys(), 'offers', ['New']) !== amazon_cache_file(amazon_keys(), 'offers', ['Used']), 'Condition isolation');
     check(amazon_cache_file(amazon_keys(), 'catalog', []) !== amazon_cache_file(['refreshToken' => 'other'], 'catalog', []), 'Credential isolation');
     foreach (['catalog', 'offers'] as $route) check((bool)preg_match("/case 'GET amazon\/$route':\s*require_role\('staff'\)/", $source), 'Staff-only route');
-    echo "Amazon API offline checks passed.\n";
+    check((bool)preg_match("/case 'POST amazon\\/offers-batch':\\s*require_role\\('staff'\\)/", $source), 'Batch route is staff-only');
+    foreach ([[], array_fill(0, 21, ['asin' => 'B000000001', 'cond' => 'used']), [['asin' => '../secret', 'cond' => 'used']], [['asin' => 'B000000001', 'cond' => 'bad']]] as $bad) {
+        check(response(fn() => amazon_offers_batch($bad))->status === 400, 'Reject malformed batches');
+    }
+    $requests = [];
+    for ($i = 10; $i < 16; $i++) $requests[] = ['asin' => 'B' . str_pad((string)$i, 9, '0', STR_PAD_LEFT), 'cond' => 'used'];
+    $fake = function ($path, $query) use ($item) {
+        if (str_contains($path, '/catalog/')) return [200, json_encode(array_merge($item, ['asin' => basename($path)]))];
+        return [200, json_encode(['payload' => ['Offers' => [['ListingPrice' => ['Amount' => 20], 'Shipping' => ['Amount' => 2], 'SubCondition' => 'very_good']]]])];
+    };
+    $fakePost = function ($path, $body) {
+        check($path === '/batches/products/pricing/v0/itemOffers', 'Official batch endpoint');
+        check(count($body['requests']) === 6, 'Use batch for six uncached members');
+        $responses = [];
+        foreach ($body['requests'] as $i => $r) {
+            preg_match('#/items/([^/]+)/offers#', $r['uri'], $m); $asin = $m[1];
+            $response = ['request' => ['Asin' => $asin, 'ItemCondition' => $r['ItemCondition'], 'MarketplaceId' => AMZ_MARKETPLACE],
+                'status' => ['statusCode' => 200], 'body' => ['payload' => ['ASIN' => $asin, 'ItemCondition' => 'Used',
+                    'Offers' => [['ListingPrice' => ['Amount' => 20 + $i], 'Shipping' => ['Amount' => 2], 'SubCondition' => 'very_good']]]]];
+            if ($i === 1) { $response['status']['statusCode'] = 429; $response['headers'] = ['Retry-After' => '60']; }
+            if ($i === 2) $response['body']['payload']['ASIN'] = 'B999999999';
+            if ($i === 3) continue; // Missing member cannot become an empty success.
+            if ($i === 4) $responses[] = $response; // Duplicate member is ambiguous.
+            $responses[] = $response;
+        }
+        return [200, json_encode(['responses' => array_reverse($responses)])];
+    };
+    $batch = response(fn() => amazon_offers_batch($requests))->payload['results'];
+    check($batch['B000000010:used']['data']['lowest'] === 2200, 'Batch includes shipping and preserves subcondition');
+    check($batch['B000000010:used']['data']['offers'][0]['sub'] === 'very_good', 'Batch grade survives');
+    check($batch['B000000015:used']['data']['lowest'] === 2700, 'Reordered response maps by identity, not index');
+    foreach ([11, 12, 13, 14] as $i) check(isset($batch['B0000000' . $i . ':used']['error']), 'Failed, mismatched, missing and duplicate members stay incomplete');
+    $state = json_decode(file_get_contents(data_path('amazon-throttle.lock')), true);
+    check($state['cooldown'] > microtime(true) + 50, 'Member 429 preserves shared cooldown even when envelope is HTTP 200');
+    $before = count($calls);
+    response(fn() => amazon_offers('', 'used', 'B000000010'));
+    response(fn() => amazon_offers_batch([$requests[0], $requests[5]]));
+    check(count($calls) === $before, 'Batch and individual endpoints share successful cache entries');
+    $retry = response(fn() => amazon_offers_batch([$requests[1]]))->payload['results'];
+    check($retry['B000000011:used']['data']['lowest'] === 2200, 'Failed members are retried using singles for a small remaining group');
+    $fakePost = fn() => [403, '{}'];
+    $fresh = array_map(fn($r) => ['asin' => str_replace('B0000000', 'B0000001', $r['asin']), 'cond' => 'new'], $requests);
+    $fallback = response(fn() => amazon_offers_batch($fresh))->payload['results'];
+    check(count(array_filter($fallback, fn($r) => isset($r['data']))) === 6, 'Unsupported batch permission retains individual offer checks');
+    echo "Amazon API offline checks and batch identity, cache, partial failure and fallback checks passed.\n";
 } finally {
     foreach (glob($folder . '/cache/*') ?: [] as $file) unlink($file);
     if (is_dir($folder . '/cache')) rmdir($folder . '/cache');
+    foreach (glob($folder . '/*') ?: [] as $file) unlink($file);
     rmdir($folder);
 }

@@ -933,8 +933,9 @@ Guide (the Google Sheet tab).
      An unfinished search with no price says **No priced offer found yet**,
      not that Amazon has no offers. **Retry Amazon** resumes after a failure
      without repeating completed checks. Unfinished progress expires after one hour.
-     Catalog searches use Amazon's faster catalog allowance; offer-price requests
-     keep their separate limit. Variant and standard-game searches overlap and
+     Catalog searches continue while matching offer prices are checked in batches.
+     Shared results avoid repeating checks across staff computers. Amazon's limits
+     still apply. Variant and standard-game searches overlap and
      share duplicate requests. All pages, matching checks and pricing rules remain
      in place; busy periods or Amazon throttling can still take longer.
      For used/CIB items, if barcode and title/platform searches find no usable

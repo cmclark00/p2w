@@ -1060,9 +1060,20 @@ The site's **only server-side code**. Everything else is static.
     compares known UPCs plus exact-title/platform and base-title/platform
     searches, even when the barcode already has an offer. Search candidates
     require positive platform evidence in the title or attributes. Catalog
-    searches automatically follow every pageToken and check matching offers
-    sequentially, with up to five known UPCs; no manual batch continuation is
-    needed. Server throttling uses each operation's quota. Successful responses
+    searches automatically follow every pageToken with up to five known UPCs;
+    no manual continuation is needed. Catalog pages overlap offer I/O. The browser
+    coalesces matching ASIN/condition reads into groups of at most 20 through
+    `POST amazon/offers-batch`; six or more uncached members use SP-API itemOffersBatch,
+    smaller groups use individual offers. Unsupported batch access falls back to
+    singles. Responses map by ASIN/condition/marketplace, never array position;
+    failed/missing/duplicate members stay incomplete, while successful ones cache.
+    Per-cache-key locks deduplicate work across staff. Search results seed the
+    single-ASIN metadata cache using Amazon's own title/platform evidence.
+    Server queues use separate operation locks (catalog search/item, offers,
+    batches), with the shared state lock held only for clock updates. Batches
+    use a conservative 10.1-second cadence; global 429 cooldowns, including
+    member failures inside HTTP 200 batches, still protect all queues/devices.
+    A success never clears another operation's cooldown. Successful responses
     are retained in memory for one hour while incomplete; Retry replays
     those locally and resumes remaining requests after a failure. Complete results use the normal
     result cache. Saving/removing credentials clears both caches. Missing/repeated
