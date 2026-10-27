@@ -918,8 +918,14 @@ Guide (the Google Sheet tab).
    - **Possible high outliers:** one isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
-     the next highest valid sale. Cheaper sales farther down the list do not
-     trigger another outlier test. For any title, $34.95 beside $26 stays
+     the next highest valid sale. A group of **two or three high sales** is
+     also flagged if it is less than half the eligible sales, has at least
+     three lower comparables, and even its lowest price is **3× the median**
+     (middle price) or more. The group must also have the same 50%/$5 gap
+     above the next lower sale. Skylanders/Disney Infinity retain their looser
+     3×/$25 gap. The median is calculated once from eligible sales for that
+     condition, never repeatedly lowered by removing sales. This catches
+     $175/$149.95 above a $35–$45 range. For any title, $34.95 beside $26 stays
      eligible; an isolated $16 beside $10 is still flagged. There is no
      Kingdom Hearts exception. The row stays visible for review. Open its
      link and check that it actually sold and matches the item; click the

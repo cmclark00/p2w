@@ -3263,6 +3263,8 @@ const FLOOR_AMAZON_OUTLIER = 2;
 const FLOOR_SALE_OUTLIER_MIN = 4;
 const FLOOR_SALE_OUTLIER_RATIO = 1.5;
 const FLOOR_SALE_OUTLIER_GAP = 500; // cents; avoid treating tiny dollar differences as outliers
+const FLOOR_SALE_CLUSTER_MEDIAN_RATIO = 3;
+const FLOOR_SALE_CLUSTER_MAX = 3;
 // Skylanders/Infinity are priced toward their high sales. Only a much larger
 // isolated spike is excluded; other categories use the ordinary gap thresholds.
 const FLOOR_TOY_OUTLIER_RATIO = 3;
@@ -4375,12 +4377,25 @@ function floorSales(cur = floorCur) {
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
-    const isolatedGap = top.price >= next.price * (relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO)
-      && top.price - next.price >= (relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP);
-    // Compare to the next valid sale, not the broader lower-price cluster.
-    // Higher legitimate copies should not be discarded just because most sales are cheaper.
+    const ratio = relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO;
+    const gap = relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP;
+    const isolatedGap = top.price >= next.price * ratio && top.price - next.price >= gap;
     if (isolatedGap) {
       top.outlier = { nextPrice: next.price, lowerCount: normal.length - 1 };
+    }
+    // One fixed median of the eligible, selected-condition sample: never
+    // repeatedly remove high prices and recalculate against a cheaper sample.
+    const middle = Math.floor(normal.length / 2);
+    const median = normal.length % 2 ? normal[middle].price
+      : (normal[middle - 1].price + normal[middle].price) / 2;
+    for (let count = Math.min(FLOOR_SALE_CLUSTER_MAX, Math.floor((normal.length - 1) / 2)); count >= 2; count--) {
+      if (normal.length - count < 3) continue;
+      const lowest = normal[count - 1].price, below = normal[count].price;
+      if (lowest < median * FLOOR_SALE_CLUSTER_MEDIAN_RATIO || lowest < below * ratio || lowest - below < gap) continue;
+      for (const sale of normal.slice(0, count)) {
+        sale.outlier = { nextPrice: below, lowerCount: normal.length - count, median, groupCount: count };
+      }
+      break;
     }
   }
   return sales;
@@ -4797,7 +4812,10 @@ function floorOwnBasis(cur = floorCur) {
   const amazonMismatch = floorAmazonMismatch(cur);
   if (amazonMismatch) checks.push(`Amazon excluded from pricing: ${amazonMismatch}. Review the linked listing`);
   for (const s of sales.filter((s) => s.outlier)) {
-    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: next comparable sale ${money(s.outlier.nextPrice)}, with ${s.outlier.lowerCount} lower sales. Open the listing and verify it actually sold before using it`);
+    const comparison = s.outlier.groupCount
+      ? `group of ${s.outlier.groupCount} high sales; eligible-sales median ${money(s.outlier.median)}, next sale below group ${money(s.outlier.nextPrice)}`
+      : `next comparable sale ${money(s.outlier.nextPrice)}`;
+    checks.push(`${picked?.i === s.i ? 'Manually included' : 'Excluded from automatic pricing'} possible high sale outlier ${money(s.price)}: ${comparison}, with ${s.outlier.lowerCount} lower sales. Verify the sale, condition and whether the price is representative before including it`);
   }
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);

@@ -673,13 +673,17 @@ The site's **only server-side code**. Everything else is static.
     `floorSales()` flags an isolated highest sale when
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
-    single highest sale is excluded; no recursive removal or median cap.
-    Compare only to the next valid sale, not the upper quartile of cheaper
-    sales. The broad cluster exclusion and Kingdom Hearts title exception
-    were removed: $34.95 beside $26 stays eligible for any title, while
-    an isolated $16 beside $10 still meets the exclusion thresholds.
-    Nearby high sales support one another, and fewer than four comparables
-    keep the ordinary sparse-data behavior. This is a review heuristic,
+    single highest sale is excluded by the isolated-sale check. A separate
+    small-group check catches two or three high sales when the group is a
+    strict minority, at least three lower comparables remain, and its lowest
+    price is at least 3x the median of all eligible selected-condition sales.
+    The boundary to the next sale below that group must also meet the same
+    relative/dollar gap. Use one fixed median, never recursive recalculation;
+    inspect groups largest first and exclude at most three rows. Review notes
+    give the median, group size and next lower price. No median price cap or
+    title-specific exception: $34.95 beside $26 remains eligible, while
+    $175/$149.95 above a $35–$45 cluster is flagged. Sparse data retains the
+    ordinary behavior. This is a review heuristic,
     not verification that a listing did or did not sell.
     Sales older than six calendar months are excluded when at least three distinct
     eligible matching sales fall within that window. With fewer than three, old
@@ -910,8 +914,9 @@ The site's **only server-side code**. Everything else is static.
     Skylanders/Infinity use the condition's PriceCharting market value;
     uncommon figures and rare Skylanders use the highest eligible sale with
     existing variant checks. Skylanders/Infinity use a looser outlier rule:
-    only an isolated sale at least 3x the next valid sale AND $25 higher is
-    excluded, with at least three lower valid comparables. Amiibo, other toy
+    an isolated sale must be at least 3x the next valid sale AND $25 higher,
+    with at least three lower valid comparables. Small high groups also need
+    this looser 3x/$25 boundary, plus the ordinary median/minority safeguards. Amiibo, other toy
     lines and games use the ordinary 50% and $5 next-sale gap thresholds.
     When a verified, priced Amazon match exists for the selected condition,
     Skylanders/Infinity instead use the normal maximum of highest eligible

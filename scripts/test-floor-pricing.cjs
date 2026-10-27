@@ -703,6 +703,60 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
 });
 
+test('median check excludes a small high cluster without changing premiums or manual review', () => {
+  const product = { ...item, 'product-name': 'Final Fantasy VIII', 'console-name': 'Playstation', 'gamestop-price': 1999, 'cib-price': 2980 };
+  const example = highSaleCur([17500,14995,4499,4400,4299,3800,3599,3500], product,
+    { amazon: { found: true, offers: [{price:2799}] } });
+  const before = JSON.stringify(example);
+  const rows = invoke('floorSales',example);
+  assert.equal(rows.filter(s=>s.outlier).length,2);
+  assert.equal(rows[0].outlier.median,4349.5);
+  assert.equal(rows[1].outlier.groupCount,2);
+  assert.equal(rows[0].outlier.nextPrice,4499);
+  assert.equal(invoke('floorResult',example).r.price,4500);
+  assert.ok(invoke('floorResult',example).b.checks.some(s=>s.includes('eligible-sales median')));
+  assert.equal(invoke('floorResult',{...example,pick:0}).r.price,17500);
+  const old = json('settings.floorPremiums');
+  try {
+    run('settings.floorPremiums = [{phrase:"Final Fantasy VIII",pct:50}]');
+    const result = invoke('floorResult',example);
+    assert.equal(result.b.basis,4499);
+    assert.equal(result.premium.pct,50);
+    assert.equal(result.r.price,7000);
+  } finally { run(`settings.floorPremiums = ${JSON.stringify(old)}`); }
+  assert.equal(JSON.stringify(example),before);
+});
+
+test('median groups require a minority, three lower comparables and a clear boundary without cascading', () => {
+  for (const [prices, count] of [
+    [[17500,14995,14000,4499,4400,4299,3800],3],
+    [[9000,9000,1000,1000,1000],2],
+    [[9000,9000,1000,1000],0],
+    [[9000,9000,9000,1000,1000,1000],0],
+    [[3000,3000,1000,1000,1000],2],
+    [[2999,2999,1000,1000,1000],0],
+    [[9000,8500,6000,5000,2000,2000,2000,2000,2000],0],
+    [[8000,6000,4000,3000,2999,2900,2800,2700],0],
+    [[3000,1600,1000,999,950],1],
+  ]) assert.equal(invoke('floorSales',highSaleCur(prices)).filter(s=>s.outlier).length,count,prices.join(','));
+  const example=highSaleCur([9000,9000,1000,1000,1000]);
+  example.sales.cib[4].title='Example Game Steelbook';
+  example.sales.loose=[1000,1000,1000].map(price=>({price,title:'Example Game'}));
+  assert.equal(invoke('floorSales',example).filter(s=>s.outlier).length,0,'Wrong editions and other conditions cannot supply support');
+});
+
+test('median group detection preserves looser Skylanders and Infinity gaps', () => {
+  for(const system of ['Skylanders','Disney Infinity','Playstation 4']) {
+    const product={...item,'product-name':'Example Figure','console-name':system};
+    const example=highSaleCur([6500,6000,2500,1000,1000,1000,1000],product);
+    example.sales.cib.forEach((s,i)=>{s.url=`https://www.ebay.com/itm/${111111111111+i}`;});
+    if(system!=='Playstation 4') { example.condition='loose'; example.sales.loose=example.sales.cib; }
+    assert.equal(invoke('floorSales',example).filter(s=>s.outlier).length,system==='Playstation 4'?2:0,system);
+    example.sales.cib[2].price=2000;
+    assert.equal(invoke('floorSales',example).filter(s=>s.outlier).length,2,system);
+  }
+});
+
 test('named game lists cannot price a single game across sold evidence and Amazon', () => {
   const product = { ...item, 'product-name': 'Sword Art Online: Lost Song' };
   const bundle = 'Sword Art Online: Lost Song, Hollow Realization, PlayStation 4 PS4';
