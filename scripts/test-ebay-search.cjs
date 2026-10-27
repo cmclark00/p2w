@@ -142,6 +142,16 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.deepEqual(marketPages,[1,2],'A sold price plus shipping at 3x market cannot stop pagination');
   assert.equal(result(marketLimited).b.basis,1500);
   assert.equal(rows(marketLimited)[0].outlier.pcLimit,3000);
+  const savedPricingRules=vm.runInContext('settings.floorPremiums',ctx);
+  try {
+    vm.runInContext('settings.floorPremiums=[{phrase:"WWE 2K20",pct:0}]',ctx);
+    const specific={...searchCur(),product:wwe}, specificPages=[];
+    await invoke(ctx,'runFloorEbaySearch',specific,()=>{},()=>false,{search:async(q,page)=>{
+      specificPages.push(page);return {...ready([{...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),price:3000}]),page,more:true};
+    }});
+    assert.deepEqual(specificPages,[1],'A specific rule can stop at a valid sold match at 3x PC');
+    assert.equal(result(specific).b.basis,3000);
+  } finally {ctx.savedPricingRules=savedPricingRules;vm.runInContext('settings.floorPremiums=savedPricingRules',ctx);}
   const sao = {...searchCur(), product:{...wwe,'cib-price':3000,'product-name':'Sword Art Online: Lost Song'}};
   const saoPages=[];
   await invoke(ctx,'runFloorEbaySearch',sao,()=>{},()=>false,{search:async(q,page)=>{

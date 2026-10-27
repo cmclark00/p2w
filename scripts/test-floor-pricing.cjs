@@ -798,7 +798,7 @@ test('PriceCharting guard works with one sale, preserves fallbacks, premiums and
   const old=json('settings.floorPremiums');
   try {
     run('settings.floorPremiums=[{phrase:"Final Fantasy IX",pct:100}]');
-    assert.equal(invoke('floorResult',example).r.price,12000,'Premium can exceed the general evidence threshold');
+    assert.equal(invoke('floorResult',example).r.price,24000,'Specific premium uses the highest valid sale without general outlier exclusions');
     run('settings.floorPremiums=[]');
     assert.equal(invoke('floorResult',{...example,pick:0}).b.basis,12000);
     assert.equal(invoke('floorResult',{...example,typed:13000}).b.from,'typed');
@@ -811,6 +811,39 @@ test('PriceCharting guard works with one sale, preserves fallbacks, premiums and
     const noMarket=highSaleCur([9000],{...product,'cib-price':market});
     assert.equal(invoke('floorResult',noMarket).b.basis,9000,'Missing/invalid market must not create a zero threshold');
   }
+});
+
+test('specific pricing rules bypass price-only outliers including zero-percent Pokemon rules', () => {
+  const original=json('settings.floorPremiums');
+  try {
+    for (const [name,system] of [['Pokemon Yellow','GameBoy'],['Pokemon Diamond','Nintendo DS'],["Conker's Bad Fur Day",'Nintendo 64']]) {
+      const product={...item,'product-name':name,'console-name':system,'cib-price':1000};
+      assert.ok(invoke('floorPricingRule',name,system),'Configured rule exists');
+      for(const prices of [[9000,2000,1900,1800],[9000,8500,2000,1900,1800,1700]]) {
+        const example=highSaleCur(prices,product);
+        assert.equal(invoke('floorSales',example).some(s=>s.outlier),false,'3x and single/group outliers bypassed');
+        assert.equal(invoke('floorResult',example).b.basis,9000);
+        assert.ok(invoke('floorResult',example).b.checks.some(s=>s.includes('Specific pricing rule')));
+      }
+    }
+    assert.equal(invoke('floorPremium','Pokemon Diamond','Nintendo DS'),null,'0% still means no percentage increase');
+    for(const pct of [25,-10,0]) {
+      run(`settings.floorPremiums=[{phrase:'Example Game',system:'Playstation 4',pct:${pct}}]`);
+      const example=highSaleCur([9000,8500,2000,1900,1800,1700],{...item,'cib-price':1000});
+      assert.equal(invoke('floorResult',example).b.basis,9000);
+      assert.equal(invoke('floorResult',example).r.premiumBasis,9000*(1+pct/100));
+      assert.ok(invoke('floorSales',{...example,product:{...example.product,'console-name':'Playstation 3'}})[0].outlier,'Wrong-system rule cannot exempt another game');
+      for(const [change,check] of [[{title:'Example Game PS4, Fallout4'},null],[{title:'Example Game PS4 French'},null],
+        [{title:'Example Game PS4 Brand New Sealed'},null],[{sellerCountry:'Italy',locationSource:'ebay-located-in'},null],
+        [{},{state:'offer'}],[{},{state:'ended'}]]) {
+        const sale={...example.sales.cib[0],...change,url:'https://www.ebay.com/itm/123456789012'};
+        const invalid={...example,sales:{cib:[sale,...example.sales.cib.slice(2)]},ebayChecks:{results:{'123456789012':check}}};
+        assert.equal(invoke('floorSales',invalid)[0].odd,true,'Specific rule cannot admit invalid evidence: '+JSON.stringify([change,check]));
+      }
+    }
+    run('settings.floorPremiums=[]');
+    assert.ok(invoke('floorSales',highSaleCur([9000,2000,1900,1800],{...item,'cib-price':1000}))[0].outlier,'Unconfigured games retain general filters');
+  } finally {run(`settings.floorPremiums=${JSON.stringify(original)}`);}
 });
 
 test('market guard uses each edition reference and leaves special figure policies intact', () => {
@@ -844,9 +877,9 @@ test('median check excludes a small high cluster without changing premiums or ma
   try {
     run('settings.floorPremiums = [{phrase:"Final Fantasy VIII",pct:50}]');
     const result = invoke('floorResult',example);
-    assert.equal(result.b.basis,4499);
+    assert.equal(result.b.basis,17500);
     assert.equal(result.premium.pct,50);
-    assert.equal(result.r.price,7000);
+    assert.equal(result.r.price,26000);
   } finally { run(`settings.floorPremiums = ${JSON.stringify(old)}`); }
   assert.equal(JSON.stringify(example),before);
 });
@@ -960,7 +993,7 @@ test('Killzone uses the supported baseline without a special discount while othe
   const killzone = invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'product-name': 'Killzone: Shadow Fall' }, { amazon }));
   assert.equal(killzone.b.basis, 1000); assert.equal(killzone.premium, null); assert.equal(killzone.r.price, 1000);
   const pokemon = invoke('floorResult', highSaleCur([10000, 5000, 4999, 4500], { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }));
-  assert.equal(pokemon.b.basis, 5000); assert.equal(pokemon.premium.pct, 10); assert.equal(pokemon.r.price, 5500);
+  assert.equal(pokemon.b.basis, 10000); assert.equal(pokemon.premium.pct, 10); assert.equal(pokemon.r.price, 11000);
 });
 
 test('outlier thresholds require both a large relative gap and a $5 gap with three lower comparables', () => {

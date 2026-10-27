@@ -582,7 +582,7 @@ function shitboxReason(line, g) {
 // The shop's premium for a game on the shelf ({ phrase, system?, pct }), or null. The longest matching phrase
 // wins; for the same phrase, a line naming the game's system beats one without (system = PriceCharting console).
 // A negative pct lowers the price; 0 exempts the game from shorter lines.
-function floorPremium(name, system = '', s = settings) {
+function floorPricingRule(name, system = '', s = settings) {
   const text = norm(name);
   const sys = norm(system);
   const rank = (pr) => norm(pr.phrase).length * 2 + (pr.system ? 1 : 0);
@@ -591,6 +591,10 @@ function floorPremium(name, system = '', s = settings) {
     if (!hasPhrase(text, pr.phrase) || (pr.system && !hasPhrase(sys, pr.system))) continue;
     if (!best || rank(pr) > rank(best)) best = pr;
   }
+  return best;
+}
+function floorPremium(name, system = '', s = settings) {
+  const best = floorPricingRule(name, system, s);
   return best && best.pct !== 0 ? best : null;
 }
 // "Pokemon on GameBoy premium +25%" / "Pokemon Red on GameBoy discount −5%"
@@ -4397,8 +4401,11 @@ function floorSales(cur = floorCur) {
   // This reference guard does not require a large sample. Use the selected
   // product/condition's market value, never retail estimates or another edition.
   const pcMarket = Number(cur.product?.[PC_FIELDS.market[cur.condition]]);
+  // Specific configured rules (including explicit 0% exceptions) outrank
+  // generic price-only exclusions. Invalid listing evidence still stays out.
+  const specificPricing = !!floorPricingRule(name, cur.product?.['console-name']);
   // Toys-to-life retain their specific common-average / uncommon-high-sale policy.
-  if (!floorToyFamily(cur.product) && Number.isFinite(pcMarket) && pcMarket > 0) {
+  if (!specificPricing && !floorToyFamily(cur.product) && Number.isFinite(pcMarket) && pcMarket > 0) {
     const pcLimit = pcMarket * FLOOR_SALE_PC_LIMIT_RATIO;
     for (const sale of sales) {
       if (!sale.odd && Number.isFinite(sale.price) && sale.price >= pcLimit) {
@@ -4437,7 +4444,7 @@ function floorSales(cur = floorCur) {
   }
   const normal = sales.filter((s) => !s.odd && !s.outlier && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
-  if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
+  if (!specificPricing && normal.length >= FLOOR_SALE_OUTLIER_MIN) {
     const [top, next] = normal;
     const ratio = relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO;
     const gap = relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP;
@@ -4872,6 +4879,8 @@ function floorOwnBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
+  const specificRule = floorPricingRule(cur.product?.['product-name'], cur.product?.['console-name']);
+  if (specificRule) checks.push(`Specific pricing rule: ${specificRule.phrase}${specificRule.system ? ` on ${specificRule.system}` : ''}. General 3× PriceCharting, isolated-high-sale and median-group exclusions do not apply; listing identity, condition, location and sale verification checks still apply`);
   if (cur.directEbay?.result) {
     const search = cur.directEbay.result;
     checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Direct sale totals include known shipping once; item/shipping amounts are shown in each row. Shipping marked unknown is not assumed free. Matching used copies, including loose games, can support CIB pricing.` : search.reason);
@@ -5233,7 +5242,7 @@ function renderFloorPricer() {
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
             <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
-            <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
+            <li>General high-sale outlier filters do not apply when a specific pricing rule matches. Invalid listings remain excluded.</li>
             <li>Rounding: through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
