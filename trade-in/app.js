@@ -3359,17 +3359,13 @@ function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging
     return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && sealed);
   }
   return ODD_SALE_RE.test(t) || BUNDLE_RE.test(t) || (rhythm === 'disc' && WITH_INSTRUMENTS_RE.test(t))
-    || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(t) : NOT_COMPLETE_RE.test(t))
+    || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(t) : !(condition === 'cib' && sale.cibUsedEvidence) && NOT_COMPLETE_RE.test(t))
     || (condition !== 'new' && sealed);
 }
 
 // eBay's item-condition filter for the sold-listings link: Loose and CIB are used copies (eBay's Used, Like
 // New, Very Good, Good and Acceptable grades: 3000, 2750, 4000, 5000, 6000), New is Brand New (1000).
 const EBAY_CONDITIONS = { loose: '3000|2750|4000|5000|6000', cib: '3000|2750|4000|5000|6000', new: '1000' };
-// Words that narrow eBay's search to the condition: loose leaves out boxed and sealed copies, CIB asks for
-// complete ones, New for sealed ones.
-const EBAY_WORDS = { loose: ' -sealed -cib -complete -"brand new"', cib: ' (complete,cib)', new: ' sealed' };
-
 // Links for double-checking a price on eBay, GameStop, Amazon, or PriceCharting.
 function floorLinks(p, condition) {
   condition = floorCondition(p, condition);
@@ -3377,8 +3373,8 @@ function floorLinks(p, condition) {
   const sys = p['console-name'] || '';
   const q = (s) => encodeURIComponent(s.replace(/\s+/g, ' ').trim());
   return {
-    // Sold listings in this condition, highest price first.
-    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(`${name} ${sys}${floorToyFamily(p) && condition === 'loose' ? '' : EBAY_WORDS[condition] || ''}`)}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
+    // Short identity query, highest total first; do not require CIB/complete words.
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(floorEbaySearchQuery(p))}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
       + `&LH_ItemCondition=${encodeURIComponent(EBAY_CONDITIONS[condition] || EBAY_CONDITIONS.loose)}`,
     gamestop: `https://www.gamestop.com/search/?q=${q(name)}`,
     amazon: `https://www.amazon.com/s?k=${q(`${name} ${sys}`)}`,
@@ -3999,8 +3995,13 @@ const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a
   price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
 const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state) || !!verification?.skipped;
 function floorEbaySearchQuery(product) {
-  // Search the edition's identity without demanding sellers use the word Edition.
-  return `${product['product-name'] || ''} ${product['console-name'] || ''}`.replace(/[\[\]()]/g, ' ')
+  // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
+  // packaging adjectives: these are evaluated on results, not demanded in search.
+  const system = String(product['console-name'] || '').replace(/playstation\s*([1-5])/i, 'PS$1')
+    .replace(/^playstation$/i, 'PS1').replace(/playstation vita/i, 'PS Vita')
+    .replace(/game\s*boy advance/i, 'GBA').replace(/super nintendo/i, 'SNES')
+    .replace(/nintendo entertainment system/i, 'NES');
+  return `${product['product-name'] || ''} ${system}`.replace(/[\[\]():]/g, ' ')
     .replace(/\bedition\b/gi, '').replace(/\s+/g, ' ').trim().slice(0, 180);
 }
 function floorDirectCondition(sale, product) {
@@ -4020,13 +4021,18 @@ function floorMergedSales(cur, pool) {
   for (const s of result.sales) {
     const previous = merged.get(s.id);
     let condition = floorDirectCondition(s, cur.product);
+    // CIB can use a higher-priced used copy even when loose or packaging is
+    // unspecified. This never admits sealed, broken, accessory-only or wrong-game evidence.
+    const cibUsedEvidence = cur.condition === 'cib' && !floorToyFamily(cur.product) && !floorIsHardware(cur.product)
+      && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText || '') && condition !== 'new';
     // An otherwise valid PC row already supplies its condition category. A generic
     // used grade adds sold evidence, but must not demote that row merely for brevity.
     if (!condition && previous && cur.condition !== 'new' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
       && !floorListingMismatch(previous.title, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
     merged.delete(s.id); // The same eBay listing must not count twice or in the wrong condition.
-    if (condition && condition !== cur.condition) continue;
-    merged.set(s.id, { ...s, directEbay: true, conditionUnknown: !condition,
+    if (condition && condition !== cur.condition && !cibUsedEvidence) continue;
+    const shipping = Number.isSafeInteger(s.shipping) && s.shipping >= 0 ? s.shipping : null;
+    merged.set(s.id, { ...s, itemPrice: s.price, shipping, price: s.price + (shipping || 0), directEbay: true, cibUsedEvidence, conditionUnknown: !condition && !cibUsedEvidence,
       searchVerification: { state: s.state, price: s.price, checkedAt: result.checkedAt, source: 'ebay-search' } });
   }
   return [...merged.values()];
@@ -4070,7 +4076,7 @@ function floorDirectSearchHtml(cur) {
   if (!s) return '';
   const r = s.result;
   const note = s.loading ? 'Searching eBay sold listings…' : r?.state === 'ready'
-    ? `Direct eBay · ${r.sales.length} sold results read${r.partial ? ' · partial search' : ''}`
+    ? `Direct eBay · ${r.sales.length} sold results read · includes known shipping${r.partial ? ' · partial search' : ''}`
     : r?.reason || 'Direct eBay search unavailable';
   return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || r.partial) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
 }
@@ -4080,7 +4086,7 @@ function floorEbayResult(sale, product, result, condition) {
   if (!result.title || floorListingMismatch(result.title, product)) return { state: 'mismatch' };
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
-  if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== sale.price)) return { state: 'price' };
+  if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
   return { state: result.state, price: result.price, checkedAt: result.checkedAt };
 }
 async function verifyFloorEbaySale(cur, index, progress = () => {}, cancelled = () => false,
@@ -4651,7 +4657,7 @@ function floorOwnBasis(cur = floorCur) {
   const checks = [];
   if (cur.directEbay?.result) {
     const search = cur.directEbay.result;
-    checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Item prices are used; shipping is shown separately, keeping existing pricing rules.` : search.reason);
+    checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Direct sale totals include known shipping once; item/shipping amounts are shown in each row. Shipping marked unknown is not assumed free. Matching used copies, including loose games, can support CIB pricing.` : search.reason);
   }
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
@@ -4832,7 +4838,7 @@ function renderFloorPricer() {
     salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
-        <td class="muted">${esc(s.date)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>+ ${money(s.shipping)} shipping` : ''}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
+        <td class="muted">${esc(s.date)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
       `;
   }

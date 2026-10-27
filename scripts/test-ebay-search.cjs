@@ -45,7 +45,10 @@ const base = () => ({ product, condition: 'cib', sales: { cib: [{ ...sold, price
 const result = c => invoke(ctx, 'floorResult', c);
 const rows = c => invoke(ctx, 'floorSales', c);
 assert.equal(rows(base()).length, 1, 'Same item dedupes across PriceCharting and eBay');
-assert.equal(result(base()).r.price, 4000, 'Recovered $40 sale follows unchanged rounding, no forced $50');
+assert.equal(result(base()).b.basis, 4612, 'Recovered sale includes known shipping exactly once');
+assert.equal(result(base()).r.price, 4500, 'Total follows unchanged rounding');
+assert.equal(result(base()).b.basis, 4612, 'Repeated pricing does not add shipping again');
+assert.equal(invoke(ctx, 'floorEbayResult', rows(base())[0], product, { id:sold.id, title:sold.title, state:'sold', price:4000 }, 'cib').state, 'sold', 'Original-item checks compare item price, not delivered total');
 assert.equal(rows(base())[0].verification.state, 'sold');
 assert.equal(invoke(ctx, 'floorEbayCandidates', base(), 2).length, 0, 'Positive sold cards do not need redundant item tabs');
 const prior = base(); prior.ebayChecks = { results: { [sold.id]: { state: 'ended' } } };
@@ -62,18 +65,44 @@ sealed.condition = 'new'; assert.equal(rows(sealed).length, 1);
 const ambiguous = base(); ambiguous.directEbay.result = ready([{ ...sold, title: 'The Order 1886 Playstation 4' }]);
 assert.equal(rows(ambiguous)[0].mismatch, 'Different named edition');
 const unknown = base(); unknown.product = { ...product, 'product-name': 'The Order: 1886' }; unknown.directEbay.result = ambiguous.directEbay.result;
-assert.equal(rows(unknown)[0].conditionUnknown, true); assert.equal(rows(unknown)[0].odd, true);
+assert.equal(rows(unknown)[0].conditionUnknown, false); assert.equal(rows(unknown)[0].odd, false, 'Generic used evidence can support CIB pricing');
 unknown.sales.cib[0] = { ...sold, title: 'The Order 1886 Playstation 4 CIB' };
 assert.equal(rows(unknown)[0].conditionUnknown, false, 'A duplicate keeps valid PC condition evidence when the eBay grade is only generic used');
+const wwe = { id: '456', 'product-name': 'WWE 2K20', 'console-name': 'Playstation 4', 'cib-price': 1000 };
+const delivered={...base(),product:wwe,sales:{cib:[]},directEbay:{result:ready([
+  {...sold,title:'WWE 2K20 PS4 CIB',conditionText:'Pre-Owned',price:1070,shipping:1173},
+  {...sold,id:'123456789012',url:'https://www.ebay.com/itm/123456789012',title:'WWE 2K20 PS4 CIB',conditionText:'Pre-Owned',price:1650,shipping:0}
+])}};
+assert.equal(rows(delivered)[0].price,2243,'Highest delivered total outranks a higher item-only price');
+assert.equal(result(delivered).r.price,2500,'WWE example follows the existing low-price rounding');
+delivered.directEbay.result.sales[0].shipping=null;
+assert.equal(rows(delivered).find(s=>s.id===sold.id).shipping,null,'Unknown shipping stays unknown');
+assert.equal(rows(delivered).find(s=>s.id===sold.id).price,1070,'Never invent shipping');
+assert.equal(invoke(ctx, 'floorEbaySearchQuery', wwe), 'WWE 2K20 PS4');
+assert.equal(new URL(invoke(ctx, 'floorLinks', wwe, 'cib').ebay).searchParams.get('_nkw'), 'WWE 2K20 PS4', 'Manual link has no complete/CIB query restriction');
+assert.equal(invoke(ctx, 'floorEbaySearchQuery', product), 'The Order 1886 Steelbook PS4', 'Keep edition identity');
+for (const title of ['WWE 2K20 PS4 Disc Only', 'WWE 2K20 PS4', 'WWE 2K20 PS4 No Case']) {
+  const c={...base(),product:wwe,sales:{cib:[]},directEbay:{result:ready([{...sold,title,conditionText:'Pre-Owned',price:1070,shipping:1173}])}};
+  assert.equal(result(c).b.basis,2243,title);assert.equal(rows(c)[0].odd,false);
+  c.condition='new';assert.equal(rows(c).filter(s=>!s.odd).length,0,'Used cannot price sealed inventory');
+}
+for (const title of ['WWE 2K20 PS4 Case Only No Game','WWE 2K20 PS4 Disc Only Bundle with WWE 2K19',
+  'WWE 2K20 Deluxe Edition PS4 Disc Only','WWE 2K19 PS4 Disc Only','WWE 2K20 Xbox One Disc Only','WWE 2K20 PS4 Brand New Sealed']) {
+  const c={...base(),product:wwe,sales:{cib:[]},directEbay:{result:ready([{...sold,title,conditionText:'Pre-Owned',price:2500}])}};
+  assert.equal(rows(c)[0].odd,true,title);
+}
+const loose={...base(),product:wwe,condition:'loose',sales:{loose:[]},directEbay:{result:ready([{...sold,title:'WWE 2K20 PS4 Complete CIB',conditionText:'Pre-Owned'}])}};
+assert.equal(rows(loose).length,0,'CIB cannot inflate loose pricing');
 const toy = { 'product-name': 'Sonic Boom - Giants, Glow in the Dark', 'console-name': 'Skylanders', 'loose-price': 977 };
 assert.equal(invoke(ctx, 'floorDirectCondition', { title: 'Sonic Boom CIB Original Box', conditionText: 'Pre-Owned' }, toy), 'loose');
 const rare = { ...base(), product: toy, condition: 'loose', sales: {}, directEbay: { result: ready([{ ...sold, price: 1500, title: 'Skylanders Giants Glow in the Dark Sonic Boom', conditionText: 'Pre-Owned' }]) } };
+rare.directEbay.result.sales[0].shipping=0;
 assert.equal(result(rare).r.price, 2000, 'Rare minimum intact');
 const pending = base(); pending.directEbay.loading = true; assert.equal(result(pending).b.waiting, true);
 pending.typed = 5000; assert.equal(result(pending).r.price, 5000, 'Typed reviewed prices stay usable');
 const incomplete = base(); incomplete.directEbay.result.partial = true; assert.equal(result(incomplete).b.searchReview, true);
 const standard = base(); standard.directEbay.standard = { result: ready([{ ...sold, id: '999999999999', url: 'https://www.ebay.com/itm/999999999999', title: 'The Order 1886 Playstation 4 CIB', price: 5000 }]) };
-assert.equal(result(standard).b.basis, 5000, 'Standard fallback includes direct evidence without allowing variant comps into the standard');
+assert.equal(result(standard).b.basis, 5612, 'Standard fallback includes delivered direct evidence without allowing variant comps into the standard');
 
 // Search worker validates messages, bounds tab lifetime, shares/cache jobs, and closes only its own tabs.
 let listeners = [], onRemove = [], created = [], removed = [], requests = [], timers = new Set(), nextId = 10;

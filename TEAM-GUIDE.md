@@ -824,7 +824,11 @@ Guide (the Google Sheet tab).
    - **Direct eBay sold search (helper 1.1.6):** the tool also looks directly on
      eBay for sales PriceCharting missed. It reads the first page of results and
      labels recovered rows **Direct eBay**, including condition and shipping.
-     Accepted offers/crossed prices are excluded. Shipping is shown separately;
+       Accepted offers/crossed prices are excluded. Direct sale prices include known
+       shipping once, with the item/shipping breakdown shown. Unknown shipping is
+       labeled. Searches use short names such as **WWE 2K20 PS4**, without requiring
+       “complete” or “CIB.” A matching used or disc-only sale can support a higher
+       CIB price; wrong games, bundles, editions and empty cases still cannot.
      the usual pricing rules and premiums still apply. **Partial search** or
      **unavailable** means review the linked search; it does not mean no sales.
      Sign in to eBay in the same Chrome profile if requested. Download the helper

@@ -784,10 +784,17 @@ The site's **only server-side code**. Everything else is static.
     game. One inactive search tab at a time; first page (120 requested results), sorted
     highest price+shipping. More pages or unreadable cards are explicitly partial.
     Positive dated Sold cards with non-struck USD item prices supply sold evidence;
-    accepted offers are excluded. Shipping is displayed separately, not added to the
-    pricing baseline. A search card can resolve generic archived Ended/unknown status;
+    accepted offers are excluded. Direct-sale baselines and sorting include known
+    shipping once; rows retain/display item price and shipping separately. Unknown
+    shipping is explicitly labeled, not assumed free. Original-item verification
+    compares item price, not the delivered total. A search card can resolve generic archived Ended/unknown status;
     explicit offer/price/identity conflicts retain exclusions/review. Conditions need
     title/grade evidence (New Other is not sealed; opened figures remain loose).
+    Owner clarification Oct. 27: matching used games, including explicit loose/disc-only
+    or unspecified packaging, may support a higher CIB price. The reverse remains
+    disallowed; sealed, broken, empty-case, bundle and identity exclusions remain.
+    Both search links and helper queries use short platform names (e.g. PS4), with
+    title/edition identity but no complete/CIB/loose adjectives added to the query.
     Merge by original eBay ID before existing matching/outlier/premium/rounding logic;
     direct cards need no redundant item checks. Search state is separate from PC sales
     so delayed PC loads cannot overwrite it. All conditions share the search. No work
