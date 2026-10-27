@@ -821,6 +821,16 @@ Guide (the Google Sheet tab).
    - **Loose games:** listings with a box, case, manual, or CIB description are
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
+   - **Direct eBay sold search (helper 1.1.6):** the tool also looks directly on
+     eBay for sales PriceCharting missed. It reads the first page of results and
+     labels recovered rows **Direct eBay**, including condition and shipping.
+     Accepted offers/crossed prices are excluded. Shipping is shown separately;
+     the usual pricing rules and premiums still apply. **Partial search** or
+     **unavailable** means review the linked search; it does not mean no sales.
+     Sign in to eBay in the same Chrome profile if requested. Download the helper
+     update, replace the unpacked files, Reload it in chrome://extensions, and
+     refresh pricing. Allow the added eBay search-page access if Chrome asks.
+     All conditions share a search, and verified sold cards avoid extra item tabs.
    - **Targeted eBay checks:** with Chrome Market Helper **1.1.5+**, the tool
      checks GameStop and the first potential price-driving eBay sale together,
      then checks further eBay sales **in pairs**. There is **no three-sale cap**:

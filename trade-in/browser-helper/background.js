@@ -1,5 +1,5 @@
 'use strict';
-if (typeof importScripts === 'function') importScripts('ebay-background.js');
+if (typeof importScripts === 'function') importScripts('ebay-background.js', 'ebay-search-background.js');
 // No broad tabs, cookies, storage, scripting or browsing-history permissions.
 const activeChecks = new Map(), stockCache = new Map();
 function stockTarget(value) {

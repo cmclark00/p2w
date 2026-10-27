@@ -1,0 +1,132 @@
+'use strict';
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const reader = vm.createContext({ URL, Date });
+vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-search-reader.js', 'utf8'), reader);
+const invoke = (ctx, name, ...args) => { ctx.args = args; return vm.runInContext(`${name}(...args)`, ctx); };
+// Values/markup roles observed on live eBay sold search, Oct 26 2026. No seller/account data.
+const card = { title: 'The Order 1886 PS4 Game Steelbook PlayStation 4 Tested Clean', url: 'https://www.ebay.com/itm/116915330518?tracking=ignored',
+  sold: 'Sold Sep 12, 2026', positive: true, price: '$40.00', condition: 'New (Other)', shipping: '+$6.12 delivery', details: 'or Best Offer' };
+const parse = values => invoke(reader, 'parseEbaySearchCard', { ...card, ...values });
+assert.equal(parse().price, 4000); assert.equal(parse().shipping, 612); assert.equal(parse().date, '2026-09-12');
+assert.equal(parse().state, 'sold', 'Offering negotiation is not proof an offer was accepted');
+assert.equal(parse({ struck: true }).state, 'offer');
+assert.equal(parse({ details: 'Best offer accepted' }).state, 'offer');
+for (const v of [{ sold: 'Ended Sep 12, 2026' }, { sold: '123 sold' }, { positive: false }, { price: '$40.00 to $60.00' },
+  { price: 'C $40.00' }, { price: 'EUR 40.00' }, { price: '$0.00' }, { url: 'https://www.ebay.com/p/195265830' },
+  { url: 'https://evil.test/itm/116915330518' }, { title: '' }]) assert.equal(parse(v), null, JSON.stringify(v));
+const el = (text = '', extra = {}) => ({ textContent: text, getClientRects: () => [1], closest: () => null, ...extra });
+const price = el('$40.00', { querySelectorAll: () => [], matches: () => false });
+const row = el('', { querySelector(selector) {
+  if (selector === '.s-card__title .su-styled-text') return el(card.title, { closest: s => s === 'a' ? ({ href: card.url }) : null });
+  if (selector.includes('Sold Item')) return el('Sold Sep 12, 2026', { classList: { contains: () => true } });
+}, querySelectorAll(selector) {
+  return selector === '.s-card__price' ? [price] : selector === '.s-card__subtitle' ? [el(card.condition)] : [el(card.details), el(card.shipping)];
+} });
+const query = 'The Order 1886 Steelbook PS4', href = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1';
+const doc = { querySelector: selector => selector === '#srp-results-heading' ? el('1 result for ' + query) : null,
+  querySelectorAll: selector => selector === '#srp-river-results li.s-card' ? [row] : [], defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) } };
+assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].price, 4000);
+for (const url of [href.replace('LH_Sold=1', 'LH_Sold=0'), 'https://signin.ebay.com/', href.replace('_nkw=', '_wrong=')])
+  assert.equal(invoke(reader, 'readEbaySearch', doc, url, query).state, 'unknown');
+const noCards = { ...doc, querySelectorAll: () => [] };
+assert.equal(invoke(reader, 'readEbaySearch', noCards, href, query).state, 'unknown', 'A layout failure is not zero sales');
+assert.equal(invoke(reader, 'readEbaySearch', { ...noCards, querySelector: s => s.includes('heading') ? el('0 results for ' + query) : null }, href, query).state, 'ready');
+assert.equal(invoke(reader, 'readEbaySearch', { ...doc, querySelector: s => s.includes('next') ? el('next') : doc.querySelector(s) }, href, query).partial, true);
+price.matches = () => true;
+assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].state, 'offer'); price.matches = () => false;
+
+const ctx = vm.createContext({ console, URL, Date, setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
+  document: { querySelector: () => ({ value: '', innerHTML: '', addEventListener() {} }), addEventListener() {} } });
+vm.runInContext(fs.readFileSync('trade-in/dead-games.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('trade-in/app.js', 'utf8').replace(/\binit\(\);\s*$/, ''), ctx);
+const product = { id: '123', 'product-name': 'The Order: 1886 [Steelbook Edition]', 'console-name': 'Playstation 4', 'cib-price': 2124 };
+const sold = parse(), ready = rows => ({ state: 'ready', sales: rows, checkedAt: 123456, partial: false });
+const base = () => ({ product, condition: 'cib', sales: { cib: [{ ...sold, price: 2500, source: undefined, state: undefined }] }, typed: null, pick: null, amazon: { found: false }, directEbay: { result: ready([sold]) } });
+const result = c => invoke(ctx, 'floorResult', c);
+const rows = c => invoke(ctx, 'floorSales', c);
+assert.equal(rows(base()).length, 1, 'Same item dedupes across PriceCharting and eBay');
+assert.equal(result(base()).r.price, 4000, 'Recovered $40 sale follows unchanged rounding, no forced $50');
+assert.equal(rows(base())[0].verification.state, 'sold');
+assert.equal(invoke(ctx, 'floorEbayCandidates', base(), 2).length, 0, 'Positive sold cards do not need redundant item tabs');
+const prior = base(); prior.ebayChecks = { results: { [sold.id]: { state: 'ended' } } };
+assert.equal(rows(prior)[0].verification.state, 'sold', 'Dated sold result is stronger than generic archived ended status');
+prior.ebayChecks.results[sold.id] = { state: 'offer' };
+assert.equal(rows(prior)[0].odd, true, 'Known hidden accepted price remains excluded');
+for (const change of [{ title: 'The Order 1886 PS4 Collectors Edition Statue' }, { title: 'The Order 1886 PS4 Steelbook Case Only No Game' },
+  { title: 'Another Game PS4 CIB' }, { title: 'The Order 1886 PS4 Steelbook French Version' }, { state: 'offer' }, { conditionText: 'For parts or not working' }]) {
+  const c = base(); c.directEbay.result = ready([{ ...sold, ...change }]); assert.equal(rows(c)[0].odd, true, JSON.stringify(change));
+}
+const sealed = base(); sealed.directEbay.result = ready([{ ...sold, conditionText: 'Brand New', title: 'The Order 1886 Steelbook PS4 Sealed' }]);
+assert.equal(rows(sealed).length, 0, 'New cannot contaminate CIB, including duplicate PC rows');
+sealed.condition = 'new'; assert.equal(rows(sealed).length, 1);
+const ambiguous = base(); ambiguous.directEbay.result = ready([{ ...sold, title: 'The Order 1886 Playstation 4' }]);
+assert.equal(rows(ambiguous)[0].mismatch, 'Different named edition');
+const unknown = base(); unknown.product = { ...product, 'product-name': 'The Order: 1886' }; unknown.directEbay.result = ambiguous.directEbay.result;
+assert.equal(rows(unknown)[0].conditionUnknown, true); assert.equal(rows(unknown)[0].odd, true);
+unknown.sales.cib[0] = { ...sold, title: 'The Order 1886 Playstation 4 CIB' };
+assert.equal(rows(unknown)[0].conditionUnknown, false, 'A duplicate keeps valid PC condition evidence when the eBay grade is only generic used');
+const toy = { 'product-name': 'Sonic Boom - Giants, Glow in the Dark', 'console-name': 'Skylanders', 'loose-price': 977 };
+assert.equal(invoke(ctx, 'floorDirectCondition', { title: 'Sonic Boom CIB Original Box', conditionText: 'Pre-Owned' }, toy), 'loose');
+const rare = { ...base(), product: toy, condition: 'loose', sales: {}, directEbay: { result: ready([{ ...sold, price: 1500, title: 'Skylanders Giants Glow in the Dark Sonic Boom', conditionText: 'Pre-Owned' }]) } };
+assert.equal(result(rare).r.price, 2000, 'Rare minimum intact');
+const pending = base(); pending.directEbay.loading = true; assert.equal(result(pending).b.waiting, true);
+pending.typed = 5000; assert.equal(result(pending).r.price, 5000, 'Typed reviewed prices stay usable');
+const incomplete = base(); incomplete.directEbay.result.partial = true; assert.equal(result(incomplete).b.searchReview, true);
+const standard = base(); standard.directEbay.standard = { result: ready([{ ...sold, id: '999999999999', url: 'https://www.ebay.com/itm/999999999999', title: 'The Order 1886 Playstation 4 CIB', price: 5000 }]) };
+assert.equal(result(standard).b.basis, 5000, 'Standard fallback includes direct evidence without allowing variant comps into the standard');
+
+// Search worker validates messages, bounds tab lifetime, shares/cache jobs, and closes only its own tabs.
+let listeners = [], onRemove = [], created = [], removed = [], requests = [], timers = new Set(), nextId = 10;
+const worker = vm.createContext({ URL, Date, Map, setTimeout: fn => { timers.add(fn); return fn; }, clearTimeout: fn => timers.delete(fn),
+  pricingSender: s => s.frameId === 0 && s.url === 'https://play2wingames.com/trade-in/' && Number.isInteger(s.tab?.id),
+  chrome: { runtime: { getManifest: () => ({ version: '1.1.6' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
+    create: async args => { created.push(args); return { id: nextId++ }; }, remove: async id => removed.push(id),
+    sendMessage: (id, m) => new Promise(resolve => requests.push({ id, m, resolve })), onRemoved: { addListener: h => onRemove.push(h) } } } });
+vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-background.js', 'utf8'), worker);
+vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-search-background.js', 'utf8'), worker);
+const sender = { frameId: 0, tab: { id: 1 }, url: 'https://play2wingames.com/trade-in/' };
+const send = (query, from = sender, protocol = 2) => new Promise(resolve => { if (!listeners[1]({ type: 'P2W_EBAY_SEARCH', query, protocol }, from, resolve)) resolve(null); });
+const flush = () => new Promise(r => setImmediate(r));
+(async () => {
+  let calls = 0;
+  const c = base(); delete c.directEbay;
+  const helper = { search: async q => { calls++; return ready(q.includes('Steelbook') ? [sold] : []); } };
+  await invoke(ctx, 'runFloorEbaySearch', c, () => {}, () => false, helper);
+  assert.equal(calls, 2, 'Edition and standard searches both run');
+  await invoke(ctx, 'runFloorEbaySearch', c, () => {}, () => false, helper); assert.equal(calls, 2, 'Renders reuse search, all conditions share it');
+  const absent = base(); delete absent.directEbay; await invoke(ctx, 'runFloorEbaySearch', absent, () => {}, () => false, null);
+  assert.equal(absent.directEbay.loading, false); assert.equal(result(absent).b.searchReview, true);
+  const cancelled = base(); delete cancelled.directEbay; let stop = false, updates = 0;
+  await invoke(ctx, 'runFloorEbaySearch', cancelled, () => updates++, () => stop, { search: async () => { stop = true; return ready([sold]); } });
+  assert.equal(updates, 1, 'Cancelled lookup does not redraw another game');
+  assert.equal(await send(query, { ...sender, frameId: 1 }), null);
+  assert.equal((await send(query, sender, 1)).state, 'unknown');
+  const a = send(query), b = send(query), other = send('Road Redemption PS4'); await flush();
+  assert.equal(created.length, 1); assert.equal(created[0].active, false);
+  assert.equal(new URL(created[0].url).searchParams.get('LH_Sold'), '1'); assert.equal(new URL(created[0].url).searchParams.get('_sop'), '16');
+  requests[0].resolve(ready([sold])); await a; await b; await flush();
+  assert.equal(created.length, 2); assert.ok(removed.includes(10));
+  assert.equal((await send(query)).sales.length, 1); assert.equal(created.length, 2, 'Five-minute cache avoids repeat searches');
+  onRemove[1](11); assert.equal((await other).state, 'unknown'); await flush();
+  assert.ok(removed.includes(11)); assert.ok(!removed.includes(1)); assert.equal(timers.size, 0, 'All queue and active watchdogs cleared');
+  const timeout = send('Unreachable Game PS4'); await flush(); for (const fn of [...timers]) fn();
+  assert.equal((await timeout).state, 'unknown'); await flush(); assert.equal(timers.size, 0);
+  const pageListeners = new Set(), messages = [];
+  const pageWindow = { addEventListener: (t, f) => pageListeners.add(f), removeEventListener: (t, f) => pageListeners.delete(f),
+    postMessage: data => queueMicrotask(() => { for (const f of [...pageListeners]) f({ data, source: pageWindow, origin: 'https://play2wingames.com' }); }) };
+  let oldHelper = false;
+  const bridge = vm.createContext({ window: pageWindow, location: { origin: 'https://play2wingames.com' }, crypto: require('node:crypto').webcrypto, setTimeout, clearTimeout,
+    chrome: { runtime: { sendMessage: m => {
+      messages.push(m);
+      if (oldHelper) return Promise.resolve({ available: true, protocol: 2, targeted: 1 });
+      return new Promise(resolve => { for (const h of listeners) if (h(m, sender, resolve)) return; resolve(null); });
+    } } } });
+  vm.runInContext(fs.readFileSync('trade-in/browser-helper/bridge.js', 'utf8'), bridge);
+  vm.runInContext(fs.readFileSync('trade-in/stock-helper-client.js', 'utf8'), bridge);
+  assert.equal((await pageWindow.P2WEbayHelper.search(query)).sales[0].price, 4000);
+  assert.equal(messages.at(-1).type, 'P2W_EBAY_SEARCH'); assert.equal(pageListeners.size, 2, 'Request listeners clean up');
+  oldHelper = true; messages.length = 0;
+  assert.equal((await pageWindow.P2WEbayHelper.search(query)).state, 'unavailable');
+  assert.equal(messages.length, 1, 'Old worker receives only a capability ping, never a search tab request');
+  console.log('Direct eBay sold parsing, conditions, deduplication, baseline/premiums, cancellation, tab queue/cache/timeouts passed.');
+})().catch(e => { console.error(e); process.exitCode = 1; });

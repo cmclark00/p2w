@@ -3398,7 +3398,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.5';
+const FLOOR_HELPER_RECOMMENDED = '1.1.6';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -3409,7 +3409,7 @@ function floorHelperStatusInfo(helper) {
     comparison = (parts[i] || 0) - (required[i] || 0);
     if (comparison) break;
   }
-  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1;
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1;
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
@@ -3942,6 +3942,82 @@ async function loadFloorSales(product) {
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
   price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
 const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state) || !!verification?.skipped;
+function floorEbaySearchQuery(product) {
+  // Search the edition's identity without demanding sellers use the word Edition.
+  return `${product['product-name'] || ''} ${product['console-name'] || ''}`.replace(/[\[\]()]/g, ' ')
+    .replace(/\bedition\b/gi, '').replace(/\s+/g, ' ').trim().slice(0, 180);
+}
+function floorDirectCondition(sale, product) {
+  const grade = sale.conditionText || '', title = sale.title || '';
+  if (/^(?:Brand New|New)$/i.test(grade)) return 'new';
+  if (!/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(grade)) return null;
+  if (floorToyFamily(product)) return floorFigureSaleCondition(sale, 'loose');
+  if (/\b(?:loose|(?:disc|disk|cart|cartridge) only|no (?:case|box|manual))\b/i.test(title)) return 'loose';
+  if (/\b(?:cib|complete|steel[ -]?book|with (?:case|box|manual)|w\/\s*(?:case|box|manual)|game and case|disc\s*\+\s*case)\b/i.test(title)) return 'cib';
+  // A generic Pre-Owned/New (Other) label does not establish included packaging.
+  return floorIsHardware(product) ? 'loose' : null;
+}
+function floorMergedSales(cur, pool) {
+  const result = cur.directEbay?.result;
+  if (result?.state !== 'ready' || !result.sales?.length) return pool;
+  const merged = new Map(pool.map(s => [floorSaleKey(s), s]));
+  for (const s of result.sales) {
+    const previous = merged.get(s.id);
+    let condition = floorDirectCondition(s, cur.product);
+    // An otherwise valid PC row already supplies its condition category. A generic
+    // used grade adds sold evidence, but must not demote that row merely for brevity.
+    if (!condition && previous && cur.condition !== 'new' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
+      && !floorListingMismatch(previous.title, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
+    merged.delete(s.id); // The same eBay listing must not count twice or in the wrong condition.
+    if (condition && condition !== cur.condition) continue;
+    merged.set(s.id, { ...s, directEbay: true, conditionUnknown: !condition,
+      searchVerification: { state: s.state, price: s.price, checkedAt: result.checkedAt, source: 'ebay-search' } });
+  }
+  return [...merged.values()];
+}
+async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
+  helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
+  if (cur.directEbay || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
+  if (!helper?.search) { cur.directEbay = { loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.6.' } }; return; }
+  const state = cur.directEbay = { loading: true };
+  progress();
+  const read = async product => {
+    if (!helper?.search) return { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.6.' };
+    const query = floorEbaySearchQuery(product);
+    let value;
+    try { value = await helper.search(query); }
+    catch (_) { value = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
+    if (!value || !Array.isArray(value.sales)) return { state: 'unknown', sales: [], reason: 'Direct eBay search did not finish. Retry or review eBay manually.' };
+    // Validate again at the page boundary; never let arbitrary URLs or malformed prices into the table.
+    const sales = value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
+      && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
+      && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+    return { ...value, url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120', sales,
+      partial: !!value.partial || sales.length !== value.sales.length };
+  };
+  try {
+    const found = await read(cur.product);
+    const selected = cur.pick == null ? null : floorSales(cur).find(s => s.i === cur.pick);
+    state.result = found;
+    if (selected) cur.pick = floorSales(cur).find(s => floorSaleKey(s) === floorSaleKey(selected))?.i ?? null;
+    if (cancelled() || cur.directEbay !== state) return;
+    const standard = floorStandardGame(cur.product);
+    if (standard && state.result.state === 'ready') state.standard = { result: await read(standard) };
+  } catch (_) { state.result = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
+  finally {
+    state.loading = false;
+    if (!cancelled() && cur.directEbay === state) progress();
+  }
+}
+function floorDirectSearchHtml(cur) {
+  const s = cur.directEbay;
+  if (!s) return '';
+  const r = s.result;
+  const note = s.loading ? 'Searching eBay sold listings…' : r?.state === 'ready'
+    ? `Direct eBay · ${r.sales.length} sold results read${r.partial ? ' · partial search' : ''}`
+    : r?.reason || 'Direct eBay search unavailable';
+  return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || r.partial) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
+}
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
@@ -4002,14 +4078,16 @@ function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   const state = cur.targetedEbay;
   const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
-  const skipped = [cur, cur.standardGame].some(c => Object.values(c?.ebayChecks?.results || {}).some(v => v.skipped && (!b.basis || v.price >= b.basis)));
+  const skipped = [cur, b.standardReference?.cur].filter(Boolean).some(c => floorSales(c).some(s => s.verification?.skipped && (!b.basis || s.price >= b.basis)));
   const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
   if (cur.typed != null) return b;
-  const review = skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
+  const searchReview = cur.directEbay && !cur.directEbay.loading && [cur.directEbay.result, cur.directEbay.standard?.result].filter(Boolean).some(r => r.state !== 'ready' || r.partial);
+  const review = searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
   const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); stopping at a verified price-driving sale.`
+    : searchReview ? 'Direct eBay search is unavailable or partial. Review the search before labeling; no results does not prove no sales.'
     : 'Price needs review: some eBay evidence could not be verified. Unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
-  return { ...b, ebayReview: review, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
+  return { ...b, ebayReview: review, searchReview, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
 }
 // Predict only the next possible driver if the current one is rejected. All
 // hypothetical exclusions stay in a copy, never in the actual pricing evidence.
@@ -4021,6 +4099,7 @@ function floorEbayCandidates(cur, limit, early = false) {
   // These provisional changes never publish a price or alter real source status.
   if (early && floorUnverifiedBasis(cur).waiting) {
     shadow.salesLoading = false; shadow.fullLoading = false;
+    if (shadow.directEbay?.loading) shadow.directEbay = { ...shadow.directEbay, loading: false };
     if (!shadow.amazon || shadow.amazon.loading) shadow.amazon = { found: false };
     if (shadow.gamestopStock?.state === 'loading') {
       shadow.product = { ...shadow.product, 'gamestop-price': 0 };
@@ -4138,11 +4217,16 @@ function floorSales(cur = floorCur) {
   const cap = rhythmDiscSaleCap(cur);
   const pool = floorToyFamily(cur.product) ? Object.entries(cur.sales || {}).flatMap(([condition, rows]) =>
     rows.filter((s) => floorFigureSaleCondition(s, condition) === cur.condition)) : cur.sales?.[cur.condition] || [];
-  const unique = floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool;
+  const unique = floorMergedSales(cur, floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool);
   const sales = unique.map((s, i) => {
-    const mismatch = floorListingMismatch(s.title, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product);
+    const mismatch = floorListingMismatch(s.title, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product)
+      || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
-    const verification = !invalid ? cur.ebayChecks?.results[floorSaleKey(s)] : null;
+    const checked = cur.ebayChecks?.results[floorSaleKey(s)];
+    // A dated SOLD search card resolves generic ENDED/unreadable archives. Price/identity conflicts still need review.
+    const verification = !invalid ? s.searchVerification && checked && ['price', 'mismatch'].includes(checked.state)
+      ? { state: 'unknown', skipped: true, price: s.price } : checked?.state === 'offer' ? checked
+        : s.searchVerification || checked : null;
     return { ...s, i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
   }).sort((a, b) => b.price - a.price);
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
@@ -4489,7 +4573,7 @@ function floorUnverifiedBasis(cur = floorCur) {
   const own = floorOwnBasis(cur);
   if (cur.typed != null || own.waiting || !floorStandardGame(cur.product)) return own;
   const standard = cur.standardGame || { product: floorStandardGame(cur.product), sales: {}, salesError: 'Standard catalog entry not available' };
-  const baseCur = { ...standard, condition: cur.condition, pick: null, typed: null, manualMissing: false,
+  const baseCur = { ...standard, condition: cur.condition, pick: null, typed: null, manualMissing: false, directEbay: cur.directEbay?.standard,
     amazon: cur.amazon?.standard || (cur.amazon?.error ? { error: cur.amazon.error } : { found: false }) };
   const base = floorOwnBasis(baseCur);
   const checks = [...own.checks];
@@ -4509,6 +4593,10 @@ function floorOwnBasis(cur = floorCur) {
   const sale = picked && (!auto.sale || picked.price >= auto.sale.price) ? picked : auto.sale;
   const gs = floorGsFor(cur); // confirmed out-of-stock listings cannot set a minimum
   const checks = [];
+  if (cur.directEbay?.result) {
+    const search = cur.directEbay.result;
+    checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Item prices are used; shipping is shown separately, keeping existing pricing rules.` : search.reason);
+  }
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
@@ -4535,7 +4623,7 @@ function floorOwnBasis(cur = floorCur) {
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
   if (floorGs(cur.product) && cur.gamestopStock?.state === 'loading') return { basis: null, sale, checks, waiting: true };
   // Never publish a fallback while the primary sold evidence or required checks are still loading.
-  if (cur.fullLoading || cur.salesLoading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
+  if (cur.fullLoading || cur.salesLoading || cur.directEbay?.loading || (!cur.sales && !cur.salesError)) return { basis: null, sale, checks, waiting: true };
   if (cur.fullError) checks.push('Full PriceCharting lookup failed; GameStop may be missing. Retry the search before labeling');
   if (cur.amazon?.error) checks.push(`Amazon check unavailable: ${cur.amazon.error}`);
   const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
@@ -4626,7 +4714,7 @@ function floorResult(cur) {
 // Run the same pricing rules against available evidence, including premiums.
 function floorEstimate(cur) {
   if (!floorResult(cur).b.waiting || !floorAutoSale(floorSales(cur)).sale) return null;
-  return floorResult({ ...cur, fullLoading: false, salesLoading: false,
+  return floorResult({ ...cur, fullLoading: false, salesLoading: false, directEbay: cur.directEbay ? { ...cur.directEbay, loading: false } : undefined,
     amazon: !cur.amazon || cur.amazon.loading ? { found: false } : cur.amazon,
     gamestopStock: cur.gamestopStock?.state === 'loading' ? { state: 'unknown' } : cur.gamestopStock,
   }).r;
@@ -4660,6 +4748,7 @@ function renderFloorPricer() {
   if (!floorCur) { el.innerHTML = ''; return; }
   const cur = floorCur = floorConditionCur(floorCur);
   const condition = cur.condition;
+  void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
   void runFloorTargetedEbay(cur, () => {
     if (floorCur === cur && cur.condition === condition) queueFloorPricerRender(cur, condition);
   }, () => floorCur !== cur || cur.condition !== condition || cur.typed != null);
@@ -4681,13 +4770,13 @@ function renderFloorPricer() {
   const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || (b.from === 'standard' ? floorAutoSale(sales).sale : b.sale);
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
   else if (cur.salesError && !sales.length) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
-  else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales on PriceCharting.</p>`;
+  else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales in the checked sources.</p>`;
   else {
     const shown = cur.showAll ? sales : sales.slice(0, 8);
     salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
         <td class="num">${money(s.price)}</td>
         <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
-        <td class="muted">${esc(s.date)}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
+        <td class="muted">${esc(s.date)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>+ ${money(s.shipping)} shipping` : ''}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
       ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
       `;
   }
@@ -4710,7 +4799,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : b.ebayReview ? 'Needs review' : estimate ? 'Estimate' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -4732,10 +4821,10 @@ function renderFloorPricer() {
     <div class="floor-price-context">
         ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
-          ${b.ebayReview ? '<span class="badge warn">Price needs review · eBay sale unverified</span>' : ''}
+          ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? 'direct eBay search incomplete' : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
@@ -4762,7 +4851,8 @@ function renderFloorPricer() {
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
-        <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales (from PriceCharting)</div>
+        <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
+        ${floorDirectSearchHtml(cur)}
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
@@ -4918,6 +5008,7 @@ function onFloorPricerClick(e) {
   if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
+  if (act === 'ebay-search') { if (!floorCur.directEbay?.loading) { floorCur.directEbay = null; renderFloorPricer(); } return; }
   if (act === 'ebay') { if (!floorCur.ebayChecks?.loading && !floorCur.targetedEbay?.running) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;

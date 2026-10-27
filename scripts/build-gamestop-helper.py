@@ -6,7 +6,7 @@ import json
 
 root = Path(__file__).resolve().parents[1]
 source = root / 'trade-in' / 'browser-helper'
-files = ['manifest.json', 'background.js', 'bridge.js', 'stock-reader.js', 'ebay-background.js', 'ebay-reader.js', 'EBAY-UPDATE.txt']
+files = ['manifest.json', 'background.js', 'bridge.js', 'stock-reader.js', 'ebay-background.js', 'ebay-reader.js', 'ebay-search-background.js', 'ebay-search-reader.js', 'EBAY-UPDATE.txt']
 manifest = json.loads((source / 'manifest.json').read_text(encoding='utf-8'))
 files += list(manifest['icons'].values())
 parser = argparse.ArgumentParser(description=__doc__)

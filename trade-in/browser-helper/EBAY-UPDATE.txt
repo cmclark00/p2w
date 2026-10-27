@@ -1,61 +1,40 @@
-Play2Win Market Helper 1.1.5
+Play2Win Market Helper 1.1.6
 
-This ZIP is the manual installation used by staff. It does not auto-update.
-First install: extract to a permanent folder, open chrome://extensions, enable
-Developer mode, click Load unpacked and select the folder with manifest.json.
-To update: extract the new ZIP over that same folder and click Reload on the
-extension card. Keep only one Play2Win helper enabled, then refresh pricing.
+Update each staff computer/profile manually:
+1. Download the helper ZIP from Floor Pricing and extract it over the helper's
+   permanent folder (the folder containing manifest.json).
+2. Open chrome://extensions and click Reload on Play2Win Market Helper.
+   Allow eBay search-page access if Chrome asks. Keep only one helper enabled.
+3. Refresh the pricing tool. The header should say Connected - v1.1.6.
+For first installation, enable Developer mode and choose Load unpacked instead.
 Manual guide: https://play2wingames.com/trade-in/helper-setup.html
-
 Connection checks: https://play2wingames.com/trade-in/helper.html
 Privacy: https://play2wingames.com/trade-in/helper-privacy.html
 
-Update the existing unpacked helper in Chrome at chrome://extensions:
-click Reload on Play2Win's helper, approve eBay item-page access if Chrome asks,
-then refresh the pricing tool. This folder now contains the complete update.
-On another computer, replace the unpacked folder with the new downloaded ZIP
-contents before clicking Reload.
+New: direct eBay sold search can discover sales PriceCharting missed. It reads
+one page of up to 120 results, highest price plus shipping first, in a temporary
+background tab. Edition lookups also search the standard game separately.
+All conditions share that search; results are matched to the selected condition.
+A positive Sold date and a visible non-struck USD item price are required.
+Accepted offers are excluded; or Best Offer alone does not mean accepted.
+Shipping is displayed separately and does not change the existing price rules.
+The same item ID counts once across both sources. Positive dated sold results
+can resolve a generic Ended archive; price/identity conflicts still need review.
+Unknown packaging, variants, bundles and outliers keep their normal safeguards.
+Direct sold cards do not open redundant individual item tabs. Existing targeted
+checks still verify other price-driving sales, in pairs after the first check
+with GameStop, until verified or eligible evidence is exhausted.
 
-If duplicate eBay product tabs are opening, switch the helper off first and
-refresh every open pricing-tool tab to stop an old sweep. Reload this extension,
-confirm Chrome shows version 1.1.5, turn it back on and refresh the pricing tool.
-Close the unwanted duplicate product tabs. The website cannot reload an installed
-Chrome extension for you. Version 1.1.2 rejects old automatic sweep requests;
-the updated website refuses eBay checks through an older installed helper.
+The first result page is not a complete history of eBay. More pages, unreadable
+cards, blocked searches and missing sign-in are flagged for review. Use Open
+search to inspect more results. Sign in to eBay in the same Chrome profile if
+needed; the helper never fills credentials or solves challenges. Search waits
+are bounded; typed reviewed prices remain available. Search results are cached
+in memory for 5 minutes. Bulk audits/rechecks never open helper tabs.
 
-First installation: extract the ZIP, open chrome://extensions, turn on Developer
-mode, choose Load unpacked, and select the folder containing manifest.json.
-Refresh https://play2wingames.com/trade-in/ in the same Chrome profile.
-Each staff computer/profile needs its own installation. Remove the helper at
-chrome://extensions. It cannot run inside the Codex in-app browser.
-
-The helper reads matching GameStop product pages and eBay.com/itm/ item pages.
-Targeted checks require version 1.1.5. The live tool starts GameStop and the
-first potential price-driving eBay sale together, then checks further eBay sales
-in pairs while Amazon/catalog loading continues. There is no total check cap.
-It stops at a verified price-driving sale, when another source determines the
-price, or when eligible listings run out. Each item ID is checked once per
-condition. Unreadable checked pages are skipped and flagged Needs review, never
-called sold or ended. A verified highest driver settles eBay without waiting for
-its backup; the final price still waits for the other sources. Add to list waits
-while checking; typed reviewed prices remain available. Bulk rechecks and history
-audits do not open eBay tabs. Manual Check selected sale remains available.
-This scheduling update is on the website; installed helper 1.1.5 needs no update.
-Checks retain the original-listing URL controls to avoid product-page redirects.
-The helper expands See original listing, reads
-the item's status/title/price, and close only those temporary tabs. It never
-buys, bids, submits offers, messages sellers, changes carts, or solves challenges.
-Archived original-item ENDED summary cards are excluded even without a price panel.
-Only explicit sold status plus the original visible, non-struck USD price can
-verify a sale. Blocked or unclear pages remain unverified, not confirmed sales.
-
-Ended listings and accepted-offer/struck-through prices are excluded. A sold
-price must be visible in USD and match the PriceCharting amount. Specific
-premiums, rare-figure minimums and existing rounding still apply afterward.
-Without the helper, provisional PriceCharting evidence stays eligible and needs
-review. Unreadable automatically checked listings are skipped while searching
-for a verified sale; they remain visible for manual review. A check takes
-at most 12 seconds with this version per listing. Targeted checks temporarily hold Add to list.
-
-Confirmed out-of-stock GameStop prices
-are reference-only and do not set a minimum. Specific premiums still apply.
+It reads only Play2Win trade-in, matching GameStop product, original eBay item
+and eBay search pages. It never buys, bids, submits offers, changes carts or
+messages sellers. Temporary tabs close automatically. Specific premiums,
+rare-figure minimums and existing rounding remain in the pricing tool.
+The website cannot reload an installed Chrome extension for you. This manual
+installation does not auto-update and cannot run in the Codex in-app browser.

@@ -5,7 +5,7 @@ const manifest = JSON.parse(fs.readFileSync(root + 'manifest.json', 'utf8'));
 assert.equal(manifest.manifest_version, 3);
 assert.equal(manifest.permissions, undefined);
 assert.equal(manifest.host_permissions, undefined);
-assert.deepEqual(manifest.content_scripts.flatMap(s => s.matches), ['https://play2wingames.com/trade-in/*', 'https://www.gamestop.com/*products/*', 'https://gamestop.com/*products/*', 'https://www.ebay.com/itm/*', 'https://ebay.com/itm/*']);
+assert.deepEqual(manifest.content_scripts.flatMap(s => s.matches), ['https://play2wingames.com/trade-in/*', 'https://www.gamestop.com/*products/*', 'https://gamestop.com/*products/*', 'https://www.ebay.com/itm/*', 'https://ebay.com/itm/*', 'https://www.ebay.com/sch/i.html*', 'https://ebay.com/sch/i.html*']);
 const reader = vm.createContext({ chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} } } });
 vm.runInContext(fs.readFileSync(root + 'stock-reader.js', 'utf8'), reader);
 function button({ state = 'in', condition = 'Pre-Owned', sku = '930799', visible = true, disabled = state === 'out', label = state === 'out' ? 'Not Available' : 'Add to Cart', availability = state === 'out' ? 'Not Available' : 'In Stock' } = {}) {

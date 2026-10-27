@@ -761,7 +761,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.5+ and protocol 2/targeted capability. No response says Not connected, not
+    1.1.6+ and protocol 2/targeted/search capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -778,6 +778,25 @@ The site's **only server-side code**. Everything else is static.
     before checking packaging words. Original eBay verification uses the same check.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
+
+  - **Direct eBay discovery (helper 1.1.6):** live pricing automatically searches
+    sold+completed results for the selected edition and, when applicable, the standard
+    game. One inactive search tab at a time; first page (120 requested results), sorted
+    highest price+shipping. More pages or unreadable cards are explicitly partial.
+    Positive dated Sold cards with non-struck USD item prices supply sold evidence;
+    accepted offers are excluded. Shipping is displayed separately, not added to the
+    pricing baseline. A search card can resolve generic archived Ended/unknown status;
+    explicit offer/price/identity conflicts retain exclusions/review. Conditions need
+    title/grade evidence (New Other is not sealed; opened figures remain loose).
+    Merge by original eBay ID before existing matching/outlier/premium/rounding logic;
+    direct cards need no redundant item checks. Search state is separate from PC sales
+    so delayed PC loads cannot overwrite it. All conditions share the search. No work
+    in bulk audits. Capability search:1 gates new messages; older helpers prompt update.
+    Search cache: 40 queries, 5 minutes; unknown 20 seconds. Queue max 3, one active;
+    18s active / 24s total watchdog, owner-close cleanup. Missing login/challenges/layout
+    failures remain unknown, never zero sales. Scripts ebay-search-reader/background.js
+    are included in the manual ZIP. Tests: test-ebay-search.cjs; parser fields verified
+    against live s-card markup and The Order 1886 $40 sale on Oct. 26, 2026.
 
   - **Targeted original eBay verification:** Market Helper 1.1.5 advertises
     protocol 2 plus targeted capability 1. Old helpers never receive automatic

@@ -45,6 +45,7 @@ jobs:
           node scripts/test-gamestop-helper.cjs
           node scripts/test-ebay-helper.cjs
           node scripts/test-ebay-verification.cjs
+          node scripts/test-ebay-search.cjs
       - name: Install PHP test runtime
         run: sudo apt-get update -qq && sudo apt-get install -y php-cli php-curl php-mbstring php-sqlite3 php-xml
       - name: Check PHP syntax
