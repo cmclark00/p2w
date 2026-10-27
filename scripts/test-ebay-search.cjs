@@ -177,6 +177,15 @@ const flush = () => new Promise(r => setImmediate(r));
   }});
   assert.deepEqual(creaturePages,[1,2],'A longer title containing the selected name cannot stop search');
   assert.equal(result(creatures).r.price,1500);
+  const witcher={...searchCur(),product:{...wwe,'cib-price':1695,'product-name':'Witcher 3: Wild Hunt'}};
+  const witcherPages=[];
+  await invoke(ctx,'runFloorEbaySearch',witcher,()=>{},()=>false,{search:async(q,page)=>{
+    witcherPages.push(page);return {...ready([{...comp(page,'Pre-Owned',page===1
+      ?'PS4: Witcher 3 Wild Hunt, w/Music+, Fallout4, Diablo 3, FarCry 4, Borderlands 3'
+      :'Witcher 3 Wild Hunt PS4 CIB'),price:page===1?4800:3041}]),page,more:true};
+  }});
+  assert.deepEqual(witcherPages,[1,2],'Numbered game list cannot stop pagination');
+  assert.equal(result(witcher).r.price,3000);
   const geo=searchCur(), geoPages=[];
   await invoke(ctx,'runFloorEbaySearch',geo,()=>{},()=>false,{search:async(q,page)=>{
     geoPages.push(page);return {...ready([{

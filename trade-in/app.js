@@ -4576,8 +4576,9 @@ function floorKnownGameTitle(title, product) {
 // Creatures" cannot price Creatures, nor can "Halo 3 ODST" price Halo 3.
 const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
 // A title list can name a second game without saying "bundle". Require an
-// explicit separator after the selected title and two title-like leading
-// words, rather than treating every subtitle or comma as an extra game.
+// explicit separator after the selected title. Extra names may be two words,
+// numbered names ("Diablo 3"/"Fallout4"), or several single-word titles.
+// Packaging lists and a lone descriptive word are not enough on their own.
 function floorNamedGameBundle(title, product) {
   if (floorToyFamily(product) || floorIsHardware(product)) return false;
   const name = product?.['product-name'] || '';
@@ -4589,9 +4590,16 @@ function floorNamedGameBundle(title, product) {
     .split(/\s*(?:[,;&+\/|]|\band\b|\bplus\b)\s*/i).map(floorTitleWords);
   const at = parts.findIndex(words => (` ${words.join(' ')} `).includes(` ${core.join(' ')} `));
   if (at < 0) return false;
-  return parts.slice(at + 1).some(words => words.length >= 2
+  const contents = /^(?:soundtracks?|music|cds?|slipcovers?|stickers?|art|books?|steelbook|postcards?|patches|pins?|inlays?|inlay|artwork|cover|covers)$/;
+  const titleWord = word => !!word && !FLOOR_TITLE_DETAILS.test(word) && !contents.test(word) && !/^\d+$/.test(word);
+  const following = parts.slice(at + 1);
+  if (following.some(words => titleWord(words[0]) && !selected.has(words[0])
+    && (/^[a-z][a-z\d]*[a-z]\d+$/.test(words[0]) || /^\d+$/.test(words[1] || '')))) return true;
+  if (following.some(words => words.length >= 2
     && words.slice(0, 2).every(word => !FLOOR_TITLE_DETAILS.test(word) && !/^\d+$/.test(word))
-    && words.slice(0, 2).some(word => !selected.has(word)));
+    && !words.every(word => contents.test(word) || FLOOR_TITLE_DETAILS.test(word) || /^\d+$/.test(word))
+    && words.slice(0, 2).some(word => !selected.has(word)))) return true;
+  return new Set(following.filter(words => words.length === 1 && titleWord(words[0]) && !selected.has(words[0])).map(words => words[0])).size >= 2;
 }
 function floorTitleIdentityMismatch(title, product) {
   const name = product?.['product-name'] || '';

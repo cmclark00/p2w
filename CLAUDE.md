@@ -662,6 +662,9 @@ The site's **only server-side code**. Everything else is static.
     `floorNamedGameBundle()` also holds separated title lists for review when
     the selected game's full name is followed by another title-like phrase
     (e.g. "Lost Song, Hollow Realization"), even without "bundle" wording.
+    This includes numbered names ("Diablo 3"), joined names ("Fallout4"),
+    and multiple distinct one-word titles after the selected game. Normal
+    soundtrack/map/manual/packaging lists are not extra game names.
     It applies to direct eBay, PriceCharting and Amazon before selection, so
     a rejected title list cannot stop the paginated search. Ordinary packaging,
     known title aliases and named compilations retain their existing handling.

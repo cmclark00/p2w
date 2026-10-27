@@ -906,6 +906,32 @@ test('named game lists cannot price a single game across sold evidence and Amazo
   assert.equal(invoke('floorAutoSale', invoke('floorSales', example)).sale.price, 1500, 'PriceCharting bundle cannot set baseline');
 });
 
+test('numbered and compact game names in lists cannot hide behind ordinary pack-in wording', () => {
+  const product={...item,'product-name':'Witcher 3: Wild Hunt','cib-price':1695};
+  const screenshot='PS4: Witcher 3 Wild Hunt, w/Music+, Fallout4, Diablo 3, FarCry 4, Borderlands 3';
+  const titles=[screenshot,'Witcher 3 Wild Hunt, Fallout4','Witcher 3 Wild Hunt, Diablo 3',
+    'Witcher 3 Wild Hunt, FarCry IV','Witcher 3 Wild Hunt, Doom, Hades',
+    'Witcher 3 Wild Hunt, w/Map, Fallout4, Manual','Witcher 3 Wild Hunt, Art Academy'];
+  for(const title of titles) {
+    assert.equal(invoke('floorListingMismatch',title,product),'Multiple-game title list — review',title);
+    assert.equal(invoke('floorAmazonLowest',cur(product,{amazon:{found:true,title,offers:[{price:4800}]}})),null,title);
+    assert.equal(invoke('floorGsFor',cur({...product,'gamestop-price':4800},{gamestopStock:{state:'in',title}})),null,title);
+    const example=cur(product,{sales:{cib:[{title,price:4800,date:'2026-10-01'},
+      {title:'Witcher 3 Wild Hunt PS4 CIB',price:3041,date:'2026-10-01'}]}});
+    assert.equal(invoke('floorResult',example).r.price,3000,'PC title lists cannot drive price');
+    example.sales.cib.shift();
+    example.directEbay={result:{state:'ready',sales:[{id:'123456789012',title,price:4800,shipping:0,state:'sold',conditionText:'Pre-Owned',date:'2026-10-01',sellerCountry:'United States'}]}};
+    assert.equal(invoke('floorResult',example).r.price,3000,'Verified direct sold bundles still excluded');
+  }
+  for(const title of ['Witcher 3 Wild Hunt PS4, CIB, Soundtrack, Maps, Stickers',
+    'Witcher 3 Wild Hunt PS4, Disc 1, Disc 2, Manual',
+    'Witcher 3 Wild Hunt PS4, w/Music+, Map, Slipcover',
+    'Witcher 3 Wild Hunt PS4, PS5 Compatible, 2015'])
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+  assert.equal(invoke('floorListingMismatch','Example Collection, Fallout4, Diablo 3, PS4',{...item,'product-name':'Example Collection'}),null);
+  assert.equal(invoke('floorListingMismatch','Example Game Deluxe Edition, Art Book, Soundtrack CD, Stickers, PS4',{...item,'product-name':'Example Game [Deluxe Edition]'}),null);
+});
+
 test('Kingdom Hearts uses the general gap rule while bundles and failed sold checks stay excluded', () => {
   const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2', 'gamestop-price': 999 };
   const example = highSaleCur([3495, 2600, 2495, 2399, 2000, 1900, 1800, 1700, 1600, 1500], product,
