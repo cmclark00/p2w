@@ -544,6 +544,11 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-details ul { padding-left: 18px; margin: 10px 0 0; font-size: 0.85rem; color: var(--muted); }
 .floor-details li + li { margin-top: 10px; }
 .floor-details p { overflow-wrap: anywhere; }
+.floor-excluded { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.floor-sale-group { margin: 8px 0 8px 12px; }
+.floor-sale-group > summary { color: var(--muted); }
+.floor-sale-group[open] > summary { margin-bottom: 8px; }
+.floor-sale-group > div { overflow-x: auto; }
 .floor-amazon-details { margin: 8px 0; }
 .floor-result .link { align-self: flex-start; padding: 0; font-size: 0.82rem; color: var(--muted); }
 .floor-list .money-input input { width: 80px; font-weight: 600; }

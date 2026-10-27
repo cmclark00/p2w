@@ -119,6 +119,63 @@ test('foreign language labels and codes cannot price standard inventory in any s
     { ...product, 'product-name': 'The Last of Us Remastered [Italian Version]' }), null, 'Explicitly selected imports still require a matching variant');
 });
 
+test('long game names reject sequel and subtitle extensions across sources', () => {
+  const product = { ...item, 'product-name': 'Dynasty Warriors: Gundam', 'console-name': 'Playstation 3' };
+  for (const suffix of ['Reborn', '2', '3', 'II', 'Reborn PS3 CIB', 'PS3 Reborn', 'Sony PlayStation 3 Reborn']) {
+    const title = `Dynasty Warriors Gundam ${suffix}`;
+    assert.match(invoke('floorListingMismatch', title, product), /Different game/);
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title, offers: [{ price: 9000 }] } })), null);
+  }
+  for (const title of ['Dynasty Warriors Gundam PS3 CIB', 'Dynasty Warriors: Gundam Complete Tested Working'])
+    assert.equal(invoke('floorListingMismatch', title, product), null);
+  assert.equal(invoke('floorListingMismatch', 'Dynasty Warriors Gundam Reborn PS3 CIB',
+    {...product,'product-name':'Dynasty Warriors: Gundam Reborn'}), null);
+  assert.equal(invoke('floorListingMismatch', 'Dynasty Warriors Gundam Special Edition PS3 + Poster',
+    {...product,'product-name':'Dynasty Warriors: Gundam [Special Edition]'}), null);
+});
+
+test('sales display keeps eligible rows visible and groups excluded rows without changing selection', () => {
+  const sales = Array.from({length:10},(_,i)=>({i,title:`Eligible ${i}`,price:2000-i,date:'2026-10-01'}));
+  const reasons = ['Different game, sequel, or unconfirmed title extension','Different special edition or reprint',
+    'Italian language/packaging variant','Different platform','Bundle or extra items','Box/case included — not loose'];
+  reasons.forEach((mismatch,i)=>sales.push({i:i+10,title:`Excluded ${i}`,price:9999,odd:true,mismatch}));
+  sales.push({i:16,title:'Ended sale',price:9999,odd:true,verification:{state:'ended'}});
+  sales.push({i:17,title:'High outlier',price:9999,outlier:{nextPrice:2000}});
+  sales.push({i:18,title:'Other excluded',price:9999,odd:true});
+  const b={from:'sale',sale:sales[0]}, example=cur();
+  const html=invoke('floorSalesHtml',example,sales,b);
+  assert.equal((html.match(/data-sale="/g)||[]).length,8,'Only eight eligible rows initially, no hidden row DOM');
+  assert.ok(html.includes('Excluded listings (9)')); assert.ok(html.includes('Show all 10 eligible sales'));
+  assert.ok(!html.includes(' open')); assert.ok(!html.includes('Excluded 0'));
+  for (const key of ['game','variant','foreign','platform','bundle','condition','verification','outlier','other'])
+    assert.ok(html.includes(`data-sale-group="${key}"`));
+  example.showAll=true;example.openSaleGroups={excluded:true,game:true};
+  const opened=invoke('floorSalesHtml',example,sales,b);
+  assert.equal((opened.match(/data-sale="/g)||[]).length,11);
+  assert.ok(opened.includes('Excluded 0'));assert.ok(!opened.includes('Excluded 1'));
+  assert.ok(opened.includes('Show fewer eligible sales'));
+  const manuallyChosen=invoke('floorSalesSections',sales,{from:'sale',sale:sales[10]});
+  assert.ok(manuallyChosen.eligible.some(s=>s.i===10),'Manually chosen excluded row stays visible');
+  assert.ok(!manuallyChosen.groups.game);
+  assert.ok(invoke('floorSaleTable',[{i:50,title:'<img src=x onerror=alert(1)>',price:100}],{}).includes('&lt;img'));
+});
+
+test('excluded group toggles populate on demand and preserve review state across renders', () => {
+  const example=cur(item,{openSaleGroups:{excluded:true},sales:{cib:[{title:'Example Game PS4 CIB',price:2000},
+    {title:'Example Game PS4 Italian Version',price:8000,url:'https://www.ebay.com/itm/123456789012'}]}});
+  context.toggleCur=example;run('floorCur=toggleCur');
+  const body={innerHTML:''}, detail={dataset:{saleGroup:'foreign',saleCondition:'cib'},open:true,querySelector:()=>body};
+  context.toggleEvent={target:detail};run('onFloorSalesToggle(toggleEvent)');
+  assert.ok(body.innerHTML.includes('Italian Version'));assert.ok(body.innerHTML.includes('123456789012'));
+  assert.equal(run('floorCur.openSaleGroups.foreign'),true);
+  example.openSaleGroups.excluded=true;
+  assert.ok(invoke('floorSalesHtml',example,invoke('floorSales',example),invoke('floorBasis',example)).includes('data-sale-group="foreign" data-sale-condition="cib" open'));
+  detail.open=false;run('onFloorSalesToggle(toggleEvent)');assert.equal(body.innerHTML,'');
+  assert.equal(run('floorCur.openSaleGroups.foreign'),false);
+  detail.open=true;detail.dataset.saleCondition='new';run('onFloorSalesToggle(toggleEvent)');assert.equal(body.innerHTML,'');
+  run('floorCur=null');
+});
+
 test('matching variants and ordinary packaging remain eligible while unconfirmed special editions do not', () => {
   for (const title of ['Example Game PS4 CIB with manual', 'Example Game with original case and inserts',
     'Example Game (English Version) PS4', 'Example Game USA NTSC-U ESRB', 'Example Game PS4 / PS5 compatible']) {

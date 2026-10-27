@@ -146,6 +146,13 @@ const flush = () => new Promise(r => setImmediate(r));
   }});
   assert.deepEqual(languagePages,[1,2],'Foreign variants cannot stop pagination');
   assert.equal(invoke(ctx,'floorAutoSale',invoke(ctx,'floorSales',lastOfUs)).sale.title,'The Last Of Us Remastered PS4 CIB USA');
+  const gundam={...searchCur(),product:{...wwe,'product-name':'Dynasty Warriors: Gundam','console-name':'Playstation 3'}};
+  const gundamPages=[];
+  await invoke(ctx,'runFloorEbaySearch',gundam,()=>{},()=>false,{search:async(q,page)=>{
+    gundamPages.push(page);return {...ready([comp(page,'Pre-Owned',page===1
+      ?'Dynasty Warriors Gundam Reborn PS3 CIB':'Dynasty Warriors Gundam PS3 CIB')]),page,more:true};
+  }});
+  assert.deepEqual(gundamPages,[1,2],'A sequel cannot stop the original game search');
   const newPages=[];paged.condition='new';
   await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{newPages.push(page);return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page,more:true};}});
   assert.deepEqual(newPages,[1],'Condition change searches for its own highest match');

@@ -639,11 +639,14 @@ The site's **only server-side code**. Everything else is static.
     explicitly selected foreign editions still require matching evidence.
     Missing titles are excluded.
     Product identity words must also be present, with punctuation, common
-    spelling aliases and Roman numerals normalized. Unconfirmed short-title
+    spelling aliases and Roman numerals normalized. Unconfirmed title
     extensions/sequels (Final Fight vs Final Fight Guy, Halo 3 vs ODST),
     preorders/presales, counted multi-game lots (including platform words
     between the count and "games"), unknown named/numbered editions, and
     gun/sensor/accessory extras are held for review on both eBay and Amazon.
+    The extension check applies to long names too (Dynasty Warriors: Gundam
+    vs Reborn), while known aliases, normal condition/platform words, selected
+    edition qualifiers and actual compilations retain their existing handling.
     Standard/platform editions and selected extras remain eligible; named
     collections can advertise their included games. These filters run before
     source selection and do not modify premium settings or rounding rules.
@@ -661,6 +664,12 @@ The site's **only server-side code**. Everything else is static.
     mismatch warning. Staff can deliberately include a marked eBay row;
     the warning records that override. Rhythm-game cap calculations also
     exclude title mismatches before taking their loose-sales median.
+    `floorSalesHtml()` shows eligible rows first (eight, with a reversible
+    show-all control). Excluded rows are grouped by reason under collapsed
+    native details; tables are populated only when opened and cleared on
+    collapse. `onFloorSalesToggle()` retains open groups across pricing renders,
+    resets on condition changes, and keeps original row indices/links so review
+    actions still work. A manually included price-driving row stays visible.
     `floorSales()` flags an isolated highest sale when
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that

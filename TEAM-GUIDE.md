@@ -879,14 +879,21 @@ Guide (the Google Sheet tab).
      PriceCharting's retail-sell number is a reference, not a pricing rule.
    - **Never counted:** lots, sealed copies, bundles with a console, and
      sales of another edition (Steelbook, GOTY, Collector's…) listed under
-     the plain game. They show dimmed.
+     the plain game. Open **Excluded listings** to review them by reason:
+     wrong game, edition, language/region, platform, bundle, condition, sale
+     verification or outlier. Each group shows its count; links and manual
+     review remain available inside. The main list shows eight eligible
+     sales, with **Show all eligible sales / Show fewer** when needed.
    - **Read the listing titles:** both eBay and Amazon are checked for
      different language/packaging versions (French, Spanish, etc.),
      regions/imports, special editions/reprints, bundled extras/bonus discs,
      and clearly different platforms. The reason appears beside excluded
      listings and remains in saved-list review notes. Matching selected
      variants can still qualify. Missing titles need review too. An Amazon
-     barcode match does not bypass these checks: a mismatched catalog title
+     listing or eBay sale with an extra sequel/subtitle after the game name
+     is held for review even when the base name is long: **Dynasty Warriors:
+     Gundam Reborn** cannot price the original **Dynasty Warriors: Gundam**.
+     An Amazon barcode match does not bypass these checks: a mismatched catalog title
      excludes its offers from pricing. Amazon provides a shared product
      title, not every seller's description, so open the listing when unsure.
      Normal contents such as **Disc + Case + Manual** are CIB, not a bundle;

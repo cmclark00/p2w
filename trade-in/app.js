@@ -4445,7 +4445,7 @@ function floorKnownGameTitle(title, product) {
 // A title must identify the selected product, not merely share its franchise.
 // Unknown extensions directly after a game's name are held for review: "Final
 // Fight Guy" and "Halo 3 ODST" cannot price Final Fight and Halo 3 respectively.
-const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
+const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
 // A title list can name a second game without saying "bundle". Require an
 // explicit separator after the selected title and two title-like leading
 // words, rather than treating every subtitle or comma as an extra game.
@@ -4474,14 +4474,22 @@ function floorTitleIdentityMismatch(title, product) {
   const listed = floorTitleWords(title);
   if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
   const hardware = !!floorToyFamily(product) || floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
-  if (!hardware) {
+  if (!hardware && !/\b(?:collection|compilation|anthology|trilogy)\b/i.test(name)) {
     const text = ` ${floorTitleWords(floorBundleTitle(title, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
     // Sellers may reorder a platform or descriptive subtitle. Missing identity
     // words are still rejected above; do not confuse ordering with another game.
-    const next = start < 0 ? '' : text.slice(start + phrase.length).trim().split(' ')[0];
+    let tail = start < 0 ? '' : text.slice(start + phrase.length).trim();
+    // A platform inserted before the sequel name is still the same conflict:
+    // "Dynasty Warriors Gundam PS3 Reborn" is not the original game.
+    for (let i = 0; i < 3 && tail; i++) {
+      const platform = FLOOR_PLATFORMS.find(re => new RegExp(`^(?:(?:sony|microsoft|nintendo|sega) )?(?:${re.source})(?: |$)`).test(tail));
+      if (!platform) break;
+      tail = tail.replace(new RegExp(`^(?:(?:sony|microsoft|nintendo|sega) )?(?:${platform.source})(?: |$)`), '').trim();
+    }
+    const next = tail.split(' ')[0];
     const variantWords = floorTitleWords(name);
-    if (next && (core.length <= 2 || /^\d{1,2}$/.test(next)) && !FLOOR_TITLE_DETAILS.test(next)
+    if (next && !FLOOR_TITLE_DETAILS.test(next)
       && !['standard', 'regular', 'base'].includes(next) && !variantWords.includes(next)) return 'Different game, sequel, or unconfirmed title extension';
   }
   return null;
@@ -4853,6 +4861,66 @@ function floorStandardHtml(b) {
     </details>`;
 }
 
+const FLOOR_SALE_GROUPS = { game: 'Different game / sequel', variant: 'Edition / figure variant',
+  foreign: 'Foreign language / region', platform: 'Different platform', bundle: 'Bundles / extra items',
+  condition: 'Condition / packaging', verification: 'Sale not verified / price unavailable',
+  outlier: 'Possible price outliers', other: 'Other excluded listings' };
+function floorSaleGroup(s) {
+  const reason = s.mismatch || '';
+  if (/language|region|import/i.test(reason)) return 'foreign';
+  if (/platform/i.test(reason)) return 'platform';
+  if (/bundle|multiple-game|extra item/i.test(reason)) return 'bundle';
+  if (/edition|reprint|variant|character/i.test(reason)) return 'variant';
+  if (/game|sequel|title extension|product/i.test(reason)) return 'game';
+  if (/condition|packaging|box|case|manual/i.test(reason)) return 'condition';
+  if (floorEbayExcluded(s.verification)) return 'verification';
+  return s.outlier ? 'outlier' : 'other';
+}
+function floorSalesSections(sales, b) {
+  const eligible = [], groups = {};
+  for (const sale of sales) {
+    if (!(sale.odd || sale.outlier) || b.from === 'sale' && b.sale?.i === sale.i) eligible.push(sale);
+    else (groups[floorSaleGroup(sale)] ||= []).push(sale);
+  }
+  return { eligible, groups };
+}
+function floorSaleTable(rows, b) {
+  return `<table class="floor-sales"><tbody>${rows.map(s => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
+    <td class="num">${money(s.price)}</td>
+    <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
+    <td class="muted">${esc(s.date || '')}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
+}
+function floorSalesHtml(cur, sales, b) {
+  const { eligible, groups } = floorSalesSections(sales, b);
+  const shown = cur.showAll ? eligible : eligible.slice(0, 8);
+  const excluded = Object.values(groups).reduce((n, rows) => n + rows.length, 0);
+  const open = cur.openSaleGroups || {};
+  const attrs = key => `data-sale-group="${key}" data-sale-condition="${cur.condition}"${open[key] ? ' open' : ''}`;
+  return `${shown.length ? floorSaleTable(shown, b) : '<p class="muted">No eligible sales found. Review excluded listings below.</p>'}
+    ${eligible.length > 8 ? `<button type="button" class="link" data-floor-act="all">${cur.showAll ? 'Show fewer eligible sales' : `Show all ${eligible.length} eligible sales`}</button>` : ''}
+    ${excluded ? `<details class="floor-details floor-excluded" ${attrs('excluded')}><summary>Excluded listings (${excluded})</summary>
+      ${Object.entries(FLOOR_SALE_GROUPS).filter(([key]) => groups[key]?.length).map(([key, label]) => `<details class="floor-details floor-sale-group" ${attrs(key)}><summary>${label} (${groups[key].length})</summary><div data-sale-group-body>${open.excluded && open[key] ? floorSaleTable(groups[key], b) : ''}</div></details>`).join('')}
+    </details>` : ''}`;
+}
+function onFloorSalesToggle(e) {
+  const detail = e.target, key = detail.dataset?.saleGroup;
+  if (!floorCur || !key || detail.dataset.saleCondition !== floorCur.condition) return;
+  const host = $('#floorPricer');
+  if (host.contains && !host.contains(detail)) return;
+  (floorCur.openSaleGroups ||= {})[key] = detail.open;
+  // Hidden groups do not need hundreds of table rows. Populate only on demand.
+  const { b } = floorResult(floorCur), { groups } = floorSalesSections(floorSales(floorCur), b);
+  const fill = node => {
+    const body = node.querySelector('[data-sale-group-body]');
+    if (body) body.innerHTML = floorCur.openSaleGroups.excluded && node.open ? floorSaleTable(groups[node.dataset.saleGroup] || [], b) : '';
+  };
+  if (key === 'excluded') detail.querySelectorAll('[data-sale-group]').forEach(node => {
+    if (detail.open) fill(node);
+    else { const body = node.querySelector('[data-sale-group-body]'); if (body) body.innerHTML = ''; }
+  });
+  else fill(detail);
+}
+
 let floorRenderTimer = null;
 function queueFloorPricerRender(cur, condition) {
   if (floorRenderTimer !== null) clearTimeout(floorRenderTimer);
@@ -4890,15 +4958,7 @@ function renderFloorPricer() {
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
   else if (cur.salesError && !sales.length) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales in the checked sources.</p>`;
-  else {
-    const shown = cur.showAll ? sales : sales.slice(0, 8);
-    salesHtml = `<table class="floor-sales"><tbody>${shown.map((s) => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale && s.i === b.sale.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
-        <td class="num">${money(s.price)}</td>
-        <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
-        <td class="muted">${esc(s.date)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>
-      ${sales.length > shown.length ? `<button type="button" class="link" data-floor-act="all">Show all ${sales.length} sales</button>` : ''}
-      `;
-  }
+  else salesHtml = floorSalesHtml(cur, sales, b);
 
   const showTyped = !!b.need || cur.typed != null;
   const reviewNotes = [...new Set(b.checks)];
@@ -5112,7 +5172,7 @@ function onFloorPricerClick(e) {
   const cond = e.target.closest('[data-floor-cond]')?.dataset.floorCond;
   if (cond) {
     const amazonChanged = cond !== floorCur.condition;
-    Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false });
+    Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false, openSaleGroups: {} });
     if (cond !== 'cib') floorCur.manualMissing = false;
     if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
     floorCur.ebayChecks = null; floorCur.ebayRun = null; floorCur.targetedEbay = null;
@@ -5124,7 +5184,7 @@ function onFloorPricerClick(e) {
   if (act === 'variants') { runFloorVariants(floorCur.product); $('#floorScan').focus(); $('#floorScan').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
-  if (act === 'all') { floorCur.showAll = true; renderFloorPricer(); return; }
+  if (act === 'all') { floorCur.showAll = !floorCur.showAll; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
   if (act === 'ebay-search') { if (!floorCur.directEbay?.loading) { floorCur.directEbay = null; renderFloorPricer(); } return; }
@@ -5485,6 +5545,7 @@ function wireFloor() {
   const pricer = $('#floorPricer');
   pricer.addEventListener('click', onFloorPricerClick);
   pricer.addEventListener('change', onFloorPricerChange);
+  pricer.addEventListener('toggle', onFloorSalesToggle, true);
   pricer.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.matches('[data-floor-field="typed"]')) {
       e.preventDefault();
