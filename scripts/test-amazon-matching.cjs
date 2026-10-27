@@ -23,6 +23,40 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('catalog prefetch is bounded at two while matching keeps barcode order and every query', async () => {
+    const good=candidate('B000000001'),bad=candidate('B000000001','Final Fight Guy');
+    const pending=[],calls=[];let active=0,peak=0,offers=0;
+    const e=engine(async(route,params)=>{
+      calls.push([route,params]);
+      if(route!=='amazon/catalog'){offers++;return offer(good,2500);}
+      peak=Math.max(peak,++active);
+      const data=await new Promise(resolve=>pending.push({params,resolve}));active--;return data;
+    });
+    const task=e.fetch({...product,upc:'123456789012 123456789013 123456789014'});
+    const tick=()=>new Promise(r=>setImmediate(r));
+    await tick();assert.equal(pending.length,2);assert.equal(peak,2);
+    pending[1].resolve({candidates:[bad]});await tick();assert.equal(pending.length,3);
+    assert.equal(offers,0,'Later barcode response cannot decide identity before earlier barcode');
+    pending[0].resolve({candidates:[good]});await tick();
+    for(let i=2;i<4;i++){assert.ok(pending[i]);pending[i].resolve({candidates:[]});await tick();}
+    const result=await task;
+    assert.equal(result.asin,good.asin);assert.equal(result.offers[0].price,2500);assert.equal(peak,2);
+    assert.equal(calls.filter(([r])=>r==='amazon/catalog').length,4,'All three UPCs and title query checked');
+    assert.equal(offers,2,'Duplicate ASIN checks still coalesce');
+  });
+  await test('sealed-item Used comparisons queue together without affecting New pricing', async () => {
+    const choices=[candidate('B000000001'),candidate('B000000002'),candidate('B000000003')], pending=[];
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/catalog')return {candidates:choices};
+      const c=choices.find(c=>c.asin===params.asin);
+      if(params.cond==='used')await new Promise(resolve=>pending.push(resolve));
+      return {...offer(c,params.cond==='new'?6000:1000),condition:params.cond==='new'?'New':'Used'};
+    });
+    const task=e.fetch(product,'new');await new Promise(r=>setImmediate(r));
+    assert.equal(pending.length,3,'Comparisons enter batch queue together instead of serial HTTP calls');
+    pending.forEach(resolve=>resolve());const result=await task;
+    assert.equal(result.offers[0].price,6000);assert.equal(result.references.used.offers[0].price,1000);
+  });
   await test('game grades separate Loose and CIB; unknown grades and ungraded lowest cannot price used games', () => {
     const e=engine(async()=>{});
     e.ctx.cur={product,condition:'loose',amazon:{...candidate('B000000001'),found:true,condition:'Used',lowest:100,offers:[
@@ -170,8 +204,8 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     });
     const result = await e.fetch(p, 'cib');
     assert.equal(result.asin, renewed.asin); assert.equal(result.renewedFallback, true); assert.equal(result.offers[0].price, 9999);
-    assert.equal(calls[3][1].q, 'Lollipop Chainsaw Playstation 3');
-    assert.equal(calls[4][1].q, 'Lollipop Chainsaw Playstation 3 renewed');
+    assert.deepEqual(calls.filter(([route])=>route==='amazon/catalog').map(([,p])=>p.q || p.upc),
+      [product.upc,'Lollipop Chainsaw Playstation 3','Lollipop Chainsaw Playstation 3 renewed']);
     assert.equal(calls.filter(([route]) => route === 'amazon/offers').length, 4);
     e.ctx.result = result; e.ctx.p = p;
     const priced = e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Lollipop Chainsaw PS3 complete",price:12999}]},amazon:result})');

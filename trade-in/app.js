@@ -3705,11 +3705,12 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         progress.responses.set(k, result);
         return result;
       }
-      async function catalog(params, renewed = false) {
+      async function catalog(params, renewed = false, firstPage = null) {
         let pageToken;
         const tokens = new Set();
         for (let page = 0; page < 50; page++) {
-          const data = await resumeRequest('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
+          const data = page === 0 && firstPage ? await firstPage
+            : await resumeRequest('amazon/catalog', { ...params, ...(pageToken ? { pageToken } : {}) });
           // Identity decisions stay in catalog order (barcodes before title queries).
           // Offer I/O runs alongside subsequent catalog pages on its independent queue.
           const work = check(renewed ? { ...data, candidates: [...deferredRenewed.values(), ...(data.candidates || [])] } : data, !params.upc, renewed);
@@ -3770,11 +3771,31 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       const priced = () => floorAmazonPrioritizeUsed({ product, condition }, verified.filter((a) => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0));
       try {
         if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
-        for (const upc of upcs) await catalog({ upc });
-        searched = true;
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
-        for (const q of queries) await catalog({ q });
+        // Fetch independent first pages two at a time, but apply matching in
+        // the original barcode/title order. All queries and page tokens still
+        // get checked; server-wide pacing/cooldowns remain authoritative.
+        const firstPages = [...upcs.map(upc => ({ upc })), ...queries.map(q => ({ q }))].map(params => {
+          let resolve, reject;
+          const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+          promise.catch(() => {});
+          return { params, promise, resolve, reject };
+        });
+        let cursor = 0;
+        const prefetch = Array.from({ length: Math.min(2, firstPages.length) }, async () => {
+          while (cursor < firstPages.length) {
+            const page = firstPages[cursor++];
+            try { page.resolve(await resumeRequest('amazon/catalog', page.params)); }
+            catch (err) { page.reject(err); }
+          }
+        });
+        try {
+          for (const page of firstPages) {
+            if (page.params.q) searched = true;
+            await catalog(page.params, false, page.promise);
+          }
+        } finally { await Promise.allSettled(prefetch); }
         await finishOffers();
         // Keep the existing Renewed fallback when no regular Used offer exists.
         if (!priced().some(a => !a.newReference) && condition !== 'new') {
@@ -3787,14 +3808,14 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       // For sealed inventory, Used is a comparison only. It can neither price
       // the sealed copy nor make an otherwise completed New lookup incomplete.
       if (cond === 'new' && !searchError) {
-        for (const item of [...verified]) {
+        await Promise.all([...verified].map(async item => {
           try {
             const used = await resumeRequest('amazon/offers', { asin: item.asin, cond: 'used' });
             if (used.asin === item.asin && used.found && !floorAmazonCandidateMismatch(used, product, 'cib', item.matchMethod !== 'barcode')) {
               verified.push({ ...used, offerCondition: 'used', displayOnly: true, matchMethod: item.matchMethod });
             }
           } catch (err) { referenceErrors.used = err.message; }
-        }
+        }));
       }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
         || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
@@ -4018,7 +4039,13 @@ async function loadFloorSales(product) {
 }
 
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
-  price: 'Sale price differs — review', mismatch: 'eBay item does not match', location: 'Seller outside North America', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
+  price: 'Sale price differs — review', mismatch: 'eBay item does not match', location: 'Seller outside North America', unknown: 'Unverified — review manually', pending: 'Checking sale…', historical: 'Historical evidence — not verified' };
+function floorOutsideEbayWindow(sale, now = Date.now()) {
+  const date = sale?.date;
+  return /^\d{4}-\d{2}-\d{2}$/.test(date || '') && Number.isFinite(Date.parse(date))
+    && new Date(date).toISOString().slice(0, 10) === date
+    && date < new Date(now - 90 * 864e5).toISOString().slice(0, 10);
+}
 const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch', 'location'].includes(verification?.state) || !!verification?.skipped;
 function floorEbaySearchQuery(product) {
   // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
@@ -4096,7 +4123,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       const matched = candidates.find(s => !s.odd && !s.outlier && s.verification?.state === 'sold');
       // Do not infer a slow seller just because its first, highest-price page
       // has old listings. Continue until recent evidence or pagination resolves it.
-      const olderPending = candidates.some(s => s.ageInfo?.pending);
+      const olderPending = candidates.some(s => s.ageInfo?.pending || s.historicalInfo?.pending);
       if (matched && !olderPending) return { ...result, stoppedAtMatch: true,
         partial: partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown',
         reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown' ? ' Some evidence, shipping or seller location needs review.' : ''}` };
@@ -4198,16 +4225,18 @@ function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
 function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   const state = cur.targetedEbay;
-  const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
+  const historical = !!(driver?.sale.historicalInfo?.retained);
+  const checking = !!(driver && !historical && state?.running && driver.sale.verification?.state !== 'sold');
   const skipped = [cur, b.standardReference?.cur].filter(Boolean).some(c => floorSales(c).some(s => s.verification?.skipped && (!b.basis || s.price >= b.basis)));
   const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
   if (cur.typed != null) return b;
   const searchReview = cur.directEbay && !cur.directEbay.loading && [cur.directEbay.result, cur.directEbay.standard?.result].filter(Boolean).some(r => r.state !== 'ready' || r.partial);
-  const review = searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
+  const review = historical || searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
   const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); stopping at a verified price-driving sale.`
     : searchReview ? 'Direct eBay search is unavailable or partial. Review the search before labeling; no results does not prove no sales.'
-    : 'Price needs review: some eBay evidence could not be verified. Unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
+    : historical ? 'Historical PriceCharting sale retained. Its date is highlighted; current eBay sold status is unavailable. Review the evidence or Product Research before labeling.'
+    : 'Price needs review: some eBay evidence could not be verified. Recent unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
   return { ...b, ebayReview: review, searchReview, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
 }
 // Predict only the next possible driver if the current one is rejected. All
@@ -4230,7 +4259,7 @@ function floorEbayCandidates(cur, limit, early = false) {
   const candidates = [], keys = new Set();
   while (candidates.length < limit) {
     const driver = floorEbayDriver(shadow);
-    if (!driver || ['sold', 'pending'].includes(driver.sale.verification?.state)) break;
+    if (!driver || ['sold', 'pending', 'historical'].includes(driver.sale.verification?.state)) break;
     const key = floorSaleKey(driver.sale);
     if (keys.has(key)) break;
     keys.add(key);
@@ -4345,11 +4374,18 @@ function floorSales(cur = floorCur) {
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
     const checked = cur.ebayChecks?.results[floorSaleKey(s)];
     // A dated SOLD search card resolves generic ENDED/unreadable archives. Price/identity conflicts still need review.
-    const verification = !invalid ? s.searchVerification && checked && ['price', 'mismatch'].includes(checked.state)
+    let verification = !invalid ? s.searchVerification && checked && ['price', 'mismatch'].includes(checked.state)
       ? { state: 'unknown', skipped: true, price: s.price } : ['offer', 'location'].includes(checked?.state) ? checked
         : s.searchVerification || checked : null;
+    // An old generic Ended/unreadable archive is not proof it failed to sell.
+    // Keep this provisional candidate separate from verified Sold evidence;
+    // restoring an excluded check requires a completed, sparse search below.
+    // Untested rows within six months keep their existing eligibility.
+    const historicalCandidate = !invalid && !s.directEbay && floorOutsideEbayWindow(s)
+      && !verification?.confirmedUnsold && (!verification || ['unknown', 'ended', 'pending'].includes(verification.state));
+    if (historicalCandidate) verification = { state: 'historical', previousState: verification?.state, previouslyExcluded: floorEbayExcluded(verification) };
     return { ...s, ...(checked?.sellerCountry ? { sellerCountry: checked.sellerCountry, locationSource: checked.locationSource } : {}),
-      i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
+      i, mismatch, verification, historicalCandidate, odd: invalid || floorEbayExcluded(verification) };
   }).sort((a, b) => b.price - a.price);
   // Keep price plus shipping, including Canadian postage; filter explicit
   // overseas origin instead of using the delivery amount as a proxy.
@@ -4373,12 +4409,25 @@ function floorSales(cur = floorCur) {
   const { today, cutoff } = floorSaleAgeWindow();
   const dated = sales.filter(s => !s.odd && !s.outlier && /^\d{4}-\d{2}-\d{2}$/.test(s.date || '')
     && Number.isFinite(Date.parse(s.date)) && new Date(s.date).toISOString().slice(0, 10) === s.date);
+  // Count PriceCharting's dated matching history without claiming eBay verified it.
   const recentCount = new Set(dated.filter(s => s.date >= cutoff && s.date <= today).map(floorSaleKey)).size;
   const sparse = recentCount < FLOOR_RECENT_SALE_MIN;
   const searchUnfinished = !!(cur.salesLoading || cur.salesError || cur.directEbay?.loading
     || cur.directEbay?.result?.more || cur.directEbay?.result?.partial
     || cur.directEbay?.result && cur.directEbay.result.state !== 'ready');
-  for (const sale of dated.filter(s => s.date < cutoff)) {
+  for (const sale of sales.filter(s => s.historicalCandidate && !s.odd && !s.outlier)) {
+    const needsSlowException = sale.date < cutoff || sale.verification.previouslyExcluded;
+    sale.historicalInfo = { retained: !needsSlowException || sparse && !searchUnfinished,
+      pending: needsSlowException && sparse && searchUnfinished, recentCount, slowSeller: needsSlowException };
+    if (sale.date < cutoff) sale.ageInfo = { old: true, ...sale.historicalInfo };
+    if (!sale.historicalInfo.retained) {
+      sale.odd = true;
+      sale.exclusion = sale.date < cutoff
+        ? (sale.historicalInfo.pending ? 'Older than six months — recent-sales check incomplete' : 'Older than six months')
+        : (sale.historicalInfo.pending ? 'Historical sale — recent-sales check incomplete' : 'Historical sale — enough recent evidence');
+    }
+  }
+  for (const sale of dated.filter(s => !s.odd && s.date < cutoff)) {
     const pending = sparse && searchUnfinished;
     sale.ageInfo = { old: true, recentCount, retained: sparse && !pending, pending };
     if (!sale.ageInfo.retained) {
@@ -4807,6 +4856,8 @@ function floorOwnBasis(cur = floorCur) {
   const oldRetained = sales.filter(s => s.ageInfo?.retained);
   const oldExcluded = sales.filter(s => s.ageInfo && !s.ageInfo.retained);
   if (oldRetained.length) checks.push(`${oldRetained.length} older sale${oldRetained.length === 1 ? '' : 's'} retained as slow-selling evidence: fewer than ${FLOOR_RECENT_SALE_MIN} valid matching sales found within six months. Review the age before labeling`);
+  const historical = sales.filter(s => s.historicalInfo?.retained);
+  if (historical.length) checks.push(`${historical.length} historical PriceCharting sale${historical.length === 1 ? '' : 's'} retained. Beyond eBay's 90-day completed-search window, generic Ended/unreadable pages do not disprove a sale. Restoring excluded checks or sales older than six months requires the slow-seller exception. Amber dates mark unverified historical evidence; automatic archive tabs are skipped. Identity, condition, location, accepted-offer and price-outlier exclusions still apply`);
   if (oldExcluded.length) checks.push(`${oldExcluded.length} sales older than six months excluded${oldExcluded.some(s => s.ageInfo.pending) ? '; recent-sales search incomplete, so slow-selling status is not established' : ''}`);
   if (sales.some(s => s.exclusion === 'Seller outside North America')) checks.push('Sales explicitly located outside North America are excluded. Canadian and other North American sales still include shipping; shipping cost alone never establishes location');
   if (sale?.directEbay && floorSaleLocation(sale) === 'unknown') checks.push('Selected direct eBay sale has no confirmed seller country; review its location. Shipping cost alone does not prove overseas origin');
@@ -4948,7 +4999,7 @@ function floorStandardHtml(b) {
     Specific premiums and deductions apply afterward.</p>
     ${cur.amazon ? `<div class="eyebrow">Standard-game Amazon</div>${floorAmazonReferencesHtml(cur, ref)}${cur.amazon.incomplete || cur.amazon.error ? '<button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>' : ''}` : ''}
     ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
-    <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${esc(s.date || '')}</td></tr>`).join('')}</tbody></table>
+    <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${floorSaleDateHtml(s)}</td></tr>`).join('')}</tbody></table>
     </details>`;
 }
 
@@ -4958,6 +5009,7 @@ const FLOOR_SALE_GROUPS = { game: 'Different game / sequel', variant: 'Edition /
   age: 'Older than six months', location: 'Seller outside North America', outlier: 'Possible price outliers', other: 'Other excluded listings' };
 function floorSaleGroup(s) {
   if (s.ageInfo && !s.ageInfo.retained) return 'age';
+  if (s.historicalInfo && !s.historicalInfo.retained) return 'verification';
   if (s.exclusion === 'Seller outside North America' || s.verification?.state === 'location') return 'location';
   const reason = s.mismatch || '';
   if (/language|region|import/i.test(reason)) return 'foreign';
@@ -4977,11 +5029,15 @@ function floorSalesSections(sales, b) {
   }
   return { eligible, groups };
 }
+function floorSaleDateHtml(s) {
+  const label = s.historicalInfo?.retained ? 'Historical · not verified' : s.ageInfo?.retained ? 'Older · slow seller' : '';
+  return label ? `<span class="floor-sale-date-old">${esc(s.date)} · ${label}</span>` : esc(s.date || '');
+}
 function floorSaleTable(rows, b) {
   return `<table class="floor-sales"><tbody>${rows.map(s => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
     <td class="num">${money(s.price)}</td>
     <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
-    <td class="muted">${esc(s.date || '')}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    <td class="muted">${floorSaleDateHtml(s)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 function floorSalesHtml(cur, sales, b) {
   const { eligible, groups } = floorSalesSections(sales, b);

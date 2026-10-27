@@ -57,7 +57,8 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     if (system === 'Skylanders') assert.equal(before, 2000);
   }
   // First check overlaps stock; later candidates run in pairs without a total cap.
-  const old = rows => cur(product, rows.map((price, i) => ({ ...sale(price, String(111111111111 + i)), date: '2025-01-01' })));
+  // These checks exercise verifiable recent pages, not the historical exception.
+  const old = rows => cur(product, rows.map((price, i) => ({ ...sale(price, String(111111111111 + i)), date: new Date(Date.now()-60*864e5).toISOString().slice(0,10) })));
   const targeted = (c, responses, cancel = () => false) => {
     const calls = [];
     const helper = { targetedAvailable: async () => true, checkTargeted: async url => {
@@ -66,6 +67,14 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
     } };
     return invoke('runFloorTargetedEbay', c, () => {}, cancel, helper).then(() => calls);
   };
+  const archive=cur(product,[{...sale(3000,'111111111111'),date:'2023-05-23'}]);
+  archive.ebayChecks={results:{'111111111111':{state:'unknown',skipped:true}}};
+  assert.equal((await targeted(archive,['sold'])).length,0,'Historical references never open automatic archive tabs');
+  assert.equal(result(archive).b.basis,3000);assert.equal(result(archive).b.ebayReview,true);
+  const standardArchive=cur({...product,id:'variant','cib-price':2000,'product-name':'Example Game [Deluxe Edition]'},[]);
+  standardArchive.standardGame=archive;
+  assert.equal((await targeted(standardArchive,['sold'])).length,0,'Standard-game historical driver also skips tabs');
+  assert.equal(result(standardArchive).b.ebayReview,true);
   const good = old([3000, 2900, 2800, 2700]); const original = result(good).r.price;
   assert.equal((await targeted(good, ['sold'])).length, 1);
   assert.equal(result(good).r.price, original); assert.equal(result(good).b.ebayReview, undefined);
@@ -138,7 +147,7 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   // Late related-page evidence can introduce a higher driver even after an early sold result.
   const late = old([3000]); late.salesLoading = true;
   await targeted(late, ['sold']);
-  late.sales.cib.unshift({ ...sale(3100, '999999999999'), date: '2025-01-01' }); late.salesLoading = false;
+  late.sales.cib.unshift({ ...sale(3100, '999999999999'), date: old([3100]).sales.cib[0].date }); late.salesLoading = false;
   assert.equal((await targeted(late, ['sold'])).length, 1);
   assert.equal(result(late).b.basis, 3100);
   const priceUnchanged = old([3000, 2900]); const planned = invoke('floorEbayCandidates', priceUnchanged, 2);

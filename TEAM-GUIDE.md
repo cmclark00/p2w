@@ -878,10 +878,21 @@ Guide (the Google Sheet tab).
      than three valid matching sales are found, older sales can remain as
      clearly labeled slow-selling evidence. An incomplete search does not prove
      an item is slow-selling. Open the older-sales review group to inspect dates.
+     For slow sellers, an old eBay page that only says Ended or cannot be read
+     does not erase the PriceCharting history. Beyond eBay's normal 90-day
+     completed-search window, retained historical dates show in **amber**, with
+     **Historical · not verified** and a review warning. The helper skips automatic
+     checks of these archives; staff can still open/check them manually. Known
+     accepted offers, wrong items and price outliers remain excluded.
+     Untested sales within six months remain eligible under the existing rules;
+     the amber date does not introduce a new 90-day cutoff for pricing.
      Sales explicitly located outside North America are excluded. Canadian
      and other North American sales still include shipping, even when expensive.
      Missing seller location is flagged for review; shipping cost is not proof
      of location. Update the manual helper to **1.1.8** to read location labels.
+     Amazon now overlaps independent catalog reads and batches Used comparisons
+     for sealed items, while retaining all matching and pricing checks. These
+     website improvements only need a page refresh; no new helper install.
    - **PriceCharting's own market price is only a fallback** when none
      of those three references is available. Fallback prices always say **Double-check**.
      PriceCharting's retail-sell number is a reference, not a pricing rule.

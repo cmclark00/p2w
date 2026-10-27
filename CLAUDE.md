@@ -702,7 +702,16 @@ The site's **only server-side code**. Everything else is static.
     rows remain labeled slow-selling evidence; incomplete/paginated direct searches
     cannot establish this exception before enough recent matches or exhaustion.
     Counting follows identity, condition, origin and verification checks; duplicates
-    do not count twice. Old exclusions and overseas origin have their own collapsed
+    do not count twice. For sparse completed lookups, PriceCharting rows beyond
+    eBay's 90-day completed-search window remain eligible historical evidence even
+    if a generic archived Ended page or unreadable check had excluded them. These
+    are not verified Sold results: amber dates/text and Needs review persist.
+    Untested rows within six months retain their existing eligibility, with the
+    same historical label beyond 90 days; this does not add a 90-day exclusion.
+    Known offer/price/identity/location exclusions, invalid dates and the 3x market
+    guard still apply. No automatic original-item tabs for historical drivers;
+    manual checks remain available. Confirmed Sold rows keep their verified status.
+    Old exclusions and overseas origin have their own collapsed
     review groups. Specific premiums and explicit manual choices remain downstream.
     The flagged row stays visible with a badge and a review explanation.
     Staff can click it to include it explicitly; the warning remains.
@@ -873,10 +882,12 @@ The site's **only server-side code**. Everything else is static.
     recovered from related pages. No checks for typed prices or other driving sources.
     There is no per-lookup count cap: stop when the highest eligible driver is
     verified, another source sets the baseline, or eligible evidence is exhausted.
-    Confirmed ended/offer/mismatch/price discrepancies exclude that sale. Unreadable
+    Recent ended/offer/mismatch/price discrepancies exclude that sale. Unreadable
     checked listings retain state unknown, with skipped:true excluding them from
     the automatic baseline and a Needs review flag. Missing links behave the same.
-    They are never labeled ended or sold. Without the helper, provisional evidence
+    Older generic ended/unreadable PC archives follow the slow-seller exception
+    above and skip automatic checks; they are never relabeled verified Sold.
+    Without the helper, provisional evidence
     remains unchanged with Needs review. A market-average fallback after exhausting
     sales also needs review. Manual optional checks retain their original behavior.
     Hypothetical exclusions used to plan a backup never mutate real evidence.
@@ -1127,6 +1138,12 @@ The site's **only server-side code**. Everything else is static.
     require positive platform evidence in the title or attributes. Catalog
     searches automatically follow every pageToken with up to five known UPCs;
     no manual continuation is needed. Catalog pages overlap offer I/O. The browser
+    prefetches independent first catalog pages with at most two concurrent reads
+    per identity, but applies matches in the original barcode/title order. All
+    queries/pages and failures remain accounted for; shared server rate limits
+    still pace actual Amazon traffic. Sealed-item Used comparison reads enter
+    the batch queue together, remaining display-only and nonblocking on failure.
+    The browser
     coalesces matching ASIN/condition reads into groups of at most 20 through
     `POST amazon/offers-batch`; six or more uncached members use SP-API itemOffersBatch,
     smaller groups use individual offers. Unsupported batch access falls back to

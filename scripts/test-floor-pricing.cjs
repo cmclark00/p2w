@@ -186,7 +186,7 @@ test('six-month evidence window excludes old sales but retains labeled scarce-sa
     assert.equal(invoke('floorSaleAgeWindow',Date.parse('2026-08-31T12:00:00Z')).cutoff,'2026-02-28');
     const sale=(i,date,price)=>({title:'Example Game PS4 CIB',date,price,url:`https://www.ebay.com/itm/${100000000000+i}`});
     const old=sale(1,'2026-04-26',5000), recent=[sale(2,'2026-04-27',2000),sale(3,'2026-09-01',1900),sale(4,'2026-10-01',1800)];
-    const example=cur(item,{sales:{cib:[old,...recent]}}), snapshot=JSON.stringify(example.sales);
+    const example=cur(item,{sales:{cib:[old,...recent]},ebayChecks:{results:{'100000000002':{state:'sold',price:2000}}}}), snapshot=JSON.stringify(example.sales);
     const rows=invoke('floorSales',example);
     assert.equal(rows[0].exclusion,'Older than six months');
     assert.equal(invoke('floorSaleGroup',rows[0]),'age');
@@ -206,6 +206,47 @@ test('six-month evidence window excludes old sales but retains labeled scarce-sa
     assert.equal(invoke('floorSales',sparse)[0].ageInfo.pending,true,'First-page scarcity is not proof of a slow seller');
     assert.equal(invoke('floorSales',sparse)[0].odd,true);
     assert.equal(invoke('floorResult',{...example,pick:0}).r.price,5000,'Staff can still explicitly review and include an older row');
+  } finally {context.Date=previousDate;}
+});
+
+test('slow sellers retain unavailable old PC sales without claiming verified sales or relaxing other checks', () => {
+  const previousDate=context.Date;
+  context.Date=class extends Date {static now(){return Date.parse('2026-10-27T12:00:00Z');}};
+  try {
+    const product={...item,'product-name':"Fight'N Rage",'cib-price':2516};
+    const row=(i,price,date='2023-05-23')=>({title:"Fight'N Rage PS4 CIB",price,date,url:`https://www.ebay.com/itm/${200000000000+i}`});
+    const example=cur(product,{sales:{cib:[row(1,5499),row(2,4949),row(3,3499)]},
+      ebayChecks:{results:{'200000000001':{state:'unknown',skipped:true},'200000000002':{state:'ended'},'200000000003':{state:'ended'}}},
+      directEbay:{result:{state:'ready',sales:[],more:false}}});
+    const snapshot=JSON.stringify(example), rows=invoke('floorSales',example);
+    assert.ok(rows.every(s=>!s.odd && s.historicalInfo.retained && s.verification.state==='historical'));
+    const result=invoke('floorResult',example);
+    assert.equal(result.r.price,5500); assert.equal(result.b.ebayReview,true);
+    const html=invoke('floorSaleTable',rows,result.b);
+    assert.ok(html.includes('floor-sale-date-old'));assert.ok(html.includes('Historical · not verified'));
+    assert.ok(!html.includes('Sold price verified'));assert.equal(JSON.stringify(example),snapshot);
+    for(const state of ['offer','price','mismatch','location']) {
+      const checks={results:{...example.ebayChecks.results,'200000000001':{state}}};
+      assert.ok(invoke('floorSales',{...example,ebayChecks:checks})[0].odd,state);
+    }
+    const knownUnsold={results:{'200000000001':{state:'ended',confirmedUnsold:true}}};
+    assert.ok(invoke('floorSales',{...example,ebayChecks:knownUnsold})[0].odd);
+    const high={...example,sales:{cib:[row(1,7548),row(2,4949)]}};
+    assert.ok(invoke('floorSales',high)[0].outlier,'3x PC guard still applies to historical evidence');
+    const recent=[row(4,3000,'2026-09-01'),row(5,2999,'2026-10-01'),row(6,2900,'2026-10-20')];
+    assert.ok(invoke('floorSales',{...example,sales:{cib:[...example.sales.cib,...recent]}})[0].odd,'Three recent matches disable historical exception');
+    for(const state of [{loading:true},{result:{state:'ready',sales:[],more:true}},{result:{state:'ready',sales:[],partial:true}},{result:{state:'unknown',sales:[]}}]) {
+      assert.ok(invoke('floorSales',{...example,directEbay:state})[0].historicalInfo.pending,'Incomplete search must not establish scarcity');
+    }
+    const fresh={...example,sales:{cib:[row(1,5499,'2026-10-01')]}};
+    assert.ok(invoke('floorSales',fresh)[0].odd,'Recent unreadable pages remain excluded');
+    const withinSixMonths={...example,sales:{cib:[row(1,5499,'2026-06-01'),...recent]},ebayChecks:{results:{}}};
+    assert.equal(invoke('floorSales',withinSixMonths)[0].odd,false,'Untested history within six months keeps its existing eligibility');
+    withinSixMonths.ebayChecks.results['200000000001']={state:'ended'};
+    assert.equal(invoke('floorSales',withinSixMonths)[0].odd,true,'Restoring an archived failed check still requires a slow seller');
+    assert.equal(invoke('floorOutsideEbayWindow',{date:'2026-07-29'}),false,'90-day boundary is not older than window');
+    assert.equal(invoke('floorOutsideEbayWindow',{date:'2026-07-28'}),true);
+    for(const date of [null,'invalid','2026-02-30','2027-01-01'])assert.equal(invoke('floorOutsideEbayWindow',{date}),false);
   } finally {context.Date=previousDate;}
 });
 

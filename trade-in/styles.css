@@ -510,6 +510,7 @@ table.log-items th, table.log-items td { padding: 6px 8px; }
 .floor-sales tr.picked td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 .floor-sales tr.odd td { opacity: 0.6; }
 .floor-sales td.num { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.floor-sale-date-old { color: #f1c84b; font-weight: 600; }
 .floor-sales a { color: var(--paper); text-decoration-color: var(--line); }
 .nowrap { white-space: nowrap; }
 .floor-result { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--surface-2); border-radius: var(--radius); }
