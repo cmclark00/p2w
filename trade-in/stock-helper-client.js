@@ -19,7 +19,7 @@ window.P2WGameStopHelper = {
   },
 };
 
-function ebayHelperRequest(type, url, mode = 'manual', query) {
+function ebayHelperRequest(type, url, mode = 'manual', query, page = 1) {
   return new Promise(resolve => {
     const nonce = crypto.randomUUID();
     let acknowledged = false;
@@ -32,14 +32,14 @@ function ebayHelperRequest(type, url, mode = 'manual', query) {
     const probe = setTimeout(() => { if (!acknowledged) finish(null); }, 800);
     const deadline = setTimeout(() => finish({ state: 'unknown' }), type === 'P2W_EBAY_PING' ? 2500 : 28000);
     window.addEventListener('message', receive);
-    window.postMessage({ type, nonce, url, query, protocol: 2, mode }, location.origin);
+    window.postMessage({ type, nonce, url, query, page, protocol: 2, mode }, location.origin);
   });
 }
 window.P2WEbayHelper = {
-  async search(query) {
+  async search(query, page = 1) {
     const h = await ebayHelperRequest('P2W_EBAY_PING');
-    if (!h?.available || h.protocol !== 2 || h.search !== 1) return { state: 'unavailable', sales: [], reason: 'Direct sold search needs helper 1.1.6. Download the update above.' };
-    return ebayHelperRequest('P2W_EBAY_SEARCH_REQUEST', undefined, 'search', query);
+    if (!h?.available || h.protocol !== 2 || h.search !== 1 || h.pagination !== 1) return { state: 'unavailable', sales: [], reason: 'Direct sold search needs helper 1.1.7. Download the update above.' };
+    return ebayHelperRequest('P2W_EBAY_SEARCH_REQUEST', undefined, 'search', query, page);
   },
   status: () => ebayHelperRequest('P2W_EBAY_PING'), // Capability/version only; never opens a listing tab.
   targetedAvailable: async () => { const h = await ebayHelperRequest('P2W_EBAY_PING'); return !!h?.available && h.protocol === 2 && h.targeted === 1; },

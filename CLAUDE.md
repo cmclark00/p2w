@@ -761,7 +761,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.6+ and protocol 2/targeted/search capabilities. No response says Not connected, not
+    1.1.7+ and protocol 2/targeted/search/pagination capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -779,10 +779,17 @@ The site's **only server-side code**. Everything else is static.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
 
-  - **Direct eBay discovery (helper 1.1.6):** live pricing automatically searches
+  - **Direct eBay discovery (helper 1.1.7):** live pricing automatically searches
     sold+completed results for the selected edition and, when applicable, the standard
-    game. One inactive search tab at a time; first page (120 requested results), sorted
-    highest price+shipping. More pages or unreadable cards are explicitly partial.
+    game. One inactive search-page tab at a time (120 requested results per page),
+    sorted highest price+shipping. Continue while no eligible same-condition sold
+    row exists; stop on the first page with a match after the normal identity,
+    bundle, offer and outlier filters. Lower unread pages after that stop do not
+    imply failure. Unreadable cards, unknown shipping, failed/repeated/wrong pages
+    and the 50-page safety guard stay reviewable; never claim complete coverage.
+    Validate page number and descending-sort URL, dedupe IDs across pages, and
+    cancel publication on condition/item/typed-price changes. Helper cache keys
+    include query and page. Original item checks also read visible condition.
     Positive dated Sold cards with non-struck USD item prices supply sold evidence;
     accepted offers are excluded. Direct-sale baselines and sorting include known
     shipping once; rows retain/display item price and shipping separately. Unknown
@@ -797,8 +804,8 @@ The site's **only server-side code**. Everything else is static.
     title/edition identity but no complete/CIB/loose adjectives added to the query.
     Merge by original eBay ID before existing matching/outlier/premium/rounding logic;
     direct cards need no redundant item checks. Search state is separate from PC sales
-    so delayed PC loads cannot overwrite it. All conditions share the search. No work
-    in bulk audits. Capability search:1 gates new messages; older helpers prompt update.
+    so delayed PC loads cannot overwrite it. Conditions reuse cached pages but each condition searches until its own match. No work
+    in bulk audits. Capabilities search:1/pagination:1 gate new messages; older helpers prompt update.
     Search cache: 40 queries, 5 minutes; unknown 20 seconds. Queue max 3, one active;
     18s active / 24s total watchdog, owner-close cleanup. Missing login/challenges/layout
     failures remain unknown, never zero sales. Scripts ebay-search-reader/background.js
@@ -1140,14 +1147,16 @@ The site's **only server-side code**. Everything else is static.
     retain the established Renewed fallback behavior. Good preference is separate
     for regular and Renewed channels. Pins show the selected Used grade, and offer
     rows identify ineligible grades. A collapsed Amazon condition guide above
-    game offers explains the grades and the cheaper-New comparison for staff.
+    game offers explains the grades and condition separation for staff.
     Loose/CIB result caches are separate; switching
     condition reloads selection and stale requests cannot replace the new condition.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
-    With both regular conditions priced, select min(lowest Used, lowest New),
-    shipping included; never select the most expensive seller within a condition.
-    A winning New offer is labeled `newReference` / Amazon New; ties prefer Used. All title/platform/edition checks
-    still apply; factory-sealed wording is permitted only for the New reference.
+    Only matching Used evidence prices Loose/CIB; regular New is display-only.
+    Only New evidence prices New; Like New, Used, Open Box and Renewed do not.
+    Opposite-condition display failures do not block the eligible condition.
+    GameStop pre-owned stays visible but never sets a New inventory minimum.
+    PriceCharting condition categories still apply, with explicit used/opened
+    titles rejected from New and sealed titles rejected from used evidence.
     The result retains separate lowest `references.used`, `.new` and `.renewed`
     offers and links. Pinned prices show each condition and mark the selected
     Amazon reference; the comparison table distinguishes that selection from
@@ -1159,7 +1168,7 @@ The site's **only server-side code**. Everything else is static.
     deferred renewed/refurbished candidates plus a title/platform/renewed
     search get the same identity checks with positive platform evidence.
     Each verified renewed ASIN is checked under both Used and New offer
-    conditions; regular New offers are also compared so the cheaper one wins.
+    conditions as refurbished evidence; regular New is only a display comparison.
     The lowest usable Renewed offer is tagged `renewedFallback` and
     visibly labeled. Renewed uses the normal three-source maximum:
     `max(highest eligible eBay sale, lowest Renewed, applicable GameStop)`, before
@@ -1174,7 +1183,7 @@ The site's **only server-side code**. Everything else is static.
     and condition; failed promises are evicted so retries work.
     The API supplies a shared catalog title, not each seller's description;
     hidden or mislabeled variants still require staff review. Loose/CIB compare
-    with **Used and New**, New with **New** only. **Loaded automatically for every game.** Only the lowest matching
+    with **Used** (New display-only), New with **New** only. **Loaded automatically for every game.** Only the lowest matching
     offer enters the three-reference maximum, for every system. Higher
     offers and missing offers add no markup. The game
     can now use the title/platform search without a UPC. `GET amazon/test` checks the

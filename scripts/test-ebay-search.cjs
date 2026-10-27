@@ -22,16 +22,18 @@ const row = el('', { querySelector(selector) {
 }, querySelectorAll(selector) {
   return selector === '.s-card__price' ? [price] : selector === '.s-card__subtitle' ? [el(card.condition)] : [el(card.details), el(card.shipping)];
 } });
-const query = 'The Order 1886 Steelbook PS4', href = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1';
+const query = 'The Order 1886 Steelbook PS4', href = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16';
 const doc = { querySelector: selector => selector === '#srp-results-heading' ? el('1 result for ' + query) : null,
   querySelectorAll: selector => selector === '#srp-river-results li.s-card' ? [row] : [], defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) } };
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].price, 4000);
 for (const url of [href.replace('LH_Sold=1', 'LH_Sold=0'), 'https://signin.ebay.com/', href.replace('_nkw=', '_wrong=')])
   assert.equal(invoke(reader, 'readEbaySearch', doc, url, query).state, 'unknown');
+assert.equal(invoke(reader,'readEbaySearch',doc,href.replace('_sop=16','_sop=13'),query).state,'unknown','Only highest-first pages can justify stopping early');
+assert.equal(invoke(reader,'readEbaySearch',doc,href,query,2).state,'unknown','Wrong page cannot be counted twice');
 const noCards = { ...doc, querySelectorAll: () => [] };
 assert.equal(invoke(reader, 'readEbaySearch', noCards, href, query).state, 'unknown', 'A layout failure is not zero sales');
 assert.equal(invoke(reader, 'readEbaySearch', { ...noCards, querySelector: s => s.includes('heading') ? el('0 results for ' + query) : null }, href, query).state, 'ready');
-assert.equal(invoke(reader, 'readEbaySearch', { ...doc, querySelector: s => s.includes('next') ? el('next') : doc.querySelector(s) }, href, query).partial, true);
+assert.equal(invoke(reader, 'readEbaySearch', { ...doc, querySelector: s => s.includes('next') ? el('next') : doc.querySelector(s) }, href, query).more, true);
 price.matches = () => true;
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].state, 'offer'); price.matches = () => false;
 
@@ -40,7 +42,7 @@ const ctx = vm.createContext({ console, URL, Date, setTimeout, clearTimeout, loc
 vm.runInContext(fs.readFileSync('trade-in/dead-games.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('trade-in/app.js', 'utf8').replace(/\binit\(\);\s*$/, ''), ctx);
 const product = { id: '123', 'product-name': 'The Order: 1886 [Steelbook Edition]', 'console-name': 'Playstation 4', 'cib-price': 2124 };
-const sold = parse(), ready = rows => ({ state: 'ready', sales: rows, checkedAt: 123456, partial: false });
+const sold = parse(), ready = rows => ({ state: 'ready', sales: rows, checkedAt: 123456, partial: false, page: 1, sorted: true });
 const base = () => ({ product, condition: 'cib', sales: { cib: [{ ...sold, price: 2500, source: undefined, state: undefined }] }, typed: null, pick: null, amazon: { found: false }, directEbay: { result: ready([sold]) } });
 const result = c => invoke(ctx, 'floorResult', c);
 const rows = c => invoke(ctx, 'floorSales', c);
@@ -108,15 +110,36 @@ assert.equal(result(standard).b.basis, 5612, 'Standard fallback includes deliver
 let listeners = [], onRemove = [], created = [], removed = [], requests = [], timers = new Set(), nextId = 10;
 const worker = vm.createContext({ URL, Date, Map, setTimeout: fn => { timers.add(fn); return fn; }, clearTimeout: fn => timers.delete(fn),
   pricingSender: s => s.frameId === 0 && s.url === 'https://play2wingames.com/trade-in/' && Number.isInteger(s.tab?.id),
-  chrome: { runtime: { getManifest: () => ({ version: '1.1.6' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
+  chrome: { runtime: { getManifest: () => ({ version: '1.1.7' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
     create: async args => { created.push(args); return { id: nextId++ }; }, remove: async id => removed.push(id),
     sendMessage: (id, m) => new Promise(resolve => requests.push({ id, m, resolve })), onRemoved: { addListener: h => onRemove.push(h) } } } });
 vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-background.js', 'utf8'), worker);
 vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-search-background.js', 'utf8'), worker);
 const sender = { frameId: 0, tab: { id: 1 }, url: 'https://play2wingames.com/trade-in/' };
-const send = (query, from = sender, protocol = 2) => new Promise(resolve => { if (!listeners[1]({ type: 'P2W_EBAY_SEARCH', query, protocol }, from, resolve)) resolve(null); });
+const send = (query, from = sender, protocol = 2, page = 1) => new Promise(resolve => { if (!listeners[1]({ type: 'P2W_EBAY_SEARCH', query, protocol, page }, from, resolve)) resolve(null); });
 const flush = () => new Promise(r => setImmediate(r));
 (async () => {
+  const searchCur=()=>({...base(),product:wwe,sales:{cib:[]},directEbay:undefined});
+  const comp=(n,grade,title)=>({...sold,id:String(100000000000+n),url:`https://www.ebay.com/itm/${100000000000+n}`,title,conditionText:grade,price:5000-n*100,shipping:0});
+  const pageCalls=[];const paged=searchCur();
+  await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{
+    pageCalls.push(page);return {...ready(page===1?[comp(1,'Brand New','WWE 2K20 PS4 Brand New'),comp(2,'Pre-Owned','WWE 2K20 & WWE 2K19 PS4 Bundle')]:[comp(3,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
+  }});
+  assert.deepEqual(pageCalls,[1,2]);assert.equal(paged.directEbay.result.stoppedAtMatch,true);assert.equal(paged.directEbay.result.partial,false,'Unread lower pages are not a failure after a sorted match');
+  const newPages=[];paged.condition='new';
+  await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{newPages.push(page);return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page,more:true};}});
+  assert.deepEqual(newPages,[1],'Condition change searches for its own highest match');
+  const exhausted=searchCur();let count=0;
+  await invoke(ctx,'runFloorEbaySearch',exhausted,()=>{},()=>false,{search:async(q,page)=>{count++;return {...ready([comp(page,'Brand New','WWE 2K20 PS4 Brand New')]),page,more:page<3};}});
+  assert.equal(count,3);assert.equal(exhausted.directEbay.result.partial,false);assert.equal(exhausted.directEbay.result.stoppedAtMatch,undefined);
+  for(const mode of ['repeat','failed','wrong-page']) {
+    const c=searchCur();let count=0;
+    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>{count++;if(page===2&&mode==='failed')throw Error('Blocked');return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page:mode==='wrong-page'?1:page,more:true};}});
+    assert.equal(count,2,mode);assert.equal(c.directEbay.result.partial,true,mode);assert.equal(c.directEbay.result.sales.length,1,'Keep prior evidence without duplicates');
+  }
+  const switched=searchCur();let release;const inFlight=invoke(ctx,'runFloorEbaySearch',switched,()=>{},()=>false,{search:()=>new Promise(r=>release=r)});
+  switched.condition='new';release(ready([comp(1,'Pre-Owned','WWE 2K20 PS4 CIB')]));await inFlight;
+  assert.equal(switched.directEbay.result,undefined,'Stale CIB completion cannot publish into New');
   let calls = 0;
   const c = base(); delete c.directEbay;
   const helper = { search: async q => { calls++; return ready(q.includes('Steelbook') ? [sold] : []); } };
@@ -130,6 +153,7 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.equal(updates, 1, 'Cancelled lookup does not redraw another game');
   assert.equal(await send(query, { ...sender, frameId: 1 }), null);
   assert.equal((await send(query, sender, 1)).state, 'unknown');
+  for(const page of [0,51,'2',-1,1.5]) assert.equal((await send(query,sender,2,page)).state,'unknown');
   const a = send(query), b = send(query), other = send('Road Redemption PS4'); await flush();
   assert.equal(created.length, 1); assert.equal(created[0].active, false);
   assert.equal(new URL(created[0].url).searchParams.get('LH_Sold'), '1'); assert.equal(new URL(created[0].url).searchParams.get('_sop'), '16');
@@ -154,6 +178,10 @@ const flush = () => new Promise(r => setImmediate(r));
   vm.runInContext(fs.readFileSync('trade-in/stock-helper-client.js', 'utf8'), bridge);
   assert.equal((await pageWindow.P2WEbayHelper.search(query)).sales[0].price, 4000);
   assert.equal(messages.at(-1).type, 'P2W_EBAY_SEARCH'); assert.equal(pageListeners.size, 2, 'Request listeners clean up');
+  const pageTwo=pageWindow.P2WEbayHelper.search(query,2);await flush();
+  assert.equal(new URL(created.at(-1).url).searchParams.get('_pgn'),'2','Page travels through client, bridge and worker');
+  requests.at(-1).resolve({...ready([sold]),page:2});assert.equal((await pageTwo).page,2);
+  const beforeCachedPage=created.length;assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2);assert.equal(created.length,beforeCachedPage,'Cache separates pages');
   oldHelper = true; messages.length = 0;
   assert.equal((await pageWindow.P2WEbayHelper.search(query)).state, 'unavailable');
   assert.equal(messages.length, 1, 'Old worker receives only a capability ping, never a search tab request');

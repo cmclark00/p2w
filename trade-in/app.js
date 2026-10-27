@@ -3349,6 +3349,7 @@ function floorLoosePackagingMismatch(title, condition, product = null) {
 // Amazon Used catalogs do not distinguish Loose/CIB; apply packaging checks to sold-item evidence only.
 function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging = true) {
   const toy = floorToyFamily(product);
+  if (condition === 'new' && /\b(?:pre[ -]?owned|used|unsealed|opened|open box|new\s*\(other\)|like new|not sealed|no seal)\b/i.test(sale.title || '')) return true;
   if (checkPackaging && floorLoosePackagingMismatch(sale.title, condition, product)) return true;
   // Opened packaging is valid used-figure evidence, not a sealed collectible.
   const t = toy ? floorFigureTitle(sale.title) : sale.title;
@@ -3394,7 +3395,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.6';
+const FLOOR_HELPER_RECOMMENDED = '1.1.7';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -3405,7 +3406,7 @@ function floorHelperStatusInfo(helper) {
     comparison = (parts[i] || 0) - (required[i] || 0);
     if (comparison) break;
   }
-  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1;
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1;
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
@@ -3717,7 +3718,14 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const results = await Promise.allSettled(tasks.map(async ({ c, offerCond }) => {
           // A renewed ASIN may carry New offers; that is still a renewed item,
           // never evidence for the original game's sealed condition.
-            const offer = { ...await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }), renewedFallback,
+            let data;
+            try { data = await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }); }
+            catch (err) {
+              if (cond === 'used' && offerCond === 'new' && !renewedFallback) { referenceErrors.new = err.message; return; }
+              throw err;
+            }
+            const offer = { ...data, renewedFallback,
+              displayOnly: cond === 'used' && offerCond === 'new' && !renewedFallback,
               newReference: cond === 'used' && !renewedFallback && offerCond === 'new' };
             const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
@@ -3764,32 +3772,24 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
         || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
-      // Compare the cheapest verified offer in each regular condition, not the
-      // most expensive seller. Sealed inventory and Renewed fallback stay separate.
-      const regularUsed = choices.find(a => !a.renewedFallback && a.offerCondition === 'used');
-      const regularNew = choices.find(a => !a.renewedFallback && a.offerCondition === 'new');
-      const compareConditions = cond === 'used' && regularUsed && regularNew;
-      const selected = compareConditions
-        ? (floorAmazonLowest({ product, condition, amazon: regularNew }) < floorAmazonLowest({ product, condition, amazon: regularUsed }) ? regularNew : regularUsed)
-        : choices[0] || verified[0];
+      // Opposite-condition offers remain visible comparisons, never pricing evidence.
+      const selected = choices[0] || verified.find(a => !a.newReference && !a.displayOnly) || null;
       const matchNotes = [];
       if (!floorIsHardware(product) && !floorToyFamily(product) && condition !== 'new') matchNotes.push(condition === 'loose'
         ? 'Loose Used offers: Good preferred across matching listings; Acceptable only when no matching Good offer is returned. Other grades do not price Loose'
         : 'CIB Used offers: lowest Very Good or Like New (Mint) offer; either grade works alone. Good and Acceptable do not price CIB');
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
+      if (!choices.length && !searchError) matchNotes.push('No eligible offer for this condition; no Amazon price used.');
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
       if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; ${searchError ? 'search not finished' : 'compared barcode and title/platform searches'}` : searchError ? 'No verified Amazon match found yet; search not finished' : 'No verified Amazon listing found in the title/platform search; review manually');
       const listingCount = new Set(choices.map((a) => a.asin)).size;
       if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; compared the lowest matching offers by condition${searchError ? ' found so far' : ''}`);
-      if (selected?.renewedFallback && !searchError) matchNotes.push(choices.length
-        ? 'Renewed fallback: no usable regular used Amazon offer found. Compared matching new offers and selected the lowest verified reference; original packaging and inserts are not confirmed'
-        : 'Renewed listing verified, but no usable offer found; no Amazon price used');
-      if (compareConditions && !searchError) matchNotes.push('Amazon condition comparison: selected the lower of the lowest matching Used and New offers, including shipping. Equal prices prefer Used. Other source rules, premiums and rounding still apply');
-      else if (selected?.newReference && choices.length && !searchError) matchNotes.push('New-copy Amazon reference: no regular Used offer was found. The existing Renewed fallback comparison still applies. Shipping included; other source rules, premiums and rounding still apply');
+      if (selected?.renewedFallback && !searchError) matchNotes.push('Renewed fallback: no usable regular used Amazon offer found. Renewed is used/refurbished evidence, never factory-new evidence');
+      matchNotes.push('Conditions stay separate: New offers are display-only for used inventory; Used and Renewed cannot price New inventory.');
       const references = {};
       for (const kind of ['used', 'new', 'renewed']) {
         const matches = floorAmazonPrioritizeUsed({ product, condition: condition === 'new' ? 'cib' : condition }, verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind));
-        const value = a => floorAmazonLowest({ product, condition: a.displayOnly ? 'cib' : condition, amazon: a });
+        const value = a => floorAmazonLowest({ product, condition: kind === 'new' ? 'new' : condition === 'new' ? 'cib' : condition, amazon: { ...a, displayOnly: false } });
         references[kind] = matches.filter(a => value(a) > 0).sort((a,b) => value(a) - value(b) || a.asin.localeCompare(b.asin))[0] || matches[0] || null;
       }
       if (searchError && !selected) throw Error(searchError);
@@ -4039,44 +4039,68 @@ function floorMergedSales(cur, pool) {
 }
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
-  if (cur.directEbay || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
-  if (!helper?.search) { cur.directEbay = { loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.6.' } }; return; }
-  const state = cur.directEbay = { loading: true };
+  if (cur.directEbay?.condition === cur.condition || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
+  if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.7.' } }; return; }
+  const condition = cur.condition;
+  const state = cur.directEbay = { condition, loading: true };
+  const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
   progress();
   const read = async product => {
-    if (!helper?.search) return { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.6.' };
     const query = floorEbaySearchQuery(product);
-    let value;
-    try { value = await helper.search(query); }
-    catch (_) { value = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
-    if (!value || !Array.isArray(value.sales)) return { state: 'unknown', sales: [], reason: 'Direct eBay search did not finish. Retry or review eBay manually.' };
-    // Validate again at the page boundary; never let arbitrary URLs or malformed prices into the table.
-    const sales = value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
-      && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
-      && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
-    return { ...value, url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120', sales,
-      partial: !!value.partial || sales.length !== value.sales.length };
+    const rows = new Map(); let partial = false;
+    const result = { state: 'ready', sales: [], pages: 0, url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
+    for (let page = 1; page <= 50 && !stopped(); page++) {
+      let value;
+      try { value = await helper.search(query, page); } catch (_) { value = null; }
+      if (stopped()) return result;
+      if (value?.state !== 'ready' || !Array.isArray(value.sales) || value.page !== page || value.sorted !== true) {
+        return { ...result, state: rows.size ? 'ready' : value?.state || 'unknown', partial: true,
+          reason: value?.reason || 'The next sold-results page could not be verified. Review or retry the search.' };
+      }
+      const sales = value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
+        && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
+        && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+      const before = rows.size;
+      for (const sale of sales) if (!rows.has(sale.id)) rows.set(sale.id, sale);
+      partial ||= !!value.partial || value.skipped > 0 || sales.length !== value.sales.length;
+      Object.assign(result, { sales: [...rows.values()], pages: page, checkedAt: value.checkedAt, more: !!value.more, partial });
+      // Use the same identity, condition, offer and outlier rules as pricing.
+      // Do not stop for a mismatched bundle, hidden offer, or unreadable condition.
+      const matched = floorSales({ product, condition, sales: {}, directEbay: { result } })
+        .find(s => !s.odd && !s.outlier && s.verification?.state === 'sold');
+      if (matched) return { ...result, stoppedAtMatch: true,
+        partial: partial || matched.shipping == null,
+        reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null ? ' Some evidence or shipping needs review.' : ''}` };
+      if (!value.more) return { ...result, reason: `Checked ${page} page${page === 1 ? '' : 's'}; no eligible ${GAME_CONDITIONS[condition]} sale found.` };
+      if (rows.size === before) return { ...result, partial: true, reason: 'eBay repeated a page or returned unreadable results. Review the remaining pages manually.' };
+      state.page = page + 1; progress();
+    }
+    return { ...result, partial: true, reason: 'Search stopped at the pagination safety limit or was cancelled. Review remaining results.' };
   };
   try {
     const found = await read(cur.product);
+    if (stopped()) return;
     const selected = cur.pick == null ? null : floorSales(cur).find(s => s.i === cur.pick);
     state.result = found;
     if (selected) cur.pick = floorSales(cur).find(s => floorSaleKey(s) === floorSaleKey(selected))?.i ?? null;
-    if (cancelled() || cur.directEbay !== state) return;
+    if (stopped()) return;
     const standard = floorStandardGame(cur.product);
-    if (standard && state.result.state === 'ready') state.standard = { result: await read(standard) };
+    if (standard && state.result.state === 'ready') {
+      const base = await read(standard);
+      if (!stopped()) state.standard = { result: base };
+    }
   } catch (_) { state.result = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
   finally {
     state.loading = false;
-    if (!cancelled() && cur.directEbay === state) progress();
+    if (!stopped()) progress();
   }
 }
 function floorDirectSearchHtml(cur) {
   const s = cur.directEbay;
   if (!s) return '';
   const r = s.result;
-  const note = s.loading ? 'Searching eBay sold listings…' : r?.state === 'ready'
-    ? `Direct eBay · ${r.sales.length} sold results read · includes known shipping${r.partial ? ' · partial search' : ''}`
+  const note = s.loading ? `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
+    ? `Direct eBay · ${r.sales.length} sold results read${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${r.partial ? ' · needs review' : ''}`
     : r?.reason || 'Direct eBay search unavailable';
   return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || r.partial) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
 }
@@ -4084,6 +4108,10 @@ function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
   if (!result.title || floorListingMismatch(result.title, product)) return { state: 'mismatch' };
+  if (result.conditionText) {
+    const brandNew = /^(Brand New|New)$/i.test(result.conditionText);
+    if (condition === 'new' ? !brandNew : brandNew || !/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(result.conditionText)) return { state: 'mismatch' };
+  } else if (condition === 'new' && !SEALED_RE.test(result.title)) return { state: 'unknown' };
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
   if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
@@ -4577,7 +4605,7 @@ function looseBundleUnreliable(cur) {
 const floorGsOutOfStock = (cur) => cur.gamestopStock?.state === 'out' && !!cur.gamestopStock.title
   && !floorListingMismatch(cur.gamestopStock.title, cur.product);
 function floorGsFor(cur) {
-  if (floorGsOutOfStock(cur)) return null;
+  if (cur.condition === 'new' || floorGsOutOfStock(cur)) return null;
   const gs = floorGs(cur.product);
   return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
@@ -4601,7 +4629,8 @@ function floorAmazonUsesGrades(cur) {
     && !a?.newReference && String(a?.offerCondition || a?.condition || '').toLowerCase() !== 'new';
 }
 function floorAmazonEligibleOffers(cur) {
-  const offers = (cur.amazon?.offers || []).filter(o => Number.isFinite(Number(o.price)) && Number(o.price) > 0);
+  const offers = (cur.amazon?.offers || []).filter(o => Number.isFinite(Number(o.price)) && Number(o.price) > 0
+    && (cur.condition !== 'new' || !o.sub || floorAmazonSub(o) === 'new'));
   if (!floorAmazonUsesGrades(cur)) return offers;
   if (cur.condition === 'loose') {
     const good = offers.filter(o => floorAmazonSub(o) === 'good');
@@ -4623,8 +4652,11 @@ function floorAmazonPrioritizeUsed(cur, entries) {
 function floorAmazonLowest(cur, showPartial = false) {
   if (cur.amazon?.incomplete && !showPartial) return null;
   if (!cur.amazon?.found || floorAmazonMismatch(cur)) return null;
+  const a = cur.amazon, offerCondition = String(a.offerCondition || a.condition || '').toLowerCase();
+  if (cur.condition === 'new' ? a.renewedFallback || offerCondition === 'used' || a.displayOnly
+    : !a.renewedFallback && (a.newReference || offerCondition === 'new')) return null;
   const prices = floorAmazonEligibleOffers(cur).map(o => Number(o.price));
-  const lowest = prices.length ? Math.min(...prices) : floorAmazonUsesGrades(cur) ? null : Number(cur.amazon.lowest);
+  const lowest = prices.length ? Math.min(...prices) : floorAmazonUsesGrades(cur) || a.offers?.length ? null : Number(cur.amazon.lowest);
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
 }
 
@@ -4926,7 +4958,7 @@ function renderFloorPricer() {
             <li><strong>Acceptable:</strong> loose / disc only. Fallback when no Good offer is available.</li>
             <li><strong>Very Good:</strong> game with case / cover art and/or manual. Treated as CIB.</li>
             <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; either works alone.</li>
-            <li><strong>New:</strong> new-copy offer. For Loose/CIB, a cheaper New offer wins over eligible Used.</li>
+            <li><strong>New:</strong> new-copy offer. Only prices New inventory; reference-only for Loose/CIB.</li>
             <li><strong>Renewed:</strong> separate fallback when no eligible regular Used offer is found; not proof of original sealed condition.</li>
           </ul>
           <p class="muted small-print">These are our pricing categories; check seller notes for exact contents. Prices include shipping. Specific pricing rules and premiums still apply.</p>
@@ -4940,7 +4972,7 @@ function renderFloorPricer() {
           ${!toy ? `<ul>
             <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
-            <li>Amazon: use the lower of the lowest matching Used and New offers, including shipping.</li>
+            <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
             <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
             <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>Suspected outliers are excluded. Check the listing before selecting it to include it.</li>
@@ -4963,12 +4995,12 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
   const refs = a?.references || { [selectedKind]: a };
   const kinds = ['used', 'new', ...(a?.renewedChecked || refs.renewed ? ['renewed'] : [])];
   const rows = kinds.map(kind => {
-    const ref = refs[kind], referenceCur = { ...cur, condition: ref?.displayOnly ? 'cib' : cur.condition, amazon: ref };
+    const ref = refs[kind], referenceCur = { ...cur, condition: kind === 'new' ? 'new' : cur.condition === 'new' ? 'cib' : cur.condition, amazon: ref ? { ...ref, displayOnly: false } : ref };
     const selectedOffer = floorAmazonEligibleOffers(referenceCur).sort((x, y) => Number(x.price) - Number(y.price))[0];
     const grade = kind === 'used' && floorAmazonUsesGrades(referenceCur) && selectedOffer ? AMZ_SUB[floorAmazonSub(selectedOffer)] : '';
     const label = { used: 'Used', new: 'New', renewed: 'Renewed' }[kind] + (grade ? ` · ${grade}` : '');
-    const price = ref && !a?.error ? floorAmazonLowest({ ...cur, condition: ref.displayOnly ? 'cib' : cur.condition, amazon: ref }, true) : null;
-    const selected = price > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting;
+    const price = ref && !a?.error ? floorAmazonLowest(referenceCur, true) : null;
+    const selected = price > 0 && floorAmazonLowest(cur) > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting;
     const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
       : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
@@ -4999,7 +5031,7 @@ function floorAmazonHtml(cur, b) {
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;
   if (!offers.length) return `${head}<p class="muted">${a.incomplete
     ? 'No priced offer found yet; Amazon search is incomplete.'
-    : `No matching ${amazonCond(cur.condition) === 'new' ? 'new' : 'used or new'} offers returned by Amazon${a.renewedFallback ? ', including Renewed' : ''}.`}</p>`;
+    : `No matching ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers returned by Amazon${a.renewedFallback ? ', including Renewed' : ''}.`}</p>`;
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : !eligible.includes(o) ? 'muted' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[floorAmazonSub(o)] || AMZ_SUB[o.sub] || o.sub || 'Unknown grade')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${!eligible.includes(o) ? 'Not used for this condition' : i === lowestAt ? a.incomplete ? 'lowest found so far' : 'lowest eligible' : ''}</td></tr>`).join('')}</tbody></table>

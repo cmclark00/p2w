@@ -38,7 +38,9 @@ function readEbaySale(doc, id, href) {
   const prices = [...primary.querySelectorAll('.x-price-primary__price')].filter(visible).map(e => e.textContent.trim());
   if (prices.length !== 1 || !/^US\s*\$\s*[\d,]+(?:\.\d{2})?$/.test(prices[0])) return unknown;
   const price = Math.round(Number(prices[0].replace(/[^\d.]/g, '')) * 100);
-  return Number.isSafeInteger(price) && price > 0 ? { state: 'sold', id, title, price } : unknown;
+  const conditionNode = main.querySelector('.x-item-condition-text');
+  const conditionText = visible(conditionNode) ? conditionNode.textContent.trim().match(/^(Brand New|New \(Other\)|New|Pre-Owned|Used|Open box|For parts or not working)(?=\s|:|$)/i)?.[1] : null;
+  return Number.isSafeInteger(price) && price > 0 ? { state: 'sold', id, title, price, ...(conditionText ? { conditionText } : {}) } : unknown;
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || message?.type !== 'P2W_EBAY_READ' || !/^\d{9,15}$/.test(message.id)

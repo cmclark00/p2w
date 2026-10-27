@@ -44,15 +44,15 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       assert.equal(e.run('floorAmazonLowest(cur)'),1000,'Game packaging policy leaves figures and hardware unchanged');
     }
   });
-  await test('Loose prefers Good across every verified ASIN, with Acceptable fallback and cheaper New comparison intact', async () => {
+  await test('Loose prefers Good across every verified ASIN, with Acceptable fallback and New display-only', async () => {
     const first=candidate('B000000001'),second=candidate('B000000002');
-    for(const [grade,newPrice,want] of [['good',6000,4500],['acceptable',6000,1000],['good',3000,3000]]) {
+    for(const [grade,newPrice,want] of [['good',6000,4500],['acceptable',6000,1000],['good',3000,4500]]) {
       const e=engine(async(route,p)=>route==='amazon/catalog'?{candidates:[first,second]}:{...offer(p.asin===first.asin?first:second,null),
         condition:p.cond==='new'?'New':'Used',offers:p.cond==='new'?[{price:newPrice,sub:'new'}]:[{price:p.asin===first.asin?1000:4500,sub:p.asin===first.asin?'acceptable':grade}]});
       const result=await e.fetch();e.ctx.result=result;
       assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),want);
       assert.equal(result.references.used.asin,grade==='good'?second.asin:first.asin);
-      assert.equal(result.newReference,newPrice===3000);
+      assert.equal(result.newReference,false);
       assert.match(e.run('floorAmazonReferencesHtml({product,condition:"loose",amazon:result},{from:"amazon"},true)'),grade==='good'?/Used · Good/:/Used · Acceptable/);
     }
   });
@@ -194,26 +194,26 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       const result = await e.fetch(); assert.equal(result.asin, good.asin); assert.equal(result.renewedFallback, false);
     }
   });
-  await test('lower condition minimum sets the used/CIB Amazon reference while premiums and source floors remain intact', async () => {
+  await test('used/CIB Amazon reference ignores cheaper New while premiums and source floors remain intact', async () => {
     const p={...product,'product-name':'Pokemon Shield','console-name':'Nintendo Switch'};
     const good=candidate('B000000001','Pokemon Shield Nintendo Switch',['Nintendo Switch']);
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog') {assert.ok(!params.q?.endsWith('renewed'));return {candidates:[good]};}
       return {...offer(good,params.cond==='new'?6000:9000),condition:params.cond==='new'?'New':'Used'};
     });
-    const result=await e.fetch(p,'cib');assert.equal(result.newReference,true);assert.equal(result.renewedFallback,false);
-    assert.equal(result.offers[0].price,6000);e.ctx.p=p;e.ctx.result=result;e.run('amazonSet=true');
+    const result=await e.fetch(p,'cib');assert.equal(result.newReference,false);assert.equal(result.renewedFallback,false);
+    assert.equal(result.offers[0].price,9000);e.ctx.p=p;e.ctx.result=result;e.run('amazonSet=true');
     const cur='{product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch CIB",price:5000}]},amazon:result}';
-    const priced=e.run(`floorResult(${cur})`);assert.equal(priced.premium.pct,10);assert.equal(priced.r.price,6500);
-    assert.match(e.run(`floorAmazonHtml(${cur},{from:"amazon"})`),/Amazon new-copy reference offers/);
+    const priced=e.run(`floorResult(${cur})`);assert.equal(priced.premium.pct,10);assert.equal(priced.r.price,10000);
+    assert.match(e.run(`floorAmazonHtml(${cur},{from:"amazon"})`),/Amazon used offers/);
     assert.equal(e.run('floorResult({product:{...p,"gamestop-price":10000},condition:"cib",sales:{cib:[]},amazon:result}).b.basis'),10000);
     assert.equal(e.run('floorResult({product:p,condition:"cib",sales:{cib:[{title:"Pokemon Shield Nintendo Switch CIB",price:11000}]},amazon:result}).b.basis'),11000);
   });
-  await test('lower condition minimum wins and equal offers keep Used', async () => {
+  await test('Used remains selected regardless of the New price', async () => {
     for(const newPrice of [1500,2500,9000]) {
       const good=candidate('B000000001');
       const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[good]}:offer(good,params.cond==='new'?newPrice:2500));
-      const result=await e.fetch();assert.equal(result.offers[0].price,Math.min(newPrice,2500));assert.equal(result.newReference,newPrice<2500);
+      const result=await e.fetch();assert.equal(result.offers[0].price,2500);assert.equal(result.newReference,false);
     }
   });
   await test('separate Used/New links retain their prices and distinguish the selected reference from the shelf baseline', async () => {
@@ -221,7 +221,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[used,fresh]}
       : {...offer(params.asin===used.asin?used:fresh,params.cond==='used'?(params.asin===used.asin?4000:5000):(params.asin===fresh.asin?3000:6000)),condition:params.cond==='new'?'New':'Used'});
     const result=await e.fetch(product,'cib');assert.equal(result.references.used.asin,used.asin);assert.equal(result.references.new.asin,fresh.asin);
-    assert.equal(result.asin,fresh.asin);assert.equal(result.offers[0].price,3000, "Choose min(condition minima), with separate prices still visible");
+    assert.equal(result.asin,used.asin);assert.equal(result.offers[0].price,4000, "Only Used prices CIB, with both references visible");
     e.ctx.result=result;e.run('amazonSet=true');
     const html=e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"sale"})');
     assert.ok(html.includes(used.url)&&html.includes(fresh.url));assert.match(html,/\$40\.00/);assert.match(html,/\$30\.00/);
@@ -247,7 +247,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       if(fail)assert.match(html,/Check failed/);else assert.match(html,/\$10\.00/);
     }
   });
-  await test('new-only regular listings still compare Renewed and choose the cheaper shipping-inclusive offer', async () => {
+  await test('new-only regular listings are display-only while Renewed remains used fallback', async () => {
     for(const [newPrice,renewedPrice,wantsNew] of [[7394,7024,false],[6000,7024,true],[6000,null,true]]) {
       const regular=candidate('B000000001'),renewed=candidate('B000000002','Final Fight SNES (Renewed)');let renewedChecked=false;
       const e=engine(async(route,params)=>{
@@ -255,30 +255,29 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
         const item=params.asin===regular.asin?regular:renewed;
         return {...offer(item,item===regular?(params.cond==='new'?newPrice:null):renewedPrice),condition:params.cond==='new'?'New':'Used'};
       });
-      const result=await e.fetch();assert.equal(renewedChecked,true);assert.equal(result.newReference,wantsNew);
-      assert.equal(result.asin,wantsNew?regular.asin:renewed.asin);assert.equal(result.offers[0].price,wantsNew?newPrice:renewedPrice);
-      if(!wantsNew) assert.ok(result.matchNotes.some(n=>n.includes('no usable regular used Amazon offer found')&&n.includes('Compared matching new offers')));
+      const result=await e.fetch();assert.equal(renewedChecked,true);assert.notEqual(result.newReference,true);
+      e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),renewedPrice);
+      assert.equal(result.references.new.offers[0].price,newPrice);
     }
   });
-  await test('new reference permits factory-sealed wording but rejects wrong editions and languages', async () => {
+  await test('new display reference permits sealed wording but never prices CIB', async () => {
     const good=candidate('B000000001','Final Fight SNES Factory Sealed'),bad=candidate('B000000002','Final Fight Guy SNES Factory Sealed'),french=candidate('B000000003','Final Fight French Version SNES Factory Sealed');
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog') return {candidates:[good,bad,french]};
       assert.equal(params.asin,good.asin);return {...offer(good,params.cond==='new'?6000:null),condition:params.cond==='new'?'New':'Used'};
     });
-    const result=await e.fetch();assert.equal(result.asin,good.asin);assert.equal(result.newReference,true);
+    const result=await e.fetch();assert.equal(result.references.new.asin,good.asin);e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
     assert.ok(result.rejected.some(r=>r.asin===bad.asin));assert.ok(result.rejected.some(r=>r.asin===french.asin));
   });
-  await test('a failed New check stays incomplete and Retry reuses the completed Used check', async () => {
+  await test('a failed display-only New check does not block Used pricing', async () => {
     const good=candidate('B000000001');let fail=true,usedCalls=0;
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog')return {candidates:[good]};
       if(params.cond==='used'){usedCalls++;return offer(good,9000);}
       if(fail)throw Error('New offers unavailable');return {...offer(good,6000),condition:'New'};
     });
-    e.ctx.result=await e.fetch();assert.equal(e.ctx.result.incomplete,true);
-    assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),null);
-    fail=false;const result=await e.fetch();assert.equal(result.newReference,true);assert.equal(result.offers[0].price,6000);assert.equal(usedCalls,1);
+    e.ctx.result=await e.fetch(product,'cib');assert.equal(e.ctx.result.incomplete,undefined);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),9000);assert.ok(e.ctx.result.referenceErrors.new);assert.equal(usedCalls,1);
   });
   await test('renewed fallback still rejects wrong games, platforms, imports, editions, bundles and digital copies', async () => {
     const bad = [candidate('B000000001', 'Final Fight Guy (Renewed)'), candidate('B000000002', 'Final Fight Sega CD (Renewed)', ['Sega CD']),
@@ -480,7 +479,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.doesNotMatch(html,/No used offers on Amazon right now|No matching used offers returned/);
     fail=false;e.ctx.result=await e.fetch();
     html=e.run('floorAmazonHtml({product,condition:"cib",amazon:result},{from:"sale"})');
-    assert.match(html,/No matching used or new offers returned by Amazon/);assert.doesNotMatch(html,/search is incomplete/);
+    assert.match(html,/No matching used offers returned by Amazon/);assert.doesNotMatch(html,/search is incomplete/);
   });
   await test('runaway pagination stops at the safety cap without an automatic retry loop', async () => {
     const good=candidate('B000000001');let pages=0;

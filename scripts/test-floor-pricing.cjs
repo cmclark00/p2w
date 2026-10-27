@@ -32,7 +32,7 @@ const cur = (product = item, extra = {}) => {
   const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: `${product['product-name']} complete`, price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
   // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
   if (result.amazon?.found) result.amazon = { title: product['product-name'], ...result.amazon,
-    offers: result.amazon.offers?.map(o => ({ sub: result.condition === 'loose' ? 'good' : 'very_good', ...o })) };
+    offers: result.amazon.offers?.map(o => ({ sub: result.condition === 'new' ? 'new' : result.condition === 'loose' ? 'good' : 'very_good', ...o })) };
   return result;
 };
 
@@ -58,6 +58,26 @@ test('loose PSP games use normal trade offers while other disc-only tiers stay i
   }
   assert.equal(invoke('priceLine', { ...line, condition: 'cib' }, settings).cash, 840);
   assert.equal(invoke('guideCheck', { ...line, name: 'Madden NFL 07', condition: 'cib' }, settings).flat, 25);
+});
+
+test('New and used evidence stay separated across Amazon, GameStop and PriceCharting', () => {
+  const p={...item,'gamestop-price':9999};
+  assert.equal(invoke('floorGsFor',{product:p,condition:'new'}),null);
+  assert.equal(invoke('floorGsFor',{product:p,condition:'cib'}),9999);
+  for(const condition of ['loose','cib']) {
+    for(const a of [{condition:'New'},{offerCondition:'new',newReference:true}]) {
+      assert.equal(invoke('floorAmazonLowest',cur(p,{condition,amazon:{found:true,...a,lowest:8000,offers:[{price:8000,sub:'new'}]}})),null);
+    }
+  }
+  for(const a of [{condition:'Used',offers:[{price:8000,sub:'like_new'}]},
+    {condition:'New',offers:[{price:8000,sub:'very_good'}]},
+    {condition:'New',renewedFallback:true,offers:[{price:8000,sub:'new'}]}]) {
+    assert.equal(invoke('floorAmazonLowest',cur(p,{condition:'new',amazon:{found:true,lowest:8000,...a}})),null);
+  }
+  for(const title of ['Example Game Used','Example Game Pre-Owned','Example Game Open box','Example Game Unsealed','Example Game Like New']) {
+    assert.equal(invoke('floorSales',cur(p,{condition:'new',sales:{new:[{price:9000,title}]}}))[0].odd,true,title);
+  }
+  assert.equal(invoke('floorSales',cur(p,{sales:{cib:[{price:9000,title:'Example Game Brand New Sealed'}]}}))[0].odd,true);
 });
 
 test('eBay and Amazon exclude language, region, edition, extras and platform mismatches before pricing', () => {
@@ -358,12 +378,12 @@ test('audit mismatches cannot drive eBay or Amazon baselines', () => {
 
 test('helper status reports installed versions and capability readiness without claiming absent means uninstalled', () => {
   assert.equal(invoke('floorHelperStatusInfo', null).text, 'Not connected');
-  const capability = { available: true, protocol: 2, targeted: 1, search: 1 };
-  for (const version of ['1.1.6', '1.1.10', '1.2.0', '2.0.0']) {
+  const capability = { available: true, protocol: 2, targeted: 1, search: 1, pagination: 1 };
+  for (const version of ['1.1.7', '1.1.10', '1.2.0', '2.0.0']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'connected'); assert.equal(status.text, `Connected · v${version}`);
   }
-  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.0.99', undefined, '<script>']) {
+  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.1.6', '1.0.99', undefined, '<script>']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'update'); assert.ok(status.text.includes('Update needed'));
     assert.ok(!status.text.includes('<script>'));
@@ -805,10 +825,11 @@ test('three-reference baseline applies across tiers and conditions before specif
           const sales = { [condition]: [{ price: ebay, title: 'Example Game ' + ({ loose: 'disc only', cib: 'complete', new: 'sealed' })[condition] }] };
           const amazon = { found: true, lowest: amazonLow, offers: [{ price: 90000 }, { price: amazonLow }, { price: 50000 }] };
           const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
-          assert.equal(r.b.from, from);
+          const expectedFrom = condition === 'new' && from === 'gamestop' ? 'sale' : from;
+          assert.equal(r.b.from, expectedFrom);
           const expected = manualMissing && condition === 'cib'
-            ? { sale: 13000, amazon: 14000, gamestop: 16000 }[from]
-            : { sale: 15000, amazon: 16000, gamestop: 18000 }[from];
+            ? { sale: 13000, amazon: 14000, gamestop: 16000 }[expectedFrom]
+            : { sale: 15000, amazon: 16000, gamestop: 18000 }[expectedFrom];
           assert.equal(r.r.price, expected);
         }
       }

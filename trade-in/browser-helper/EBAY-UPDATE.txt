@@ -1,36 +1,30 @@
-Play2Win Market Helper 1.1.6
+Play2Win Market Helper 1.1.7
 
 Update each staff computer/profile manually:
 1. Download the helper ZIP from Floor Pricing and extract it over the helper's
    permanent folder (the folder containing manifest.json).
 2. Open chrome://extensions and click Reload on Play2Win Market Helper.
    Allow eBay search-page access if Chrome asks. Keep only one helper enabled.
-3. Refresh the pricing tool. The header should say Connected - v1.1.6.
+3. Refresh the pricing tool. The header should say Connected - v1.1.7.
 For first installation, enable Developer mode and choose Load unpacked instead.
 Manual guide: https://play2wingames.com/trade-in/helper-setup.html
 Connection checks: https://play2wingames.com/trade-in/helper.html
 Privacy: https://play2wingames.com/trade-in/helper-privacy.html
 
-New: direct eBay sold search can discover sales PriceCharting missed. It reads
-one page of up to 120 results, highest price plus shipping first, in a temporary
-background tab. Edition lookups also search the standard game separately.
-All conditions share that search; results are matched to the selected condition.
-A positive Sold date and a visible non-struck USD item price are required.
-Accepted offers are excluded; or Best Offer alone does not mean accepted.
-Shipping is displayed separately and does not change the existing price rules.
-The same item ID counts once across both sources. Positive dated sold results
-can resolve a generic Ended archive; price/identity conflicts still need review.
-Unknown packaging, variants, bundles and outliers keep their normal safeguards.
-Direct sold cards do not open redundant individual item tabs. Existing targeted
-checks still verify other price-driving sales, in pairs after the first check
-with GameStop, until verified or eligible evidence is exhausted.
+New: direct eBay sold search reads pages highest price plus shipping first.
+It continues only while no eligible matching sale for the selected condition
+has been found, then stops. Wrong games, editions, bundles, accepted offers
+and wrong conditions cannot stop the search. Only Brand New evidence prices
+New inventory; New (Other), Like New and open-box are used conditions.
 
-The first result page is not a complete history of eBay. More pages, unreadable
-cards, blocked searches and missing sign-in are flagged for review. Use Open
-search to inspect more results. Sign in to eBay in the same Chrome profile if
-needed; the helper never fills credentials or solves challenges. Search waits
-are bounded; typed reviewed prices remain available. Search results are cached
-in memory for 5 minutes. Bulk audits/rechecks never open helper tabs.
+The pricing tool decides eligibility and includes known shipping once. Changing
+condition cancels the old search and reuses cached pages for the new condition.
+One background search tab runs at a time, with page timeouts and automatic cleanup.
+Failed, repeated, unreadable pages or the pagination safety limit require review.
+A successful stop means a highest eligible match was found, not that the entire
+sales history was read. Sign in to eBay in the same Chrome profile if needed.
+The helper never fills credentials or solves challenges. Bulk audits/rechecks
+never open helper tabs. Specific premiums and rounding stay in the pricing tool.
 
 It reads only Play2Win trade-in, matching GameStop product, original eBay item
 and eBay search pages. It never buys, bids, submits offers, changes carts or

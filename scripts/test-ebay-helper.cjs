@@ -10,14 +10,14 @@ vm.runInContext(fs.readFileSync(root + 'ebay-reader.js', 'utf8'), reader);
 // Minimal DOM fixture follows original eBay item markup, not the collapsed SOLD card.
 const el = (text = '', visible = true, strike = false) => ({ textContent: text,
   getClientRects: () => visible ? [1] : [], matches: () => strike, querySelector: () => null, querySelectorAll: () => [] });
-function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false,
+function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false, condition = '',
   strike = false, hiddenStrike = false, hiddenSold = false, summary = false, conflict = false, hiddenPrice = false, duplicatePrice = false } = {}) {
   const primary = el(), section = el(), main = el();
   primary.querySelectorAll = s => s === '.x-price-primary__price' ? [el(price, !hiddenPrice), ...(duplicatePrice ? [el(price)] : [])]
     : [el(price, true, strike), el('$99.99', !hiddenStrike && strike, strike)];
   section.querySelector = () => primary;
   section.querySelectorAll = () => offer ? [el('Best offer accepted')] : [];
-  main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : section;
+  main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : s === '.x-item-condition-text' ? el(condition) : section;
   return { readyState: 'complete', defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) },
     querySelector: selector => selector === '#mainContent' && !summary ? main : null,
     querySelectorAll: s => s === 'button' ? [] : [el(status, !hiddenSold), ...(conflict ? [el('This listing has ended.')] : [])] };
@@ -27,6 +27,9 @@ function parse(options, url = 'https://www.ebay.com/itm/404870222598') {
   return vm.runInContext('readEbaySale(doc, "404870222598", href)', reader);
 }
 assert.equal(parse().state, 'sold'); assert.equal(parse().price, 1800);
+assert.equal(parse({condition:'Brand New: unopened'}).conditionText,'Brand New');
+assert.equal(parse({condition:'New (Other): opened box'}).conditionText,'New (Other)');
+assert.equal(parse({condition:'Used: tested'}).conditionText,'Used');
 assert.equal(parse({ price: 'US $1,300.00' }).price, 130000);
 assert.equal(parse({ status: 'This listing has ended.' }).state, 'ended');
 assert.equal(parse({ offer: true }).state, 'offer', 'SOLD badge must not override accepted offer');

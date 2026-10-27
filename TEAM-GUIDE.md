@@ -805,7 +805,7 @@ Guide (the Google Sheet tab).
    cannot run it. Remove or reload it on Chrome's extensions page.
 
    **eBay sold** opens a search for the current game
-   and condition; a direct eBay price feed awaits integration approval.
+   and condition; the Chrome helper also reads direct sold results.
    **Type a different price**, its price field, and **Use automatic price** stay
    pinned beside the shelf price while editing on wider screens (beneath it on
    phones). Desktop controls align horizontally in two rows, with condition and
@@ -821,8 +821,9 @@ Guide (the Google Sheet tab).
    - **Loose games:** listings with a box, case, manual, or CIB description are
      excluded, even if PriceCharting filed them as loose. “No box/manual” stays
      eligible. Opened toys-to-life packaging still counts as loose.
-   - **Direct eBay sold search (helper 1.1.6):** the tool also looks directly on
-     eBay for sales PriceCharting missed. It reads the first page of results and
+   - **Direct eBay sold search (helper 1.1.7):** the tool also looks directly on
+     eBay for sales PriceCharting missed. It checks pages highest-first until it finds
+     a valid sale for the selected condition, then stops. It
      labels recovered rows **Direct eBay**, including condition and shipping.
        Accepted offers/crossed prices are excluded. Direct sale prices include known
        shipping once, with the item/shipping breakdown shown. Unknown shipping is
@@ -834,7 +835,8 @@ Guide (the Google Sheet tab).
      Sign in to eBay in the same Chrome profile if requested. Download the helper
      update, replace the unpacked files, Reload it in chrome://extensions, and
      refresh pricing. Allow the added eBay search-page access if Chrome asks.
-     All conditions share a search, and verified sold cards avoid extra item tabs.
+     Changing condition searches for that condition using cached pages where possible.
+     Verified sold cards avoid extra item tabs. Failed or repeated pages still need review.
    - **Targeted eBay checks:** with Chrome Market Helper **1.1.5+**, the tool
      checks GameStop and the first potential price-driving eBay sale together,
      then checks further eBay sales **in pairs**. There is **no three-sale cap**:
@@ -961,13 +963,11 @@ Guide (the Google Sheet tab).
      If an edition has no usable Amazon price, **Standard Amazon** in the pinned
      row shows the standard game's verified fallback prices. Its match stays
      separate from your edition; specific premiums still apply.
-     The tool checks **Used and New** for Loose/CIB, finds the lowest eligible
-     shipping-inclusive offer in each, and uses **the lower of those two prices**
-     as its Amazon reference. For example, Used $40 and New $30 selects New $30;
-     Used $30 and New $40 selects Used $30. It does not pick the highest seller
-     within either condition. Ties prefer Used. Without a regular Used offer,
-     the existing Renewed fallback comparison remains. Other source rules,
-     specific premiums, deductions and rounding still apply.
+     **Keep conditions separate:** only New evidence prices New inventory.
+     Brand-new listings do not price CIB or Loose. Amazon Very Good/Like New
+     remain CIB; Like New, open-box and Renewed are not factory-new. Opposite
+     condition prices remain visible for comparison only. GameStop pre-owned
+     cannot set a minimum for New inventory. Specific premiums and rounding remain.
      **Amazon Used and New are shown separately** in the pinned row and each
      opens its matching listing. Renewed appears separately when checked.
      **Selected** marks the Amazon reference, while **Sets baseline** in the
