@@ -19,9 +19,11 @@ const current = () => ({ product, gamestopUrl: 'https://www.gamestop.com/product
   run('floorCur = null'); resolve({ state: 'out', title: 'Lollipop Chainsaw - PlayStation 3' }); await pending;
   assert.equal(run('stockRenders'), 0, 'Stale item cannot rerender a different game');
   assert.match(run('floorGameStopStock(cur)'), /Out of stock online/);
-  for (const result of [{ state: 'in', title: 'Another Game PS3' }, { state: 'in', title: 'Lollipop Chainsaw Xbox 360' }]) {
+  for (const result of [{ state: 'in', title: 'Another Game PS3' }, { state: 'in', title: 'Lollipop Chainsaw Xbox 360' },
+    { state: 'in', title: 'Lollipop Chainsaw PS3 ITALIAN - FIRST PRINT' }]) {
     ctx.result = result; run('api = async () => result'); await run('loadFloorGameStopStock(cur)');
     assert.equal(ctx.cur.gamestopStock.state, 'unknown', 'Wrong product/platform stays unknown');
+    assert.equal(run('floorGsFor(cur)'), null, 'Known wrong listing cannot set a price minimum');
   }
   run('api = async () => { throw new Error("Blocked"); }'); await run('loadFloorGameStopStock(cur)');
   assert.match(run('floorGameStopStock(cur)'), /Check stock/);

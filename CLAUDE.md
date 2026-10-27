@@ -632,7 +632,12 @@ The site's **only server-side code**. Everything else is static.
     unmarked products use English/North American variant assumptions;
     explicitly selected variants must agree with the listing. Edition
     and language markers use contextual matching ("French Revolution"
-    alone is not a French-language variant). Missing titles are excluded.
+    alone is not a French-language variant). Platform-following labels such as
+    "PS4 ITALIAN - FIRST PRINT" and language codes such as `(ITA)`, `(FRA)`,
+    `(ESP)`, `(GER)` and `(JPN)` also reject foreign variants for standard copies.
+    The shared check runs before direct-search stopping and source selection;
+    explicitly selected foreign editions still require matching evidence.
+    Missing titles are excluded.
     Product identity words must also be present, with punctuation, common
     spelling aliases and Roman numerals normalized. Unconfirmed short-title
     extensions/sequels (Final Fight vs Final Fight Guy, Halo 3 vs ODST),
@@ -747,7 +752,9 @@ The site's **only server-side code**. Everything else is static.
     results remove GameStop from `floorGsFor()` and every reference clamp, while
     keeping its displayed amount. Pending checks with a GameStop price block an
     automatic recommendation; typed overrides still work. Unknown/in-stock retains
-    the usual floor. Rechecks and history audit fetch stock before calculation. Runs separately after the selected catalog page's
+    the usual floor unless the returned title explicitly mismatches the product
+    or variant; a known mismatch is preserved and excludes that minimum too.
+    Rechecks and history audit fetch stock before calculation. Runs separately after the selected catalog page's
     sales resolve (never a sibling figure's link). Network access may be blocked
     by GameStop; never treat an HTTP error or a listed price as stock evidence.
     Optional `trade-in/browser-helper` is a Manifest V3 Chrome extension, packaged

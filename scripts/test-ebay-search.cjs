@@ -136,6 +136,16 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.deepEqual(saoPages,[1,2],'Named bundle must not stop the sold search');
   assert.equal(invoke(ctx,'floorSales',sao)[0].mismatch,'Multiple-game title list — review');
   assert.equal(invoke(ctx,'floorAutoSale',invoke(ctx,'floorSales',sao)).sale.title,'Sword Art Online: Lost Song PS4 CIB');
+  const lastOfUs = {...searchCur(),product:{...wwe,'product-name':'The Last of Us Remastered'}};
+  const languagePages=[];
+  await invoke(ctx,'runFloorEbaySearch',lastOfUs,()=>{},()=>false,{search:async(q,page)=>{
+    languagePages.push(page);return {...ready(page===1
+      ?[comp(1,'Pre-Owned','THE LAST OF US Remastered PS4 Sony PlayStation 4 ITALIAN - FIRST PRINT'),
+        comp(2,'Pre-Owned','The Last Of Us Remastered PS4 GAME for Playstation 4 Multi Language (ITA)')]
+      :[comp(3,'Pre-Owned','The Last Of Us Remastered PS4 CIB USA')]),page,more:true};
+  }});
+  assert.deepEqual(languagePages,[1,2],'Foreign variants cannot stop pagination');
+  assert.equal(invoke(ctx,'floorAutoSale',invoke(ctx,'floorSales',lastOfUs)).sale.title,'The Last Of Us Remastered PS4 CIB USA');
   const newPages=[];paged.condition='new';
   await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{newPages.push(page);return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page,more:true};}});
   assert.deepEqual(newPages,[1],'Condition change searches for its own highest match');

@@ -4279,7 +4279,7 @@ async function fetchFloorGameStopStock(product, url, request = (route, params) =
       stock = ['in', 'out'].includes(serverStock?.state) ? serverStock : browserStock || serverStock;
     }
     return ['in', 'out'].includes(stock?.state) && (!stock.title || floorListingMismatch(stock.title, product))
-      ? { state: 'unknown', reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
+      ? { state: 'unknown', title: stock.title, mismatch: !!stock.title, reason: 'GameStop product title did not match. Open the listing to verify.' } : stock;
   } catch (_) { return { state: 'unknown' }; }
 }
 
@@ -4347,9 +4347,9 @@ const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || 
 // A barcode or PriceCharting category is not enough: inspect the actual listing title too.
 // Language words need variant context so "French Revolution" is not mistaken for French packaging.
 const FLOOR_LANGUAGES = [
-  ['French', 'french|francais|francaise|francophone|fr'], ['Spanish', 'spanish|espanol|espanola|espagnol|castellano|es'],
-  ['German', 'german|deutsch|deutsche|de'], ['Italian', 'italian|italiano|italiana|it'],
-  ['Japanese', 'japanese|japonais|japones|jp'], ['Chinese', 'chinese|mandarin|cantonese'],
+  ['French', 'french|francais|francaise|francophone|fr|fra|fre'], ['Spanish', 'spanish|espanol|espanola|espagnol|castellano|es|esp|spa'],
+  ['German', 'german|deutsch|deutsche|de|ger|deu'], ['Italian', 'italian|italiano|italiana|it|ita'],
+  ['Japanese', 'japanese|japonais|japones|jp|jpn'], ['Chinese', 'chinese|mandarin|cantonese|chn|zho'],
   ['Korean', 'korean|koreano'], ['Portuguese', 'portuguese|portugues|portuguesa'],
   ['Russian', 'russian'], ['Dutch', 'dutch|nederlands'], ['Polish', 'polish|polski'], ['Arabic', 'arabic'],
   ['English', 'english|anglais|ingles|en'],
@@ -4358,7 +4358,11 @@ function floorListingLanguages(title) {
   const text = norm(title);
   return FLOOR_LANGUAGES.filter(([, words]) => {
     const long = words.split('|').filter((w) => w.length > 2).join('|');
-    return new RegExp(`\\b(?:${words}) (?:version|edition|language|import|release|packaging|cover)\\b|\\b(?:version|edition|edicion|language|langue|idioma|sprache|lingua) (?:in |en )?(?:${words})\\b|\\b(?:${long})$|\\b(?:${long}) (?:(?:sony|nintendo|microsoft) )?(?:ps[1-5]|playstation [1-5]|switch|xbox)\\b`, 'i').test(text)
+    // A platform followed by a language is a packaging label even when more
+    // seller wording follows ("PlayStation 4 ITALIAN - FIRST PRINT"). Codes
+    // remain contextual; ordinary title words and historical settings aren't languages.
+    const platformLabel = `(?:ps[1-5]|playstation [1-5]|psp|vita|xbox(?: 360| one| series [sx])?|switch(?: 2)?|wii(?: u)?|3ds|nds|gba|gameboy advance|game boy advance|gamecube|n64|snes|nes|genesis|mega drive|saturn|dreamcast)`;
+    return new RegExp(`\\b(?:${platformLabel}) (?:${long})\\b|\\b(?:${words}) (?:version|edition|language|import|release|packaging|cover|cib|complete|sealed|first print|text|audio|subtitles)\\b|\\b(?:version|edition|edicion|language|langue|idioma|sprache|lingua) (?:in |en )?(?:${words})\\b|\\b(?:${long})$|\\b(?:${long}) (?:(?:sony|nintendo|microsoft) )?(?:ps[1-5]|playstation [1-5]|switch|xbox)\\b`, 'i').test(text)
       || new RegExp(`[\\[(][^\\])]*\\b(?:${words})\\b[^\\])]*[\\])]|(?:^|[-:|])\\s*(?:${long})\\s*(?:$|[-:|])`, 'i').test(String(title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
   }).map(([language]) => language);
 }
@@ -4624,7 +4628,8 @@ function looseBundleUnreliable(cur) {
 const floorGsOutOfStock = (cur) => cur.gamestopStock?.state === 'out' && !!cur.gamestopStock.title
   && !floorListingMismatch(cur.gamestopStock.title, cur.product);
 function floorGsFor(cur) {
-  if (cur.condition === 'new' || floorGsOutOfStock(cur)) return null;
+  if (cur.condition === 'new' || floorGsOutOfStock(cur) || cur.gamestopStock?.mismatch
+    || cur.gamestopStock?.title && floorListingMismatch(cur.gamestopStock.title, cur.product)) return null;
   const gs = floorGs(cur.product);
   return gs != null && gs > rhythmDiscSaleCap(cur) ? null : gs;
 }
@@ -4711,6 +4716,7 @@ function floorOwnBasis(cur = floorCur) {
     checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Direct sale totals include known shipping once; item/shipping amounts are shown in each row. Shipping marked unknown is not assumed free. Matching used copies, including loose games, can support CIB pricing.` : search.reason);
   }
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
+  if (cur.gamestopStock?.mismatch || cur.gamestopStock?.title && floorListingMismatch(cur.gamestopStock.title, cur.product)) checks.push('GameStop listing does not match this product or variant; its displayed price does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
   if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Reload Chrome Market Helper 1.1.2 or later and refresh the tool, or review the listing manually; normal pricing continues');

@@ -99,6 +99,26 @@ test('eBay and Amazon exclude language, region, edition, extras and platform mis
   }
 });
 
+test('foreign language labels and codes cannot price standard inventory in any source', () => {
+  const product = { ...item, 'product-name': 'The Last of Us Remastered', 'gamestop-price': 9999 };
+  const titles = ['THE LAST OF US Remastered PS4 Sony PlayStation 4 ITALIAN - FIRST PRINT',
+    'The Last Of Us Remastered PS4 GAME for Playstation 4 Multi Language (ITA)',
+    'The Last Of Us Remastered PS4 ITA CIB', 'The Last Of Us Remastered Italian First Print PS4',
+    'The Last Of Us Remastered PS4 French CIB', 'The Last Of Us Remastered (FRA) PS4',
+    'The Last Of Us Remastered PS4 ESP Complete', 'The Last Of Us Remastered [GER] PS4',
+    'The Last Of Us Remastered PS4 JPN Sealed'];
+  for (const title of titles) {
+    assert.match(invoke('floorListingMismatch', title, product), /language\/packaging variant/, title);
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title, offers: [{ price: 9999 }] } })), null, title);
+    assert.equal(invoke('floorSales', cur(product, { sales: { cib: [{ title, price: 9699 }] } }))[0].odd, true, title);
+    assert.equal(invoke('floorGsFor', cur(product, { gamestopStock: { state: 'in', title } })), null, title);
+  }
+  assert.equal(invoke('floorListingMismatch', 'PS4 It Takes Two CIB', { ...item, 'product-name': 'It Takes Two' }), null);
+  assert.equal(invoke('floorListingMismatch', 'The Italian Job PS2 CIB', { ...item, 'product-name': 'The Italian Job', 'console-name': 'Playstation 2' }), null);
+  assert.equal(invoke('floorListingMismatch', 'The Last Of Us Remastered PS4 Italian Version',
+    { ...product, 'product-name': 'The Last of Us Remastered [Italian Version]' }), null, 'Explicitly selected imports still require a matching variant');
+});
+
 test('matching variants and ordinary packaging remain eligible while unconfirmed special editions do not', () => {
   for (const title of ['Example Game PS4 CIB with manual', 'Example Game with original case and inserts',
     'Example Game (English Version) PS4', 'Example Game USA NTSC-U ESRB', 'Example Game PS4 / PS5 compatible']) {
@@ -810,7 +830,7 @@ test('confirmed out-of-stock GameStop is reference-only across regular, Renewed 
   assert.equal(invoke('floorResult', { ...out, amazon: { error: 'Rate limited' } }).r.price, 5000);
   assert.equal(invoke('floorResult', { ...out, amazon: { ...example.amazon, renewedFallback: true } }).r.price, 7000);
   assert.equal(invoke('floorResult', { ...out, product: { ...product, 'gamestop-price': 170000 }, sales: { cib: [{ title: 'Example Game complete', price: 60000 }] } }).r.price, 60000);
-  assert.equal(invoke('floorResult', { ...out, gamestopStock: { state: 'out', title: 'Another Game PS4' } }).r.price, 10000);
+  assert.equal(invoke('floorResult', { ...out, gamestopStock: { state: 'out', title: 'Another Game PS4' } }).r.price, 7000, 'Known wrong product cannot set a minimum');
   assert.equal(invoke('floorResult', { ...out, gamestopStock: { state: 'out' } }).r.price, 10000);
 });
 
