@@ -681,6 +681,13 @@ The site's **only server-side code**. Everything else is static.
     Nearby high sales support one another, and fewer than four comparables
     keep the ordinary sparse-data behavior. This is a review heuristic,
     not verification that a listing did or did not sell.
+    Sales older than six calendar months are excluded when at least three distinct
+    eligible matching sales fall within that window. With fewer than three, old
+    rows remain labeled slow-selling evidence; incomplete/paginated direct searches
+    cannot establish this exception before enough recent matches or exhaustion.
+    Counting follows identity, condition, origin and verification checks; duplicates
+    do not count twice. Old exclusions and overseas origin have their own collapsed
+    review groups. Specific premiums and explicit manual choices remain downstream.
     The flagged row stays visible with a badge and a review explanation.
     Staff can click it to include it explicitly; the warning remains.
     Back to the automatic price clears both the selected sale and typed override.
@@ -692,7 +699,7 @@ The site's **only server-side code**. Everything else is static.
     lower the automatic price below the highest valid sale. Typed prices
     remain explicit manual overrides. `floorBasis()` adds review notes for
     fewer than `FLOOR_FEW_SALES` sales or a newest sale older than
-    `FLOOR_STALE_DAYS`. Shelf prices at or above `FLOOR_REVIEW` ($100)
+    six calendar months. Shelf prices at or above `FLOOR_REVIEW` ($100)
     also request review.
   - **Sales source.** The API has no
     sales data ("historic sales are not supported"), so **`GET
@@ -783,7 +790,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.7+ and protocol 2/targeted/search/pagination capabilities. No response says Not connected, not
+    1.1.8+ and protocol 2/targeted/search/pagination/location capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -801,7 +808,7 @@ The site's **only server-side code**. Everything else is static.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
 
-  - **Direct eBay discovery (helper 1.1.7):** live pricing automatically searches
+  - **Direct eBay discovery (helper 1.1.8):** live pricing automatically searches
     sold+completed results for the selected edition and, when applicable, the standard
     game. One inactive search-page tab at a time (120 requested results per page),
     sorted highest price+shipping. Continue while no eligible same-condition sold
@@ -815,7 +822,12 @@ The site's **only server-side code**. Everything else is static.
     Positive dated Sold cards with non-struck USD item prices supply sold evidence;
     accepted offers are excluded. Direct-sale baselines and sorting include known
     shipping once; rows retain/display item price and shipping separately. Unknown
-    shipping is explicitly labeled, not assumed free. Original-item verification
+    shipping is explicitly labeled, not assumed free. Helper 1.1.8 also reads
+    explicit "Located in" labels from cards and original-item shipping sections.
+    `floorSaleLocation()` excludes sellers outside North America; Canada and
+    other North American countries remain eligible with their full shipping.
+    High postage is not an origin proxy. Missing location stays unknown/reviewable,
+    and known overseas results cannot stop pagination. Original-item verification
     compares item price, not the delivered total. A search card can resolve generic archived Ended/unknown status;
     explicit offer/price/identity conflicts retain exclusions/review. Conditions need
     title/grade evidence (New Other is not sealed; opened figures remain loose).
@@ -827,7 +839,7 @@ The site's **only server-side code**. Everything else is static.
     Merge by original eBay ID before existing matching/outlier/premium/rounding logic;
     direct cards need no redundant item checks. Search state is separate from PC sales
     so delayed PC loads cannot overwrite it. Conditions reuse cached pages but each condition searches until its own match. No work
-    in bulk audits. Capabilities search:1/pagination:1 gate new messages; older helpers prompt update.
+    in bulk audits. Capabilities search:1/pagination:1/location:1 gate new messages; older helpers prompt update.
     Search cache: 40 queries, 5 minutes; unknown 20 seconds. Queue max 3, one active;
     18s active / 24s total watchdog, owner-close cleanup. Missing login/challenges/layout
     failures remain unknown, never zero sales. Scripts ebay-search-reader/background.js

@@ -5,10 +5,15 @@ vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-search-reader.js',
 const invoke = (ctx, name, ...args) => { ctx.args = args; return vm.runInContext(`${name}(...args)`, ctx); };
 // Values/markup roles observed on live eBay sold search, Oct 26 2026. No seller/account data.
 const card = { title: 'The Order 1886 PS4 Game Steelbook PlayStation 4 Tested Clean', url: 'https://www.ebay.com/itm/116915330518?tracking=ignored',
-  sold: 'Sold Sep 12, 2026', positive: true, price: '$40.00', condition: 'New (Other)', shipping: '+$6.12 delivery', details: 'or Best Offer' };
+  sold: 'Sold Sep 12, 2026', positive: true, price: '$40.00', condition: 'New (Other)', shipping: '+$6.12 delivery', location: 'Located in United States', details: 'or Best Offer' };
 const parse = values => invoke(reader, 'parseEbaySearchCard', { ...card, ...values });
 assert.equal(parse().price, 4000); assert.equal(parse().shipping, 612); assert.equal(parse().date, '2026-09-12');
 assert.equal(parse().state, 'sold', 'Offering negotiation is not proof an offer was accepted');
+assert.equal(parse().sellerCountry,'United States');
+assert.equal(parse({location:'Located in: Canada'}).sellerCountry,'Canada');
+assert.equal(parse({location:'Located in Italy'}).locationSource,'ebay-located-in');
+assert.equal(parse({location:'Ships worldwide'}).sellerCountry,null,'Delivery destinations are not seller location');
+assert.equal(parse({location:''}).sellerCountry,null);
 assert.equal(parse({ struck: true }).state, 'offer');
 assert.equal(parse({ details: 'Best offer accepted' }).state, 'offer');
 for (const v of [{ sold: 'Ended Sep 12, 2026' }, { sold: '123 sold' }, { positive: false }, { price: '$40.00 to $60.00' },
@@ -20,12 +25,13 @@ const row = el('', { querySelector(selector) {
   if (selector === '.s-card__title .su-styled-text') return el(card.title, { closest: s => s === 'a' ? ({ href: card.url }) : null });
   if (selector.includes('Sold Item')) return el('Sold Sep 12, 2026', { classList: { contains: () => true } });
 }, querySelectorAll(selector) {
-  return selector === '.s-card__price' ? [price] : selector === '.s-card__subtitle' ? [el(card.condition)] : [el(card.details), el(card.shipping)];
+  return selector === '.s-card__price' ? [price] : selector === '.s-card__subtitle' ? [el(card.condition)] : [el(card.details), el(card.shipping), el(card.location)];
 } });
 const query = 'The Order 1886 Steelbook PS4', href = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16';
 const doc = { querySelector: selector => selector === '#srp-results-heading' ? el('1 result for ' + query) : null,
   querySelectorAll: selector => selector === '#srp-river-results li.s-card' ? [row] : [], defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) } };
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].price, 4000);
+assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].sellerCountry,'United States');
 for (const url of [href.replace('LH_Sold=1', 'LH_Sold=0'), 'https://signin.ebay.com/', href.replace('_nkw=', '_wrong=')])
   assert.equal(invoke(reader, 'readEbaySearch', doc, url, query).state, 'unknown');
 assert.equal(invoke(reader,'readEbaySearch',doc,href.replace('_sop=16','_sop=13'),query).state,'unknown','Only highest-first pages can justify stopping early');
@@ -52,6 +58,9 @@ assert.equal(result(base()).r.price, 4500, 'Total follows unchanged rounding');
 assert.equal(result(base()).b.basis, 4612, 'Repeated pricing does not add shipping again');
 assert.equal(invoke(ctx, 'floorEbayResult', rows(base())[0], product, { id:sold.id, title:sold.title, state:'sold', price:4000 }, 'cib').state, 'sold', 'Original-item checks compare item price, not delivered total');
 assert.equal(rows(base())[0].verification.state, 'sold');
+assert.equal(invoke(ctx,'floorEbayResult',rows(base())[0],product,{id:sold.id,title:sold.title,state:'sold',price:4000,sellerCountry:'Rome, Italy',locationSource:'ebay-located-in'},'cib').state,'location');
+const foreignCheck=base();foreignCheck.ebayChecks={results:{[sold.id]:{state:'location',sellerCountry:'Italy',locationSource:'ebay-located-in'}}};
+assert.equal(rows(foreignCheck)[0].odd,true,'Original-item overseas evidence overrides a sold search card');
 assert.equal(invoke(ctx, 'floorEbayCandidates', base(), 2).length, 0, 'Positive sold cards do not need redundant item tabs');
 const prior = base(); prior.ebayChecks = { results: { [sold.id]: { state: 'ended' } } };
 assert.equal(rows(prior)[0].verification.state, 'sold', 'Dated sold result is stronger than generic archived ended status');
@@ -110,7 +119,7 @@ assert.equal(result(standard).b.basis, 5612, 'Standard fallback includes deliver
 let listeners = [], onRemove = [], created = [], removed = [], requests = [], timers = new Set(), nextId = 10;
 const worker = vm.createContext({ URL, Date, Map, setTimeout: fn => { timers.add(fn); return fn; }, clearTimeout: fn => timers.delete(fn),
   pricingSender: s => s.frameId === 0 && s.url === 'https://play2wingames.com/trade-in/' && Number.isInteger(s.tab?.id),
-  chrome: { runtime: { getManifest: () => ({ version: '1.1.7' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
+  chrome: { runtime: { getManifest: () => ({ version: '1.1.8' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
     create: async args => { created.push(args); return { id: nextId++ }; }, remove: async id => removed.push(id),
     sendMessage: (id, m) => new Promise(resolve => requests.push({ id, m, resolve })), onRemoved: { addListener: h => onRemove.push(h) } } } });
 vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-background.js', 'utf8'), worker);
@@ -153,6 +162,30 @@ const flush = () => new Promise(r => setImmediate(r));
       ?'Dynasty Warriors Gundam Reborn PS3 CIB':'Dynasty Warriors Gundam PS3 CIB')]),page,more:true};
   }});
   assert.deepEqual(gundamPages,[1,2],'A sequel cannot stop the original game search');
+  const geo=searchCur(), geoPages=[];
+  await invoke(ctx,'runFloorEbaySearch',geo,()=>{},()=>false,{search:async(q,page)=>{
+    geoPages.push(page);return {...ready([{
+      ...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),sellerCountry:page===1?'Italy':'Canada',locationSource:'ebay-located-in',shipping:2596
+    }]),page,more:true};
+  }});
+  assert.deepEqual(geoPages,[1,2],'Overseas sales cannot stop search; Canadian shipping can');
+  assert.equal(invoke(ctx,'floorAutoSale',rows(geo)).sale.sellerCountry,'Canada');
+  const oldDate=ctx.Date;ctx.Date=class extends Date{static now(){return Date.parse('2026-10-27T12:00:00Z');}};
+  try {
+    const aging=searchCur(), agePages=[];
+    await invoke(ctx,'runFloorEbaySearch',aging,()=>{},()=>false,{search:async(q,page)=>{
+      agePages.push(page);return {...ready(page===1
+        ?[{...comp(1,'Pre-Owned','WWE 2K20 PS4 CIB'),date:'2025-10-01'},comp(2,'Pre-Owned','WWE 2K20 PS4 CIB')]
+        :[comp(3,'Pre-Owned','WWE 2K20 PS4 CIB'),comp(4,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
+    }});
+    assert.deepEqual(agePages,[1,2],'Old first-page evidence cannot falsely establish a slow seller');
+    assert.equal(rows(aging)[0].exclusion,'Older than six months');
+    const scarce=searchCur(), scarcePages=[];
+    await invoke(ctx,'runFloorEbaySearch',scarce,()=>{},()=>false,{search:async(q,page)=>{
+      scarcePages.push(page);return {...ready(page===1?[{...comp(1,'Pre-Owned','WWE 2K20 PS4 CIB'),date:'2025-10-01'}]:[]),page,more:page===1};
+    }});
+    assert.deepEqual(scarcePages,[1,2]);assert.equal(rows(scarce)[0].ageInfo.retained,true,'Older evidence allowed after a scarce search exhausts');
+  } finally {ctx.Date=oldDate;}
   const newPages=[];paged.condition='new';
   await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{newPages.push(page);return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page,more:true};}});
   assert.deepEqual(newPages,[1],'Condition change searches for its own highest match');
@@ -208,6 +241,7 @@ const flush = () => new Promise(r => setImmediate(r));
   const pageTwo=pageWindow.P2WEbayHelper.search(query,2);await flush();
   assert.equal(new URL(created.at(-1).url).searchParams.get('_pgn'),'2','Page travels through client, bridge and worker');
   requests.at(-1).resolve({...ready([sold]),page:2});assert.equal((await pageTwo).page,2);
+  assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).sales[0].sellerCountry,'United States','Worker preserves observed country');
   const beforeCachedPage=created.length;assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2);assert.equal(created.length,beforeCachedPage,'Cache separates pages');
   oldHelper = true; messages.length = 0;
   assert.equal((await pageWindow.P2WEbayHelper.search(query)).state, 'unavailable');

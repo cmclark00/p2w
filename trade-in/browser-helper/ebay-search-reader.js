@@ -12,9 +12,11 @@ function parseEbaySearchCard(card) {
   const delivery = String(card.shipping || '');
   const shipping = /^Free (?:delivery|shipping)$/i.test(delivery) ? 0
     : /^\+\$[\d,.]+ (?:delivery|shipping)$/i.test(delivery) ? Math.round(Number(delivery.match(/[\d,.]+/)[0].replace(/,/g, '')) * 100) : null;
+  const sellerCountry = String(card.location || '').match(/^Located in\s*:?\s+([\p{L} .,'’()&-]{2,80})$/iu)?.[1]?.trim() || null;
   return { id, url: `https://www.ebay.com/itm/${id}`, title: card.title, price: cents,
     date: new Date(time).toISOString().slice(0, 10), conditionText: String(card.condition || '').slice(0, 100),
-    state: offer ? 'offer' : 'sold', shipping, source: 'ebay-search' };
+    state: offer ? 'offer' : 'sold', shipping, sellerCountry,
+    locationSource: sellerCountry ? 'ebay-located-in' : null, source: 'ebay-search' };
 }
 function readEbaySearch(doc, href, query, page = 1) {
   const unknown = { state: 'unknown', reason: 'Search unavailable. Sign in to eBay or review the search manually.', sales: [] };
@@ -42,7 +44,8 @@ function readEbaySearch(doc, href, query, page = 1) {
       sold: text(status), positive: !!status?.classList.contains('positive'), price: text(p),
       struck: !!p && [p, ...p.querySelectorAll('*')].some(el => visible(el) &&
         (el.matches('s, del, .strikethrough') || doc.defaultView.getComputedStyle(el).textDecorationLine.includes('line-through'))),
-      condition, details: lines.join(' '), shipping: lines.find(t => /^(?:\+\$|Free (?:delivery|shipping))/i.test(t)) });
+      condition, details: lines.join(' '), location: lines.find(t => /^Located in\b/i.test(t)),
+      shipping: lines.find(t => /^(?:\+\$|Free (?:delivery|shipping))/i.test(t)) });
     if (row) sales.push(row); else skipped++;
   }
   // Zero is valid only with an explicit zero-result heading. Layout changes are failures.

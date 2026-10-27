@@ -874,6 +874,14 @@ Guide (the Google Sheet tab).
      The highest of those three numbers sets the baseline. Specific rules
      and premiums take priority afterward. For example, eBay $150,
      Amazon $134, and GameStop below $150 gives a $150 shelf price.
+   - **Sale age and location:** use sales from the last six months. If fewer
+     than three valid matching sales are found, older sales can remain as
+     clearly labeled slow-selling evidence. An incomplete search does not prove
+     an item is slow-selling. Open the older-sales review group to inspect dates.
+     Sales explicitly located outside North America are excluded. Canadian
+     and other North American sales still include shipping, even when expensive.
+     Missing seller location is flagged for review; shipping cost is not proof
+     of location. Update the manual helper to **1.1.8** to read location labels.
    - **PriceCharting's own market price is only a fallback** when none
      of those three references is available. Fallback prices always say **Double-check**.
      PriceCharting's retail-sell number is a reference, not a pricing rule.

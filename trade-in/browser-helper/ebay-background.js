@@ -20,6 +20,7 @@ async function finishEbay(job, result) {
     && (result.state !== 'sold' || Number.isSafeInteger(result.price) && result.price > 0 && result.price < 100000000);
   const value = valid ? { state: result.state, id: job.target.id, title: result.title,
     ...(result.conditionText ? { conditionText: String(result.conditionText).slice(0, 100) } : {}),
+    ...(result.sellerCountry && result.locationSource === 'ebay-located-in' ? { sellerCountry: String(result.sellerCountry).slice(0, 120), locationSource: 'ebay-located-in' } : {}),
     price: result.state === 'sold' ? result.price : null, source: 'browser-helper', checkedAt: Math.floor(Date.now() / 1000) } : ebayUnknown();
   ebayCache.set(job.target.id, value);
   if (ebayCache.size > 500) ebayCache.delete(ebayCache.keys().next().value);
@@ -47,7 +48,7 @@ function pumpEbay() {
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: chrome.runtime.getManifest().version, protocol: 2, targeted: 1, search: 1, pagination: 1 }); return false; }
+  if (message?.type === 'P2W_EBAY_CAPABILITY' && pricingSender(sender)) { respond({ available: true, version: chrome.runtime.getManifest().version, protocol: 2, targeted: 1, search: 1, pagination: 1, location: 1 }); return false; }
   if (message?.type === 'P2W_EBAY_CHECK' && pricingSender(sender)) {
     // Reject stale pricing pages/bridges that still launch automatic all-sales sweeps.
     if (message.protocol !== 2 || !['manual', 'targeted'].includes(message.mode)) { respond(ebayUnknown()); return false; }

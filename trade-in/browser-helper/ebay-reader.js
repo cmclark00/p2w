@@ -40,7 +40,11 @@ function readEbaySale(doc, id, href) {
   const price = Math.round(Number(prices[0].replace(/[^\d.]/g, '')) * 100);
   const conditionNode = main.querySelector('.x-item-condition-text');
   const conditionText = visible(conditionNode) ? conditionNode.textContent.trim().match(/^(Brand New|New \(Other\)|New|Pre-Owned|Used|Open box|For parts or not working)(?=\s|:|$)/i)?.[1] : null;
-  return Number.isSafeInteger(price) && price > 0 ? { state: 'sold', id, title, price, ...(conditionText ? { conditionText } : {}) } : unknown;
+  const locations = [...main.querySelectorAll('.ux-labels-values--shipping .ux-textspans, .ux-labels-values--location .ux-textspans')]
+    .filter(visible).map(el => el.textContent.trim().match(/^Located in\s*:\s*(.{2,120})$/i)?.[1]).filter(Boolean);
+  const sellerCountry = locations.length === 1 ? locations[0] : null;
+  return Number.isSafeInteger(price) && price > 0 ? { state: 'sold', id, title, price,
+    ...(conditionText ? { conditionText } : {}), ...(sellerCountry ? { sellerCountry, locationSource: 'ebay-located-in' } : {}) } : unknown;
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || message?.type !== 'P2W_EBAY_READ' || !/^\d{9,15}$/.test(message.id)

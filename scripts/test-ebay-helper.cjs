@@ -10,7 +10,7 @@ vm.runInContext(fs.readFileSync(root + 'ebay-reader.js', 'utf8'), reader);
 // Minimal DOM fixture follows original eBay item markup, not the collapsed SOLD card.
 const el = (text = '', visible = true, strike = false) => ({ textContent: text,
   getClientRects: () => visible ? [1] : [], matches: () => strike, querySelector: () => null, querySelectorAll: () => [] });
-function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false, condition = '',
+function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false, condition = '', location = '',
   strike = false, hiddenStrike = false, hiddenSold = false, summary = false, conflict = false, hiddenPrice = false, duplicatePrice = false } = {}) {
   const primary = el(), section = el(), main = el();
   primary.querySelectorAll = s => s === '.x-price-primary__price' ? [el(price, !hiddenPrice), ...(duplicatePrice ? [el(price)] : [])]
@@ -18,6 +18,7 @@ function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', pri
   section.querySelector = () => primary;
   section.querySelectorAll = () => offer ? [el('Best offer accepted')] : [];
   main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : s === '.x-item-condition-text' ? el(condition) : section;
+  main.querySelectorAll = () => location ? [el(location)] : [];
   return { readyState: 'complete', defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) },
     querySelector: selector => selector === '#mainContent' && !summary ? main : null,
     querySelectorAll: s => s === 'button' ? [] : [el(status, !hiddenSold), ...(conflict ? [el('This listing has ended.')] : [])] };
@@ -30,6 +31,9 @@ assert.equal(parse().state, 'sold'); assert.equal(parse().price, 1800);
 assert.equal(parse({condition:'Brand New: unopened'}).conditionText,'Brand New');
 assert.equal(parse({condition:'New (Other): opened box'}).conditionText,'New (Other)');
 assert.equal(parse({condition:'Used: tested'}).conditionText,'Used');
+assert.equal(parse({location:'Located in: Toronto, Canada'}).sellerCountry,'Toronto, Canada');
+assert.equal(parse({location:'Located in: Rome, Italy'}).locationSource,'ebay-located-in');
+assert.equal(parse({location:'Delivery to Italy'}).sellerCountry,undefined);
 assert.equal(parse({ price: 'US $1,300.00' }).price, 130000);
 assert.equal(parse({ status: 'This listing has ended.' }).state, 'ended');
 assert.equal(parse({ offer: true }).state, 'offer', 'SOLD badge must not override accepted offer');

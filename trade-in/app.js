@@ -3107,7 +3107,30 @@ const FLOOR_TIERS = [
 ];
 const FLOOR_OTHER = { id: 'other', rule: "Baseline: highest of eBay sold, lowest Amazon offer, and GameStop. Specific rules take priority; PriceCharting is a fallback. Double-check this system" };
 const FLOOR_FEW_SALES = 3;         // fewer non-odd sales than this: ask staff to double-check
-const FLOOR_STALE_DAYS = 180;      // newest sale older than this: ask staff to double-check
+const FLOOR_RECENT_SALE_MIN = 3;  // below this, older evidence may support a slow-selling item
+function floorSaleAgeWindow(now = Date.now()) {
+  const today = new Date(now), year = today.getUTCFullYear(), month = today.getUTCMonth(), day = today.getUTCDate();
+  const lastDay = new Date(Date.UTC(year, month - 5, 0)).getUTCDate();
+  return { today: today.toISOString().slice(0, 10), cutoff: new Date(Date.UTC(year, month - 6, Math.min(day, lastDay))).toISOString().slice(0, 10) };
+}
+// Only explicit listing location is evidence of origin; shipping cost and
+// language alone cannot establish where a seller is located.
+function floorSaleLocation(sale) {
+  const country = norm(sale.sellerCountry || '');
+  if (!country || /^(?:unknown|not specified|unspecified|worldwide|multiple locations|not available)$/.test(country)) return 'unknown';
+  const north = ['united states', 'united states of america', 'usa', 'us', 'u s', 'u s a', 'north america', 'canada', 'mexico',
+    'belize', 'guatemala', 'el salvador', 'honduras', 'nicaragua', 'costa rica', 'panama',
+    'bahamas', 'barbados', 'cuba', 'dominica', 'dominican republic', 'grenada', 'haiti',
+    'jamaica', 'saint kitts and nevis', 'saint lucia', 'saint vincent and the grenadines',
+    'antigua and barbuda', 'trinidad and tobago', 'puerto rico', 'bermuda', 'greenland',
+    'aruba', 'curacao', 'cayman islands', 'turks and caicos islands', 'british virgin islands',
+    'us virgin islands', 'virgin islands', 'anguilla', 'montserrat', 'saint martin', 'sint maarten',
+    'guadeloupe', 'martinique', 'saint barthelemy', 'saint pierre and miquelon'];
+  if (north.some(name => country === name || country.endsWith(' ' + name))) return 'north-america';
+  // Search cards report a country after "Located in". Unknown/missing labels
+  // remain reviewable instead of assuming that high postage means overseas.
+  return sale.locationSource === 'ebay-located-in' ? 'outside-north-america' : 'unknown';
+}
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
 const FLOOR_EXPENSIVE_GAME = 50000; // sold or lowest verified Amazon at $500+, with a valid sale: Amazon is reference-only for games
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
@@ -3395,7 +3418,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.7';
+const FLOOR_HELPER_RECOMMENDED = '1.1.8';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -3406,7 +3429,7 @@ function floorHelperStatusInfo(helper) {
     comparison = (parts[i] || 0) - (required[i] || 0);
     if (comparison) break;
   }
-  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1;
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1 && helper.location === 1;
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
@@ -3992,8 +4015,8 @@ async function loadFloorSales(product) {
 }
 
 const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
-  price: 'Sale price differs — review', mismatch: 'eBay item does not match', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
-const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch'].includes(verification?.state) || !!verification?.skipped;
+  price: 'Sale price differs — review', mismatch: 'eBay item does not match', location: 'Seller outside North America', unknown: 'Unverified — review manually', pending: 'Checking sale…' };
+const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch', 'location'].includes(verification?.state) || !!verification?.skipped;
 function floorEbaySearchQuery(product) {
   // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
   // packaging adjectives: these are evaluated on results, not demanded in search.
@@ -4040,12 +4063,12 @@ function floorMergedSales(cur, pool) {
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
   if (cur.directEbay?.condition === cur.condition || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
-  if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.7.' } }; return; }
+  if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.8.' } }; return; }
   const condition = cur.condition;
   const state = cur.directEbay = { condition, loading: true };
   const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
   progress();
-  const read = async product => {
+  const read = async (product, evidence = {}) => {
     const query = floorEbaySearchQuery(product);
     const rows = new Map(); let partial = false;
     const result = { state: 'ready', sales: [], pages: 0, url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
@@ -4066,11 +4089,14 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       Object.assign(result, { sales: [...rows.values()], pages: page, checkedAt: value.checkedAt, more: !!value.more, partial });
       // Use the same identity, condition, offer and outlier rules as pricing.
       // Do not stop for a mismatched bundle, hidden offer, or unreadable condition.
-      const matched = floorSales({ product, condition, sales: {}, directEbay: { result } })
-        .find(s => !s.odd && !s.outlier && s.verification?.state === 'sold');
-      if (matched) return { ...result, stoppedAtMatch: true,
-        partial: partial || matched.shipping == null,
-        reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null ? ' Some evidence or shipping needs review.' : ''}` };
+      const candidates = floorSales({ ...evidence, product, condition, directEbay: { result } });
+      const matched = candidates.find(s => !s.odd && !s.outlier && s.verification?.state === 'sold');
+      // Do not infer a slow seller just because its first, highest-price page
+      // has old listings. Continue until recent evidence or pagination resolves it.
+      const olderPending = candidates.some(s => s.ageInfo?.pending);
+      if (matched && !olderPending) return { ...result, stoppedAtMatch: true,
+        partial: partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown',
+        reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown' ? ' Some evidence, shipping or seller location needs review.' : ''}` };
       if (!value.more) return { ...result, reason: `Checked ${page} page${page === 1 ? '' : 's'}; no eligible ${GAME_CONDITIONS[condition]} sale found.` };
       if (rows.size === before) return { ...result, partial: true, reason: 'eBay repeated a page or returned unreadable results. Review the remaining pages manually.' };
       state.page = page + 1; progress();
@@ -4078,7 +4104,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
     return { ...result, partial: true, reason: 'Search stopped at the pagination safety limit or was cancelled. Review remaining results.' };
   };
   try {
-    const found = await read(cur.product);
+    const found = await read(cur.product, cur);
     if (stopped()) return;
     const selected = cur.pick == null ? null : floorSales(cur).find(s => s.i === cur.pick);
     state.result = found;
@@ -4086,7 +4112,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
     if (stopped()) return;
     const standard = floorStandardGame(cur.product);
     if (standard && state.result.state === 'ready') {
-      const base = await read(standard);
+      const base = await read(standard, cur.standardGame);
       if (!stopped()) state.standard = { result: base };
     }
   } catch (_) { state.result = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
@@ -4108,6 +4134,7 @@ function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
   if (!result.title || floorListingMismatch(result.title, product)) return { state: 'mismatch' };
+  if (floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
   if (result.conditionText) {
     const brandNew = /^(Brand New|New)$/i.test(result.conditionText);
     if (condition === 'new' ? !brandNew : brandNew || !/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(result.conditionText)) return { state: 'mismatch' };
@@ -4115,7 +4142,8 @@ function floorEbayResult(sale, product, result, condition) {
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
   if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
-  return { state: result.state, price: result.price, checkedAt: result.checkedAt };
+  return { state: result.state, price: result.price, checkedAt: result.checkedAt,
+    ...(result.sellerCountry ? { sellerCountry: result.sellerCountry, locationSource: result.locationSource } : {}) };
 }
 async function verifyFloorEbaySale(cur, index, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
@@ -4315,10 +4343,34 @@ function floorSales(cur = floorCur) {
     const checked = cur.ebayChecks?.results[floorSaleKey(s)];
     // A dated SOLD search card resolves generic ENDED/unreadable archives. Price/identity conflicts still need review.
     const verification = !invalid ? s.searchVerification && checked && ['price', 'mismatch'].includes(checked.state)
-      ? { state: 'unknown', skipped: true, price: s.price } : checked?.state === 'offer' ? checked
+      ? { state: 'unknown', skipped: true, price: s.price } : ['offer', 'location'].includes(checked?.state) ? checked
         : s.searchVerification || checked : null;
-    return { ...s, i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
+    return { ...s, ...(checked?.sellerCountry ? { sellerCountry: checked.sellerCountry, locationSource: checked.locationSource } : {}),
+      i, mismatch, verification, odd: invalid || floorEbayExcluded(verification) };
   }).sort((a, b) => b.price - a.price);
+  // Keep price plus shipping, including Canadian postage; filter explicit
+  // overseas origin instead of using the delivery amount as a proxy.
+  for (const sale of sales) {
+    if (!sale.odd && floorSaleLocation(sale) === 'outside-north-america') {
+      sale.exclusion = 'Seller outside North America'; sale.odd = true;
+    }
+  }
+  const { today, cutoff } = floorSaleAgeWindow();
+  const dated = sales.filter(s => !s.odd && /^\d{4}-\d{2}-\d{2}$/.test(s.date || '')
+    && Number.isFinite(Date.parse(s.date)) && new Date(s.date).toISOString().slice(0, 10) === s.date);
+  const recentCount = new Set(dated.filter(s => s.date >= cutoff && s.date <= today).map(floorSaleKey)).size;
+  const sparse = recentCount < FLOOR_RECENT_SALE_MIN;
+  const searchUnfinished = !!(cur.salesLoading || cur.salesError || cur.directEbay?.loading
+    || cur.directEbay?.result?.more || cur.directEbay?.result?.partial
+    || cur.directEbay?.result && cur.directEbay.result.state !== 'ready');
+  for (const sale of dated.filter(s => s.date < cutoff)) {
+    const pending = sparse && searchUnfinished;
+    sale.ageInfo = { old: true, recentCount, retained: sparse && !pending, pending };
+    if (!sale.ageInfo.retained) {
+      sale.exclusion = pending ? 'Older than six months — recent-sales check incomplete' : 'Older than six months';
+      sale.odd = true;
+    }
+  }
   const normal = sales.filter((s) => !s.odd && Number.isFinite(s.price) && s.price > 0);
   const relaxedToys = ['skylanders', 'infinity'].includes(floorToyFamily(cur.product));
   if (normal.length >= FLOOR_SALE_OUTLIER_MIN) {
@@ -4724,13 +4776,19 @@ function floorOwnBasis(cur = floorCur) {
     checks.push(search.state === 'ready' ? `Direct eBay search read ${search.sales.length} sold-result cards. ${search.reason || 'Visible sold dates and non-struck prices required.'} Direct sale totals include known shipping once; item/shipping amounts are shown in each row. Shipping marked unknown is not assumed free. Matching used copies, including loose games, can support CIB pricing.` : search.reason);
   }
   if (floorGsOutOfStock(cur)) checks.push('GameStop is confirmed out of stock online; its price is reference-only and does not set a minimum');
+  const oldRetained = sales.filter(s => s.ageInfo?.retained);
+  const oldExcluded = sales.filter(s => s.ageInfo && !s.ageInfo.retained);
+  if (oldRetained.length) checks.push(`${oldRetained.length} older sale${oldRetained.length === 1 ? '' : 's'} retained as slow-selling evidence: fewer than ${FLOOR_RECENT_SALE_MIN} valid matching sales found within six months. Review the age before labeling`);
+  if (oldExcluded.length) checks.push(`${oldExcluded.length} sales older than six months excluded${oldExcluded.some(s => s.ageInfo.pending) ? '; recent-sales search incomplete, so slow-selling status is not established' : ''}`);
+  if (sales.some(s => s.exclusion === 'Seller outside North America')) checks.push('Sales explicitly located outside North America are excluded. Canadian and other North American sales still include shipping; shipping cost alone never establishes location');
+  if (sale?.directEbay && floorSaleLocation(sale) === 'unknown') checks.push('Selected direct eBay sale has no confirmed seller country; review its location. Shipping cost alone does not prove overseas origin');
   if (cur.gamestopStock?.mismatch || cur.gamestopStock?.title && floorListingMismatch(cur.gamestopStock.title, cur.product)) checks.push('GameStop listing does not match this product or variant; its displayed price does not set a minimum');
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
   if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Reload Chrome Market Helper 1.1.2 or later and refresh the tool, or review the listing manually; normal pricing continues');
   if (sales.some(s => s.verification?.skipped)) checks.push('Unreadable eBay listings were skipped from automatic pricing and need manual review; they are not confirmed sold or ended');
   if (sales.some(s => s.verification?.state === 'unknown' && !s.verification.skipped)) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
-  for (const state of ['ended', 'offer', 'price', 'mismatch']) {
+  for (const state of ['ended', 'offer', 'price', 'mismatch', 'location']) {
     const count = sales.filter(s => s.verification?.state === state).length;
     if (count) checks.push(`${count} eBay listing${count === 1 ? '' : 's'} excluded: ${FLOOR_EBAY_LABELS[state]}`);
   }
@@ -4744,7 +4802,7 @@ function floorOwnBasis(cur = floorCur) {
   if (cur.pick == null) {
     if (cur.sales && auto.count && auto.count < FLOOR_FEW_SALES) checks.push(`Only ${auto.count} recent sale${auto.count === 1 ? '' : 's'} to go by`);
     const newest = sales.reduce((d, s) => (s.date > d ? s.date : d), '');
-    const cutoff = new Date(Date.now() - FLOOR_STALE_DAYS * 864e5).toISOString().slice(0, 10);
+    const cutoff = floorSaleAgeWindow().cutoff;
     if (newest && newest < cutoff) checks.push(`Newest sale is from ${newest}`);
   }
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', sale, checks: [] };
@@ -4864,8 +4922,10 @@ function floorStandardHtml(b) {
 const FLOOR_SALE_GROUPS = { game: 'Different game / sequel', variant: 'Edition / figure variant',
   foreign: 'Foreign language / region', platform: 'Different platform', bundle: 'Bundles / extra items',
   condition: 'Condition / packaging', verification: 'Sale not verified / price unavailable',
-  outlier: 'Possible price outliers', other: 'Other excluded listings' };
+  age: 'Older than six months', location: 'Seller outside North America', outlier: 'Possible price outliers', other: 'Other excluded listings' };
 function floorSaleGroup(s) {
+  if (s.ageInfo && !s.ageInfo.retained) return 'age';
+  if (s.exclusion === 'Seller outside North America' || s.verification?.state === 'location') return 'location';
   const reason = s.mismatch || '';
   if (/language|region|import/i.test(reason)) return 'foreign';
   if (/platform/i.test(reason)) return 'platform';
@@ -4887,8 +4947,8 @@ function floorSalesSections(sales, b) {
 function floorSaleTable(rows, b) {
   return `<table class="floor-sales"><tbody>${rows.map(s => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
     <td class="num">${money(s.price)}</td>
-    <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
-    <td class="muted">${esc(s.date || '')}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
+    <td class="muted">${esc(s.date || '')}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 function floorSalesHtml(cur, sales, b) {
   const { eligible, groups } = floorSalesSections(sales, b);

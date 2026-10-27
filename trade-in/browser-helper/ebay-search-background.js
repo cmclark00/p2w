@@ -15,6 +15,8 @@ async function finishEbaySearch(job, result) {
     && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && /^\d{4}-\d{2}-\d{2}$/.test(s.date)
     && ['sold', 'offer'].includes(s.state)).map(s => ({ id: s.id, url: ebayTarget(s.url).url, title: s.title, price: s.price,
       date: s.date, conditionText: String(s.conditionText || '').slice(0, 100), state: s.state,
+      sellerCountry: typeof s.sellerCountry === 'string' && s.locationSource === 'ebay-located-in' ? s.sellerCountry.slice(0, 80) : null,
+      locationSource: s.locationSource === 'ebay-located-in' ? 'ebay-located-in' : null,
       shipping: Number.isSafeInteger(s.shipping) && s.shipping >= 0 ? s.shipping : null, source: 'ebay-search' })) : [];
   const value = valid ? { state: 'ready', sales, partial: !!result.partial || sales.length !== result.sales.length,
     page: job.page, sorted: result.sorted === true, more: !!result.more, skipped: Math.max(0, Number(result.skipped) || 0), reason: String(result.reason || '').slice(0, 250) } : ebaySearchUnknown();

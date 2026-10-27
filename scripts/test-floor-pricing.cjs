@@ -176,6 +176,62 @@ test('excluded group toggles populate on demand and preserve review state across
   run('floorCur=null');
 });
 
+test('six-month evidence window excludes old sales but retains labeled scarce-sale history', () => {
+  const previousDate=context.Date;
+  context.Date=class extends Date { static now(){return Date.parse('2026-10-27T12:00:00Z');} };
+  try {
+    assert.equal(invoke('floorSaleAgeWindow').cutoff,'2026-04-27');
+    assert.equal(invoke('floorSaleAgeWindow',Date.parse('2026-08-31T12:00:00Z')).cutoff,'2026-02-28');
+    const sale=(i,date,price)=>({title:'Example Game PS4 CIB',date,price,url:`https://www.ebay.com/itm/${100000000000+i}`});
+    const old=sale(1,'2026-04-26',5000), recent=[sale(2,'2026-04-27',2000),sale(3,'2026-09-01',1900),sale(4,'2026-10-01',1800)];
+    const example=cur(item,{sales:{cib:[old,...recent]}}), snapshot=JSON.stringify(example.sales);
+    const rows=invoke('floorSales',example);
+    assert.equal(rows[0].exclusion,'Older than six months');
+    assert.equal(invoke('floorSaleGroup',rows[0]),'age');
+    assert.equal(invoke('floorResult',example).r.price,2000);
+    assert.equal(rows.find(s=>s.date==='2026-04-27').odd,false,'Six-month boundary is inclusive');
+    assert.equal(JSON.stringify(example.sales),snapshot,'Never mutate cached evidence');
+    const sparse=cur(item,{sales:{cib:[old,...recent.slice(0,2)]}});
+    assert.equal(invoke('floorResult',sparse).r.price,5000);
+    assert.equal(invoke('floorSales',sparse)[0].ageInfo.retained,true);
+    assert.ok(invoke('floorBasis',sparse).checks.some(s=>s.includes('slow-selling')));
+    assert.ok(invoke('floorSaleTable',invoke('floorSales',sparse),{}).includes('Older sale · slow-selling evidence'));
+    const duplicate=cur(item,{sales:{cib:[old,recent[0],recent[0],recent[1]]}});
+    assert.equal(invoke('floorSales',duplicate)[0].ageInfo.recentCount,2,'Duplicates do not establish sales frequency');
+    const mismatch=cur(item,{sales:{cib:[old,...recent.slice(0,2),{...recent[2],title:'Example Game PS4 French Version'}]}});
+    assert.equal(invoke('floorSales',mismatch)[0].ageInfo.retained,true,'Wrong variants do not count as recent matches');
+    sparse.directEbay={result:{state:'ready',sales:[],more:true}};
+    assert.equal(invoke('floorSales',sparse)[0].ageInfo.pending,true,'First-page scarcity is not proof of a slow seller');
+    assert.equal(invoke('floorSales',sparse)[0].odd,true);
+    assert.equal(invoke('floorResult',{...example,pick:0}).r.price,5000,'Staff can still explicitly review and include an older row');
+  } finally {context.Date=previousDate;}
+});
+
+test('Overseas sales are excluded while North American shipping and premiums remain intact', () => {
+  const product={...item,'product-name':'Rainbow Six Siege','cib-price':531,'gamestop-price':199};
+  const direct=[[695,2596],[385,1730],[356,1170],[900,598],[1439,0]].map(([price,shipping],i)=>({
+    id:String(200000000000+i),url:`https://www.ebay.com/itm/${200000000000+i}`,price,shipping,
+    title:'Rainbow Six Siege PS4 CIB',date:'2026-10-12',state:'sold',conditionText:'Pre-Owned',sellerCountry:i<3?'Australia':'Canada',locationSource:'ebay-located-in'}));
+  const example=cur(product,{sales:{cib:[]},directEbay:{result:{state:'ready',sales:direct}},amazon:{found:true,title:'Rainbow Six Siege PS4',offers:[{price:1088,sub:'very_good'}]}});
+  const rows=invoke('floorSales',example);
+  assert.equal(rows.filter(s=>s.exclusion==='Seller outside North America').length,3);
+  assert.equal(invoke('floorSaleGroup',rows[0]),'location');
+  assert.equal(invoke('floorResult',example).b.basis,1498);
+  assert.equal(invoke('floorResult',example).r.price,1500,'Confirmed overseas rows cannot drive the price');
+  const oldPremiums=json('settings.floorPremiums');
+  try {run('settings.floorPremiums=[{phrase:"Rainbow Six Siege",pct:50}]');
+    assert.equal(invoke('floorResult',example).r.price,2500,'Specific premium applies after evidence filtering');
+  } finally {context.restorePremiums=oldPremiums;run('settings.floorPremiums=restorePremiums');}
+  direct[0].sellerCountry='Canada';
+  assert.equal(invoke('floorResult',example).r.price,3500,'High Canadian shipping remains eligible, not capped by amount');
+  direct[0].sellerCountry=null;
+  assert.equal(invoke('floorSaleLocation',direct[0]),'unknown','Do not infer location from high shipping');
+  for(const country of ['United States','Canada','Mexico','Toronto, Canada','Puerto Rico'])
+    assert.equal(invoke('floorSaleLocation',{sellerCountry:country,locationSource:'ebay-located-in'}),'north-america');
+  for(const country of ['Australia','Italy','United Kingdom','Japan','Brazil','Germany'])
+    assert.equal(invoke('floorSaleLocation',{sellerCountry:country,locationSource:'ebay-located-in'}),'outside-north-america');
+});
+
 test('matching variants and ordinary packaging remain eligible while unconfirmed special editions do not', () => {
   for (const title of ['Example Game PS4 CIB with manual', 'Example Game with original case and inserts',
     'Example Game (English Version) PS4', 'Example Game USA NTSC-U ESRB', 'Example Game PS4 / PS5 compatible']) {
@@ -455,8 +511,8 @@ test('audit mismatches cannot drive eBay or Amazon baselines', () => {
 
 test('helper status reports installed versions and capability readiness without claiming absent means uninstalled', () => {
   assert.equal(invoke('floorHelperStatusInfo', null).text, 'Not connected');
-  const capability = { available: true, protocol: 2, targeted: 1, search: 1, pagination: 1 };
-  for (const version of ['1.1.7', '1.1.10', '1.2.0', '2.0.0']) {
+  const capability = { available: true, protocol: 2, targeted: 1, search: 1, pagination: 1, location: 1 };
+  for (const version of ['1.1.8', '1.1.10', '1.2.0', '2.0.0']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'connected'); assert.equal(status.text, `Connected · v${version}`);
   }
