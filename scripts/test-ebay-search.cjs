@@ -169,6 +169,14 @@ const flush = () => new Promise(r => setImmediate(r));
       ?'Dynasty Warriors Gundam Reborn PS3 CIB':'Dynasty Warriors Gundam PS3 CIB')]),page,more:true};
   }});
   assert.deepEqual(gundamPages,[1,2],'A sequel cannot stop the original game search');
+  const creatures={...searchCur(),product:{...wwe,'cib-price':1274,'product-name':'Creatures','console-name':'Playstation'}};
+  const creaturePages=[];
+  await invoke(ctx,'runFloorEbaySearch',creatures,()=>{},()=>false,{search:async(q,page)=>{
+    creaturePages.push(page);return {...ready([{...comp(page,'Pre-Owned',page===1
+      ?'Nightmare Creatures (Sony PlayStation 1 PS1, 1997)':'Creatures Sony PS1 CIB'),price:page===1?3743:1499}]),page,more:true};
+  }});
+  assert.deepEqual(creaturePages,[1,2],'A longer title containing the selected name cannot stop search');
+  assert.equal(result(creatures).r.price,1500);
   const geo=searchCur(), geoPages=[];
   await invoke(ctx,'runFloorEbaySearch',geo,()=>{},()=>false,{search:async(q,page)=>{
     geoPages.push(page);return {...ready([{

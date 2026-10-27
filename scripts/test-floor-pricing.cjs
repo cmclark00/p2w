@@ -136,6 +136,35 @@ test('long game names reject sequel and subtitle extensions across sources', () 
     {...product,'product-name':'Dynasty Warriors: Gundam [Special Edition]'}), null);
 });
 
+test('shared title matcher rejects other games containing the selected name, including prefixes', () => {
+  const product={...item,'product-name':'Creatures','console-name':'Playstation','cib-price':1274};
+  const wrong=['Nightmare Creatures (Sony PlayStation 1 PS1, 1997)',
+    'SONY PLAYSTATION 1 PS1 Nightmare Creatures',
+    'Nightmare Creatures (PlayStation 1 PS1) Game Disc Only, Tested & Works',
+    'Nightmare PS1 Creatures CIB'];
+  for (const title of wrong) {
+    assert.match(invoke('floorListingMismatch',title,product),/Different game/,title);
+    assert.equal(invoke('floorAmazonLowest',cur(product,{amazon:{found:true,title,offers:[{price:3743}]}})),null);
+    assert.equal(invoke('floorGsFor',cur({...product,'gamestop-price':3743},{gamestopStock:{state:'in',title}})),null);
+    const direct={id:'123456789012',title,price:2854,shipping:889,date:'2026-10-01',state:'sold',conditionText:'Pre-Owned',sellerCountry:'Canada'};
+    const example=cur(product,{sales:{cib:[{title:'Creatures - Sony PS1 Playstation 1 - Complete CIB - Tested',price:1499,date:'2026-10-01'}]},directEbay:{result:{state:'ready',sales:[direct]}}});
+    assert.equal(invoke('floorSales',example)[0].odd,true,'Sold status cannot override wrong identity');
+    assert.equal(invoke('floorResult',example).r.price,1500,'Wrong-game sale cannot drive price');
+    assert.equal(invoke('floorResult',{...example,amazon:{found:true,title:'Creatures PS1',offers:[{price:2330,sub:'very_good'}]}}).r.price,2500,'Matching Amazon remains eligible after wrong sales are removed');
+    example.sales.cib.unshift({title,price:3743,date:'2026-10-01'});
+    assert.equal(invoke('floorResult',{...example,directEbay:undefined}).r.price,1500,'PC rows use the same identity check');
+  }
+  for (const title of ['Creatures - Sony PS1 Playstation 1 - Complete CIB - Tested','Sony PlayStation 1 PS1 Creatures CIB','RARE Authentic Creatures PS1 Complete','1997 Creatures PS1'])
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+  for (const [name,title,system] of [['Battlefront','Star Wars Battlefront PS4','Playstation 4'],['Doom','Ultimate Doom PS1','Playstation'],['Tetris','Super Tetris SNES','Super Nintendo'],['Creatures','Creatures 2 PS1','Playstation']]) {
+    assert.match(invoke('floorListingMismatch',title,{...item,'product-name':name,'console-name':system}),/Different game/,title);
+  }
+  assert.equal(invoke('floorListingMismatch','Super Nintendo Tetris CIB',{...item,'product-name':'Tetris','console-name':'Super Nintendo'}),null,'Full platform prefixes remain metadata');
+  for (const [name,title] of [['Rainbow Six Siege',"Tom Clancy's Rainbow Six Siege PS4 CIB"],['Civilization VI',"Sid Meier's Civilization VI PS4"],['Cars','Disney Pixar Cars PS4'],['Zelda Link to the Past','The Legend of Zelda A Link to the Past']])
+    assert.equal(invoke('floorListingMismatch',title,{...item,'product-name':name}),null,'Optional credit: '+title);
+  assert.equal(invoke('floorListingMismatch',wrong[0],{...product,'product-name':'Nightmare Creatures'}),null,'The full selected title still matches');
+});
+
 test('sales display keeps eligible rows visible and groups excluded rows without changing selection', () => {
   const sales = Array.from({length:10},(_,i)=>({i,title:`Eligible ${i}`,price:2000-i,date:'2026-10-01'}));
   const reasons = ['Different game, sequel, or unconfirmed title extension','Different special edition or reprint',

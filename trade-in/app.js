@@ -4572,8 +4572,8 @@ function floorKnownGameTitle(title, product) {
 }
 
 // A title must identify the selected product, not merely share its franchise.
-// Unknown extensions directly after a game's name are held for review: "Final
-// Fight Guy" and "Halo 3 ODST" cannot price Final Fight and Halo 3 respectively.
+// Unknown words before or after a game's name are held for review: "Nightmare
+// Creatures" cannot price Creatures, nor can "Halo 3 ODST" price Halo 3.
 const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
 // A title list can name a second game without saying "bundle". Require an
 // explicit separator after the selected title and two title-like leading
@@ -4606,6 +4606,23 @@ function floorTitleIdentityMismatch(title, product) {
   if (!hardware && !/\b(?:collection|compilation|anthology|trilogy)\b/i.test(name)) {
     const text = ` ${floorTitleWords(floorBundleTitle(title, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
+    const variantWords = floorTitleWords(name);
+    // Sharing a short name inside another game's title is not a match. Check
+    // the whole prefix, including when sellers insert platform/condition words.
+    // Keep the established optional Zelda franchise wording, not arbitrary
+    // extra title words. Original seller text remains unchanged for review.
+    const first = listed.indexOf(core[0]);
+    let prefix = (start < 0 ? listed.slice(0, first).join(' ') : text.slice(0, start)).trim();
+    for (const platform of FLOOR_PLATFORMS) prefix = prefix.replace(new RegExp(platform.source, 'g'), ' ');
+    if (core[0] === 'zelda') prefix = prefix.replace(/\blegend\b/g, '').trim();
+    // Optional author/brand credits are not new game names. Strip whole
+    // credits, never their individual words from arbitrary title prefixes.
+    if (/^(?:rainbow|ghost|splinter|division|endwar|hawx)\b/.test(core.join(' '))) prefix = prefix.replace(/\btom clancy\b/g, ' ');
+    if (/^(?:civilization|pirates|railroads|alpha centauri)\b/.test(core.join(' '))) prefix = prefix.replace(/\bsid meier\b/g, ' ');
+    prefix = prefix.replace(/\bdisney(?: pixar)?\b/g, ' ');
+    const prefixWords = prefix.split(/\s+/).filter(Boolean);
+    if (prefixWords.some(word => (word === 'super' || !FLOOR_TITLE_DETAILS.test(word)) && !variantWords.includes(word)
+      && !['standard', 'regular', 'base'].includes(word))) return 'Different game or unconfirmed title prefix';
     // Sellers may reorder a platform or descriptive subtitle. Missing identity
     // words are still rejected above; do not confuse ordering with another game.
     let tail = start < 0 ? '' : text.slice(start + phrase.length).trim();
@@ -4617,7 +4634,6 @@ function floorTitleIdentityMismatch(title, product) {
       tail = tail.replace(new RegExp(`^(?:(?:sony|microsoft|nintendo|sega) )?(?:${platform.source})(?: |$)`), '').trim();
     }
     const next = tail.split(' ')[0];
-    const variantWords = floorTitleWords(name);
     if (next && !FLOOR_TITLE_DETAILS.test(next)
       && !['standard', 'regular', 'base'].includes(next) && !variantWords.includes(next)) return 'Different game, sequel, or unconfirmed title extension';
   }

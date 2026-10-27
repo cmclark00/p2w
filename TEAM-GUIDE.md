@@ -912,6 +912,9 @@ Guide (the Google Sheet tab).
      listing or eBay sale with an extra sequel/subtitle after the game name
      is held for review even when the base name is long: **Dynasty Warriors:
      Gundam Reborn** cannot price the original **Dynasty Warriors: Gundam**.
+     Added words before the name are checked too: **Nightmare Creatures**
+     cannot price **Creatures**. Excluded matches stay available for review,
+     and the direct eBay search continues looking for the correct game.
      An Amazon barcode match does not bypass these checks: a mismatched catalog title
      excludes its offers from pricing. Amazon provides a shared product
      title, not every seller's description, so open the listing when unsure.

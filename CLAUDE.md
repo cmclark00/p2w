@@ -647,6 +647,11 @@ The site's **only server-side code**. Everything else is static.
     The extension check applies to long names too (Dynasty Warriors: Gundam
     vs Reborn), while known aliases, normal condition/platform words, selected
     edition qualifiers and actual compilations retain their existing handling.
+    Prefixes are checked too: Creatures cannot use Nightmare Creatures, even
+    with platform words before/between the names. Whole platform phrases,
+    normal condition details and recognized optional franchise/author credits
+    remain allowed. This shared check runs before direct eBay pagination stops
+    and applies to PriceCharting recovery, Amazon and checked GameStop titles.
     Standard/platform editions and selected extras remain eligible; named
     collections can advertise their included games. These filters run before
     source selection and do not modify premium settings or rounding rules.
