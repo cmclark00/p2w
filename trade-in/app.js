@@ -4442,6 +4442,24 @@ function floorKnownGameTitle(title, product) {
 // Unknown extensions directly after a game's name are held for review: "Final
 // Fight Guy" and "Halo 3 ODST" cannot price Final Fight and Halo 3 respectively.
 const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
+// A title list can name a second game without saying "bundle". Require an
+// explicit separator after the selected title and two title-like leading
+// words, rather than treating every subtitle or comma as an extra game.
+function floorNamedGameBundle(title, product) {
+  if (floorToyFamily(product) || floorIsHardware(product)) return false;
+  const name = product?.['product-name'] || '';
+  if (/\b(?:collection|compilation|anthology|trilogy|bundle)\b/i.test(name)) return false;
+  const core = floorTitleWords(floorVariantName(product));
+  if (!core.length) return false;
+  const selected = new Set(floorTitleWords(name));
+  const parts = floorBundleTitle(floorEditionContentsTitle(title, product), true)
+    .split(/\s*(?:[,;&+\/|]|\band\b|\bplus\b)\s*/i).map(floorTitleWords);
+  const at = parts.findIndex(words => (` ${words.join(' ')} `).includes(` ${core.join(' ')} `));
+  if (at < 0) return false;
+  return parts.slice(at + 1).some(words => words.length >= 2
+    && words.slice(0, 2).every(word => !FLOOR_TITLE_DETAILS.test(word) && !/^\d+$/.test(word))
+    && words.slice(0, 2).some(word => !selected.has(word)));
+}
 function floorTitleIdentityMismatch(title, product) {
   const name = product?.['product-name'] || '';
   if (floorToyFamily(product) === 'skylanders') {
@@ -4505,6 +4523,7 @@ function floorComputeListingMismatch(title, product) {
   const expected = `${name} ${product?.['console-name'] || ''}`;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
   if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
+  if (floorNamedGameBundle(title, product)) return 'Multiple-game title list — review';
   const wantedCounts = floorGameCounts(name);
   if (/\btrilogy\b/i.test(name)) wantedCounts.push('3');
   const collection = /\b(?:collection|compilation|anthology)\b/i.test(name);

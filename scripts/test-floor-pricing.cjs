@@ -570,6 +570,31 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
   sales: { cib: prices.map((price) => ({ price, title: `${product['product-name']} complete`, date: '2026-10-17' })) }, ...extra,
 });
 
+test('named game lists cannot price a single game across sold evidence and Amazon', () => {
+  const product = { ...item, 'product-name': 'Sword Art Online: Lost Song' };
+  const bundle = 'Sword Art Online: Lost Song, Hollow Realization, PlayStation 4 PS4';
+  for (const separator of [', ', ' & ', ' and ', ' / ', ' + ']) {
+    const title = `Sword Art Online: Lost Song${separator}Hollow Realization, PlayStation 4 PS4`;
+    assert.equal(invoke('floorListingMismatch', title, product), 'Multiple-game title list — review');
+    assert.equal(invoke('floorAmazonLowest', cur(product, { amazon: { found: true, title, offers: [{ price: 9999 }] } })), null);
+  }
+  assert.ok(invoke('floorListingMismatch', 'Doom, Doom Eternal, PS4', { ...item, 'product-name': 'Doom' }));
+  for (const title of ['Sword Art Online: Lost Song, PlayStation 4 PS4, Tested Working',
+    'Sword Art Online: Lost Song, Complete In Box, Very Good',
+    'Sword Art Online: Lost Song PS4 + Case + Manual + Map Poster']) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+  }
+  assert.equal(invoke('floorListingMismatch', 'Example Game Deluxe Edition + Art Book + Soundtrack, PS4',
+    { ...item, 'product-name': 'Example Game [Deluxe Edition]' }), null);
+  assert.equal(invoke('floorListingMismatch', 'Legend of Zelda Link to the Past/Four Swords GBA',
+    { ...item, 'product-name': 'Zelda Link to the Past', 'console-name': 'GameBoy Advance' }), null);
+  assert.equal(invoke('floorListingMismatch', 'Example Adventure Collection, First Adventure, Second Journey, PS4',
+    { ...item, 'product-name': 'Example Adventure Collection' }), null);
+  const example = cur(product, { sales: { cib: [{ title: bundle, price: 1807 },
+    { title: 'Sword Art Online Lost Song PS4 CIB', price: 1500 }] } });
+  assert.equal(invoke('floorAutoSale', invoke('floorSales', example)).sale.price, 1500, 'PriceCharting bundle cannot set baseline');
+});
+
 test('Kingdom Hearts uses the general gap rule while bundles and failed sold checks stay excluded', () => {
   const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2', 'gamestop-price': 999 };
   const example = highSaleCur([3495, 2600, 2495, 2399, 2000, 1900, 1800, 1700, 1600, 1500], product,

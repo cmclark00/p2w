@@ -646,6 +646,12 @@ The site's **only server-side code**. Everything else is static.
     "Kingdom Hearts 1 & 2" or "God of War I + II") are multi-game bundles
     for both eBay and Amazon. Platform compatibility, disc numbers and a
     selected compilation's own name do not trigger that bundle rule.
+    `floorNamedGameBundle()` also holds separated title lists for review when
+    the selected game's full name is followed by another title-like phrase
+    (e.g. "Lost Song, Hollow Realization"), even without "bundle" wording.
+    It applies to direct eBay, PriceCharting and Amazon before selection, so
+    a rejected title list cannot stop the paginated search. Ordinary packaging,
+    known title aliases and named compilations retain their existing handling.
     Rows display the reason, and saved/re-check review notes retain the
     mismatch warning. Staff can deliberately include a marked eBay row;
     the warning records that override. Rhythm-game cap calculations also
