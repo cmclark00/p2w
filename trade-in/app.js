@@ -980,7 +980,7 @@ const pcInfo = (raw) => ({ id: String(raw.id), name: raw['product-name'] || '', 
 // pc: the PriceCharting product ({ id, name, prices }) when a scanned/searched item was matched to this hardware item.
 function addHardware(hw, condition = defaultHwCondition(hw), replaceId = null, pc = null) {
   const same = trade.lines.find((l) => l.source === 'hw' && l.hwId === hw.id && l.condition === condition && isPlain(l) && l.id !== replaceId
-    && (!isPcCondition(condition) || l.matchedPcId === pc?.id));
+    && (l.matchedPcId || null) === (pc?.id || null));
   if (same) {
     same.qty += 1;
     // An item added again moves to the top of the list.
@@ -1077,9 +1077,10 @@ async function attachPcProduct(target, raw, condition) {
   const line = trade.lines.find((l) => l.id === target.lineId);
   if (!line) return; // removed meanwhile
   const pc = pcInfo(full);
-  Object.assign(line, { condition, matchedFrom: pc.name, matchedPcId: pc.id, prices: pc.prices });
+  Object.assign(line, { condition: target.referenceOnly ? line.condition : condition, matchedFrom: pc.name, matchedPcId: pc.id, prices: pc.prices });
   commit();
   flash(line.id);
+  if (target.referenceOnly) toast('PriceCharting reference linked. Click Complete trade to see the total.');
 }
 
 // A first-party Case only line whose stored prices lack PriceCharting's box-only price (search results may not
@@ -1557,14 +1558,14 @@ function pcQuery(hw) {
 
 // A hardware line switched to CIB/New without a PriceCharting product: search PriceCharting
 // in the scan box so staff pick the exact product (model, color, bundle) to price it from.
-function openPcPicker(line, condition) {
+function openPcPicker(line, condition, referenceOnly = false) {
   const input = $('#scanInput');
   const q = pcQuery(line);
   input.value = q;
   input.focus();
   input.scrollIntoView({ block: 'nearest' });
   runPcSearch(q);
-  search.attachTo = { lineId: line.id, name: line.name, category: line.category, unit: lineHw(line).unit, condition };
+  search.attachTo = { lineId: line.id, name: line.name, category: line.category, unit: lineHw(line).unit, condition, referenceOnly };
   renderResults();
 }
 
@@ -1621,8 +1622,9 @@ function renderResults() {
   let html = '';
 
   if (attach) {
-    html += `<div class="results-note picker">Pick the PriceCharting product for <strong>${esc(attach.name)}</strong> to price it
-      ${esc(HW_PC_CONDITIONS[attach.condition])}. Not the right results? Edit the search and press <kbd>Enter</kbd>, or <kbd>Esc</kbd> to cancel.</div>`;
+    html += `<div class="results-note picker">Pick the exact PriceCharting model for <strong>${esc(attach.name)}</strong>.
+      ${attach.referenceOnly ? 'Market reference only; your buying-guide payout stays unchanged.' : `Price it ${esc(HW_PC_CONDITIONS[attach.condition])}.`}
+      Not the right results? Edit the search and press <kbd>Enter</kbd>, or <kbd>Esc</kbd> to cancel.</div>`;
   } else if (search.hw.length) {
     html += '<div class="results-group">Buying guide <span>cash prices · click a condition to add</span></div>';
     for (const h of search.hw) {
@@ -1646,7 +1648,10 @@ function renderResults() {
       const sub = `<div class="r-main"><div class="r-name">${esc(p['product-name'])}${rhythmTag(p['product-name'])}</div><div class="sub">${esc(p['console-name'])}`;
       if (attach) {
         const i = search.items.push({ kind: 'pc', product: p }) - 1;
-        html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${pcCondBtns(p, attach.category, attach.unit)}</div></div>`;
+        const buttons = attach.referenceOnly
+          ? condBtn('reference', 'Use market reference', Number(p[PC_FIELDS.market[tradePcCondition(attach)]]) || null)
+          : pcCondBtns(p, attach.category, attach.unit);
+        html += `<div class="result" data-i="${i}">${sub}</div></div><div class="r-conds">${buttons}</div></div>`;
         continue;
       }
       const hw = hardwareMatch(p);
@@ -2339,18 +2344,37 @@ function tradeSerialIssue(lines) {
   return null;
 }
 
+// Buying-guide Complete means usable with cables/controller, not an original box.
+function tradePcCondition(line) {
+  return ['unit', 'complete'].includes(line.condition) ? 'loose' : line.condition;
+}
+
+function tradePcValue(line) {
+  const condition = tradePcCondition(line);
+  const key = condition === CASE_ONLY ? BOX_KEY : PC_FIELDS.market[condition];
+  const value = ['pc', 'hw'].includes(line.source) && key ? line.prices?.[key] : null;
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 // Reference value only: never substitute the buying-guide price or staff offer.
 function tradePriceChartingTotal(lines = trade.lines) {
   let total = 0, count = 0, missing = 0;
   for (const line of lines) {
     if (line.pending || line.failed || priceLine(line).dontBuy) continue;
-    const key = line.condition === CASE_ONLY ? BOX_KEY : PC_FIELDS.market[line.condition];
-    const value = ['pc', 'hw'].includes(line.source) && key ? line.prices?.[key] : null;
-    if (!Number.isFinite(value) || value <= 0) { missing += line.qty; continue; }
+    const value = tradePcValue(line);
+    if (value == null) { missing += line.qty; continue; }
     total += value * line.qty;
     count += line.qty;
   }
   return { total, count, missing };
+}
+
+function tradePcSnapshot() {
+  return { ...tradePriceChartingTotal(), capturedAt: new Date().toISOString(),
+    items: trade.lines.filter((l) => !l.pending && !l.failed && !priceLine(l).dontBuy).map((l) => ({
+      name: l.name, qty: l.qty, condition: tradePcCondition(l), value: tradePcValue(l),
+      pcId: l.pcId || l.matchedPcId || null, matchedFrom: l.matchedFrom || null,
+    })) };
 }
 
 function openComplete() {
@@ -2365,6 +2389,9 @@ function openComplete() {
   $('#completePcNote').textContent = pc.missing
     ? `Partial total · ${pc.missing} item${pc.missing === 1 ? '' : 's'} without a matching PriceCharting value. Selected condition × quantity; not the payout.`
     : 'Selected condition × quantity; not the payout.';
+  $('#completePcMatches').innerHTML = lines.filter((l) => l.source === 'hw' && !priceLine(l).dontBuy
+    && PC_FIELDS.market[tradePcCondition(l)] && tradePcValue(l) == null)
+    .map((l) => `<button type="button" class="link" data-pc-match="${esc(l.id)}">Match ${esc(l.name)} on PriceCharting</button>`).join('<br>');
   $('#payCash').textContent = money(t.cash);
   $('#payCredit').textContent = money(t.credit);
   f.payout.value = trade.split ? 'split' : 'credit';
@@ -2424,6 +2451,7 @@ async function saveCompleted(print) {
   Object.assign(trade, { staff, customer });
   saveTrade();
   const record = {
+    priceCharting: tradePcSnapshot(),
     staff, customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom },
     idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
   };
@@ -2569,8 +2597,9 @@ function exportLog() {
     (r.items || []).map((it) => `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name}${it.platform ? ` (${it.platform})` : ''}${it.serial ? ` [serial ${it.serial}]` : ''}`).join('; '),
     r.notes || '',
     (r.edits || []).map((e) => `${fmtTime(e.time)}: ${e.reason || ''}`).join('; '),
+    r.priceCharting?.count ? dollars(r.priceCharting.total) : '', r.priceCharting?.missing ?? '',
   ]);
-  const head = ['Date', 'Trade #', 'Customer', 'Staff', 'Items', 'Payout', 'Cash paid', 'Store credit issued', 'Cash offer', 'Store credit offer', 'Photo ID checked', 'Items list', 'Notes', 'Edits'];
+  const head = ['Date', 'Trade #', 'Customer', 'Staff', 'Items', 'Payout', 'Cash paid', 'Store credit issued', 'Cash offer', 'Store credit offer', 'Photo ID checked', 'Items list', 'Notes', 'Edits', 'PriceCharting value at completion', 'Items missing PriceCharting value'];
   const csv = [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
   const { from, to } = logQuery;
   const name = `trade-log${from ? `-${from}` : ''}${to && to !== from ? `-to-${to}` : ''}.csv`;
@@ -2596,6 +2625,9 @@ function logDetailHtml(r, i) {
   }).join('');
   const facts = [r.idChecked ? 'Photo ID checked' : '', r.notes ? `Notes: ${r.notes}` : '', `Logged by ${r.staff}${r.role ? ` (${r.role} login)` : ''}`].filter(Boolean);
   return `<tr class="log-detail"><td colspan="5">
+    <p><strong>PriceCharting value at completion: ${r.priceCharting ? (r.priceCharting.count ? money(r.priceCharting.total) : 'Unavailable') : 'Not recorded'}</strong>
+      ${r.priceCharting?.missing ? ` · Partial total (${esc(r.priceCharting.missing)} items without a value)` : ''}
+      ${r.priceCharting && r.edits?.some((e) => e.before?.items) ? '<br><small>Original completion snapshot; later item corrections are not reflected.</small>' : ''}</p>
     <table class="log-items"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cash</th><th class="num">Credit</th></tr></thead><tbody>${items}</tbody></table>
     <p class="muted small-print">${facts.map(esc).join(' · ')}</p>
     ${logEditsHtml(r)}
@@ -6050,6 +6082,13 @@ function wireEvents() {
   $('#completeBtn').addEventListener('click', openComplete);
   $('#completeSave').addEventListener('click', () => saveCompleted(false));
   $('#completePrint').addEventListener('click', () => saveCompleted(true));
+  $('#completePcMatches').addEventListener('click', (e) => {
+    const id = e.target.closest('[data-pc-match]')?.dataset.pcMatch;
+    const line = trade.lines.find((l) => l.id === id);
+    if (!line) return;
+    $('#completeDialog').close();
+    openPcPicker(line, line.condition, true);
+  });
   $('#completeDialog [data-close]').addEventListener('click', () => $('#completeDialog').close());
   // Keep what was typed if the dialog is cancelled and reopened; the customer box mirrors the top bar's.
   $('#staffName').addEventListener('input', (e) => { trade.staff = e.target.value; saveTrade(); });

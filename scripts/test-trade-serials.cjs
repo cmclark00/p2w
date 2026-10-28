@@ -70,7 +70,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal(invoke('tradeSerialIssue', [hardware('PS5', { qty: 2, serial: ' A, B ' })]), null);
     assert.equal(invoke('tradeSerialIssue', [hardware('PS5', { failed: true })]), null);
   });
-  run(`var sentRecords=[], printed=0;
+  run(`var sentRecords=[], printed=0, realPriceLine=priceLine;
     tradeTotals=()=>({cash:1000,credit:1200,count:1,missing:0}); updateDialogSplit=()=>{};
     saveTrade=()=>{}; priceLine=()=>({cash:1000,credit:1200}); lineDeductions=()=>[];
     api=async(route,{body})=>{sentRecords.push(body);return {id:1,time:'2026-10-19'};};
@@ -117,6 +117,45 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       assert.equal(run('sentRecords[0].items[0].serial'), line.serial);
       assert.equal(line.category, run('trade.lines[0].category'));
     }
+  });
+  await test('buying-guide hardware contributes market value without changing its payout', async () => {
+    const line = hardware('Sega Genesis', { source: 'hw', hwId: 'genesis', condition: 'complete', qty: 2,
+      hwPrices: { complete: 4000, unit: 3000 }, prices: { 'loose-price': 7500, 'cib-price': 12500, 'new-price': 25000 },
+      matchedPcId: '123', matchedFrom: 'Genesis Model 1 Console', deductions: [], override: null });
+    ctx.fixture = line;
+    const before = run('realPriceLine(fixture).cash');
+    openTrade([line]);
+    assert.equal(element('#completePcValue').textContent, '$150.00');
+    assert.equal(element('#completePcMatches').innerHTML, '');
+    assert.equal(invoke('tradePcValue', { ...line, condition: 'unit' }), 7500);
+    assert.equal(invoke('tradePcValue', { ...line, condition: 'cib' }), 12500);
+    assert.equal(invoke('tradePcValue', { ...line, condition: 'new' }), 25000);
+    assert.equal(invoke('tradePcValue', { ...line, condition: 'parts' }), null);
+    await invoke('saveCompleted', false);
+    assert.equal(run('sentRecords[0].priceCharting.total'), 15000);
+    assert.equal(run('sentRecords[0].priceCharting.items[0].pcId'), '123');
+    assert.equal(run('sentRecords[0].priceCharting.items[0].condition'), 'loose');
+    line.prices['loose-price'] = 9900;
+    assert.equal(run('sentRecords[0].priceCharting.total'), 15000);
+    assert.equal(run('sentRecords[0].priceCharting.items[0].value'), 7500);
+    assert.equal(run('realPriceLine(fixture).cash'), before);
+    assert.match(run('logDetailHtml(sentRecords[0],0)'), /PriceCharting value at completion: \$150.00/);
+    assert.match(invoke('logDetailHtml', { items: [] }, 0), /Not recorded/);
+    openTrade([{ ...line, prices: null, matchedPcId: null }]);
+    assert.match(element('#completePcMatches').innerHTML, /Match Sega Genesis on PriceCharting/);
+    await invoke('saveCompleted', false);
+    assert.match(run('logDetailHtml(sentRecords[0],0)'), /Partial total \(2 items/);
+  });
+  await test('reference-only hardware matching preserves condition and custom payout', async () => {
+    const line = hardware('Sega Genesis', { source: 'hw', condition: 'complete', cashOverride: 4500 });
+    openTrade([line]);
+    run('var oldFull=withFullPrices,oldCommit=commit,oldFlash=flash; withFullPrices=async(raw)=>raw; commit=()=>{}; flash=()=>{};');
+    try {
+      await invoke('attachPcProduct', { lineId: 'test', referenceOnly: true },
+        { id: '789', 'product-name': 'Genesis Model 2', 'loose-price': 6400 }, 'cib');
+      assert.equal(line.condition, 'complete'); assert.equal(line.cashOverride, 4500);
+      assert.equal(line.matchedPcId, '789'); assert.equal(invoke('tradePcValue', line), 6400);
+    } finally { run('withFullPrices=oldFull; commit=oldCommit; flash=oldFlash;'); }
   });
   await test('listed models and sealed Genesis require serials and ID for both completion actions', async () => {
     for (const line of [hardware('PS5'), hardware('Sega Genesis', { condition: 'new' })]) {

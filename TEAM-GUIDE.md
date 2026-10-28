@@ -717,8 +717,14 @@ Everyone in the store shares one internet address, so typos add up.
 7. When the customer agrees, click **Complete trade**:
    - **Total PriceCharting value** shows the selected-condition market values
      multiplied by quantities, separately from your payout. Missing values are
-     noted as a partial total; items marked Not buying are excluded. This
-     reference is shown in the completion window, not on customer receipts.
+     noted as a partial total; items marked Not buying are excluded. Matched
+     consoles count even when you pay buying-guide prices: Complete/Console
+     only use the loose market value, while CIB/New use those market values.
+     If a console has no market match, use **Match … on PriceCharting** to pick
+     the exact model, then click Complete trade again. The payout stays unchanged.
+     The total is saved in **trade-log details and CSV exports** as a snapshot
+     at completion, not on customer receipts. Older trades say **Not recorded**;
+     later manager item corrections do not rewrite the original snapshot.
    - Pick what they're taking: cash, store credit, or the split.
    - Type **your name** and the **customer's name**. Both are required,
      and both start blank on every new trade, so whoever is at the

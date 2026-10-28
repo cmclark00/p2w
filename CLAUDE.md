@@ -1337,9 +1337,18 @@ The site's **only server-side code**. Everything else is static.
   - The completion dialog shows `tradePriceChartingTotal`: selected-condition
     market prices × quantities (box-only for cases), without payout rules,
     deductions or rounding. Pending/failed/Not buying lines are excluded.
-    Missing or nonpositive values, custom/bulk lines and hardware conditions
-    with no matching PC condition are counted as unavailable, never replaced
-    by buying-guide prices. The reference is dialog-only, not saved or printed.
+    Buying-guide Complete/Console only/Working use matched PC Loose market
+    values (Complete means cables/controller, not an original box); CIB/New
+    use their own fields. Missing or nonpositive values, custom/bulk lines and
+    Parts/third-party conditions are unavailable, never replaced by guide prices.
+    Missing hardware references have a Match button opening the existing exact
+    model picker in reference-only mode; it retains the buying condition and
+    payout. Hardware lines with different PC IDs are not merged.
+    `priceCharting` on the saved trade is a completion snapshot with total,
+    count, missing, capturedAt and per-item market values/IDs/quantities.
+    Log details and CSV show it; older records say Not recorded. Manager edits
+    preserve the original snapshot (item corrections display a note); it is
+    not added to customer receipts. No new lookup occurs when reading the log.
   - Each file holds one object per line, one file per UTC month.
   - **No deletes. Managers can correct a trade** (owner request, Oct 2026;
     it used to be strictly append-only): **Edit trade** in a trade's
