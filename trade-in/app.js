@@ -2339,6 +2339,20 @@ function tradeSerialIssue(lines) {
   return null;
 }
 
+// Reference value only: never substitute the buying-guide price or staff offer.
+function tradePriceChartingTotal(lines = trade.lines) {
+  let total = 0, count = 0, missing = 0;
+  for (const line of lines) {
+    if (line.pending || line.failed || priceLine(line).dontBuy) continue;
+    const key = line.condition === CASE_ONLY ? BOX_KEY : PC_FIELDS.market[line.condition];
+    const value = ['pc', 'hw'].includes(line.source) && key ? line.prices?.[key] : null;
+    if (!Number.isFinite(value) || value <= 0) { missing += line.qty; continue; }
+    total += value * line.qty;
+    count += line.qty;
+  }
+  return { total, count, missing };
+}
+
 function openComplete() {
   const t = tradeTotals();
   const lines = trade.lines.filter((l) => !l.pending && !l.failed);
@@ -2346,6 +2360,11 @@ function openComplete() {
   if (trade.lines.some((l) => l.pending)) { toast('Wait for the lookups to finish.'); return; }
   if (t.missing) { toast(`${t.missing} item${t.missing === 1 ? '' : 's'} still need a price.`, 'error'); return; }
   const f = $('#completeForm').elements;
+  const pc = tradePriceChartingTotal();
+  $('#completePcValue').textContent = pc.count ? money(pc.total) : 'Unavailable';
+  $('#completePcNote').textContent = pc.missing
+    ? `Partial total · ${pc.missing} item${pc.missing === 1 ? '' : 's'} without a matching PriceCharting value. Selected condition × quantity; not the payout.`
+    : 'Selected condition × quantity; not the payout.';
   $('#payCash').textContent = money(t.cash);
   $('#payCredit').textContent = money(t.credit);
   f.payout.value = trade.split ? 'split' : 'credit';

@@ -79,6 +79,27 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     ctx.testLines = lines; run('trade.lines=testLines; sentRecords=[]; printed=0;'); invoke('openComplete');
     element('#staffName').value = 'Test staff'; element('#completeCustomer').value = 'Test customer';
   };
+  await test('completion totals selected-condition market values and quantities, independent of offers', () => {
+    const prices = { 'loose-price': 1495, 'cib-price': 2501, 'new-price': 4000, 'retail-cib-buy': 500, 'box-only-price': 305 };
+    const game = (condition, qty = 1) => ({ source: 'pc', category: 'game', condition, qty, prices });
+    openTrade([game('loose', 2), game('cib'), game('new'), game('case')]);
+    assert.equal(element('#completePcValue').textContent, '$97.96');
+    assert.doesNotMatch(element('#completePcNote').textContent, /Partial/);
+    assert.equal(element('#payCash').textContent, '$10.00');
+    openTrade([game('cib'), { ...game('cib'), source: 'hw' }, { ...game('cib', 2), prices: {} },
+      { ...game('loose'), failed: true },
+      { ...game('loose'), source: 'custom', override: 9000 }, game('parts')]);
+    assert.equal(element('#completePcValue').textContent, '$50.02');
+    assert.match(element('#completePcNote').textContent, /Partial total · 4 items/);
+    openTrade([{ ...game('loose'), prices: { 'loose-price': 0 } }]);
+    assert.equal(element('#completePcValue').textContent, 'Unavailable');
+    run('var originalPriceLine=priceLine; priceLine=(l)=>({dontBuy:l.notBuying});');
+    try {
+      const total = invoke('tradePriceChartingTotal', [{ ...game('cib'), notBuying: true },
+        { ...game('new'), pending: true }, { ...game('new'), failed: true }, game('loose')]);
+      assert.equal(total.total, 1495); assert.equal(total.count, 1); assert.equal(total.missing, 0);
+    } finally { run('priceLine=originalPriceLine;'); }
+  });
   await test('older used hardware and games save and print without ID or serial fields', async () => {
     for (const line of [hardware('Sega Genesis'), hardware('NES', { serial: 'OLD-123' }),
       hardware('Game Boy', { category: 'handheld' }), hardware('Sonic', { category: 'game' })]) {

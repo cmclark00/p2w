@@ -1334,6 +1334,12 @@ The site's **only server-side code**. Everything else is static.
   also needs `assets/bulk-rates.json`** in its local `assets` folder.
 - **Trade log** (`POST`/`GET api.php?route=trades`): "Complete trade" saves
   a JSON record per trade to `p2w-trade-in-data/trades/YYYY-MM.jsonl`.
+  - The completion dialog shows `tradePriceChartingTotal`: selected-condition
+    market prices × quantities (box-only for cases), without payout rules,
+    deductions or rounding. Pending/failed/Not buying lines are excluded.
+    Missing or nonpositive values, custom/bulk lines and hardware conditions
+    with no matching PC condition are counted as unavailable, never replaced
+    by buying-guide prices. The reference is dialog-only, not saved or printed.
   - Each file holds one object per line, one file per UTC month.
   - **No deletes. Managers can correct a trade** (owner request, Oct 2026;
     it used to be strictly append-only): **Edit trade** in a trade's

@@ -715,6 +715,10 @@ Everyone in the store shares one internet address, so typos add up.
    they want in cash, **or** how much they want in store credit. The other
    box fills in at the same rates.
 7. When the customer agrees, click **Complete trade**:
+   - **Total PriceCharting value** shows the selected-condition market values
+     multiplied by quantities, separately from your payout. Missing values are
+     noted as a partial total; items marked Not buying are excluded. This
+     reference is shown in the completion window, not on customer receipts.
    - Pick what they're taking: cash, store credit, or the split.
    - Type **your name** and the **customer's name**. Both are required,
      and both start blank on every new trade, so whoever is at the
