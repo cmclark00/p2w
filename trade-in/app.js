@@ -3699,6 +3699,7 @@ async function fetchFloorAmazon(product, condition, request = floorAmazonRequest
 }
 async function fetchFloorAmazonSingle(product, condition, request) {
   const upcs = [...new Set(String(product.upc || '').split(/[,\s]+/).filter(v => /^\d{8,14}$/.test(v)))], cond = amazonCond(condition);
+  const looseAny = floorAmazonLooseAny({ product, condition });
   const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upcs, condition]);
   if (!floorAmazonCache.has(key)) {
     let progress = floorAmazonProgress.get(key);
@@ -3762,11 +3763,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
             let data;
             try { data = await resumeRequest('amazon/offers', { asin: c.asin, cond: offerCond }); }
             catch (err) {
-              if (cond === 'used' && offerCond === 'new' && !renewedFallback) { referenceErrors.new = err.message; return; }
+              if (cond === 'used' && !looseAny && offerCond === 'new' && !renewedFallback) { referenceErrors.new = err.message; return; }
               throw err;
             }
             const offer = { ...data, renewedFallback,
-              displayOnly: cond === 'used' && offerCond === 'new' && !renewedFallback,
+              displayOnly: cond === 'used' && !looseAny && offerCond === 'new' && !renewedFallback,
               newReference: cond === 'used' && !renewedFallback && offerCond === 'new' };
             const reason = offer.asin !== c.asin ? 'Amazon returned a different catalog item'
               : renewedFallback && !AMAZON_RENEWED_RE.test(offer.title) ? 'Renewed identity changed during offer lookup'
@@ -3782,7 +3783,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const failure = results.find(r => r.status === 'rejected');
         if (failure) throw failure.reason;
       }
-      const priced = () => floorAmazonPrioritizeUsed({ product, condition }, verified.filter((a) => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0));
+      const priced = () => verified.filter(a => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0);
       try {
         if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
@@ -3811,8 +3812,9 @@ async function fetchFloorAmazonSingle(product, condition, request) {
           }
         } finally { await Promise.allSettled(prefetch); }
         await finishOffers();
-        // Keep the existing Renewed fallback when no regular Used offer exists.
-        if (!priced().some(a => !a.newReference) && condition !== 'new') {
+        // Loose games compare every regular condition before trying Renewed.
+        // Other inventory keeps its existing Used/New separation.
+        if (!(looseAny ? priced().length : priced().some(a => !a.newReference)) && condition !== 'new') {
           renewedChecked = true;
           const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
           await catalog({ q }, true);
@@ -3833,11 +3835,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       }
       const choices = priced().sort((a, b) => floorAmazonLowest({ product, condition, amazon: a }) - floorAmazonLowest({ product, condition, amazon: b })
         || Number(!!a.newReference) - Number(!!b.newReference) || a.asin.localeCompare(b.asin));
-      // Opposite-condition offers remain visible comparisons, never pricing evidence.
+      // CIB/New keep opposite-condition comparisons separate; Loose can use any regular condition.
       const selected = choices[0] || verified.find(a => !a.newReference && !a.displayOnly) || null;
       const matchNotes = [];
       if (!floorIsHardware(product) && !floorToyFamily(product) && condition !== 'new') matchNotes.push(condition === 'loose'
-        ? 'Loose Used offers: Good preferred across matching listings; Acceptable only when no matching Good offer is returned. Other grades do not price Loose'
+        ? 'Loose games: lowest matching regular offer across every Used grade and New, including shipping. No preference for Good over Acceptable or CIB grades'
         : 'CIB Used offers: lowest Very Good or Like New (Mint) offer; either grade works alone. Good and Acceptable do not price CIB');
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
       if (!choices.length && !searchError) matchNotes.push('No eligible offer for this condition; no Amazon price used.');
@@ -3845,11 +3847,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       if (searched) matchNotes.push(selected ? `Amazon listing verified by ${selected.matchMethod}; ${searchError ? 'search not finished' : 'compared barcode and title/platform searches'}` : searchError ? 'No verified Amazon match found yet; search not finished' : 'No verified Amazon listing found in the title/platform search; review manually');
       const listingCount = new Set(choices.map((a) => a.asin)).size;
       if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; compared the lowest matching offers by condition${searchError ? ' found so far' : ''}`);
-      if (selected?.renewedFallback && !searchError) matchNotes.push('Renewed fallback: no usable regular used Amazon offer found. Renewed is used/refurbished evidence, never factory-new evidence');
-      matchNotes.push('Conditions stay separate: New offers are display-only for used inventory; Used and Renewed cannot price New inventory.');
+      if (selected?.renewedFallback && !searchError) matchNotes.push(`Renewed fallback: no usable regular ${looseAny ? 'Used or New' : 'used'} Amazon offer found. Renewed is used/refurbished evidence, never factory-new evidence`);
+      matchNotes.push(looseAny ? 'Loose games can use a cheaper CIB-grade or New copy. CIB and New inventory retain their own condition rules.' : condition === 'new' ? 'New inventory uses only New offers; Used and Renewed cannot price a sealed copy.' : 'Conditions stay separate: New offers are display-only for this used inventory; Used and Renewed cannot price New inventory.');
       const references = {};
       for (const kind of ['used', 'new', 'renewed']) {
-        const matches = floorAmazonPrioritizeUsed({ product, condition: condition === 'new' ? 'cib' : condition }, verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind));
+        const matches = verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind);
         const value = a => floorAmazonLowest({ product, condition: kind === 'new' ? 'new' : condition === 'new' ? 'cib' : condition, amazon: { ...a, displayOnly: false } });
         references[kind] = matches.filter(a => value(a) > 0).sort((a,b) => value(a) - value(b) || a.asin.localeCompare(b.asin))[0] || matches[0] || null;
       }
@@ -4833,6 +4835,9 @@ function floorAmazonSub(o) {
   const sub = String(o?.sub || '').toLowerCase().replace(/[\s_-]+/g, '');
   return ({ good: 'good', acceptable: 'acceptable', verygood: 'very_good', likenew: 'like_new', mint: 'like_new' })[sub] || sub;
 }
+function floorAmazonLooseAny(cur) {
+  return cur.condition === 'loose' && !floorIsHardware(cur.product) && !floorToyFamily(cur.product);
+}
 function floorAmazonUsesGrades(cur) {
   const a = cur.amazon;
   return cur.condition !== 'new' && !floorIsHardware(cur.product) && !floorToyFamily(cur.product)
@@ -4842,29 +4847,16 @@ function floorAmazonEligibleOffers(cur) {
   const offers = (cur.amazon?.offers || []).filter(o => Number.isFinite(Number(o.price)) && Number(o.price) > 0
     && (cur.condition !== 'new' || !o.sub || floorAmazonSub(o) === 'new'));
   if (!floorAmazonUsesGrades(cur)) return offers;
-  if (cur.condition === 'loose') {
-    const good = offers.filter(o => floorAmazonSub(o) === 'good');
-    return good.length ? good : offers.filter(o => floorAmazonSub(o) === 'acceptable');
-  }
+  if (cur.condition === 'loose') return offers;
   return offers.filter(o => ['very_good', 'like_new'].includes(floorAmazonSub(o)));
 }
-// Good outranks Acceptable across ASINs, not just within one listing. Keep the
-// regular/Renewed channels separate so existing fallback behavior stays intact.
-function floorAmazonPrioritizeUsed(cur, entries) {
-  if (cur.condition !== 'loose' || floorIsHardware(cur.product) || floorToyFamily(cur.product)) return entries;
-  const hasGood = renewed => entries.some(a => !!a.renewedFallback === renewed && floorAmazonUsesGrades({ ...cur, amazon: a })
-    && floorAmazonEligibleOffers({ ...cur, amazon: a }).some(o => floorAmazonSub(o) === 'good'));
-  const good = new Set([false, true].filter(hasGood));
-  return entries.filter(a => !good.has(!!a.renewedFallback) || !floorAmazonUsesGrades({ ...cur, amazon: a })
-    || floorAmazonEligibleOffers({ ...cur, amazon: a }).some(o => floorAmazonSub(o) === 'good'));
-}
-// Shipping included. Choose the lowest eligible offer within the selected grade.
+// Shipping included. Loose games use any grade; other conditions retain their filters.
 function floorAmazonLowest(cur, showPartial = false) {
   if (cur.amazon?.incomplete && !showPartial) return null;
   if (!cur.amazon?.found || floorAmazonMismatch(cur)) return null;
   const a = cur.amazon, offerCondition = String(a.offerCondition || a.condition || '').toLowerCase();
   if (cur.condition === 'new' ? a.renewedFallback || offerCondition === 'used' || a.displayOnly
-    : !a.renewedFallback && (a.newReference || offerCondition === 'new')) return null;
+    : a.displayOnly || !floorAmazonLooseAny(cur) && !a.renewedFallback && (a.newReference || offerCondition === 'new')) return null;
   const prices = floorAmazonEligibleOffers(cur).map(o => Number(o.price));
   const lowest = prices.length ? Math.min(...prices) : floorAmazonUsesGrades(cur) || a.offers?.length ? null : Number(cur.amazon.lowest);
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
@@ -5313,12 +5305,12 @@ function renderFloorPricer() {
           <summary>Amazon condition guide</summary>
           <p class="muted small-print">How we price game conditions:</p>
           <ul>
-            <li><strong>Good:</strong> loose / disc only. First choice for Loose.</li>
-            <li><strong>Acceptable:</strong> loose / disc only. Fallback when no Good offer is available.</li>
+            <li><strong>Good / Acceptable:</strong> treated as loose / disc only.</li>
             <li><strong>Very Good:</strong> game with case / cover art and/or manual. Treated as CIB.</li>
             <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; either works alone.</li>
-            <li><strong>New:</strong> new-copy offer. Only prices New inventory; reference-only for Loose/CIB.</li>
-            <li><strong>Renewed:</strong> separate fallback when no eligible regular Used offer is found; not proof of original sealed condition.</li>
+            <li><strong>Loose pricing:</strong> lowest matching offer across all Used grades and New, including shipping. A cheaper CIB-grade or New copy counts too.</li>
+            <li><strong>New:</strong> can price Loose or New inventory; reference-only for CIB. Used cannot price New inventory.</li>
+            <li><strong>Renewed:</strong> fallback when no eligible regular offer is found (Used or New for Loose); not proof of original sealed condition.</li>
           </ul>
           <p class="muted small-print">These are our pricing categories; check seller notes for exact contents. Prices include shipping. Specific pricing rules and premiums still apply.</p>
         </details>` : ''}
@@ -5376,7 +5368,7 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
 function floorAmazonHtml(cur, b) {
   if (!amazonSet) return '';
   const a = cur.amazon;
-  const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : a?.newReference ? 'Amazon new-copy reference offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
+  const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : a?.newReference ? floorAmazonLooseAny(cur) ? 'Amazon new offers' : 'Amazon new-copy reference offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;

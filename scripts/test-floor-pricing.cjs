@@ -160,7 +160,7 @@ test('New and used evidence stay separated across Amazon, GameStop and PriceChar
   assert.equal(invoke('floorGsFor',{product:p,condition:'cib'}),9999);
   for(const condition of ['loose','cib']) {
     for(const a of [{condition:'New'},{offerCondition:'new',newReference:true}]) {
-      assert.equal(invoke('floorAmazonLowest',cur(p,{condition,amazon:{found:true,...a,lowest:8000,offers:[{price:8000,sub:'new'}]}})),null);
+      assert.equal(invoke('floorAmazonLowest',cur(p,{condition,amazon:{found:true,...a,lowest:8000,offers:[{price:8000,sub:'new'}]}})),condition === 'loose' ? 8000 : null);
     }
   }
   for(const a of [{condition:'Used',offers:[{price:8000,sub:'like_new'}]},
