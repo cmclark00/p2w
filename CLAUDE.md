@@ -1029,6 +1029,16 @@ The site's **only server-side code**. Everything else is static.
     dollar endings 2/3/4 and 7/8/9 up to the next $5; other endings round down
     to $5 (exact multiples stay unchanged). Cents do not affect the ending:
     $11.99 -> $10, $14.95 -> $15, $16.99 -> $15, $17 -> $20, $52 -> $55. The existing $10 minimum ($5 for shitbox games) remains.
+    **Amazon-driven exception through $80:** `floorAmazonLowRound()` rounds down
+    to $5 unless the amount is within $2 (inclusive) of the higher $5. Thus
+    $27/$27.99 -> $25, $28 -> $30, $32.99 -> $30, $33 -> $35. `floorResult()`
+    passes `amazonRounding` only when Amazon wins the baseline (including Renewed
+    and an Amazon-driven standard-edition fallback), not merely when an Amazon
+    listing is displayed. Apply after percentage premiums/discounts and use the
+    same rounding on market minimums so they cannot undo it. Existing manual
+    deduction ordering, game minimums and higher-price tiers remain unchanged.
+    Toys retain their specific steps; Nintendo exact MSRP pricing bypasses rounding.
+    Typed, eBay, GameStop and PriceCharting-driven prices retain the general rule.
     This rounding also applies to GameStop and `referenceMin`, so an
     unrounded market reference cannot undo the owner's low-price rule.
     Above $80, amounts stay unrounded through the baseline and adjustments.

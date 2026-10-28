@@ -3334,26 +3334,34 @@ function floorLowRound(price) {
   return price % FLOOR_STEP >= 200 ? Math.ceil(price / FLOOR_STEP) * FLOOR_STEP : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
 }
 
+// Amazon-driven prices through $80: down to $5 unless within $2 of the next $5.
+// Preserve cents at the boundary: $27.99 -> $25, $28 -> $30, $32.99 -> $30.
+function floorAmazonLowRound(price) {
+  const lower = Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
+  return price - lower >= FLOOR_STEP - 200 ? lower + FLOOR_STEP : lower;
+}
+
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
 // keep the unrounded amount until the single final rounding step for its tier,
 // apply the $10 floor ($5 for shitbox games), then the missing-manual deduction.
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
-function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null }) {
+function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const full = Math.max(min, premiumBasis <= 8000 ? floorLowRound(premiumBasis) : premiumBasis);
+  const lowRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
+  const full = Math.max(min, premiumBasis <= 8000 ? lowRound(premiumBasis) : premiumBasis);
   const ded = manualMissing ? manualDeduction(full) : 0;
-  const roundedReference = (value) => value > 0 ? (value <= 8000 ? floorLowRound(value) : value) : 0;
+  const roundedReference = (value) => value > 0 ? (value <= 8000 ? lowRound(value) : value) : 0;
   const gsFloor = roundedReference(gs);
   const marketFloor = roundedReference(referenceMin);
   const beforeShelfRound = Math.max(full - ded, gsFloor, marketFloor);
-  const price = beforeShelfRound <= 8000 && premiumBasis > 8000 ? floorLowRound(beforeShelfRound) : floorShelfRound(beforeShelfRound);
+  const price = beforeShelfRound <= 8000 && premiumBasis > 8000 ? lowRound(beforeShelfRound) : floorShelfRound(beforeShelfRound);
   return { full, ded, price, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
-    premium, premiumBasis };
+    premium, premiumBasis, amazonRounding };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -5089,7 +5097,8 @@ function floorResult(cur) {
   // including discounts below it. A 0% premium only exempts a title from a broader premium.
   const specific = !!(premium?.pct || manualMissing);
   const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
-    gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin });
+    gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
+    amazonRounding: b.from === 'amazon' || b.from === 'standard' && b.standardReference?.from === 'amazon' });
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
 
@@ -5324,10 +5333,11 @@ function renderFloorPricer() {
             <li>Regular baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
+            <li>Amazon-driven prices through $80: round down to $5 unless within $2 of the next $5 ($27.99 → $25; $28 → $30). Higher-price rounding stays unchanged.</li>
             <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
             <li>Outside the recent Switch fixed-price rule, specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>General high-sale outlier filters do not apply when a specific pricing rule matches. Invalid listings remain excluded.</li>
-            <li>Rounding: through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
+            <li>General rounding (except Amazon through $80 and exact MSRP pricing): through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
       </aside>
@@ -5398,11 +5408,12 @@ function floorMath(b, r) {
     if (r.price !== r.beforeShelfRound) parts.push(`rounded to toys-to-life ${r.toy === 'amiibo' || r.beforeShelfRound >= 1500 ? '$5' : '$2 / $15'} step: ${money(r.price)}`);
     return parts.join(' → ');
   }
-  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `low-price rounding: ${money(r.full)}`);
+  const lowLabel = r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
+  if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${lowLabel}: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);
   if (r.marketRaised) parts.push(`held at market minimum ${money(r.marketRaised)}`);
-  if (r.price !== r.beforeShelfRound) parts.push(`${r.beforeShelfRound > 50000 ? 'rounded to nearest $50' : r.beforeShelfRound > 8000 ? 'rounded to nearest $10 or $25 multiple' : 'low-price rounding'}: ${money(r.price)}`);
+  if (r.price !== r.beforeShelfRound) parts.push(`${r.beforeShelfRound > 50000 ? 'rounded to nearest $50' : r.beforeShelfRound > 8000 ? 'rounded to nearest $10 or $25 multiple' : lowLabel}: ${money(r.price)}`);
   return parts.join(' → ');
 }
 

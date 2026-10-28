@@ -38,6 +38,33 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('Amazon-driven prices through $80 round down to $5 unless within $2 of the next step', () => {
+  for(const [raw,want] of [[1000,1000],[1200,1000],[1299,1000],[1300,1500],[1495,1500],[2500,2500],[2700,2500],[2799,2500],[2800,3000],[2999,3000],[3299,3000],[3300,3500],[7799,7500],[7800,8000],[8000,8000]]) {
+    const r=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,offers:[{price:raw}],lowest:raw}}));
+    assert.equal(r.b.from,'amazon');assert.equal(r.r.price,want,`${raw} cents`);
+    assert.equal(r.r.amazonRounding,true);
+    if(raw!==want && raw>=1000) assert.match(invoke('floorMath',r.b,r.r),/Amazon \$5 rounding/);
+  }
+  for(const raw of [8001,8200,14500,40200,50000,50001,52499,52500]) {
+    assert.equal(invoke('floorPrice',raw,{amazonRounding:true}).price,invoke('floorPrice',raw,{}).price,'Higher tiers stay intact');
+  }
+  const shared={sales:{cib:[{title:'Example Game CIB',price:2799}]},amazon:{found:true,offers:[{price:2700}],lowest:2700}};
+  const ebay=invoke('floorResult',cur(item,shared));assert.equal(ebay.b.from,'sale');assert.equal(ebay.r.price,3000);
+  const gs=invoke('floorResult',cur({...item,'gamestop-price':2799},{...shared,sales:{cib:[]}}));assert.equal(gs.b.from,'gamestop');assert.equal(gs.r.price,3000);
+  const typed=invoke('floorResult',cur(item,{...shared,typed:2799}));assert.equal(typed.r.price,3000);
+  const renewed=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,title:'Example Game (Renewed)',renewedFallback:true,condition:'New',offers:[{price:2799,sub:'new'}],lowest:2799}}));
+  assert.equal(renewed.b.from,'amazon');assert.equal(renewed.r.price,2500,'Renewed follows the selected Amazon source');
+  const variant=cur({...item,id:'201','product-name':'Example Game [Deluxe Edition]'},{sales:{cib:[]},
+    standardGame:{product:{...item,id:'200'},sales:{cib:[]}},
+    amazon:{found:false,standard:{found:true,title:'Example Game',condition:'Used',offers:[{price:2799,sub:'very_good'}],lowest:2799}}});
+  const standard=invoke('floorResult',variant);assert.equal(standard.b.from,'standard');assert.equal(standard.b.standardReference.from,'amazon');assert.equal(standard.r.price,2500);
+  const sealed=invoke('floorResult',cur(item,{condition:'new',sales:{new:[]},amazon:{found:true,condition:'New',offers:[{price:2799,sub:'new'}],lowest:2799}}));
+  assert.equal(sealed.b.from,'amazon');assert.equal(sealed.r.price,2500);
+  const premium=invoke('floorPrice',2500,{amazonRounding:true,premium:{pct:10}});assert.equal(premium.premiumBasis,2750);assert.equal(premium.price,2500,'Premium applies before source-specific rounding');
+  const manual=invoke('floorPrice',3799,{amazonRounding:true,manualMissing:true});assert.equal(manual.full,3500);assert.equal(manual.ded,500);assert.equal(manual.price,3000);
+  const floors=invoke('floorPrice',2799,{amazonRounding:true,referenceMin:2799,gs:2700});assert.equal(floors.price,2500,'Reference minimum cannot undo Amazon rounding');
+});
+
 test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing adjustments', () => {
   const release = new Date().toISOString().slice(0,10);
   const product = {...item, 'product-name':'Pokemon New Adventure', 'console-name':'Nintendo Switch', 'release-date':release, 'gamestop-price':12000};
@@ -1254,7 +1281,7 @@ test('out-of-stock exclusion preserves premiums, discounts, deductions and pendi
   const example = cur(product, { sales: { cib: [{ title: 'Pokemon Shield complete', price: 5000 }] },
     amazon: { found: true, offers: [{ price: 7000 }] }, gamestopStock: { state: 'out', title: 'Pokemon Shield Nintendo Switch' } });
   const r = invoke('floorResult', example);
-  assert.equal(r.b.basis, 7000); assert.equal(r.premium.pct, 10); assert.equal(r.r.price, 8000);
+  assert.equal(r.b.basis, 7000); assert.equal(r.premium.pct, 10); assert.equal(r.r.premiumBasis, 7700); assert.equal(r.r.price, 7500); // Amazon $77 is more than $2 below $80.
   const pending = invoke('floorResult', { ...example, gamestopStock: { state: 'loading' } });
   assert.equal(pending.b.waiting, true); assert.equal(pending.r, null);
   assert.equal(invoke('floorResult', { ...example, typed: 5000, gamestopStock: { state: 'loading' } }).r.price, 5000);
