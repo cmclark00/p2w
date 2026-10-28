@@ -34,13 +34,20 @@ eval(str_replace('__DIR__', var_export(dirname(__DIR__) . '/trade-in', true), su
 try {
     $item = ['asin' => 'B000000001', 'summaries' => [
         ['marketplaceId' => 'OTHER', 'itemName' => 'Wrong marketplace title'],
-        ['marketplaceId' => AMZ_MARKETPLACE, 'itemName' => 'Final Fight - Super Nintendo']],
+        ['marketplaceId' => AMZ_MARKETPLACE, 'itemName' => 'Final Fight - Super Nintendo', 'manufacturer'=>'Capcom']],
         'attributes' => ['platform' => [['value' => 'Super Nintendo', 'marketplace_id' => AMZ_MARKETPLACE], ['value' => 'Other platform', 'marketplace_id' => 'OTHER']]]];
     $fake = fn($path, $query) => [200, json_encode(['items' => [$item, array_merge($item, ['asin' => 'B000000002'])], 'pagination' => ['nextToken' => 'more']])];
     $catalog = amazon_catalog_items(amazon_keys(), '123456789012');
     check(count($catalog['candidates']) === 2, 'Keep all UPC candidates');
     check($catalog['candidates'][0]['title'] === 'Final Fight - Super Nintendo', 'Use US summary');
     check($catalog['candidates'][0]['platforms'] === ['Super Nintendo'], 'Keep US structured platform');
+    check($catalog['candidates'][0]['publishers'] === ['Capcom'] && $catalog['candidates'][0]['publisherSource'] === 'amazon-manufacturer', 'Keep game manufacturer, not Nintendo platform brand');
+    $publisherItem = $item;
+    $publisherItem['attributes']['publisher'] = [['value'=>'Nintendo','marketplace_id'=>AMZ_MARKETPLACE],['value'=>'Ubisoft','marketplace_id'=>'OTHER']];
+    check(amazon_candidate($publisherItem)['publishers'] === ['Nintendo'] && amazon_candidate($publisherItem)['publisherSource'] === 'amazon-publisher', 'Explicit US publisher outranks manufacturer');
+    $brandOnly = ['asin'=>'B000000003','summaries'=>[['marketplaceId'=>AMZ_MARKETPLACE,'brand'=>'Nintendo','itemName'=>'Mario + Rabbids Nintendo Switch']]];
+    check(amazon_candidate($brandOnly)['publishers'] === [], 'Brand and title cannot imply Nintendo publisher');
+
     check($calls[0][1]['identifiersType'] === 'UPC' && !isset($calls[0][1]['keywords']), 'Identifier query');
     check($catalog['more'] === true, 'Preserve truncated-search indicator');
     check($catalog['nextToken'] === 'more', 'Return pagination token');
@@ -72,6 +79,7 @@ try {
     check($offers['asin'] === 'B000000001' && $offers['url'] === 'https://www.amazon.com/dp/B000000001', 'ASIN and link stay paired');
     check($offers['title'] === $item['summaries'][1]['itemName'] && $offers['platforms'] === ['Super Nintendo'], 'Offer response uses server-fetched catalog evidence');
     check($offers['lowest'] === 3200 && $offers['offers'][1]['price'] === 4500, 'Sort prices including shipping');
+    check($offers['publishers'] === ['Capcom'] && $offers['publisherSource'] === 'amazon-manufacturer', 'Individual offers preserve publisher evidence');
     check($offers['count'] === 8 && $offers['condition'] === 'New', 'Preserve count and condition');
     check($offers['msrp'] === 5999 && $offers['msrpSource'] === 'amazon-list-price', 'MSRP is manufacturer ListPrice, not lowest offer');
     foreach ([[], ['CurrencyCode'=>'EUR','Amount'=>59.99], ['CurrencyCode'=>'USD','Amount'=>0], ['CurrencyCode'=>'USD','Amount'=>'invalid']] as $list) {
@@ -110,6 +118,7 @@ try {
         return [200, json_encode(['responses' => array_reverse($responses)])];
     };
     $batch = response(fn() => amazon_offers_batch($requests))->payload['results'];
+    check($batch['B000000010:used']['data']['publishers'] === ['Capcom'], 'Batch preserves publisher evidence');
     check($batch['B000000010:used']['data']['msrp'] === 6999, 'Batch preserves manufacturer MSRP');
     check($batch['B000000010:used']['data']['lowest'] === 2200, 'Batch includes shipping and preserves subcondition');
     check($batch['B000000010:used']['data']['offers'][0]['sub'] === 'very_good', 'Batch grade survives');

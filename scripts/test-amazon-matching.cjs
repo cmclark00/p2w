@@ -25,7 +25,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
 (async () => {
   await test('manufacturer MSRP survives verified lookups with no used offers and excludes wrong matches', async () => {
     const p={'product-name':'Example Adventure','console-name':'Nintendo Switch','release-date':new Date().toISOString().slice(0,10)};
-    const good={asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch']};
+    const good={asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],publishers:['Nintendo'],publisherSource:'amazon-manufacturer'};
     const bad={asin:'B000000002',title:'Example Adventure Deluxe Edition Nintendo Switch',platforms:['Nintendo Switch']};
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog')return {candidates:[good,bad]};

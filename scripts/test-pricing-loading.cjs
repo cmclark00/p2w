@@ -29,7 +29,7 @@ function engine(request) {
   assert.equal(switchLoad.run('floorCur.product["release-date"]'),new Date().toISOString().slice(0,10));
   assert.match(switchLoad.element('#floorPricer').innerHTML,/Checking MSRP/);
   assert.match(switchLoad.element('#floorPricer').innerHTML,/data-floor-act="add" disabled/);
-  switchLoad.run(`floorCur.amazon={found:true,msrpCandidates:[{asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],msrp:5999,msrpSource:'amazon-list-price'}]};renderFloorPricer();`);
+  switchLoad.run(`floorCur.amazon={found:true,publisherCandidates:[{asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],publishers:['Nintendo'],publisherSource:'amazon-manufacturer'}],msrpCandidates:[{asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],msrp:5999,msrpSource:'amazon-list-price'}]};renderFloorPricer();`);
   assert.match(switchLoad.element('#floorPricer').innerHTML,/\$54.99/);
   assert.match(switchLoad.element('#floorPricer').innerHTML,/MSRP <strong>\$59.99<\/strong>/);
   assert.match(switchLoad.element('#floorPricer').innerHTML,/data-floor-act="add">/);

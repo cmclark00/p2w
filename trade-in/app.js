@@ -3849,8 +3849,10 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       const msrpCandidates = verified.filter(a => !a.renewedFallback && !AMAZON_RENEWED_RE.test(a.title || '')
         && a.msrpSource === 'amazon-list-price' && Number.isSafeInteger(a.msrp) && a.msrp > 500)
         .map(a => ({ asin: a.asin, title: a.title, platforms: a.platforms, msrp: a.msrp, msrpSource: a.msrpSource, url: a.url }));
+      const publisherCandidates = verified.filter(a => !a.renewedFallback && !AMAZON_RENEWED_RE.test(a.title || ''))
+        .map(a => ({ asin: a.asin, title: a.title, platforms: a.platforms, publishers: a.publishers, publisherSource: a.publisherSource }));
       return { ...(selected || { found: false }), rejected, matchNotes, searched, references, referenceErrors, renewedChecked,
-        msrpCandidates, ...(searchError ? { incomplete: true, searchError } : {}) };
+        msrpCandidates, publisherCandidates, ...(searchError ? { incomplete: true, searchError } : {}) };
     })();
     floorAmazonCache.set(key, pending);
     pending.then(result => {
@@ -4102,7 +4104,7 @@ function floorMergedSales(cur, pool) {
 }
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
-  if (floorRecentSwitch(cur)) return; // A fixed MSRP price does not need sold-search tabs.
+  if (floorSwitchMsrpBasis(cur)) return; // A fixed MSRP price does not need sold-search tabs.
   if (cur.directEbay?.condition === cur.condition || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
   if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.8.' } }; return; }
   const condition = cur.condition;
@@ -4997,7 +4999,7 @@ function floorOwnBasis(cur = floorCur) {
 // floor, the missing-manual deduction) don't apply to them.
 const floorIsHardware = (p) => !isGameCat(guessCategory(p['product-name'] || '')) || /^(systems?|consoles?|accessor)/i.test(p.genre || '');
 
-// A rolling calendar-year window for the selected release/edition, not the
+// A rolling three-calendar-year window for the selected release/edition, not the
 // franchise's original release. Missing metadata never becomes a guessed MSRP.
 function floorRecentSwitch(cur, now = Date.now()) {
   const p = cur.product || {};
@@ -5007,25 +5009,47 @@ function floorRecentSwitch(cur, now = Date.now()) {
   const release = p['release-date'];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(release || '') || !Number.isFinite(Date.parse(release))
     || new Date(release).toISOString().slice(0, 10) !== release)
-    return { need: 'Confirm this Switch game’s release date and MSRP before pricing. Recent pre-owned games must be exactly MSRP minus $5.' };
+    return { need: 'Confirm this Switch game’s release date and MSRP before pricing. Nintendo-published pre-owned games from the past 3 years must be exactly MSRP minus $5.' };
   const today = new Date(now).toISOString().slice(0, 10), date = new Date(today);
-  const year = date.getUTCFullYear() - 1, month = date.getUTCMonth();
+  const year = date.getUTCFullYear() - 3, month = date.getUTCMonth();
   const cutoff = new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate()))).toISOString().slice(0, 10);
   if (release > today) return { need: 'This release date is in the future. Confirm the release and MSRP before pricing a pre-owned copy.' };
   return release >= cutoff ? { release } : null;
+}
+function floorSwitchPublisher(cur) {
+  const candidates = cur.amazon?.publisherCandidates || [];
+  const states = new Set();
+  for (const c of candidates) {
+    if (!/^[A-Z0-9]{10}$/.test(c.asin || '') || !['amazon-publisher', 'amazon-manufacturer'].includes(c.publisherSource)
+      || !Array.isArray(c.publishers) || AMAZON_RENEWED_RE.test(c.title || '')
+      || floorAmazonCandidateMismatch({ ...c, newReference: true }, cur.product, cur.condition, true)) continue;
+    for (const value of c.publishers) {
+      if (typeof value !== 'string') continue;
+      const name = value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!name || /^(?:unknown|not specified|not available|generic|video games|n a|nintendo switch(?: 2)?)$/.test(name)) continue;
+      states.add(/^nintendo(?: of america)?(?: inc| incorporated| co ltd| ltd)?$/.test(name) ? 'nintendo' : 'other');
+    }
+  }
+  return states.size === 1 ? [...states][0] : 'unknown';
 }
 function floorSwitchMsrpBasis(cur) {
   if (cur.typed != null) return null; // Deliberate staff overrides remain explicit.
   const recent = floorRecentSwitch(cur);
   if (!recent) return null;
-  const checks = ['Pre-owned Switch / Switch 2 released within 12 months: exactly MSRP minus $5. No premiums, market floors, manual-missing deduction or rounding on this fixed price.'];
+  const checks = ['Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5. No premiums, market floors, manual-missing deduction or rounding on this fixed price.'];
   const pending = { basis: null, from: 'msrp', checks };
   if (recent.waiting) return { ...pending, waiting: true };
-  if (recent.need) return { ...pending, need: recent.need };
   const a = cur.amazon;
+  if (a && !a.loading && !a.error && !a.incomplete && !amazonSandbox && floorSwitchPublisher(cur) === 'other') return null;
+  if (recent.need) return { ...pending, need: recent.need };
   if (a?.loading || amazonSet && !a) return { ...pending, waiting: true };
   if (!a || a.error || a.incomplete || amazonSandbox) return { ...pending,
-    need: 'Verified MSRP unavailable. Complete the Amazon check or confirm MSRP and enter exactly MSRP minus $5.' };
+    need: 'Publisher/MSRP check unavailable. Complete the Amazon check or confirm the publisher and price manually. Nintendo-published games from the past 3 years use exactly MSRP minus $5.' };
+  const publisher = floorSwitchPublisher(cur);
+  if (publisher === 'other') return null;
+  if (publisher !== 'nintendo') return { ...pending,
+    need: 'Confirm the publisher. Nintendo-published games from the past 3 years use exactly MSRP minus $5; third-party games use normal pricing. Publisher details are missing or conflicting.' };
+  checks.push('Nintendo confirmed by publisher/manufacturer metadata on matching Amazon game listings; console branding and character names are not publisher evidence.');
   const candidates = (a.msrpCandidates || []).filter(c => /^[A-Z0-9]{10}$/.test(c.asin || '')
     && c.msrpSource === 'amazon-list-price' && Number.isSafeInteger(c.msrp) && c.msrp > 500
     && !AMAZON_RENEWED_RE.test(c.title || '')
@@ -5054,7 +5078,7 @@ function floorResult(cur) {
     return { b: { ...b, need: note, checks: [...b.checks, `${note} ${playability.caveats}`] }, r: null, shitbox, premium: null, hw, toy, toyGroup, playability };
   }
   const typed = b.from === 'typed';
-  if (b.from === 'msrp' || typed && floorRecentSwitch(cur)) {
+  if (b.from === 'msrp' || typed && floorSwitchMsrpBasis({ ...cur, typed: null })) {
     const price = b.basis;
     const r = price > 0 ? { price, full: price, premiumBasis: price, beforeShelfRound: price, min: 0, ded: 0, exact: true } : null;
     return { b, r, shitbox: null, premium: null, hw, toy, toyGroup, playability };
@@ -5072,7 +5096,7 @@ function floorResult(cur) {
 // Display-only preview: never use this for Add to list, saved prices or audits.
 // Run the same pricing rules against available evidence, including premiums.
 function floorEstimate(cur) {
-  if (floorRecentSwitch(cur)) return null;
+  if (floorSwitchMsrpBasis(cur)) return null;
   if (!floorResult(cur).b.waiting || !floorAutoSale(floorSales(cur)).sale) return null;
   return floorResult({ ...cur, fullLoading: false, salesLoading: false, directEbay: cur.directEbay ? { ...cur.directEbay, loading: false } : undefined,
     amazon: !cur.amazon || cur.amazon.loading ? { found: false } : cur.amazon,
@@ -5296,7 +5320,7 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
-            <li>Pre-owned Switch / Switch 2 games released within 12 months: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting MSRP needs review.</li>
+            <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
             <li>Regular baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>

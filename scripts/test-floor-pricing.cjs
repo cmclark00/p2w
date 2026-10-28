@@ -42,11 +42,12 @@ test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing
   const release = new Date().toISOString().slice(0,10);
   const product = {...item, 'product-name':'Pokemon New Adventure', 'console-name':'Nintendo Switch', 'release-date':release, 'gamestop-price':12000};
   const candidate = {asin:'B000000001', title:'Pokemon New Adventure Nintendo Switch', platforms:['Nintendo Switch'], msrp:5999, msrpSource:'amazon-list-price'};
-  const base = cur(product,{manualMissing:true,amazon:{found:true,msrpCandidates:[candidate]},sales:{cib:[{title:'Pokemon New Adventure Complete',price:15000}]}});
+  const publisher = {...candidate,publishers:['Nintendo'],publisherSource:'amazon-manufacturer'};
+  const base = cur(product,{manualMissing:true,amazon:{found:true,publisherCandidates:[publisher],msrpCandidates:[candidate]},sales:{cib:[{title:'Pokemon New Adventure Complete',price:15000}]}});
   for (const platform of ['Nintendo Switch','Nintendo Switch 2']) {
     for (const condition of ['cib','loose']) {
       for (const msrp of [5999,6999,7999,59999]) {
-        const c={...base,condition,product:{...product,'console-name':platform},amazon:{found:true,msrpCandidates:[{...candidate,title:`Pokemon New Adventure ${platform}`,platforms:[platform],msrp}]}};
+        const c={...base,condition,product:{...product,'console-name':platform},amazon:{found:true,publisherCandidates:[{...publisher,title:`Pokemon New Adventure ${platform}`,platforms:[platform]}],msrpCandidates:[{...candidate,title:`Pokemon New Adventure ${platform}`,platforms:[platform],msrp}]}};
         const r=invoke('floorResult',c);
         assert.equal(r.r.price,msrp-500);assert.equal(r.r.exact,true);assert.equal(r.premium,null);assert.equal(r.r.ded,0);
         assert.equal(r.b.from,'msrp');assert.equal(invoke('floorBasisInfo',r.b).msrp,msrp);
@@ -63,9 +64,9 @@ test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing
     {found:true,msrpCandidates:[{...candidate,title:'Pokemon New Adventure PlayStation 5',platforms:['PlayStation 5']}]},
     {found:true,msrpCandidates:[candidate,{...candidate,asin:'B000000002',msrp:6999}]},
     {found:true,msrpCandidates:[{...candidate,msrpSource:'seller-price'}]}]) {
-    const r=invoke('floorResult',{...base,amazon});assert.equal(r.r,null,JSON.stringify(amazon));assert.ok(r.b.need||r.b.waiting);
+    const r=invoke('floorResult',{...base,amazon:amazon ? {publisherCandidates:[publisher],...amazon} : amazon});assert.equal(r.r,null,JSON.stringify(amazon));assert.ok(r.b.need||r.b.waiting);
   }
-  assert.equal(invoke('floorResult',{...base,amazon:{found:true,msrpCandidates:[candidate,{...candidate,asin:'B000000002'}]}}).r.price,5499);
+  assert.equal(invoke('floorResult',{...base,amazon:{...base.amazon,msrpCandidates:[candidate,{...candidate,asin:'B000000002'}]}}).r.price,5499);
   assert.equal(invoke('floorEstimate',{...base,amazon:{loading:true}}),null);
   assert.equal(invoke('floorResult',{...base,amazon:{found:false,standard:base.amazon}}).r,null,'Standard edition MSRP cannot replace edition MSRP');
   assert.equal(invoke('floorResult',{...base,product:{...product,'release-date':''}}).r,null);
@@ -74,11 +75,32 @@ test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing
   assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2010-01-01'}}),null);
   assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'product-name':'Nintendo Switch Console',genre:'Systems'}}),null);
   assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'console-name':'Playstation 5'}}),null);
+  const luigi={...product,'product-name':"Luigi's Mansion 2 HD",'release-date':'2024-06-27'};
+  const luigiPublisher={...publisher,title:"Luigi's Mansion 2 HD Nintendo Switch"};
+  const luigiMsrp={...candidate,title:luigiPublisher.title};
+  const realNow=Date.now;
+  try { Date.now=()=>Date.parse('2026-10-27T12:00:00Z');
+    assert.equal(invoke('floorResult',cur(luigi,{amazon:{found:true,publisherCandidates:[luigiPublisher],msrpCandidates:[luigiMsrp]}})).r.price,5499,'Luigi qualifies without a title-specific exception');
+  } finally { Date.now=realNow; }
+  for(const publishers of [[],['Unknown'],['Nintendo Switch'],['Nintendo','Ubisoft']]) {
+    assert.equal(invoke('floorResult',{...base,amazon:{...base.amazon,publisherCandidates:[{...publisher,publishers}]}}).r,null,'Unknown/conflicting publisher requires review');
+  }
+  assert.equal(invoke('floorResult',{...base,amazon:{...base.amazon,publisherCandidates:[{...publisher,publisherSource:'brand'}]}}).r,null,'Brand is not publisher evidence');
+  const thirdParty={...base,amazon:{...base.amazon,publisherCandidates:[{...publisher,publishers:['Ubisoft']}]}};
+  assert.notEqual(invoke('floorResult',thirdParty).b.from,'msrp','Third parties retain market pricing');
+  assert.notEqual(invoke('floorResult',{...thirdParty,product:{...product,'release-date':''}}).b.from,'msrp','Third-party market pricing does not require release metadata');
+  const rabbids={...product,'product-name':'Mario + Rabbids Sparks of Hope'};
+  const rabbidsCur=cur(rabbids,{amazon:{found:true,publisherCandidates:[{...publisher,title:'Mario + Rabbids Sparks of Hope Nintendo Switch',publishers:['Ubisoft']}],msrpCandidates:[{...candidate,title:'Mario + Rabbids Sparks of Hope Nintendo Switch'}]}});
+  assert.equal(invoke('floorSwitchPublisher',rabbidsCur),'other');
+  assert.notEqual(invoke('floorResult',rabbidsCur).b.from,'msrp','Nintendo characters do not imply Nintendo publication');
+  assert.equal(invoke('floorSwitchPublisher',{...base,amazon:{...base.amazon,publisherCandidates:[{...publisher,title:'Different Game Nintendo Switch'}]}}),'unknown','Publisher evidence must match the actual game');
+
+  assert.equal(invoke('floorResult',{...thirdParty,manualMissing:false,typed:5499}).r.price,5500,'Third-party typed prices retain normal rounding');
   const now=Date.parse('2026-10-27T12:00:00Z');
-  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2025-10-27'}},now));
-  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2025-10-26'}},now),null);
+  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2023-10-27'}},now));
+  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2023-10-26'}},now),null);
   for(const date of ['', '2026-02-30','2027-01-01']) assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':date}},now).need);
-  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2023-02-28'}},Date.parse('2024-02-29T12:00:00Z')).release);
+  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2021-02-28'}},Date.parse('2024-02-29T12:00:00Z')).release);
 });
 
 test('loose PSP games use normal trade offers while other disc-only tiers stay intact', () => {

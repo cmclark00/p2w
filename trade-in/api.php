@@ -527,14 +527,28 @@ function amazon_candidate(array $item): array {
     }
   }
   $asin = (string)($item['asin'] ?? '');
+  // Do not use brand: Nintendo can be the console brand on third-party games.
+  // Prefer explicit publisher metadata, then the game's catalog manufacturer.
+  $publishers = []; $publisherSource = null;
+  foreach (['publisher', 'manufacturer'] as $field) {
+    $values = [];
+    foreach ((array)($item['attributes'][$field] ?? []) as $a) {
+      if (isset($a['marketplace_id']) && $a['marketplace_id'] !== AMZ_MARKETPLACE) continue;
+      if (is_string($a['value'] ?? null) && trim($a['value']) !== '') $values[] = cut_text(trim($a['value']), 160);
+    }
+    if ($field === 'manufacturer' && is_string($summary['manufacturer'] ?? null) && trim($summary['manufacturer']) !== '')
+      $values[] = cut_text(trim($summary['manufacturer']), 160);
+    if ($values) { $publishers = array_values(array_unique($values)); $publisherSource = 'amazon-' . $field; break; }
+  }
   return ['asin' => $asin, 'title' => cut_text((string)($summary['itemName'] ?? ''), 512),
+    'publishers' => $publishers, 'publisherSource' => $publisherSource,
     'platforms' => array_values(array_unique($platforms)), 'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin)];
 }
 
 function amazon_cache_file(array $keys, string $kind, array $query): string {
   $dir = data_path('cache');
   if (!is_dir($dir)) @mkdir($dir, 0700);
-  return $dir . '/amz-' . ($kind === 'offers' ? 'v3' : 'v2') . '-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
+  return $dir . '/amz-' . ($kind === 'offers' ? 'v4' : 'v3') . '-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
 }
 
 function amazon_cached(string $file): ?array {
@@ -623,6 +637,7 @@ function amazon_offer_output(array $item, string $condition, array $payload): ar
   usort($offers, static fn($a, $b) => $a['price'] <=> $b['price']);
   return ['status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $item['asin'],
     'title' => $item['title'], 'platforms' => $item['platforms'], 'url' => 'https://www.amazon.com/dp/' . rawurlencode($item['asin']),
+    'publishers' => $item['publishers'] ?? [], 'publisherSource' => $item['publisherSource'] ?? null,
     'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)), 'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers,
     'msrp' => $msrp, 'msrpSource' => $msrp !== null ? 'amazon-list-price' : null];
 }

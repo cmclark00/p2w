@@ -1040,14 +1040,16 @@ Guide (the Google Sheet tab).
      PriceCharting reads are reused for five minutes in the open page; refreshing
      clears that browser cache. Large uncached Amazon searches can still take
      longer because Amazon limits request speed.
-   - **Recent pre-owned Switch games:** Switch and Switch 2 games released in
-     the last 12 months are exactly **MSRP minus $5**, for both Loose and CIB.
+   - **Recent Nintendo-published Switch games:** Nintendo-published Switch and
+     Switch 2 games released in the last 3 years are exactly **MSRP minus $5**, for both Loose and CIB.
      For example, $59.99 MSRP means **$54.99**. This fixed price overrides market
      prices, premiums, missing-manual deductions and rounding. The MSRP link
-     appears next to the market references. If the release date or matching
+     appears next to the market references. If the publisher, release date or matching
      manufacturer's MSRP cannot be confirmed (or listings disagree), confirm
      them and type the exact price; do not substitute an Amazon seller's asking
-     price for MSRP. Older games and New copies retain their existing rules.
+     price for MSRP. Third-party games, older games and New copies retain their existing rules.
+     Nintendo characters or console branding alone do not establish the publisher.
+     Luigi’s Mansion 2 HD qualifies under this three-year window.
    - **For other games, specific rules take priority:** configured premiums and discounts
      apply to the baseline, and missing-manual deductions still apply.
      A specific discount can lower the price below the market references.

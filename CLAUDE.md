@@ -678,22 +678,31 @@ The site's **only server-side code**. Everything else is static.
     collapse. `onFloorSalesToggle()` retains open groups across pricing renders,
     resets on condition changes, and keeps original row indices/links so review
     actions still work. A manually included price-driving row stays visible.
-    **Recent pre-owned Switch fixed price:** Nintendo Switch / Switch 2 games
-    released within the last 12 calendar months use exactly MSRP minus $5 for
+    **Recent Nintendo-published Switch fixed price:** Nintendo-published Switch /
+    Switch 2 games released within the last 3 calendar years use exactly MSRP minus $5 for
     Loose/CIB. `floorRecentSwitch()` uses the selected edition's full product
     `release-date`; the anniversary boundary is inclusive. `floorSwitchMsrpBasis()`
-    takes USD manufacturer `Summary.ListPrice` from Amazon's existing item-offers
+    requires matching Nintendo publisher evidence and takes USD manufacturer `Summary.ListPrice` from Amazon's existing item-offers
     responses, not seller prices, Buy Box, New market prices, or standard-edition
     fallback metadata. The proxy exposes it as integer-cent `msrp` with
-    `msrpSource: amazon-list-price` and uses offers cache v3 (catalog stays v2).
+    `msrpSource: amazon-list-price` and uses offers cache v4 / catalog cache v3.
     All verified regular ASINs retain this metadata even without eligible offers.
+    `amazon_candidate()` exposes US `publisher` attributes, or (when absent) the
+    game's `manufacturer` attributes/summary, as `publishers` / `publisherSource`.
+    Brand/title/platform words are never publisher evidence. `floorSwitchPublisher()`
+    rechecks title/platform/edition, excludes Renewed, and requires consistent
+    Nintendo company metadata; unknown/conflicting publishers require review.
+    A confirmed other publisher retains the normal engine (even when release
+    metadata is missing). Manufacturer is a catalog proxy when publisher is absent,
+    not independently verified Nintendo-store metadata. Luigi's Mansion 2 HD
+    (2024-06-27) qualifies under the general three-year rule, with no title exception.
     Missing/invalid/future dates, missing/conflicting MSRP, incomplete Amazon or
     sandbox data require review, never an invented amount. Renewed and mismatched
     editions/platforms cannot supply MSRP. Exact pricing bypasses market floors,
     premiums, manual deductions and rounding; $59.99 becomes $54.99. Dead Games
     shelf holds still apply. Explicit staff prices remain possible and preserve
     cents in this scope. Other games keep existing rules. MSRP/source are saved
-    with the price. Automatic eBay search is skipped when this rule applies;
+    with the price. Automatic eBay search waits for this rule’s eligibility check and is skipped for qualifying games;
     source links and manual review remain available. No extra API requests or
     helper update are needed.
     **Specific configured pricing rules take priority over price-only outlier
