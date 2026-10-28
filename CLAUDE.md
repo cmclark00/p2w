@@ -678,6 +678,24 @@ The site's **only server-side code**. Everything else is static.
     collapse. `onFloorSalesToggle()` retains open groups across pricing renders,
     resets on condition changes, and keeps original row indices/links so review
     actions still work. A manually included price-driving row stays visible.
+    **Recent pre-owned Switch fixed price:** Nintendo Switch / Switch 2 games
+    released within the last 12 calendar months use exactly MSRP minus $5 for
+    Loose/CIB. `floorRecentSwitch()` uses the selected edition's full product
+    `release-date`; the anniversary boundary is inclusive. `floorSwitchMsrpBasis()`
+    takes USD manufacturer `Summary.ListPrice` from Amazon's existing item-offers
+    responses, not seller prices, Buy Box, New market prices, or standard-edition
+    fallback metadata. The proxy exposes it as integer-cent `msrp` with
+    `msrpSource: amazon-list-price` and uses offers cache v3 (catalog stays v2).
+    All verified regular ASINs retain this metadata even without eligible offers.
+    Missing/invalid/future dates, missing/conflicting MSRP, incomplete Amazon or
+    sandbox data require review, never an invented amount. Renewed and mismatched
+    editions/platforms cannot supply MSRP. Exact pricing bypasses market floors,
+    premiums, manual deductions and rounding; $59.99 becomes $54.99. Dead Games
+    shelf holds still apply. Explicit staff prices remain possible and preserve
+    cents in this scope. Other games keep existing rules. MSRP/source are saved
+    with the price. Automatic eBay search is skipped when this rule applies;
+    source links and manual review remain available. No extra API requests or
+    helper update are needed.
     **Specific configured pricing rules take priority over price-only outlier
     filters.** `floorPricingRule()` returns the most specific matched rule,
     including 0% rules (e.g. DS/3DS Pokemon), using the same phrase/system

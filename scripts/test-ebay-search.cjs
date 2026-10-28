@@ -128,6 +128,11 @@ const sender = { frameId: 0, tab: { id: 1 }, url: 'https://play2wingames.com/tra
 const send = (query, from = sender, protocol = 2, page = 1) => new Promise(resolve => { if (!listeners[1]({ type: 'P2W_EBAY_SEARCH', query, protocol, page }, from, resolve)) resolve(null); });
 const flush = () => new Promise(r => setImmediate(r));
 (async () => {
+  const recent={product:{id:'12','product-name':'Example Adventure','console-name':'Nintendo Switch','release-date':new Date().toISOString().slice(0,10)},condition:'cib'};
+  let fixedSearchCalls=0;
+  await invoke(ctx,'runFloorEbaySearch',recent,()=>{},()=>false,{search:async()=>{fixedSearchCalls++;}});
+  assert.equal(fixedSearchCalls,0,'MSRP rule skips automatic sold-search tabs');
+
   const searchCur=()=>({...base(),product:{...wwe,'cib-price':3000},sales:{cib:[]},directEbay:undefined});
   const comp=(n,grade,title)=>({...sold,id:String(100000000000+n),url:`https://www.ebay.com/itm/${100000000000+n}`,title,conditionText:grade,price:5000-n*100,shipping:0});
   const pageCalls=[];const paged=searchCur();

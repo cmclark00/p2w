@@ -66,13 +66,18 @@ try {
         return [200, json_encode(['payload' => ['Offers' => [
             ['ListingPrice' => ['Amount' => 40], 'Shipping' => ['Amount' => 5]],
             ['ListingPrice' => ['Amount' => 30], 'Shipping' => ['Amount' => 2], 'SubCondition' => 'new', 'IsFulfilledByAmazon' => true]],
-            'Summary' => ['TotalOfferCount' => 8]]])];
+            'Summary' => ['TotalOfferCount' => 8, 'ListPrice' => ['CurrencyCode' => 'USD', 'Amount' => 59.99]]]])];
     };
     $offers = response(fn() => amazon_offers('', 'new', 'B000000001'))->payload;
     check($offers['asin'] === 'B000000001' && $offers['url'] === 'https://www.amazon.com/dp/B000000001', 'ASIN and link stay paired');
     check($offers['title'] === $item['summaries'][1]['itemName'] && $offers['platforms'] === ['Super Nintendo'], 'Offer response uses server-fetched catalog evidence');
     check($offers['lowest'] === 3200 && $offers['offers'][1]['price'] === 4500, 'Sort prices including shipping');
     check($offers['count'] === 8 && $offers['condition'] === 'New', 'Preserve count and condition');
+    check($offers['msrp'] === 5999 && $offers['msrpSource'] === 'amazon-list-price', 'MSRP is manufacturer ListPrice, not lowest offer');
+    foreach ([[], ['CurrencyCode'=>'EUR','Amount'=>59.99], ['CurrencyCode'=>'USD','Amount'=>0], ['CurrencyCode'=>'USD','Amount'=>'invalid']] as $list) {
+        $out = amazon_offer_output(amazon_candidate($item), 'New', ['Summary'=>['ListPrice'=>$list], 'Offers'=>[['ListingPrice'=>['Amount'=>59.99]]]]);
+        check($out['msrp'] === null && $out['msrpSource'] === null, 'Never infer MSRP from seller prices or other currencies');
+    }
     $before = count($calls); response(fn() => amazon_offers('', 'new', 'B000000001')); check(count($calls) === $before, 'Offer cache');
     check(amazon_cache_file(amazon_keys(), 'offers', ['New']) !== amazon_cache_file(amazon_keys(), 'offers', ['Used']), 'Condition isolation');
     check(amazon_cache_file(amazon_keys(), 'catalog', []) !== amazon_cache_file(['refreshToken' => 'other'], 'catalog', []), 'Credential isolation');
@@ -94,7 +99,7 @@ try {
         foreach ($body['requests'] as $i => $r) {
             preg_match('#/items/([^/]+)/offers#', $r['uri'], $m); $asin = $m[1];
             $response = ['request' => ['Asin' => $asin, 'ItemCondition' => $r['ItemCondition'], 'MarketplaceId' => AMZ_MARKETPLACE],
-                'status' => ['statusCode' => 200], 'body' => ['payload' => ['ASIN' => $asin, 'ItemCondition' => 'Used',
+                'status' => ['statusCode' => 200], 'body' => ['payload' => ['ASIN' => $asin, 'ItemCondition' => 'Used', 'Summary'=>['ListPrice'=>['CurrencyCode'=>'USD','Amount'=>69.99]],
                     'Offers' => [['ListingPrice' => ['Amount' => 20 + $i], 'Shipping' => ['Amount' => 2], 'SubCondition' => 'very_good']]]]];
             if ($i === 1) { $response['status']['statusCode'] = 429; $response['headers'] = ['Retry-After' => '60']; }
             if ($i === 2) $response['body']['payload']['ASIN'] = 'B999999999';
@@ -105,6 +110,7 @@ try {
         return [200, json_encode(['responses' => array_reverse($responses)])];
     };
     $batch = response(fn() => amazon_offers_batch($requests))->payload['results'];
+    check($batch['B000000010:used']['data']['msrp'] === 6999, 'Batch preserves manufacturer MSRP');
     check($batch['B000000010:used']['data']['lowest'] === 2200, 'Batch includes shipping and preserves subcondition');
     check($batch['B000000010:used']['data']['offers'][0]['sub'] === 'very_good', 'Batch grade survives');
     check($batch['B000000015:used']['data']['lowest'] === 2700, 'Reordered response maps by identity, not index');

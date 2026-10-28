@@ -1040,7 +1040,15 @@ Guide (the Google Sheet tab).
      PriceCharting reads are reused for five minutes in the open page; refreshing
      clears that browser cache. Large uncached Amazon searches can still take
      longer because Amazon limits request speed.
-   - **Specific rules take priority:** configured premiums and discounts
+   - **Recent pre-owned Switch games:** Switch and Switch 2 games released in
+     the last 12 months are exactly **MSRP minus $5**, for both Loose and CIB.
+     For example, $59.99 MSRP means **$54.99**. This fixed price overrides market
+     prices, premiums, missing-manual deductions and rounding. The MSRP link
+     appears next to the market references. If the release date or matching
+     manufacturer's MSRP cannot be confirmed (or listings disagree), confirm
+     them and type the exact price; do not substitute an Amazon seller's asking
+     price for MSRP. Older games and New copies retain their existing rules.
+   - **For other games, specific rules take priority:** configured premiums and discounts
      apply to the baseline, and missing-manual deductions still apply.
      A specific discount can lower the price below the market references.
      Managers can edit premiums under Settings → Floor price premiums.

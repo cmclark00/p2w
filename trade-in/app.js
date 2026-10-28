@@ -3586,7 +3586,8 @@ function pickFloorGame(product) {
   renderFloorPricer();
   loadFloorSales(product);
   const sellKeys = Object.values(PC_FIELDS['retail-sell']);
-  const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc);
+  const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc)
+    || (/^nintendo switch(?: 2)?$/i.test(product['console-name'] || '') && !product['release-date']);
   if (needsFull && tokenSet) {
     floorCur.fullLoading = true;
     renderFloorPricer();
@@ -3596,6 +3597,7 @@ function pickFloorGame(product) {
       product['gamestop-price'] = full['gamestop-price'];
       for (const k of [...sellKeys, ...Object.values(PC_FIELDS.market)]) if (k in full) product[k] = full[k];
       product.upc = product.upc || full.upc || '';
+      if (full['release-date']) product['release-date'] = full['release-date'];
       floorCur.fullLoading = false;
       renderFloorPricer();
       loadFloorAmazon();
@@ -3844,7 +3846,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         references[kind] = matches.filter(a => value(a) > 0).sort((a,b) => value(a) - value(b) || a.asin.localeCompare(b.asin))[0] || matches[0] || null;
       }
       if (searchError && !selected) throw Error(searchError);
-      return { ...(selected || { found: false }), rejected, matchNotes, searched, references, referenceErrors, renewedChecked, ...(searchError ? { incomplete: true, searchError } : {}) };
+      const msrpCandidates = verified.filter(a => !a.renewedFallback && !AMAZON_RENEWED_RE.test(a.title || '')
+        && a.msrpSource === 'amazon-list-price' && Number.isSafeInteger(a.msrp) && a.msrp > 500)
+        .map(a => ({ asin: a.asin, title: a.title, platforms: a.platforms, msrp: a.msrp, msrpSource: a.msrpSource, url: a.url }));
+      return { ...(selected || { found: false }), rejected, matchNotes, searched, references, referenceErrors, renewedChecked,
+        msrpCandidates, ...(searchError ? { incomplete: true, searchError } : {}) };
     })();
     floorAmazonCache.set(key, pending);
     pending.then(result => {
@@ -4096,6 +4102,7 @@ function floorMergedSales(cur, pool) {
 }
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
+  if (floorRecentSwitch(cur)) return; // A fixed MSRP price does not need sold-search tabs.
   if (cur.directEbay?.condition === cur.condition || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
   if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.8.' } }; return; }
   const condition = cur.condition;
@@ -4228,6 +4235,7 @@ function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
 }
 function floorBasis(cur = floorCur) {
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
+  if (b.from === 'msrp') return b;
   const state = cur.targetedEbay;
   const historical = !!(driver?.sale.historicalInfo?.retained);
   const checking = !!(driver && !historical && state?.running && driver.sale.verification?.state !== 'sold');
@@ -4856,6 +4864,8 @@ function floorAmazonLowest(cur, showPartial = false) {
 // Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorUnverifiedBasis(cur = floorCur) {
+  const msrp = floorSwitchMsrpBasis(cur);
+  if (msrp) return msrp;
   const own = floorOwnBasis(cur);
   if (cur.typed != null || own.waiting || !floorStandardGame(cur.product)) return own;
   const standard = cur.standardGame || { product: floorStandardGame(cur.product), sales: {}, salesError: 'Standard catalog entry not available' };
@@ -4987,6 +4997,48 @@ function floorOwnBasis(cur = floorCur) {
 // floor, the missing-manual deduction) don't apply to them.
 const floorIsHardware = (p) => !isGameCat(guessCategory(p['product-name'] || '')) || /^(systems?|consoles?|accessor)/i.test(p.genre || '');
 
+// A rolling calendar-year window for the selected release/edition, not the
+// franchise's original release. Missing metadata never becomes a guessed MSRP.
+function floorRecentSwitch(cur, now = Date.now()) {
+  const p = cur.product || {};
+  if (!['loose', 'cib'].includes(cur.condition) || !/^nintendo switch(?: 2)?$/i.test(p['console-name'] || '')
+    || floorIsHardware(p) || floorToyFamily(p)) return null;
+  if (cur.fullLoading) return { waiting: true };
+  const release = p['release-date'];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(release || '') || !Number.isFinite(Date.parse(release))
+    || new Date(release).toISOString().slice(0, 10) !== release)
+    return { need: 'Confirm this Switch game’s release date and MSRP before pricing. Recent pre-owned games must be exactly MSRP minus $5.' };
+  const today = new Date(now).toISOString().slice(0, 10), date = new Date(today);
+  const year = date.getUTCFullYear() - 1, month = date.getUTCMonth();
+  const cutoff = new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate()))).toISOString().slice(0, 10);
+  if (release > today) return { need: 'This release date is in the future. Confirm the release and MSRP before pricing a pre-owned copy.' };
+  return release >= cutoff ? { release } : null;
+}
+function floorSwitchMsrpBasis(cur) {
+  if (cur.typed != null) return null; // Deliberate staff overrides remain explicit.
+  const recent = floorRecentSwitch(cur);
+  if (!recent) return null;
+  const checks = ['Pre-owned Switch / Switch 2 released within 12 months: exactly MSRP minus $5. No premiums, market floors, manual-missing deduction or rounding on this fixed price.'];
+  const pending = { basis: null, from: 'msrp', checks };
+  if (recent.waiting) return { ...pending, waiting: true };
+  if (recent.need) return { ...pending, need: recent.need };
+  const a = cur.amazon;
+  if (a?.loading || amazonSet && !a) return { ...pending, waiting: true };
+  if (!a || a.error || a.incomplete || amazonSandbox) return { ...pending,
+    need: 'Verified MSRP unavailable. Complete the Amazon check or confirm MSRP and enter exactly MSRP minus $5.' };
+  const candidates = (a.msrpCandidates || []).filter(c => /^[A-Z0-9]{10}$/.test(c.asin || '')
+    && c.msrpSource === 'amazon-list-price' && Number.isSafeInteger(c.msrp) && c.msrp > 500
+    && !AMAZON_RENEWED_RE.test(c.title || '')
+    && !floorAmazonCandidateMismatch({ ...c, newReference: true }, cur.product, cur.condition, true));
+  const prices = [...new Set(candidates.map(c => c.msrp))];
+  if (prices.length !== 1) return { ...pending, need: prices.length
+    ? 'Matching listings disagree on MSRP. Confirm the correct MSRP and enter exactly MSRP minus $5.'
+    : 'No verified MSRP returned for this edition. Confirm MSRP and enter exactly MSRP minus $5; seller asking prices are not MSRP.' };
+  const msrp = prices[0], source = candidates[0];
+  checks.push(`MSRP ${money(msrp)} from Amazon’s manufacturer ListPrice for ${source.asin}; release ${recent.release}.`);
+  return { basis: msrp - 500, from: 'msrp', msrp, msrpUrl: `https://www.amazon.com/dp/${source.asin}`, checks };
+}
+
 // The shelf price for a game being priced (or re-checked): { b: floorBasis, r: floorPrice, shitbox, premium, hw }.
 function floorResult(cur) {
   cur = floorConditionCur(cur);
@@ -5002,6 +5054,11 @@ function floorResult(cur) {
     return { b: { ...b, need: note, checks: [...b.checks, `${note} ${playability.caveats}`] }, r: null, shitbox, premium: null, hw, toy, toyGroup, playability };
   }
   const typed = b.from === 'typed';
+  if (b.from === 'msrp' || typed && floorRecentSwitch(cur)) {
+    const price = b.basis;
+    const r = price > 0 ? { price, full: price, premiumBasis: price, beforeShelfRound: price, min: 0, ded: 0, exact: true } : null;
+    return { b, r, shitbox: null, premium: null, hw, toy, toyGroup, playability };
+  }
   const premium = typed ? null : floorPremium(p['product-name'], p['console-name']);
   const manualMissing = !hw && cur.condition === 'cib' && cur.manualMissing;
   // Owner clarification: specific adjustments outrank the general three-reference baseline,
@@ -5015,6 +5072,7 @@ function floorResult(cur) {
 // Display-only preview: never use this for Add to list, saved prices or audits.
 // Run the same pricing rules against available evidence, including premiums.
 function floorEstimate(cur) {
+  if (floorRecentSwitch(cur)) return null;
   if (!floorResult(cur).b.waiting || !floorAutoSale(floorSales(cur)).sale) return null;
   return floorResult({ ...cur, fullLoading: false, salesLoading: false, directEbay: cur.directEbay ? { ...cur.directEbay, loading: false } : undefined,
     amazon: !cur.amazon || cur.amazon.loading ? { found: false } : cur.amazon,
@@ -5176,13 +5234,14 @@ function renderFloorPricer() {
       <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
       ${floorAmazonReferencesHtml(cur, b, true)}
+      ${b.msrp ? `<a href="${esc(b.msrpUrl)}" target="_blank" rel="noopener noreferrer">MSRP <strong>${money(b.msrp)}</strong> · minus $5 ↗</a>` : ''}
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
     </div>
     <div class="floor-price-context">
         ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : b.from === 'msrp' ? 'Checking MSRP…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
           ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? 'direct eBay search incomplete' : 'eBay sale unverified'}</span>` : ''}
@@ -5237,11 +5296,12 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Market references</summary><p class="muted small-print">PriceCharting ${pcPrices}${gs}</p>${fulcrumReference(cur, result?.price)}</details>
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
-            <li>Regular baseline: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
+            <li>Pre-owned Switch / Switch 2 games released within 12 months: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting MSRP needs review.</li>
+            <li>Regular baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
             <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
-            <li>Specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
+            <li>Outside the recent Switch fixed-price rule, specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>General high-sale outlier filters do not apply when a specific pricing rule matches. Invalid listings remain excluded.</li>
             <li>Rounding: through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
@@ -5306,6 +5366,7 @@ function floorAmazonHtml(cur, b) {
 }
 
 function floorMath(b, r) {
+  if (b.from === 'msrp') return `MSRP ${money(b.msrp)} − $5.00 = ${money(r.price)} · exact price`;
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
   if (r.toy) {
@@ -5326,6 +5387,7 @@ const floorBasisInfo = (b) => ({
   basis: b.basis, from: b.from,
   saleDate: b.from === 'sale' ? b.sale?.date || '' : '',
   reviewNotes: b.checks || [],
+  ...(b.from === 'msrp' ? { msrp: b.msrp, msrpUrl: b.msrpUrl } : {}),
 });
 
 function addFloorItem() {
@@ -5404,7 +5466,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { standard: 'Standard-game baseline', sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { msrp: 'MSRP minus $5', standard: 'Standard-game baseline', sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => !!globalThis.P2WDeadGames && !deadGameHeld(it.name, it.platform)

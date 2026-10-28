@@ -534,7 +534,7 @@ function amazon_candidate(array $item): array {
 function amazon_cache_file(array $keys, string $kind, array $query): string {
   $dir = data_path('cache');
   if (!is_dir($dir)) @mkdir($dir, 0700);
-  return $dir . '/amz-v2-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
+  return $dir . '/amz-' . ($kind === 'offers' ? 'v3' : 'v2') . '-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
 }
 
 function amazon_cached(string $file): ?array {
@@ -607,6 +607,13 @@ function amazon_catalog(string $upc, string $q, string $pageToken = ''): void {
 // Both transports use this same output shape; title/platform always come from
 // Amazon's server-side catalog cache, never caller-supplied evidence.
 function amazon_offer_output(array $item, string $condition, array $payload): array {
+  // Amazon's Summary.ListPrice is manufacturer-suggested, not a seller's
+  // ListingPrice, Buy Box, lowest offer, or shipping-inclusive market price.
+  $list = $payload['Summary']['ListPrice'] ?? [];
+  $amount = $list['Amount'] ?? null;
+  $msrp = ($list['CurrencyCode'] ?? '') === 'USD' && is_numeric($amount)
+    && is_finite((float)$amount) && (float)$amount > 0 && (float)$amount <= 100000
+    ? (int)round((float)$amount * 100) : null;
   $offers = [];
   foreach ((array)($payload['Offers'] ?? []) as $o) {
     $price = (float)($o['ListingPrice']['Amount'] ?? 0) + (float)($o['Shipping']['Amount'] ?? 0);
@@ -616,7 +623,8 @@ function amazon_offer_output(array $item, string $condition, array $payload): ar
   usort($offers, static fn($a, $b) => $a['price'] <=> $b['price']);
   return ['status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $item['asin'],
     'title' => $item['title'], 'platforms' => $item['platforms'], 'url' => 'https://www.amazon.com/dp/' . rawurlencode($item['asin']),
-    'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)), 'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers];
+    'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)), 'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers,
+    'msrp' => $msrp, 'msrpSource' => $msrp !== null ? 'amazon-list-price' : null];
 }
 function amazon_offers(string $upc, string $cond, string $asin = ''): void {
   $keys = amazon_keys();

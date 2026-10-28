@@ -29,7 +29,7 @@ const lineHeader = 'transaction_number,date_local,transaction_type,line_mode,ite
 const txHeader = 'transaction_number,date_local,transaction_type,purchases_total,line_count';
 // Matching/rounding fixtures do not invent a market value. Reference-based
 // tests provide an explicit condition-specific PriceCharting value below.
-const item = { 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': null, 'gamestop-price': 0 };
+const item = { 'release-date': '2010-01-01', 'product-name': 'Example Game', 'console-name': 'Playstation 4', 'retail-cib-sell': 1999, 'cib-price': null, 'gamestop-price': 0 };
 const cur = (product = item, extra = {}) => {
   const result = { product, condition: 'cib', manualMissing: false, sales: { cib: [{ title: `${product['product-name']} complete`, price: 1999, date: '2026-10-01' }] }, pick: null, typed: null, ...extra };
   // Normal offer fixtures have a matching catalog title; explicit empty/null titles exercise missing evidence.
@@ -37,6 +37,49 @@ const cur = (product = item, extra = {}) => {
     offers: result.amazon.offers?.map(o => ({ sub: result.condition === 'new' ? 'new' : result.condition === 'loose' ? 'good' : 'very_good', ...o })) };
   return result;
 };
+
+test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing adjustments', () => {
+  const release = new Date().toISOString().slice(0,10);
+  const product = {...item, 'product-name':'Pokemon New Adventure', 'console-name':'Nintendo Switch', 'release-date':release, 'gamestop-price':12000};
+  const candidate = {asin:'B000000001', title:'Pokemon New Adventure Nintendo Switch', platforms:['Nintendo Switch'], msrp:5999, msrpSource:'amazon-list-price'};
+  const base = cur(product,{manualMissing:true,amazon:{found:true,msrpCandidates:[candidate]},sales:{cib:[{title:'Pokemon New Adventure Complete',price:15000}]}});
+  for (const platform of ['Nintendo Switch','Nintendo Switch 2']) {
+    for (const condition of ['cib','loose']) {
+      for (const msrp of [5999,6999,7999,59999]) {
+        const c={...base,condition,product:{...product,'console-name':platform},amazon:{found:true,msrpCandidates:[{...candidate,title:`Pokemon New Adventure ${platform}`,platforms:[platform],msrp}]}};
+        const r=invoke('floorResult',c);
+        assert.equal(r.r.price,msrp-500);assert.equal(r.r.exact,true);assert.equal(r.premium,null);assert.equal(r.r.ded,0);
+        assert.equal(r.b.from,'msrp');assert.equal(invoke('floorBasisInfo',r.b).msrp,msrp);
+        assert.match(invoke('floorMath',r.b,r.r),/exact price/);
+      }
+    }
+  }
+  assert.equal(invoke('floorResult',{...base,typed:5499}).r.price,5499,'Explicit staff price preserves cents');
+  for (const amazon of [null,{found:false},{error:'offline'},{...base.amazon,incomplete:true},{...base.amazon,loading:true},
+    {found:true,lowest:5999,msrp:5999},
+    {found:true,msrpCandidates:[{...candidate,title:'Pokemon New Adventure Deluxe Edition Nintendo Switch'}]},
+    {found:true,msrpCandidates:[{...candidate,title:'Pokemon New Adventure Nintendo Switch (Renewed)'}]},
+    {found:true,msrpCandidates:[{...candidate,title:'Pokemon Other Adventure Nintendo Switch'}]},
+    {found:true,msrpCandidates:[{...candidate,title:'Pokemon New Adventure PlayStation 5',platforms:['PlayStation 5']}]},
+    {found:true,msrpCandidates:[candidate,{...candidate,asin:'B000000002',msrp:6999}]},
+    {found:true,msrpCandidates:[{...candidate,msrpSource:'seller-price'}]}]) {
+    const r=invoke('floorResult',{...base,amazon});assert.equal(r.r,null,JSON.stringify(amazon));assert.ok(r.b.need||r.b.waiting);
+  }
+  assert.equal(invoke('floorResult',{...base,amazon:{found:true,msrpCandidates:[candidate,{...candidate,asin:'B000000002'}]}}).r.price,5499);
+  assert.equal(invoke('floorEstimate',{...base,amazon:{loading:true}}),null);
+  assert.equal(invoke('floorResult',{...base,amazon:{found:false,standard:base.amazon}}).r,null,'Standard edition MSRP cannot replace edition MSRP');
+  assert.equal(invoke('floorResult',{...base,product:{...product,'release-date':''}}).r,null);
+  run('amazonSandbox=true');assert.equal(invoke('floorResult',base).r,null);run('amazonSandbox=false');
+  assert.equal(invoke('floorRecentSwitch',{...base,condition:'new'}),null);
+  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2010-01-01'}}),null);
+  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'product-name':'Nintendo Switch Console',genre:'Systems'}}),null);
+  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'console-name':'Playstation 5'}}),null);
+  const now=Date.parse('2026-10-27T12:00:00Z');
+  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2025-10-27'}},now));
+  assert.equal(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2025-10-26'}},now),null);
+  for(const date of ['', '2026-02-30','2027-01-01']) assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':date}},now).need);
+  assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2023-02-28'}},Date.parse('2024-02-29T12:00:00Z')).release);
+});
 
 test('loose PSP games use normal trade offers while other disc-only tiers stay intact', () => {
   const settings = json('DEFAULT_SETTINGS');

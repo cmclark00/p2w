@@ -23,6 +23,22 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('manufacturer MSRP survives verified lookups with no used offers and excludes wrong matches', async () => {
+    const p={'product-name':'Example Adventure','console-name':'Nintendo Switch','release-date':new Date().toISOString().slice(0,10)};
+    const good={asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch']};
+    const bad={asin:'B000000002',title:'Example Adventure Deluxe Edition Nintendo Switch',platforms:['Nintendo Switch']};
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/catalog')return {candidates:[good,bad]};
+      const c=params.asin===good.asin?good:bad;
+      return {...c,found:true,condition:params.cond==='new'?'New':'Used',offers:[],count:0,
+        msrp:params.asin===good.asin?5999:9999,msrpSource:'amazon-list-price'};
+    });
+    const r=await e.fetch(p,'cib');
+    assert.ok(r.msrpCandidates.length>0);assert.ok(r.msrpCandidates.every(c=>c.asin===good.asin && c.msrp===5999));
+    assert.ok(r.rejected.some(c=>c.asin===bad.asin));
+    e.ctx.current={product:p,condition:'cib',amazon:r};
+    assert.equal(e.run('floorResult(current).r.price'),5499);
+  });
   await test('catalog prefetch is bounded at two while matching keeps barcode order and every query', async () => {
     const good=candidate('B000000001'),bad=candidate('B000000001','Final Fight Guy');
     const pending=[],calls=[];let active=0,peak=0,offers=0;
@@ -164,7 +180,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal(other.found, false); assert.ok(calls > after + 2);
   });
   await test('fallback preserves condition, specific premiums and the lowest-offer baseline', async () => {
-    const p = { ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
+    const p = { ...product, 'release-date': '2019-11-15', 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
     const good = candidate('B000000001', 'Pokemon Shield - Nintendo Switch', ['Nintendo Switch']);
     const e = engine(async (route, params) => route === 'amazon/catalog' ? { candidates: params.upc ? [] : [good] } : offer(good, 6000));
     e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;
@@ -229,7 +245,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     }
   });
   await test('used/CIB Amazon reference ignores cheaper New while premiums and source floors remain intact', async () => {
-    const p={...product,'product-name':'Pokemon Shield','console-name':'Nintendo Switch'};
+    const p={...product,'release-date':'2019-11-15','product-name':'Pokemon Shield','console-name':'Nintendo Switch'};
     const good=candidate('B000000001','Pokemon Shield Nintendo Switch',['Nintendo Switch']);
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog') {assert.ok(!params.q?.endsWith('renewed'));return {candidates:[good]};}
@@ -349,7 +365,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal(failed.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
   });
   await test('specific premiums remain applied after the three-source maximum with Renewed', async () => {
-    const p = { ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
+    const p = { ...product, 'release-date': '2019-11-15', 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' };
     const renewed = candidate('B000000001', 'Pokemon Shield Nintendo Switch (Renewed)', ['Nintendo Switch']);
     const e = engine(async (route) => route === 'amazon/catalog' ? { candidates: [renewed] } : offer(renewed, 6000));
     e.ctx.result = await e.fetch(p, 'cib'); e.ctx.p = p;

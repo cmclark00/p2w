@@ -17,6 +17,24 @@ function engine(request) {
   return { ctx, element, run: js => vm.runInContext(js, ctx) };
 }
 (async () => {
+  const switchLoad = engine();
+  switchLoad.run(`tokenSet=true; amazonSet=true;
+    loadFloorSales=()=>{}; loadFloorAmazon=()=>{}; closeFloorResults=()=>{};
+    PC.byId=async()=>({id:'12','product-name':'Example Adventure','console-name':'Nintendo Switch',
+      'release-date':new Date().toISOString().slice(0,10),'gamestop-price':9999});
+    const selected={id:'12','product-name':'Example Adventure','console-name':'Nintendo Switch','gamestop-price':9999,upc:'123456789012'};
+    pickFloorGame(selected);`);
+  assert.equal(switchLoad.run('floorCur.fullLoading'),true,'Missing release date triggers full product fetch even with UPC/GS');
+  await tick();
+  assert.equal(switchLoad.run('floorCur.product["release-date"]'),new Date().toISOString().slice(0,10));
+  assert.match(switchLoad.element('#floorPricer').innerHTML,/Checking MSRP/);
+  assert.match(switchLoad.element('#floorPricer').innerHTML,/data-floor-act="add" disabled/);
+  switchLoad.run(`floorCur.amazon={found:true,msrpCandidates:[{asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],msrp:5999,msrpSource:'amazon-list-price'}]};renderFloorPricer();`);
+  assert.match(switchLoad.element('#floorPricer').innerHTML,/\$54.99/);
+  assert.match(switchLoad.element('#floorPricer').innerHTML,/MSRP <strong>\$59.99<\/strong>/);
+  assert.match(switchLoad.element('#floorPricer').innerHTML,/data-floor-act="add">/);
+  assert.equal(switchLoad.run('floorCur.directEbay'),undefined,'No automatic eBay tab work for fixed MSRP');
+  console.log('PASS Switch release-date enrichment, exact MSRP UI and no unrelated sale checks');
   const matching = engine();
   matching.run(`computeCalls=0; const originalCompute=floorComputeListingMismatch;
     floorComputeListingMismatch=(...args)=>{computeCalls++;return originalCompute(...args);};
