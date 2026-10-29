@@ -201,5 +201,73 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     }
     assert.equal(invoke('mergeSettings', { quoteFooter: 'Custom footer' }).quoteFooter, 'Custom footer');
   });
+  await test('base-console matching keeps model families and rejects editions, imports and accessories', () => {
+    const profile = (name) => invoke('consoleMarketProfile', hardware(name, { source: 'hw' }));
+    const product = (name, id = '1', extra = {}) => ({ id, 'product-name': name, 'console-name': 'Playstation 4', genre: 'Systems', ...extra });
+    const pick = (name, candidates) => invoke('selectBaseConsole', candidates, profile(name));
+    const candidates = [product('Playstation 4 Pro 1TB Console', '2'), product('Playstation 4 500GB Black Console [Batman]', '3'),
+      product('Playstation 4 500GB Black Console', '4', { 'console-name': 'PAL Playstation 4' }),
+      product('Playstation 4 500GB Controller', '5'), product('Playstation 4 1TB Black Console', '6'),
+      product('Playstation 4 500GB White Console', '7'), product('Playstation 4 500GB Black Console', '8')];
+    assert.equal(pick('PS4 (PlayStation 4)', candidates).id, '8');
+    assert.equal(pick('PS4 Pro (PlayStation 4)', candidates).id, '2');
+    assert.equal(pick('PS4 (PlayStation 4)', candidates.slice(0, 4)), null);
+    for (const [name, title] of [
+      ['Sega Genesis', 'Sega Genesis Model 1 Console'], ['PS1 / PSOne (PlayStation 1)', 'Playstation System'],
+      ['PS2 Fat / Slim (PlayStation 2)', 'Playstation 2 System'], ['Nintendo Switch', 'Nintendo Switch with Gray Joy-Con'],
+      ['Nintendo Switch OLED', 'Nintendo Switch OLED [White]'], ['Nintendo Switch 2', 'Nintendo Switch 2'],
+      ['PS5 Digital (PlayStation 5)', 'Playstation 5 Console [Digital Version]'],
+      ['Xbox 360 Slim / E', 'Xbox 360 Slim Console 4GB'], ['PS3 2 USB Port (PlayStation 3)', 'Playstation 3 System 40GB'],
+      ['PS3 Backwards Compatible 4 USB Port – E (PlayStation 3)', 'Playstation 3 System 80GB [Backward Compatible]'],
+    ]) assert.ok(pick(name, [product(title)]), name);
+    assert.equal(pick('Sega Genesis', [product('Sega Genesis Model 2 Console')]), null);
+    assert.equal(pick('Nintendo Switch', [product('Nintendo Switch OLED [White]'), product('Nintendo Switch Mario Kart Bundle')]), null);
+  });
+  await test('automatic references deduplicate lookups, wait before saving and never alter payouts', async () => {
+    run(`var originalSearch=PC.search, originalById=PC.byId;
+      var searchCalls=0, detailCalls=0, finishSearch;
+      PC.search=()=>{searchCalls++; return new Promise(resolve=>{finishSearch=resolve;});};
+      PC.byId=async()=>{detailCalls++; return {id:'9708','product-name':'Sega Genesis Model 1 Console',genre:'Systems','loose-price':7000,'cib-price':15000};};
+      consoleMarketLookups.clear(); tokenSet=true;`);
+    try {
+      const a = hardware('Sega Genesis', { source: 'hw', id: 'a', condition: 'complete', qty: 2,
+        hwPrices: { complete: 2500, unit: 1000 }, cashOverride: 3000 });
+      const b = { ...a, id: 'b', condition: 'unit', qty: 1 };
+      openTrade([a, b]);
+      await Promise.resolve();
+      assert.equal(run('consoleMarketPending()'), 2);
+      await invoke('saveCompleted', false);
+      assert.match(element('#completeError').textContent, /Wait for the console/);
+      run(`finishSearch([{id:'9708','product-name':'Sega Genesis Model 1 Console',genre:'Systems'},
+        {id:'99','product-name':'Sega Genesis System [Sonic 2 Bundle]',genre:'Systems'}]);`);
+      await run('consoleMarketQueue'); await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(run('searchCalls'), 1); assert.equal(run('detailCalls'), 1);
+      assert.equal(invoke('tradePcValue', a), 7000); assert.equal(a.condition, 'complete');
+      assert.equal(a.cashOverride, 3000); assert.equal(a.prices, undefined);
+      assert.equal(run('consoleMarketPending()'), 0);
+      await invoke('saveCompleted', false);
+      assert.equal(run('sentRecords[0].priceCharting.total'), 21000);
+      assert.equal(run('sentRecords[0].priceCharting.items[0].pcId'), '9708');
+      assert.equal(invoke('tradePcValue', { ...a, name: 'Nintendo Switch' }), null);
+      const removed = { ...a, id: 'removed', consoleMarket: null };
+      ctx.testLines = [removed]; run('trade.lines=testLines; ensureTradeConsoleReferences(); trade.lines=[];');
+      await run('consoleMarketQueue'); await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(removed.consoleMarket, null);
+      assert.equal(run('consoleMarketPending()'), 0);
+    } finally { run('PC.search=originalSearch; PC.byId=originalById; tokenSet=false; trade.lines=[];'); }
+  });
+  await test('lookup failures leave a partial total and manual fallback, with no repeated request loop', async () => {
+    run(`consoleMarketLookups.clear(); tokenSet=true; var failedSearch=PC.search, failures=0;
+      PC.search=async()=>{failures++; throw Error('offline');};`);
+    try {
+      const line = hardware('Sega Genesis', { source: 'hw' });
+      openTrade([line]); await run('consoleMarketQueue'); await new Promise(resolve => setTimeout(resolve, 0));
+      invoke('renderCompletePc');
+      assert.equal(element('#completePcValue').textContent, 'Unavailable');
+      assert.match(element('#completePcMatches').innerHTML, /Match Sega Genesis/);
+      invoke('ensureTradeConsoleReferences'); assert.equal(run('failures'), 1);
+      assert.equal(run('consoleMarketPending()'), 0);
+    } finally { run('PC.search=failedSearch; tokenSet=false; trade.lines=[];'); }
+  });
   console.log(`${checks} trade serial checks passed.`);
 })().catch((err) => { console.error(err); process.exitCode = 1; });

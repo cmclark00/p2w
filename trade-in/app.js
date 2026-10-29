@@ -870,6 +870,7 @@ function saveTrade() { store.set('p2w-trade', trade); }
 function commit() {
   saveTrade();
   renderLines();
+  ensureTradeConsoleReferences();
 }
 
 function flash(id) {
@@ -2349,11 +2350,120 @@ function tradePcCondition(line) {
   return ['unit', 'complete'].includes(line.condition) ? 'loose' : line.condition;
 }
 
-function tradePcValue(line) {
+function tradePcReference(line) {
   const condition = tradePcCondition(line);
   const key = condition === CASE_ONLY ? BOX_KEY : PC_FIELDS.market[condition];
-  const value = ['pc', 'hw'].includes(line.source) && key ? line.prices?.[key] : null;
-  return Number.isFinite(value) && value > 0 ? value : null;
+  if (!['pc', 'hw'].includes(line.source) || !key) return null;
+  const direct = line.prices?.[key];
+  if (Number.isFinite(direct) && direct > 0) return { value: direct, id: line.pcId || line.matchedPcId || null, name: line.matchedFrom || line.name };
+  const auto = line.consoleMarket;
+  const value = auto?.signature === consoleMarketSignature(line) ? auto.prices?.[key] : null;
+  return Number.isFinite(value) && value > 0 ? { value, id: auto.id, name: auto.name } : null;
+}
+const tradePcValue = (line) => tradePcReference(line)?.value ?? null;
+
+// Match a base model, not a seller title. Leftover words reject bundles/editions/accessories.
+function consoleMarketKey(name) {
+  return norm(name).replace(/\bplay station\b/g, 'playstation').replace(/\bps ?([1-5])\b/g, 'playstation $1')
+    .replace(/\bplaystation 1\b/g, 'playstation').replace(/\bgameboy\b/g, 'game boy')
+    .replace(/\bnintendo entertainment system\b/g, 'nes').replace(/\bsuper nintendo\b/g, 'snes')
+    .replace(/\bnintendo 64\b/g, 'n64').replace(/\b(?:sony|nintendo|microsoft)\b/g, '')
+    .replace(/\bdigital (?:edition|version)\b/g, 'digital')
+    .replace(/\b(?:with )?(?:gray|grey|blue and red|neon blue and red) joy cons?\b/g, '')
+    .replace(/\b\d+\s*(?:gb|tb)\b/g, '')
+    .replace(/\b(?:console|system|original|standard|matte|jet|onyx|charcoal|cosmic|polar|arctic|glacier|indigo|black|white|gray|grey|silver|blue|red|purple|turquoise|yellow)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function consoleMarketProfile(line) {
+  if (line.source !== 'hw' || !['console', 'handheld'].includes(line.category)
+    || !PC_FIELDS.market[tradePcCondition(line)]) return null;
+  let name = (line.name || '').replace(/\([^)]*\)/g, '').trim();
+  const aliases = [
+    [/^ps1\s*\/\s*psone$/i, 'Playstation'], [/^ps2 fat\s*\/\s*slim$/i, 'Playstation 2'],
+    [/^ps3 2 usb port$/i, 'Playstation 3 40GB'],
+    [/^ps3 backwards compatible 4 usb port.*\bA$/i, 'Playstation 3 60GB'],
+    [/^ps3 backwards compatible 4 usb port.*\bE$/i, 'Playstation 3 80GB Backward Compatible'],
+    [/^ps5 disc$/i, 'Playstation 5'], [/^ps5 digital$/i, 'Playstation 5 Digital Edition'],
+    [/^xbox 360 fat.*non.hdmi$/i, 'Xbox 360 20GB'], [/^xbox 360 fat.*hdmi$/i, 'Xbox 360 20GB With HDMI'],
+    [/^xbox 360 slim\s*\/\s*e$/i, 'Xbox 360 Slim 4GB'],
+    [/^nes top loader$/i, 'NES Top Loader'], [/^snes jr\.?$/i, 'Super Nintendo Jr'],
+    [/^wii.*gamecube/i, 'Wii'], [/^sega genesis$/i, 'Sega Genesis Model 1'],
+    [/^sega master system 1$/i, 'Sega Master System'], [/^sega master system 2$/i, 'Sega Master System II'],
+    [/^game boy original$/i, 'Game Boy'], [/^ps portal$/i, 'Playstation Portal'],
+    [/^psp$/i, 'PSP 1000'], [/^ps vita$/i, 'Playstation Vita'], [/^atari lynx\s*\/\s*lynx 2$/i, 'Atari Lynx'],
+  ];
+  for (const [pattern, base] of aliases) if (pattern.test(name)) { name = base; break; }
+  const capacity = name.match(/\b(\d+)\s*(gb|tb)\b/i);
+  return { key: consoleMarketKey(name), query: `${name} system`, capacity: capacity ? Number(capacity[1]) * (capacity[2].toLowerCase() === 'tb' ? 1000 : 1) : null };
+}
+
+const consoleMarketSignature = (line) => `${line.category}:${line.name}`;
+function selectBaseConsole(products, profile) {
+  const capacity = (p) => { const m = p['product-name']?.match(/\b(\d+)\s*(gb|tb)\b/i); return m ? Number(m[1]) * (m[2].toLowerCase() === 'tb' ? 1000 : 1) : 0; };
+  const color = (p) => /\bblack\b/i.test(p['product-name']) ? 0 : /\bgr[ae]y\b/i.test(p['product-name']) ? 1 : 2;
+  return products.filter((p) => /^\d+$/.test(String(p.id))
+    && !/\b(?:pal|jp|japan|japanese|europe|import)\b/i.test(`${p['console-name']} ${p['product-name']}`)
+    && (!p.genre || /^systems?$/i.test(p.genre))
+    && consoleMarketKey(p['product-name'] || '') === profile.key
+    && (profile.capacity == null || capacity(p) === profile.capacity))
+    .sort((a, b) => capacity(a) - capacity(b) || color(a) - color(b) || String(a.id).localeCompare(String(b.id), 'en', { numeric: true }))[0] || null;
+}
+
+const consoleMarketLookups = new Map();
+const consoleMarketAttempts = new WeakMap();
+let consoleMarketQueue = Promise.resolve();
+function fetchBaseConsole(profile) {
+  const key = profile.query;
+  const cached = consoleMarketLookups.get(key);
+  if (cached && Date.now() - cached.time < 30 * 60 * 1000) return cached.promise;
+  const promise = consoleMarketQueue.then(async () => {
+    const selected = selectBaseConsole(await PC.search(profile.query), profile);
+    if (!selected) return null;
+    const full = await PC.byId(selected.id);
+    return selectBaseConsole([full], profile) ? pcInfo(full) : null;
+  });
+  consoleMarketQueue = promise.catch(() => null);
+  consoleMarketLookups.set(key, { time: Date.now(), promise });
+  promise.catch(() => { if (consoleMarketLookups.get(key)?.promise === promise) consoleMarketLookups.delete(key); });
+  return promise;
+}
+
+function consoleMarketPending() {
+  return trade.lines.filter((l) => consoleMarketAttempts.get(l)?.pending).length;
+}
+
+function ensureTradeConsoleReferences() {
+  if (!tokenSet) return;
+  for (const line of trade.lines) {
+    if (line.pending || line.failed || priceLine(line).dontBuy || tradePcValue(line) != null) continue;
+    const profile = consoleMarketProfile(line);
+    if (!profile) continue;
+    const signature = consoleMarketSignature(line);
+    const previous = consoleMarketAttempts.get(line);
+    if (previous?.signature === signature && (previous.pending || Date.now() - previous.time < 60000)) continue;
+    const attempt = { signature, time: Date.now(), pending: true };
+    consoleMarketAttempts.set(line, attempt);
+    fetchBaseConsole(profile).then((pc) => {
+      if (!pc || !trade.lines.includes(line) || consoleMarketSignature(line) !== signature || tradePcValue(line) != null) return;
+      // Separate from payout prices: never alter CIB/New buying bases, overrides or deductions.
+      line.consoleMarket = { ...pc, signature };
+      saveTrade();
+    }).catch(() => { /* Missing reference stays visible; staff can retry or choose manually. */ })
+      .finally(() => { attempt.pending = false; if ($('#completeDialog').open) renderCompletePc(); });
+  }
+}
+
+function renderCompletePc() {
+  const pc = tradePriceChartingTotal();
+  const pending = consoleMarketPending();
+  $('#completePcValue').textContent = pending ? 'Checking console values…' : pc.count ? money(pc.total) : 'Unavailable';
+  $('#completePcNote').textContent = pending ? 'Matching base console models automatically.' : pc.missing
+    ? `Partial total · ${pc.missing} item${pc.missing === 1 ? '' : 's'} without a matching PriceCharting value. Selected condition × quantity; not the payout.`
+    : 'Selected condition × quantity; not the payout.';
+  $('#completePcMatches').innerHTML = pending ? '' : trade.lines.filter((l) => !l.pending && !l.failed && l.source === 'hw' && !priceLine(l).dontBuy
+    && PC_FIELDS.market[tradePcCondition(l)] && tradePcValue(l) == null)
+    .map((l) => `<button type="button" class="link" data-pc-match="${esc(l.id)}">Match ${esc(l.name)} on PriceCharting</button>`).join('<br>');
 }
 
 // Reference value only: never substitute the buying-guide price or staff offer.
@@ -2373,7 +2483,7 @@ function tradePcSnapshot() {
   return { ...tradePriceChartingTotal(), capturedAt: new Date().toISOString(),
     items: trade.lines.filter((l) => !l.pending && !l.failed && !priceLine(l).dontBuy).map((l) => ({
       name: l.name, qty: l.qty, condition: tradePcCondition(l), value: tradePcValue(l),
-      pcId: l.pcId || l.matchedPcId || null, matchedFrom: l.matchedFrom || null,
+      pcId: tradePcReference(l)?.id || null, matchedFrom: tradePcReference(l)?.name || null,
     })) };
 }
 
@@ -2384,14 +2494,8 @@ function openComplete() {
   if (trade.lines.some((l) => l.pending)) { toast('Wait for the lookups to finish.'); return; }
   if (t.missing) { toast(`${t.missing} item${t.missing === 1 ? '' : 's'} still need a price.`, 'error'); return; }
   const f = $('#completeForm').elements;
-  const pc = tradePriceChartingTotal();
-  $('#completePcValue').textContent = pc.count ? money(pc.total) : 'Unavailable';
-  $('#completePcNote').textContent = pc.missing
-    ? `Partial total · ${pc.missing} item${pc.missing === 1 ? '' : 's'} without a matching PriceCharting value. Selected condition × quantity; not the payout.`
-    : 'Selected condition × quantity; not the payout.';
-  $('#completePcMatches').innerHTML = lines.filter((l) => l.source === 'hw' && !priceLine(l).dontBuy
-    && PC_FIELDS.market[tradePcCondition(l)] && tradePcValue(l) == null)
-    .map((l) => `<button type="button" class="link" data-pc-match="${esc(l.id)}">Match ${esc(l.name)} on PriceCharting</button>`).join('<br>');
+  ensureTradeConsoleReferences();
+  renderCompletePc();
   $('#payCash').textContent = money(t.cash);
   $('#payCredit').textContent = money(t.credit);
   f.payout.value = trade.split ? 'split' : 'credit';
@@ -2426,6 +2530,7 @@ async function saveCompleted(print) {
   if (completing) return;
   const error = $('#completeError');
   error.textContent = '';
+  if (consoleMarketPending()) { error.textContent = 'Wait for the console market values to finish checking.'; return; }
   const t = tradeTotals();
   const staff = $('#staffName').value.trim();
   const customer = $('#completeCustomer').value.trim();
@@ -6362,6 +6467,7 @@ async function startApp(status) {
   applyRole();
   renderTokenStatus();
   showView('trade');
+  ensureTradeConsoleReferences();
 }
 
 async function init() {

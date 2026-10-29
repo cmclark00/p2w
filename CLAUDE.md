@@ -1344,6 +1344,20 @@ The site's **only server-side code**. Everything else is static.
     Missing hardware references have a Match button opening the existing exact
     model picker in reference-only mode; it retains the buying condition and
     payout. Hardware lines with different PC IDs are not merged.
+    Missing console/handheld references now auto-search their base model when
+    added, restored or completed (`ensureTradeConsoleReferences`). Canonical
+    guide aliases plus exact normalized catalog names retain model distinctions
+    (Pro/OLED/Digital/backward-compatible) and reject extra edition/bundle words,
+    accessories and PAL/JP imports. Ordinary colors/capacities are normalized;
+    unspecified capacities prefer the smallest, then Black/Gray, never highest
+    price. Generic Genesis uses Model 1; combined guide rows use their base model.
+    Full product details are rechecked before use. A separate `consoleMarket`
+    field holds only market references; payout prices/conditions are untouched.
+    Requests run through a shared queue with 30-minute in-memory reuse; failures
+    have a one-minute retry cooldown. Completion shows pending lookups and Save
+    waits for them, without resetting form fields on background completion.
+    Removed/renamed lines ignore stale responses, and manual matches win races.
+    No usable match still shows partial coverage and the manual Match fallback.
     `priceCharting` on the saved trade is a completion snapshot with total,
     count, missing, capturedAt and per-item market values/IDs/quantities.
     Log details and CSV show it; older records say Not recorded. Manager edits

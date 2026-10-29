@@ -720,8 +720,11 @@ Everyone in the store shares one internet address, so typos add up.
      noted as a partial total; items marked Not buying are excluded. Matched
      consoles count even when you pay buying-guide prices: Complete/Console
      only use the loose market value, while CIB/New use those market values.
-     If a console has no market match, use **Match … on PriceCharting** to pick
-     the exact model, then click Complete trade again. The payout stays unchanged.
+     Consoles and handhelds automatically find their **base-model** market
+     reference in the background, keeping Pro/OLED/Digital models separate.
+     Repeat consoles reuse the lookup. If still checking, wait before saving.
+     If no usable match is found, **Match … on PriceCharting** remains available
+     as a fallback. Your buying-guide payout stays unchanged.
      The total is saved in **trade-log details and CSV exports** as a snapshot
      at completion, not on customer receipts. Older trades say **Not recorded**;
      later manager item corrections do not rewrite the original snapshot.
