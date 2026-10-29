@@ -884,6 +884,13 @@ The site's **only server-side code**. Everything else is static.
     bundle, offer and outlier filters. Lower unread pages after that stop do not
     imply failure. Unreadable cards, unknown shipping, failed/repeated/wrong pages
     and the 50-page safety guard stay reviewable; never claim complete coverage.
+    Website diagnostics retain structured reasons per page and show short labels
+    for unreadable results, unknown matched-sale shipping/location, unavailable or
+    unverified pages, duplicate pages, and the safety limit. Review notes give the
+    corresponding staff action and distinguish standard-game searches. Older
+    partial results without diagnostic metadata explicitly say the cause was not
+    reported. These labels never alter eligibility, partial flags or pricing and
+    work with the existing helper (no extension reinstall required).
     Validate page number and descending-sort URL, dedupe IDs across pages, and
     cancel publication on condition/item/typed-price changes. Helper cache keys
     include query and page. Original item checks also read visible condition.

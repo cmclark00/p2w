@@ -140,6 +140,34 @@ const flush = () => new Promise(r => setImmediate(r));
     pageCalls.push(page);return {...ready(page===1?[comp(1,'Brand New','WWE 2K20 PS4 Brand New'),comp(2,'Pre-Owned','WWE 2K20 & WWE 2K19 PS4 Bundle')]:[comp(3,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
   }});
   assert.deepEqual(pageCalls,[1,2]);assert.equal(paged.directEbay.result.stoppedAtMatch,true);assert.equal(paged.directEbay.result.partial,false,'Unread lower pages are not a failure after a sorted match');
+  assert.equal(invoke(ctx,'floorSearchReviewWarnings',paged).length,0,'Intentional stopping has no warning');
+  for (const [mode, label] of [['location','Seller location unknown'], ['shipping','Shipping unknown'],
+    ['skipped','Some results unreadable'], ['partial','Search details need review']]) {
+    const c=searchCur();
+    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>({
+      ...ready([{...comp(1,'Pre-Owned','WWE 2K20 PS4 CIB'),shipping:mode==='shipping'?null:0,
+        sellerCountry:mode==='location'?null:'United States',locationSource:'ebay-located-in'}]),page,more:true,
+      skipped:mode==='skipped'?2:0,partial:mode==='partial'
+    })});
+    const warnings=invoke(ctx,'floorSearchReviewWarnings',c);
+    assert.equal(warnings.length,1,mode);assert.equal(warnings[0].label,label,mode);
+    assert.ok(invoke(ctx,'floorDirectSearchHtml',c).includes(label));
+    assert.ok(result(c).b.checks.some(text=>text.includes(warnings[0].detail)),'Review notes explain action');
+    const before=result(c).r.price;
+    const legacy=JSON.parse(JSON.stringify(c));delete legacy.directEbay.result.issues;
+    assert.equal(result(legacy).r.price,before,'Diagnostics never change shelf price');
+    assert.equal(result(legacy).b.searchReview,result(c).b.searchReview,'Same review policy');
+    if(mode==='skipped')assert.ok(warnings[0].detail.includes('page 1'));
+  }
+  const combined=searchCur();
+  combined.directEbay={result:{...ready([]),partial:true,issues:[{code:'unreadable',page:1},{code:'unreadable',page:2}]},
+    standard:{result:{...ready([]),partial:true,issues:[{code:'location'}]}}};
+  const combinedWarnings=invoke(ctx,'floorSearchReviewWarnings',combined);
+  assert.equal(combinedWarnings.length,2);assert.ok(combinedWarnings[0].detail.includes('pages 1, 2'));
+  assert.equal(combinedWarnings[1].label,'Standard game: Seller location unknown');
+  assert.ok(invoke(ctx,'floorDirectSearchHtml',combined).includes('Standard game: Seller location unknown'));
+  const legacyWarning=invoke(ctx,'floorSearchWarnings',{...ready([]),partial:true})[0];
+  assert.ok(legacyWarning.detail.includes('did not report a specific cause'),'Do not invent a reason for older results');
   const marketLimited={...searchCur(),product:wwe}, marketPages=[];
   await invoke(ctx,'runFloorEbaySearch',marketLimited,()=>{},()=>false,{search:async(q,page)=>{
     marketPages.push(page);return {...ready([{...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),price:page===1?2500:1500,shipping:page===1?500:0}]),page,more:true};
@@ -235,6 +263,9 @@ const flush = () => new Promise(r => setImmediate(r));
     const c=searchCur();let count=0;
     await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>{count++;if(page===2&&mode==='failed')throw Error('Blocked');return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page:mode==='wrong-page'?1:page,more:true};}});
     assert.equal(count,2,mode);assert.equal(c.directEbay.result.partial,true,mode);assert.equal(c.directEbay.result.sales.length,1,'Keep prior evidence without duplicates');
+    const warning=invoke(ctx,'floorSearchReviewWarnings',c)[0];
+    assert.equal(warning.label,mode==='repeat'?'No new results on next page':mode==='failed'?'Search page unavailable':'Search page not verified');
+    assert.ok(warning.detail.includes('page 2'));
   }
   const switched=searchCur();let release;const inFlight=invoke(ctx,'runFloorEbaySearch',switched,()=>{},()=>false,{search:()=>new Promise(r=>release=r)});
   switched.condition='new';release(ready([comp(1,'Pre-Owned','WWE 2K20 PS4 CIB')]));await inFlight;
@@ -247,6 +278,7 @@ const flush = () => new Promise(r => setImmediate(r));
   await invoke(ctx, 'runFloorEbaySearch', c, () => {}, () => false, helper); assert.equal(calls, 2, 'Renders reuse search, all conditions share it');
   const absent = base(); delete absent.directEbay; await invoke(ctx, 'runFloorEbaySearch', absent, () => {}, () => false, null);
   assert.equal(absent.directEbay.loading, false); assert.equal(result(absent).b.searchReview, true);
+  assert.equal(invoke(ctx,'floorSearchReviewWarnings',absent)[0].label,'Helper not connected or outdated');
   const cancelled = base(); delete cancelled.directEbay; let stop = false, updates = 0;
   await invoke(ctx, 'runFloorEbaySearch', cancelled, () => updates++, () => stop, { search: async () => { stop = true; return ready([sold]); } });
   assert.equal(updates, 1, 'Cancelled lookup does not redraw another game');

@@ -4273,12 +4273,13 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
   const read = async (product, evidence = {}) => {
     const query = floorEbaySearchQuery(product);
     const rows = new Map(); let partial = false;
-    const result = { state: 'ready', sales: [], pages: 0, url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
+    const result = { state: 'ready', sales: [], pages: 0, issues: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
     for (let page = 1; page <= 50 && !stopped(); page++) {
       let value;
       try { value = await helper.search(query, page); } catch (_) { value = null; }
       if (stopped()) return result;
       if (value?.state !== 'ready' || !Array.isArray(value.sales) || value.page !== page || value.sorted !== true) {
+        result.issues.push({ code: value?.state === 'unavailable' ? 'helper' : value?.state === 'ready' ? 'page-unverified' : 'page-failed', page });
         return { ...result, state: rows.size ? 'ready' : value?.state || 'unknown', partial: true,
           reason: value?.reason || 'The next sold-results page could not be verified. Review or retry the search.' };
       }
@@ -4288,6 +4289,9 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       const before = rows.size;
       for (const sale of sales) if (!rows.has(sale.id)) rows.set(sale.id, sale);
       partial ||= !!value.partial || value.skipped > 0 || sales.length !== value.sales.length;
+      // Diagnostics only: retain the existing partial flag and pricing decisions.
+      if (value.skipped > 0 || sales.length !== value.sales.length) result.issues.push({ code: 'unreadable', page });
+      else if (value.partial) result.issues.push({ code: 'unspecified', page });
       Object.assign(result, { sales: [...rows.values()], pages: page, checkedAt: value.checkedAt, more: !!value.more, partial });
       // Use the same identity, condition, offer and outlier rules as pricing.
       // Do not stop for a mismatched bundle, hidden offer, or unreadable condition.
@@ -4296,13 +4300,21 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       // Do not infer a slow seller just because its first, highest-price page
       // has old listings. Continue until recent evidence or pagination resolves it.
       const olderPending = candidates.some(s => s.ageInfo?.pending || s.historicalInfo?.pending);
-      if (matched && !olderPending) return { ...result, stoppedAtMatch: true,
+      if (matched && !olderPending) {
+        if (matched.shipping == null) result.issues.push({ code: 'shipping' });
+        if (floorSaleLocation(matched) === 'unknown') result.issues.push({ code: 'location' });
+        return { ...result, stoppedAtMatch: true,
         partial: partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown',
         reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown' ? ' Some evidence, shipping or seller location needs review.' : ''}` };
+      }
       if (!value.more) return { ...result, reason: `Checked ${page} page${page === 1 ? '' : 's'}; no eligible ${GAME_CONDITIONS[condition]} sale found.` };
-      if (rows.size === before) return { ...result, partial: true, reason: 'eBay repeated a page or returned unreadable results. Review the remaining pages manually.' };
+      if (rows.size === before) {
+        result.issues.push({ code: 'no-progress', page });
+        return { ...result, partial: true, reason: 'eBay repeated a page or returned unreadable results. Review the remaining pages manually.' };
+      }
       state.page = page + 1; progress();
     }
+    result.issues.push({ code: 'limit' });
     return { ...result, partial: true, reason: 'Search stopped at the pagination safety limit or was cancelled. Review remaining results.' };
   };
   try {
@@ -4323,14 +4335,41 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
     if (!stopped()) progress();
   }
 }
+// Presentation only. Do not use warning text to admit/exclude a sale or change a price.
+function floorSearchWarnings(result) {
+  if (!result || result.state === 'ready' && !result.partial) return [];
+  const labels = {
+    unreadable: ['Some results unreadable', 'Open search and check unreadable result cards for a higher matching sale.'],
+    shipping: ['Shipping unknown', 'Open the matched sale and check its delivery charge; the total includes only known shipping.'],
+    location: ['Seller location unknown', 'Open the matched sale and check where the seller is located. Only North American sellers qualify.'],
+    'page-failed': ['Search page unavailable', 'Retry search. If eBay asks you to sign in, do so in Chrome; otherwise check that page manually.'],
+    'page-unverified': ['Search page not verified', 'Retry search or open it and confirm the page and highest-price sorting.'],
+    'no-progress': ['No new results on next page', 'Open search and review the remaining pages; the helper received duplicate or unreadable results.'],
+    limit: ['Search page limit reached', 'Review remaining results manually; the search reached its 50-page safety limit.'],
+    helper: ['Helper not connected or outdated', 'Check the helper status and manual download instructions above, then refresh and retry.'],
+    unspecified: ['Search details need review', 'Open search and review the results. The helper did not report a specific cause; retry to check again.']
+  };
+  const issues = result.issues?.length ? result.issues : [{ code: result.state === 'unavailable' ? 'helper' : result.state !== 'ready' ? 'page-failed' : 'unspecified' }];
+  return Object.entries(labels).flatMap(([code, [label, action]]) => {
+    const found = issues.filter(issue => issue.code === code);
+    if (!found.length) return [];
+    const pages = [...new Set(found.map(issue => issue.page).filter(Number.isInteger))];
+    return [{ label, detail: `${label}${pages.length ? ` (page${pages.length === 1 ? '' : 's'} ${pages.join(', ')})` : ''}. ${action}` }];
+  });
+}
+function floorSearchReviewWarnings(cur) {
+  return [[cur.directEbay?.result, ''], [cur.directEbay?.standard?.result, 'Standard game: ']]
+    .flatMap(([result, prefix]) => floorSearchWarnings(result).map(w => ({ label: prefix + w.label, detail: prefix + w.detail })));
+}
 function floorDirectSearchHtml(cur) {
   const s = cur.directEbay;
   if (!s) return '';
   const r = s.result;
+  const warnings = s.loading ? [] : floorSearchReviewWarnings(cur);
   const note = s.loading ? `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
-    ? `Direct eBay · ${r.sales.length} sold results read${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${r.partial ? ' · needs review' : ''}`
+    ? `Direct eBay · ${r.sales.length} sold results read${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
     : r?.reason || 'Direct eBay search unavailable';
-  return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || r.partial) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
+  return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || warnings.length) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
 }
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
@@ -4407,7 +4446,7 @@ function floorBasis(cur = floorCur) {
   const review = historical || searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
   const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); stopping at a verified price-driving sale.`
-    : searchReview ? 'Direct eBay search is unavailable or partial. Review the search before labeling; no results does not prove no sales.'
+    : searchReview ? floorSearchReviewWarnings(cur).map(w => w.detail).join(' ')
     : historical ? 'Historical PriceCharting sale retained. Its date is highlighted; current eBay sold status is unavailable. Review the evidence or Product Research before labeling.'
     : 'Price needs review: some eBay evidence could not be verified. Recent unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
   return { ...b, ebayReview: review, searchReview, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
@@ -5415,7 +5454,7 @@ function renderFloorPricer() {
         ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : b.from === 'msrp' ? 'Checking MSRP…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         <div class="floor-review-summary">
-          ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? 'direct eBay search incomplete' : 'eBay sale unverified'}</span>` : ''}
+          ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
