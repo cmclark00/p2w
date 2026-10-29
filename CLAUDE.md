@@ -1260,8 +1260,8 @@ The site's **only server-side code**. Everything else is static.
     **Loose games use the lowest matching regular offer across all Used grades
     and New**, including shipping, across every verified ASIN. Good has no priority
     over Acceptable, Very Good, Like New/Mint, other or unspecified Used grades.
-    `floorAmazonLooseAny()` scopes this to games; hardware/figures remain unchanged.
-    CIB still uses only Very Good/Like New (Mint), with either eligible alone;
+    Used-grade filtering scopes this to games; hardware/figures keep their grade policy.
+    CIB Used offers use only Very Good/Like New (Mint), with either eligible alone;
     ungraded offers and summary-only minima cannot price CIB. Loose likewise needs
     actual offer rows, not an ungraded summary minimum. Seller-note/title mismatch
     filters still apply; broad grades do not permit bundles, imports or wrong games.
@@ -1270,10 +1270,11 @@ The site's **only server-side code**. Everything else is static.
     Loose/CIB result caches are separate; switching
     condition reloads selection and stale requests cannot replace the new condition.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
-    Loose can use either regular Used or New; CIB keeps regular New display-only.
+    All pre-owned inventory selects the cheaper eligible regular Used or New offer,
+    including CIB. On equal prices, Used wins. New can also be the only available offer.
     Only New evidence prices New; Like New, Used, Open Box and Renewed do not.
-    Optional display-only failures do not block CIB/New pricing. Both Used and
-    New reads are required for Loose: an error leaves the search incomplete and
+    Optional display-only Used failures do not block New pricing. Both Used and
+    New reads are required for pre-owned inventory: an error leaves the search incomplete and
     retryable, rather than selecting a potentially higher price from partial data.
     GameStop pre-owned stays visible but never sets a New inventory minimum.
     PriceCharting condition categories still apply, with explicit used/opened
@@ -1286,11 +1287,11 @@ The site's **only server-side code**. Everything else is static.
     ASINs for display only; those cannot price the sealed item, and an optional
     Used-read failure is labeled unavailable without invalidating New pricing.
     Renewed fallback starts only without a regular eligible price: neither Used
-    nor New for Loose games, or no eligible Used offer for CIB/other used inventory.
+    nor New for any pre-owned inventory.
     Deferred renewed/refurbished candidates plus a title/platform/renewed
     search get the same identity checks with positive platform evidence.
     Each verified renewed ASIN is checked under both Used and New offer
-    conditions as refurbished evidence; regular New remains display-only for CIB.
+    conditions as refurbished evidence.
     The lowest usable Renewed offer is tagged `renewedFallback` and
     visibly labeled. Renewed uses the normal three-source maximum:
     `max(highest eligible eBay sale, lowest Renewed, applicable GameStop)`, before
@@ -1304,7 +1305,7 @@ The site's **only server-side code**. Everything else is static.
     and condition; failed promises are evicted so retries work.
     The API supplies a shared catalog title, not each seller's description;
     hidden or mislabeled variants still require staff review. Loose games compare
-    **all Used grades and New**; CIB compares eligible **Used** (New display-only),
+    **all Used grades and New**; CIB compares eligible **Used and New**,
     New inventory compares **New** only. **Loaded automatically for every game.** Only the lowest matching
     offer enters the three-reference maximum, for every system. Higher
     offers and missing offers add no markup. The game

@@ -1019,24 +1019,25 @@ Guide (the Google Sheet tab).
      with the highest eligible eBay sale and applicable GameStop price; use the
      highest. For example, $15.48 Renewed with a $24.95 eligible sale points to
      $25 before any specific adjustment. Renewed does not replace a higher sale.
-     Regular eligible offers take priority over Renewed: Used or New for Loose
-     games, eligible Used for CIB. Specific premiums, deductions and the high-value exception remain.
+     Regular eligible Used or New offers take priority over Renewed for all
+     pre-owned items. Specific premiums, deductions and the high-value exception remain.
      **Amazon conditions for Loose games:** use the **lowest matching offer
      across all Used grades and New**, including shipping. Good is not preferred
      over Acceptable; a cheaper Very Good/Like New (CIB-grade) or New copy counts
-     too. CIB still uses the cheaper of **Very Good** and **Like New** (Mint), with
-     either eligible alone. Check seller notes when exact contents matter.
+     too. CIB Used uses the cheaper of **Very Good** and **Like New** (Mint), with
+     either eligible alone, then compares that against **New** and uses the lower
+     price. New is also usable when eligible Used offers are absent. Check seller notes when exact contents matter.
      Hardware and figures keep their existing rules. The Amazon Used reference
      shows the selected grade. Open **Amazon condition guide** above the offers
      for a quick explanation. If either required Used or New lookup fails for
-     Loose, pricing waits for the completed comparison rather than assuming no offers.
+     pre-owned inventory, pricing waits for the completed comparison rather than assuming no offers.
      If an edition has no usable Amazon price, **Standard Amazon** in the pinned
      row shows the standard game's verified fallback prices. Its match stays
      separate from your edition; specific premiums still apply.
      **Keep conditions separate:** only New evidence prices New inventory.
-     Brand-new Amazon offers can price Loose, but remain reference-only for CIB.
-     Like New, open-box and Renewed are not factory-new. CIB/New retain their
-     condition filters; the all-condition Amazon comparison is specific to Loose games. GameStop pre-owned
+     Brand-new Amazon offers can price Loose or CIB when cheaper than eligible Used.
+     Like New, open-box and Renewed cannot price New inventory. Used-grade
+     filters still apply to CIB; all Used grades remain eligible for Loose games. GameStop pre-owned
      cannot set a minimum for New inventory. Specific premiums and rounding remain.
      **Amazon Used and New are shown separately** in the pinned row and each
      opens its matching listing. Renewed appears separately when checked.
