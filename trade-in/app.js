@@ -4824,8 +4824,8 @@ function floorTitleIdentityMismatch(title, product) {
   return null;
 }
 const FLOOR_PLATFORMS = [
-  /\b(?:ps1|psx|playstation 1|playstation(?! [2-5]| portable| vita))\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
-  /\b(?:ps4|playstation 4)\b/, /\b(?:ps5|playstation 5)\b/, /\b(?:psp|playstation portable)\b/,
+  /\b(?:ps1|psx|playstation 1|playstation(?! [2-5]| portable| vita| vr))\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
+  /\b(?:ps4|playstation 4|(?:playstation vr|ps ?vr)(?! ?2))\b/, /\b(?:ps5|playstation 5|(?:playstation vr|ps ?vr) ?2)\b/, /\b(?:psp|playstation portable)\b/,
   /\b(?:vita)\b/, /\bxbox 360\b/, /\bxbox one\b/, /\bxbox series\b/,
   /\bxbox\b(?! (?:360|one|series))/,
   /\b(?:nintendo )?switch 2\b/, /\b(?:nintendo )?switch\b(?! 2)/,

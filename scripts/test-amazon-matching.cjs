@@ -23,6 +23,34 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('PSVR catalog labels match PS4 games without accepting PSVR2, headsets or sequels', async () => {
+    const p={id:'astro','product-name':'Astro Bot Rescue Mission','console-name':'Playstation 4','cib-price':1500};
+    const good=candidate('B07FWG1KC6','ASTRO Bot Rescue Mission - PlayStation VR',['PlayStation 4']);
+    const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[good]}:
+      {...offer(good,null),condition:params.cond==='new'?'New':'Used',offers:params.cond==='used'?
+        [{price:3777,sub:'very_good'},{price:2984,sub:'very_good'}]:[]});
+    e.ctx.p=p;e.ctx.a=good;
+    assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),null);
+    for(const label of ['PlayStation VR','PSVR','PS VR']) {
+      e.ctx.a={...good,title:`ASTRO Bot Rescue Mission - ${label}`,platforms:[label]};
+      assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),null,label);
+      assert.equal(e.run('floorListingMismatch(a.title,p)'),null,label);
+    }
+    for(const title of ['ASTRO Bot Rescue Mission - PlayStation VR2', 'ASTRO Bot Rescue Mission - PSVR 2',
+      'ASTRO Bot Rescue Mission - PlayStation VR Headset Bundle', 'ASTRO Bot Rescue Mission - PlayStation VR Deluxe Edition',
+      'ASTRO Bot Rescue Mission - PlayStation VR Reborn', 'ASTRO Bot Rescue Mission French Version - PlayStation VR']) {
+      e.ctx.a={...good,title};assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),title);
+    }
+    e.ctx.p5={...p,'console-name':'Playstation 5'};
+    for(const label of ['PlayStation VR2','PlayStation VR 2','PSVR2','PS VR2']) {
+      e.ctx.a={...good,title:`ASTRO Bot Rescue Mission - ${label}`,platforms:[label]};
+      assert.equal(e.run('floorAmazonCandidateMismatch(a,p5,"cib",true)'),null,label);
+      assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),label);
+    }
+    e.ctx.result=await e.fetch(p,'cib');
+    assert.equal(e.ctx.result.asin,good.asin);
+    assert.equal(e.run('floorAmazonLowest({product:p,condition:"cib",amazon:result})'),2984);
+  });
   await test('manufacturer MSRP survives verified lookups with no used offers and excludes wrong matches', async () => {
     const p={'product-name':'Example Adventure','console-name':'Nintendo Switch','release-date':new Date().toISOString().slice(0,10)};
     const good={asin:'B000000001',title:'Example Adventure Nintendo Switch',platforms:['Nintendo Switch'],publishers:['Nintendo'],publisherSource:'amazon-manufacturer'};

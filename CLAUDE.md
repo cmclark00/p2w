@@ -1189,7 +1189,12 @@ The site's **only server-side code**. Everything else is static.
     compares known UPCs plus exact-title/platform and base-title/platform
     searches, even when the barcode already has an offer. Search candidates
     require positive platform evidence in the title or attributes. Catalog
-    searches automatically follow every pageToken with up to five known UPCs;
+    platform aliases recognize PlayStation VR/PSVR/PS VR as PS4 and their VR2
+    forms as PS5. Bare PlayStation's PS1 matcher excludes VR. The same aliases
+    are stripped as platform text during title checks, without allowing extra
+    sequel/edition/headset-bundle words. This fixes Astro Bot Rescue Mission's
+    Amazon title being rejected as PS1 and as an extra title extension.
+    Catalog searches automatically follow every pageToken with up to five known UPCs;
     no manual continuation is needed. Catalog pages overlap offer I/O. The browser
     prefetches independent first catalog pages with at most two concurrent reads
     per identity, but applies matches in the original barcode/title order. All
