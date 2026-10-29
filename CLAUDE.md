@@ -858,7 +858,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.8+ and protocol 2/targeted/search/pagination/location capabilities. No response says Not connected, not
+    1.1.9+ and protocol 2/targeted/search/pagination/location/searchRetry capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -890,7 +890,15 @@ The site's **only server-side code**. Everything else is static.
     corresponding staff action and distinguish standard-game searches. Older
     partial results without diagnostic metadata explicitly say the cause was not
     reported. These labels never alter eligibility, partial flags or pricing and
-    work with the existing helper (no extension reinstall required).
+    work with existing helpers. Helper 1.1.9 adds a fresh-page retry capability:
+    app.js retries a failed/unverified/partial page once before publishing warnings,
+    bypassing that query/page's cached result. Successful pages remain cached;
+    concurrent fresh requests share the existing job and normal tab/time limits.
+    Failed retries retain first-attempt usable sales; two partial reads merge by ID
+    with the latest duplicate evidence winning, while remaining partial. A fully
+    readable retry replaces that page's first attempt. Cancellation is checked
+    before/after the retry; location/shipping-only warnings do not trigger it.
+    Old helpers keep normal search but prompt update rather than pretend to retry.
     Validate page number and descending-sort URL, dedupe IDs across pages, and
     cancel publication on condition/item/typed-price changes. Helper cache keys
     include query and page. Original item checks also read visible condition.

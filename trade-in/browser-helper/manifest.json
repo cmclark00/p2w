@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Play2Win Market Helper",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Checks GameStop stock, finds direct eBay sold listings and verifies sale prices for Play2Win. Never buys, bids, or changes carts.",
   "homepage_url": "https://play2wingames.com/trade-in/helper.html",
   "icons": {

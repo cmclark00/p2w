@@ -3589,7 +3589,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.8';
+const FLOOR_HELPER_RECOMMENDED = '1.1.9';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -3600,7 +3600,7 @@ function floorHelperStatusInfo(helper) {
     comparison = (parts[i] || 0) - (required[i] || 0);
     if (comparison) break;
   }
-  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1 && helper.location === 1;
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1 && helper.location === 1 && helper.searchRetry === 1;
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
@@ -4273,19 +4273,49 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
   const read = async (product, evidence = {}) => {
     const query = floorEbaySearchQuery(product);
     const rows = new Map(); let partial = false;
-    const result = { state: 'ready', sales: [], pages: 0, issues: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
+    const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
+    const validPage = (value, page) => value?.state === 'ready' && Array.isArray(value.sales) && value.page === page && value.sorted === true;
+    const validSales = value => value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
+      && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
+      && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+    const unreadable = value => !!value.partial || value.skipped > 0 || validSales(value).length !== value.sales.length;
     for (let page = 1; page <= 50 && !stopped(); page++) {
-      let value;
+      let value, recoveredSales;
       try { value = await helper.search(query, page); } catch (_) { value = null; }
       if (stopped()) return result;
-      if (value?.state !== 'ready' || !Array.isArray(value.sales) || value.page !== page || value.sorted !== true) {
+      if (value?.state !== 'unavailable' && (!validPage(value, page) || unreadable(value))) {
+        const first = value;
+        state.retryPage = page; progress();
+        if (stopped()) return result;
+        try { value = await helper.search(query, page, true); } catch (_) { value = null; }
+        delete state.retryPage;
+        if (stopped()) return result;
+        if (value?.retryUnsupported) {
+          result.issues.push({ code: 'helper' }); value = first;
+        } else {
+          result.retriedPages.push(page);
+          if (!validPage(value, page) && validPage(first, page)) {
+            // Keep the first readable sales when the fresh page fails, with review.
+            result.issues.push({ code: value?.state === 'ready' ? 'page-unverified' : 'page-failed', page });
+            value = first;
+          } else if (validPage(value, page) && unreadable(value) && validPage(first, page)) {
+            // A second partial read may recover additional cards. Prefer its
+            // evidence for duplicate IDs; never turn two partial reads into success.
+            const recovered = new Map(validSales(first).map(s => [s.id, s]));
+            const secondSales = validSales(value);
+            for (const sale of secondSales) recovered.set(sale.id, sale);
+            if (secondSales.length !== value.sales.length) result.issues.push({ code: 'unreadable', page });
+            recoveredSales = [...recovered.values()];
+            value = { ...value, sales: recoveredSales, partial: true };
+          }
+        }
+      }
+      if (!validPage(value, page)) {
         result.issues.push({ code: value?.state === 'unavailable' ? 'helper' : value?.state === 'ready' ? 'page-unverified' : 'page-failed', page });
         return { ...result, state: rows.size ? 'ready' : value?.state || 'unknown', partial: true,
           reason: value?.reason || 'The next sold-results page could not be verified. Review or retry the search.' };
       }
-      const sales = value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
-        && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
-        && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+      const sales = recoveredSales || validSales(value);
       const before = rows.size;
       for (const sale of sales) if (!rows.has(sale.id)) rows.set(sale.id, sale);
       partial ||= !!value.partial || value.skipped > 0 || sales.length !== value.sales.length;
@@ -4354,7 +4384,8 @@ function floorSearchWarnings(result) {
     const found = issues.filter(issue => issue.code === code);
     if (!found.length) return [];
     const pages = [...new Set(found.map(issue => issue.page).filter(Number.isInteger))];
-    return [{ label, detail: `${label}${pages.length ? ` (page${pages.length === 1 ? '' : 's'} ${pages.join(', ')})` : ''}. ${action}` }];
+    const retried = pages.filter(page => result.retriedPages?.includes(page));
+    return [{ label, detail: `${label}${pages.length ? ` (page${pages.length === 1 ? '' : 's'} ${pages.join(', ')})` : ''}. ${retried.length ? `Retried once on page${retried.length === 1 ? '' : 's'} ${retried.join(', ')}. ` : ''}${action}` }];
   });
 }
 function floorSearchReviewWarnings(cur) {
@@ -4366,7 +4397,7 @@ function floorDirectSearchHtml(cur) {
   if (!s) return '';
   const r = s.result;
   const warnings = s.loading ? [] : floorSearchReviewWarnings(cur);
-  const note = s.loading ? `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
+  const note = s.loading ? s.retryPage ? `Retrying eBay page ${s.retryPage} once…` : `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
     ? `Direct eBay · ${r.sales.length} sold results read${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
     : r?.reason || 'Direct eBay search unavailable';
   return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || warnings.length) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;

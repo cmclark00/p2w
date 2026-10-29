@@ -51,7 +51,7 @@ chrome.runtime.onMessage.addListener((m, sender, respond) => {
     const key = JSON.stringify([query, page]);
     if (m.protocol !== 2 || !query || !Number.isInteger(page) || page < 1 || page > 50) { respond(ebaySearchUnknown()); return false; }
     const cached = ebaySearchCache.get(key);
-    if (cached && Date.now() / 1000 - cached.checkedAt < (cached.state === 'ready' ? 300 : 20)) { respond(cached); return false; }
+    if (m.refresh !== true && cached && Date.now() / 1000 - cached.checkedAt < (cached.state === 'ready' ? 300 : 20)) { respond(cached); return false; }
     const existing = ebaySearchJobs.get(key);
     if (existing) { existing.waiters.push({ owner: sender.tab.id, respond }); return true; }
     if (ebaySearchJobs.size >= 3) { respond(ebaySearchUnknown()); return false; }

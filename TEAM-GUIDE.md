@@ -903,6 +903,10 @@ Guide (the Google Sheet tab).
      and other North American sales still include shipping, even when expensive.
      Missing seller location is flagged for review; shipping cost is not proof
      of location. Update the manual helper to **1.1.8** to read location labels.
+     **Helper 1.1.9** also retries an unreadable or failed eBay page once automatically.
+     If the retry fails, usable sales stay available and Review notes explain what
+     still needs checking. Download the latest ZIP, replace the installed files,
+     reload the helper in Chrome, then refresh the pricing tool.
      Amazon now overlaps independent catalog reads and batches Used comparisons
      for sealed items, while retaining all matching and pricing checks. These
      website improvements only need a page refresh; no new helper install.

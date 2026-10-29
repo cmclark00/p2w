@@ -119,7 +119,7 @@ assert.equal(result(standard).b.basis, 5612, 'Standard fallback includes deliver
 let listeners = [], onRemove = [], created = [], removed = [], requests = [], timers = new Set(), nextId = 10;
 const worker = vm.createContext({ URL, Date, Map, setTimeout: fn => { timers.add(fn); return fn; }, clearTimeout: fn => timers.delete(fn),
   pricingSender: s => s.frameId === 0 && s.url === 'https://play2wingames.com/trade-in/' && Number.isInteger(s.tab?.id),
-  chrome: { runtime: { getManifest: () => ({ version: '1.1.8' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
+  chrome: { runtime: { getManifest: () => ({ version: '1.1.9' }), onMessage: { addListener: h => listeners.push(h) } }, tabs: {
     create: async args => { created.push(args); return { id: nextId++ }; }, remove: async id => removed.push(id),
     sendMessage: (id, m) => new Promise(resolve => requests.push({ id, m, resolve })), onRemoved: { addListener: h => onRemove.push(h) } } } });
 vm.runInContext(fs.readFileSync('trade-in/browser-helper/ebay-background.js', 'utf8'), worker);
@@ -143,12 +143,13 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.equal(invoke(ctx,'floorSearchReviewWarnings',paged).length,0,'Intentional stopping has no warning');
   for (const [mode, label] of [['location','Seller location unknown'], ['shipping','Shipping unknown'],
     ['skipped','Some results unreadable'], ['partial','Search details need review']]) {
-    const c=searchCur();
-    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>({
+    const c=searchCur();let readCount=0;
+    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>{readCount++;return {
       ...ready([{...comp(1,'Pre-Owned','WWE 2K20 PS4 CIB'),shipping:mode==='shipping'?null:0,
         sellerCountry:mode==='location'?null:'United States',locationSource:'ebay-located-in'}]),page,more:true,
       skipped:mode==='skipped'?2:0,partial:mode==='partial'
-    })});
+    };}});
+    assert.equal(readCount,['location','shipping'].includes(mode)?1:2,'Missing location/shipping alone never opens retry tabs');
     const warnings=invoke(ctx,'floorSearchReviewWarnings',c);
     assert.equal(warnings.length,1,mode);assert.equal(warnings[0].label,label,mode);
     assert.ok(invoke(ctx,'floorDirectSearchHtml',c).includes(label));
@@ -262,11 +263,58 @@ const flush = () => new Promise(r => setImmediate(r));
   for(const mode of ['repeat','failed','wrong-page']) {
     const c=searchCur();let count=0;
     await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page)=>{count++;if(page===2&&mode==='failed')throw Error('Blocked');return {...ready([comp(1,'Brand New','WWE 2K20 PS4 Brand New')]),page:mode==='wrong-page'?1:page,more:true};}});
-    assert.equal(count,2,mode);assert.equal(c.directEbay.result.partial,true,mode);assert.equal(c.directEbay.result.sales.length,1,'Keep prior evidence without duplicates');
+    assert.equal(count,mode==='repeat'?2:3,mode);assert.equal(c.directEbay.result.partial,true,mode);assert.equal(c.directEbay.result.sales.length,1,'Keep prior evidence without duplicates');
     const warning=invoke(ctx,'floorSearchReviewWarnings',c)[0];
     assert.equal(warning.label,mode==='repeat'?'No new results on next page':mode==='failed'?'Search page unavailable':'Search page not verified');
     assert.ok(warning.detail.includes('page 2'));
   }
+  for (const mode of ['failed','unreadable','invalid-row','wrong-page']) {
+    const c=searchCur(), calls=[];
+    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page,refresh)=>{
+      calls.push({page,refresh:!!refresh});
+      if(calls.length===1){
+        if(mode==='failed')throw Error('Transient failure');
+        return {...ready(mode==='invalid-row'?[{id:'bad'}]:[comp(1,'Pre-Owned','WWE 2K20 PS4 CIB')]),
+          page:mode==='wrong-page'?2:page,skipped:mode==='unreadable'?1:0};
+      }
+      return {...ready([comp(2,'Pre-Owned','WWE 2K20 PS4 CIB')]),page};
+    }});
+    assert.deepEqual(calls,[{page:1,refresh:false},{page:1,refresh:true}],mode);
+    assert.equal(c.directEbay.result.partial,false,mode);
+    assert.equal(invoke(ctx,'floorSearchReviewWarnings',c).length,0,'Recovered page clears its warning');
+    assert.equal(c.directEbay.result.sales.length,1,'A complete reread replaces first-attempt rows');
+  }
+  for (const mode of ['failed','partial','unsupported']) {
+    const c=searchCur();let count=0;
+    await invoke(ctx,'runFloorEbaySearch',c,()=>{},()=>false,{search:async(q,page,refresh)=>{
+      count++;
+      if(refresh&&mode==='failed')throw Error('Still unavailable');
+      if(refresh&&mode==='unsupported')return {state:'unavailable',retryUnsupported:true};
+      return {...ready([comp(refresh?2:1,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,partial:true,skipped:1};
+    }});
+    assert.equal(count,2,'Only one retry per page');
+    assert.equal(c.directEbay.result.partial,true,'Persistent unreadable results still need review');
+    assert.equal(c.directEbay.result.sales.length,mode==='partial'?2:1,'Retain usable evidence from both attempts');
+    const details=invoke(ctx,'floorSearchReviewWarnings',c).map(w=>w.detail).join(' ');
+    assert.equal(details.includes('Retried once'),mode!=='unsupported','Old helpers never claim fresh reads');
+  }
+  const retryCancelled=searchCur();let retryCalls=0;
+  const changedEvidence=searchCur();
+  await invoke(ctx,'runFloorEbaySearch',changedEvidence,()=>{},()=>false,{search:async(q,page,refresh)=>({
+    ...ready([{...comp(1,'Pre-Owned','WWE 2K20 PS4 CIB'),state:refresh?'offer':'sold'}]),page,partial:true,skipped:1
+  })});
+  assert.equal(rows(changedEvidence).length,1,'Retries deduplicate the same listing');
+  assert.equal(rows(changedEvidence)[0].odd,true,'Fresh accepted-offer evidence cannot resurrect an earlier sold price');
+  await invoke(ctx,'runFloorEbaySearch',retryCancelled,()=>{
+    if(retryCancelled.directEbay?.retryPage)retryCancelled.condition='new';
+  },()=>false,{search:async()=>{retryCalls++;return {...ready([]),partial:true};}});
+  assert.equal(retryCalls,1,'Condition change before retry opens no extra tab');
+  assert.equal(retryCancelled.directEbay.result,undefined,'Cancelled attempt never publishes');
+  const retryLate=searchCur();let releaseRetry;
+  const retryFlight=invoke(ctx,'runFloorEbaySearch',retryLate,()=>{},()=>false,{search:async(q,p,refresh)=>
+    refresh?new Promise(resolve=>releaseRetry=resolve):{...ready([]),partial:true}});
+  await flush();retryLate.typed=5000;releaseRetry(ready([comp(1,'Pre-Owned','WWE 2K20 PS4 CIB')]));await retryFlight;
+  assert.equal(retryLate.directEbay.result,undefined,'Late retry cannot overwrite a manual price');
   const switched=searchCur();let release;const inFlight=invoke(ctx,'runFloorEbaySearch',switched,()=>{},()=>false,{search:()=>new Promise(r=>release=r)});
   switched.condition='new';release(ready([comp(1,'Pre-Owned','WWE 2K20 PS4 CIB')]));await inFlight;
   assert.equal(switched.directEbay.result,undefined,'Stale CIB completion cannot publish into New');
@@ -298,11 +346,12 @@ const flush = () => new Promise(r => setImmediate(r));
   const pageListeners = new Set(), messages = [];
   const pageWindow = { addEventListener: (t, f) => pageListeners.add(f), removeEventListener: (t, f) => pageListeners.delete(f),
     postMessage: data => queueMicrotask(() => { for (const f of [...pageListeners]) f({ data, source: pageWindow, origin: 'https://play2wingames.com' }); }) };
-  let oldHelper = false;
+  let oldHelper = false, legacySearch = false;
   const bridge = vm.createContext({ window: pageWindow, location: { origin: 'https://play2wingames.com' }, crypto: require('node:crypto').webcrypto, setTimeout, clearTimeout,
     chrome: { runtime: { sendMessage: m => {
       messages.push(m);
       if (oldHelper) return Promise.resolve({ available: true, protocol: 2, targeted: 1 });
+      if (legacySearch && m.type==='P2W_EBAY_CAPABILITY') return Promise.resolve({available:true,version:'1.1.8',protocol:2,targeted:1,search:1,pagination:1,location:1});
       return new Promise(resolve => { for (const h of listeners) if (h(m, sender, resolve)) return; resolve(null); });
     } } } });
   vm.runInContext(fs.readFileSync('trade-in/browser-helper/bridge.js', 'utf8'), bridge);
@@ -314,6 +363,17 @@ const flush = () => new Promise(r => setImmediate(r));
   requests.at(-1).resolve({...ready([sold]),page:2});assert.equal((await pageTwo).page,2);
   assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).sales[0].sellerCountry,'United States','Worker preserves observed country');
   const beforeCachedPage=created.length;assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2);assert.equal(created.length,beforeCachedPage,'Cache separates pages');
+  const fresh=pageWindow.P2WEbayHelper.search(query,2,true), sharedFresh=pageWindow.P2WEbayHelper.search(query,2,true);
+  await flush();assert.equal(created.length,beforeCachedPage+1,'Fresh retry bypasses cache but coalesces concurrent requests');
+  assert.equal(messages.filter(m=>m.type==='P2W_EBAY_SEARCH').at(-1).refresh,true,'Fresh flag crosses the bridge');
+  requests.at(-1).resolve({...ready([sold]),page:2});await fresh;await sharedFresh;
+  const afterFresh=created.length;await pageWindow.P2WEbayHelper.search(query,2);
+  assert.equal(created.length,afterFresh,'Successful retry refreshes cache for normal requests');
+  legacySearch=true;messages.length=0;
+  assert.equal((await pageWindow.P2WEbayHelper.search(query,2,true)).retryUnsupported,true);
+  assert.equal(messages.length,1,'Helper without fresh-read capability receives only a ping');
+  assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2,'Existing helper still supports normal cached searches');
+  legacySearch=false;
   oldHelper = true; messages.length = 0;
   assert.equal((await pageWindow.P2WEbayHelper.search(query)).state, 'unavailable');
   assert.equal(messages.length, 1, 'Old worker receives only a capability ping, never a search tab request');
