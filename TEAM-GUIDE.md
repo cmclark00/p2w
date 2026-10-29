@@ -910,6 +910,10 @@ Guide (the Google Sheet tab).
      Amazon now overlaps independent catalog reads and batches Used comparisons
      for sealed items, while retaining all matching and pricing checks. These
      website improvements only need a page refresh; no new helper install.
+     Failed or incomplete Amazon lookups also retry once automatically, resuming
+     unfinished checks. If that still fails, partial offers remain reference-only
+     and the message says it was retried. A completed search with no matches does
+     not trigger extra attempts. This Amazon update only needs a page refresh.
    - **PriceCharting's own market price is only a fallback** when none
      of those three references is available. Fallback prices always say **Double-check**.
      PriceCharting's retail-sell number is a reference, not a pricing rule.

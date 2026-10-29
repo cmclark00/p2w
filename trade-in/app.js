@@ -3780,13 +3780,43 @@ async function loadFloorAmazon() {
   const condition = cur.condition, loadId = (cur.amazonLoadId || 0) + 1;
   cur.amazonLoadId = loadId;
   cur.amazon = { loading: true }; renderFloorPricer();
+  const cancelled = () => floorCur !== cur || cur.condition !== condition || cur.amazonLoadId !== loadId;
   try {
-    const d = await fetchFloorAmazon(cur.product, condition);
+    const d = await fetchFloorAmazonRetry(cur.product, condition, { cancelled, onRetry: () => {
+      if (!cancelled()) { cur.amazon = { loading: true, retrying: true }; renderFloorPricer(); }
+    } });
     if (floorCur === cur && cur.condition === condition && cur.amazonLoadId === loadId) cur.amazon = d;
   } catch (err) {
     if (floorCur === cur && cur.condition === condition && cur.amazonLoadId === loadId) cur.amazon = { error: err.message };
   }
   if (floorCur === cur) renderFloorPricer();
+}
+
+// Live lookups get one recovery pass. Successful catalog pages/offer members
+// remain cached; a new fetch memo retries only missing work. Audits stay explicit.
+async function fetchFloorAmazonRetry(product, condition, {
+  request = floorAmazonRequest, cancelled = () => false, onRetry = () => {},
+  pause = () => new Promise(resolve => setTimeout(resolve, 1000)),
+} = {}) {
+  const failed = value => !!(value?.error || value?.incomplete);
+  const attempt = () => fetchFloorAmazon(product, condition, request).catch(err => ({ error: err.message }));
+  const first = await attempt();
+  if (cancelled() || !failed(first) && !failed(first.standard)) return first;
+  onRetry();
+  await pause(); // Brief backoff; server-wide rate limits/cooldowns still apply.
+  if (cancelled()) return first;
+  const second = await attempt();
+  if (cancelled()) return first;
+  const retain = (before, after) => {
+    if (!after) return before;
+    // A transport failure cannot erase already verified, partial offer details.
+    const value = after.error && before && !before.error
+      ? { ...before, incomplete: true, searchError: after.error } : after;
+    return failed(value) ? { ...value, retryAttempted: true,
+      matchNotes: [...(value.matchNotes || []), 'Amazon was retried once automatically; this check still needs review. Partial offers remain reference-only.'] } : value;
+  };
+  const result = retain(first, second);
+  return first.standard || second.standard ? { ...result, standard: retain(first.standard, second.standard) } : result;
 }
 
 // Always compare barcode and title searches. A priced barcode match must not
@@ -5586,15 +5616,15 @@ function floorAmazonHtml(cur, b) {
   const a = cur.amazon;
   const label = a?.renewedFallback ? 'Amazon Renewed fallback offers' : a?.newReference ? 'Amazon new offers' : `Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers`;
   if (!a) return `<button type="button" class="link floor-amz-check" data-floor-act="amazon">Check Amazon ${amazonCond(cur.condition) === 'new' ? 'new' : 'used'} offers</button>`;
-  if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>Checking Amazon…</p>`;
-  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
+  if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>${a.retrying ? 'Retrying unfinished Amazon checks once…' : 'Checking Amazon…'}</p>`;
+  if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">${a.retryAttempted ? 'Still unavailable after one automatic retry. ' : ''}${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
   if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match${floorStandardGame(cur.product) ? ' for this edition' : ''}. Check the title, platform and edition before using another listing.</p>${matchNote}`;
   const offers = a.offers || [];
   const eligible = floorAmazonEligibleOffers(cur);
   const lowestAt = offers.findIndex((o) => eligible.includes(o) && Number(o.price) === floorAmazonLowest(cur, true));
   const usedAt = b.from === 'amazon' ? lowestAt : -1;
-  const partial = a.incomplete ? '<p class="muted"><span class="badge warn">Search incomplete · reference only</span> Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button></p>' : '';
+  const partial = a.incomplete ? `<p class="muted"><span class="badge warn">Search incomplete · reference only</span> ${a.retryAttempted ? 'Still incomplete after one automatic retry. ' : ''}Showing verified matches found so far. <button type="button" class="link" data-floor-act="amazon">Retry Amazon</button></p>` : '';
   const head = `${floorAmazonReferencesHtml(cur, b)}<div class="eyebrow floor-amz-head">${label} · <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title || 'Amazon page')} ↗</a></div>${partial}${matchNote}`;
   const mismatch = floorAmazonMismatch(cur);
   if (mismatch) return `${head}<p class="muted"><span class="badge warn">Excluded from pricing</span> ${esc(mismatch)}. Review the listing title and variant; its offers are not used.</p>`;

@@ -1238,8 +1238,15 @@ The site's **only server-side code**. Everything else is static.
     Pins, offer tables, review notes and audits retain the incomplete status.
     An unpriced partial match says no priced offer has been found yet, never
     that Amazon has no offers. Completed empty searches say no matching offers
-    were returned. Real failures and pagination guards require Retry, not an
-    automatic retry loop; partial prices remain excluded.
+    were returned. Live lookups automatically retry failed/incomplete searches once,
+    after a one-second pause, using a fresh request memo and the saved successful
+    pages/offer members. Edition and standard-game failures both trigger recovery;
+    completed empty searches do not. Server pacing/cooldowns remain authoritative.
+    Cancellation/load IDs prevent stale lookup publication or starting a retry for
+    another game/condition. Persistent failures retain partial offers as reference-only
+    and explicitly say one automatic retry was attempted. Manual Retry remains
+    available; bulk/audit calls do not gain automatic retry loops. Pricing, condition
+    selection and premiums remain unchanged. No helper update is required.
     Partial Renewed offers cannot activate the fallback prematurely.
     The interactive pricer starts the selected PriceCharting sales page before
     related-entry discovery and begins GameStop stock checking as soon as its

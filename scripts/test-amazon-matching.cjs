@@ -644,5 +644,74 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.equal(result.incomplete,undefined);
     assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2500);
   });
+  await test('automatic Amazon retry resumes failed pages once and keeps successful offers cached', async () => {
+    const a=candidate('B000000001');let later=0,first=0,offers=0,notices=0;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers'){offers++;return offer(a,2500);}
+      if(params.upc)return {candidates:[]};
+      if(!params.pageToken){first++;return {candidates:[a],more:true,nextToken:'later'};}
+      if(++later===1)throw Error('Temporary later-page failure');
+      return {candidates:[]};
+    });
+    e.ctx.condition='loose';e.ctx.onRetry=()=>notices++;
+    e.ctx.result=await e.run('fetchFloorAmazonRetry(product,"loose",{request,onRetry,pause:async()=>{}})');
+    assert.equal(notices,1);assert.equal(later,2);assert.equal(first,1);assert.equal(offers,2);
+    assert.equal(e.ctx.result.incomplete,undefined);assert.equal(e.ctx.result.retryAttempted,undefined);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2500);
+  });
+  await test('automatic Amazon retry recovers a failed offer without refetching successful members', async () => {
+    const a=candidate('B000000001');let used=0,fresh=0,catalogs=0;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/catalog'){catalogs++;return {candidates:[a]};}
+      if(params.cond==='used'){used++;return offer(a,3000);}
+      if(++fresh===1)throw Error('Offer throttled');
+      return {...offer(a,2000),condition:'New'};
+    });
+    e.ctx.condition='loose';
+    const result=await e.run('fetchFloorAmazonRetry(product,"loose",{request,pause:async()=>{}})');
+    assert.equal(used,1);assert.equal(fresh,2);assert.equal(catalogs,2);
+    assert.equal(result.newReference,true);assert.equal(result.offers[0].price,2000);
+  });
+  await test('persistent Amazon failures stop after one retry and partial prices stay excluded', async () => {
+    const a=candidate('B000000001');let attempts=0;
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/offers')return offer(a,2500);
+      if(params.upc)return {candidates:[]};
+      if(params.pageToken){attempts++;throw Error('Still unavailable');}
+      return {candidates:[a],more:true,nextToken:'later'};
+    });
+    e.ctx.condition='loose';e.ctx.result=await e.run('fetchFloorAmazonRetry(product,"loose",{request,pause:async()=>{}})');
+    assert.equal(attempts,2);assert.equal(e.ctx.result.incomplete,true);assert.equal(e.ctx.result.retryAttempted,true);
+    assert.equal(e.ctx.result.offers[0].price,2500);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),null);
+    e.run('amazonSet=true');
+    assert.match(e.run('floorAmazonHtml({product,condition:"loose",amazon:result},{})'),/Still incomplete after one automatic retry/);
+    let failures=0;
+    const failed=engine(async()=>{failures++;throw Error('Offline');});
+    const value=await failed.run('fetchFloorAmazonRetry({...product,upc:""},"loose",{request,pause:async()=>{}})');
+    assert.equal(failures,2);assert.equal(value.error,'Offline');assert.equal(value.retryAttempted,true);
+  });
+  await test('completed empty Amazon searches do not retry and cancellation prevents recovery work', async () => {
+    let reads=0,notices=0;
+    const e=engine(async()=>{reads++;return {candidates:[]};});
+    e.ctx.onRetry=()=>notices++;
+    await e.run('fetchFloorAmazonRetry(product,"loose",{request,onRetry,pause:async()=>{}})');
+    assert.equal(notices,0);assert.equal(reads,3,'UPC, title and Renewed each searched once');
+    let attempts=0;const cancelled=engine(async()=>{attempts++;throw Error('Offline');});
+    cancelled.ctx.stop=false;
+    await cancelled.run('fetchFloorAmazonRetry({...product,upc:""},"loose",{request,cancelled:()=>stop,onRetry:()=>{stop=true;},pause:async()=>{}})');
+    assert.equal(attempts,1,'No retry after switching lookup');
+  });
+  await test('standard-game Amazon recovery is independent and first partial details survive transport failure', async () => {
+    const e=engine(async()=>{});let attempts=0;
+    e.ctx.fetchStub=async()=>++attempts===1?{found:false,standard:{error:'Temporary failure'}}:{found:false,standard:{found:false}};
+    e.run('fetchFloorAmazon=fetchStub');
+    const recovered=await e.run('fetchFloorAmazonRetry(product,"cib",{pause:async()=>{}})');
+    assert.equal(attempts,2);assert.equal(recovered.standard.error,undefined);
+    attempts=0;const a={...offer(candidate('B000000001'),2500),incomplete:true,searchError:'First failure'};
+    e.ctx.fetchStub=async()=>{if(++attempts===1)return a;throw Error('Second failure');};e.run('fetchFloorAmazon=fetchStub');
+    const retained=await e.run('fetchFloorAmazonRetry(product,"cib",{pause:async()=>{}})');
+    assert.equal(retained.offers[0].price,2500);assert.equal(retained.incomplete,true);assert.equal(retained.searchError,'Second failure');
+  });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });
