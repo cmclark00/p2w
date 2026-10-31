@@ -713,5 +713,32 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const retained=await e.run('fetchFloorAmazonRetry(product,"cib",{pause:async()=>{}})');
     assert.equal(retained.offers[0].price,2500);assert.equal(retained.incomplete,true);assert.equal(retained.searchError,'Second failure');
   });
+  await test('New also loads an independent CIB comparison, sharing successful catalog and offer reads', async () => {
+    const calls=[];
+    const e=engine(async(route,params)=>{
+      calls.push([route,JSON.stringify(params)]);
+      if(route==='amazon/catalog')return {candidates:[candidate('B000000001')]};
+      return {...offer(candidate('B000000001'),params.cond==='new'?3000:4000),condition:params.cond==='new'?'New':'Used'};
+    });
+    const a=await e.fetch(product,'new');
+    assert.equal(a.condition,'New');assert.equal(a.cibComparison.condition,'New','CIB keeps cheaper-New policy');
+    assert.equal(a.cibComparison.references.used.offers[0].price,4000);
+    assert.equal(a.cibComparison.references.new.offers[0].price,3000);
+    assert.equal(new Set(calls.map(JSON.stringify)).size,calls.length,'condition comparisons do not duplicate identical HTTP reads');
+    await e.fetch(product,'cib');
+    assert.equal(new Set(calls.map(JSON.stringify)).size,calls.length,'CIB result stays cached for condition switch');
+  });
+  await test('New retries a failed CIB comparison once and preserves its review status if still incomplete', async () => {
+    const e=engine(async()=>{});let attempts=0;
+    e.ctx.fetchStub=async()=>({found:true,condition:'New',cibComparison:++attempts===1?{incomplete:true}:{found:false}});
+    e.run('fetchFloorAmazon=fetchStub');
+    const done=await e.run('fetchFloorAmazonRetry(product,"new",{pause:async()=>{}})');
+    assert.equal(attempts,2);assert.equal(done.cibComparison.incomplete,undefined);
+    attempts=0;e.ctx.fetchStub=async()=>{attempts++;return {found:true,cibComparison:{found:false,standard:{error:'offline'}}};};
+    e.run('fetchFloorAmazon=fetchStub');
+    const partial=await e.run('fetchFloorAmazonRetry(product,"new",{pause:async()=>{}})');
+    assert.equal(attempts,2);assert.equal(partial.cibComparison.standard.retryAttempted,true);
+    assert.equal(partial.cibComparison.standard.error,'offline');
+  });
   console.log(`${checks} Amazon matching checks passed.`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

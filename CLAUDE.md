@@ -1077,6 +1077,20 @@ The site's **only server-side code**. Everything else is static.
     Typed overrides bypass market minimums. `floorResult()` serves the
     pricer, Add to list and re-check. Existing saved list prices remain
     unchanged until staff re-check and accept the suggestions.
+    **New cannot finish below complete CIB for the same game/edition.**
+    `floorResult()` compares the two independently calculated final prices,
+    then raises New only when CIB is higher (New $30 / CIB $40 -> New $40).
+    Each condition applies its own premiums, exclusions and rounding exactly
+    once. CIB uses automatic selection with no missing-manual deduction or staff
+    override; New retains its own sealed-only evidence list. Toys and hardware
+    are outside this game rule, and typed overrides remain explicit.
+    Live New loads a separate CIB comparison even if staff never selected CIB,
+    reuses completed checks when available, and waits for pending comparison
+    work before enabling Add to list. Failed comparisons show a review note.
+    Amazon comparisons share catalog/offer requests and cached results, including
+    standard-edition fallback and the one automatic recovery pass. The floor
+    and its reason are retained in saved/rechecked pricing metadata; no helper
+    update is needed.
   - **Hardware on the floor** (`floorIsHardware()`: `guessCategory()` of
     the name isn't a game, or PriceCharting's genre says systems/
     accessories): priced from sales the same way, but **no game rules**
@@ -1304,8 +1318,9 @@ The site's **only server-side code**. Everything else is static.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
     All pre-owned inventory selects the cheaper eligible regular Used or New offer,
     including CIB. On equal prices, Used wins. New can also be the only available offer.
-    Only New evidence prices New; Like New, Used, Open Box and Renewed do not.
-    Optional display-only Used failures do not block New pricing. Both Used and
+    Only New evidence enters the New source baseline; Like New, Used, Open Box
+    and Renewed do not. The final New shelf recommendation also respects the
+    independently calculated complete-CIB floor described above. Both Used and
     New reads are required for pre-owned inventory: an error leaves the search incomplete and
     retryable, rather than selecting a potentially higher price from partial data.
     GameStop pre-owned stays visible but never sets a New inventory minimum.
@@ -1316,8 +1331,9 @@ The site's **only server-side code**. Everything else is static.
     Amazon reference; the comparison table distinguishes that selection from
     the source that actually sets the shelf baseline. Incomplete prices never
     show as selected. New inventory also reads Used offers from the verified
-    ASINs for display only; those cannot price the sealed item, and an optional
-    Used-read failure is labeled unavailable without invalidating New pricing.
+    ASINs for display; those do not enter its sealed source baseline. CIB is
+    searched independently for the final floor, and a failed CIB check is
+    labeled for review without claiming that used evidence is a sealed sale.
     Renewed fallback starts only without a regular eligible price: neither Used
     nor New for any pre-owned inventory.
     Deferred renewed/refurbished candidates plus a title/platform/renewed

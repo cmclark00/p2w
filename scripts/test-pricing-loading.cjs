@@ -17,6 +17,32 @@ function engine(request) {
   return { ctx, element, run: js => vm.runInContext(js, ctx) };
 }
 (async () => {
+  const sealed = engine();
+  sealed.run(`amazonSet=false; pendingComparisons=[];
+    runFloorEbaySearch=(cur,progress,cancelled)=>{
+      if(cur.directEbay?.condition===cur.condition)return;
+      cur.directEbay={condition:cur.condition,loading:true};pendingComparisons.push({cur,cancelled});
+    }; runFloorTargetedEbay=()=>{};
+    floorCur={product:{...product,'gamestop-price':0},condition:'new',sales:{
+      new:[{title:'Example Game PS4 sealed',price:2999}],cib:[{title:'Example Game PS4 CIB',price:3999}]}};
+    renderFloorPricer();`);
+  assert.equal(sealed.run('pendingComparisons.length'),2,'New selected directly starts its CIB comparison too');
+  assert.match(sealed.element('#floorPricer').innerHTML,/Checking CIB comparison/);
+  assert.match(sealed.element('#floorPricer').innerHTML,/data-floor-act="add" disabled/);
+  sealed.run(`for(const {cur} of pendingComparisons)cur.directEbay={condition:cur.condition,loading:false,result:{state:'ready',sales:[]}};
+    renderFloorPricer();renderFloorPricer();`);
+  assert.equal(sealed.run('pendingComparisons.length'),2,'repainting does not repeat comparisons');
+  assert.equal(sealed.run('floorResult(floorCur).r.price'),4000);
+  assert.match(sealed.element('#floorPricer').innerHTML,/held at CIB price \$40.00/);
+  sealed.run('floorCur.condition="cib"');
+  assert.equal(sealed.run('pendingComparisons[0].cancelled()'),true,'leaving New cancels its background CIB work');
+  sealed.run(`floorCur.amazon={loading:true};floorCur.directEbay={condition:'cib',loading:true};
+    floorCur.ebayChecks={loading:true,results:{a:{state:'pending'},b:{state:'sold'}}};loadFloorAmazon=()=>{};
+    onFloorPricerClick({target:{closest:selector=>selector==='[data-floor-cond]'?{dataset:{floorCond:'new'}}:null}});`);
+  assert.equal(sealed.run('floorCur.cibComparison.ebayChecks.results.a'),undefined,'abandoned pending checks cannot stick');
+  assert.equal(sealed.run('floorCur.cibComparison.ebayChecks.results.b.state'),'sold');
+  assert.equal(sealed.run('floorCur.cibComparison.amazon'),null,'abandoned Amazon load cannot stick');
+  console.log('PASS New CIB floor, final-price gating, cached checks and condition-switch cancellation');
   const switchLoad = engine();
   switchLoad.run(`tokenSet=true; amazonSet=true;
     loadFloorSales=()=>{}; loadFloorAmazon=()=>{}; closeFloorResults=()=>{};

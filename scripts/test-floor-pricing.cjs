@@ -38,6 +38,56 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('New games have the complete CIB recommendation as a final floor, with one premium and rounding pass', () => {
+  const p = {...item,'product-name':'Resident Evil 3','cib-price':2000,'new-price':3000};
+  const input = cur(p,{condition:'new',sales:{new:[{title:'Resident Evil 3 PS4 sealed',price:2999}],
+    cib:[{title:'Resident Evil 3 PS4 CIB',price:3999}]}});
+  const before=JSON.stringify(input), result=invoke('floorResult',input);
+  assert.equal(result.r.price,4000);assert.equal(result.r.beforeCibFloor,3000);
+  assert.equal(result.b.sale.price,2999,'CIB does not replace the selected sealed sale');
+  assert.equal(invoke('floorSales',input).length,1,'New evidence list remains condition-specific');
+  assert.match(invoke('floorMath',result.b,result.r),/held at CIB price \$40.00/);
+  assert.equal(invoke('floorBasisInfo',result.b).cibReference.price,4000);
+  assert.equal(JSON.stringify(input),before,'comparison does not mutate source evidence');
+  const high={...input,sales:{...input.sales,new:[{title:'Resident Evil 3 PS4 sealed',price:5999}]}};
+  assert.equal(invoke('floorResult',high).r.price,6000,'already higher New is unchanged');
+  assert.equal(invoke('floorResult',{...input,typed:2500}).r.price,2500,'staff override remains explicit');
+  const dirty={...input,manualMissing:true,cibComparison:{pick:0,typed:90000,manualMissing:true}};
+  assert.equal(invoke('floorResult',dirty).r.price,4000,'CIB floor is complete and automatic');
+  const bad={...input,sales:{...input.sales,cib:[
+    {title:'Resident Evil 3 PS4 + Resident Evil 2 bundle',price:5500},
+    {title:'Resident Evil 3 PS4 CIB',price:3999}]}};
+  assert.equal(invoke('floorResult',bad).r.price,4000,'wrong bundles never set the CIB floor');
+  for (const name of ['Pokemon Emerald','Shin Megami Tensei IV']) {
+    const product={...item,'product-name':name,'console-name':'Nintendo 3DS'};
+    const c=cur(product,{condition:'new',sales:{new:[{title:name+' sealed',price:3000}],cib:[{title:name+' CIB',price:4020}]}});
+    const cib=invoke('floorResult',{...c,condition:'cib'});
+    const fresh=invoke('floorResult',c);
+    assert.equal(fresh.r.price,cib.r.price,'specific premium is not applied twice: '+name);
+  }
+  const highTier={...input,product:{...p,'cib-price':40000,'new-price':40000},
+    sales:{new:[{title:'Resident Evil 3 PS4 sealed',price:40200}],cib:[{title:'Resident Evil 3 PS4 CIB',price:52800}]}};
+  assert.equal(invoke('floorResult',highTier).r.price,55000,'higher rounding tier remains a single pass');
+  const pending={...input,cibComparison:{directEbay:{condition:'cib',loading:true}}};
+  assert.equal(invoke('floorResult',pending).r,null);assert.equal(invoke('floorResult',pending).b.cibWaiting,true);
+  const unverified={...input,cibComparison:{directEbay:{condition:'cib',result:{state:'unknown',sales:[]}}}};
+  assert.equal(invoke('floorResult',unverified).b.cibReview,true,'failed CIB checks stay visible');
+});
+
+test('New CIB floor uses separate Amazon, standard edition and stock evidence', () => {
+  const amazon={found:true,title:'Example Game',condition:'New',offers:[{price:2999,sub:'new'}],
+    cibComparison:{found:true,title:'Example Game',condition:'Used',offers:[{price:3999,sub:'very_good'}]}};
+  const c=cur(item,{condition:'new',sales:{new:[],cib:[]},amazon});
+  assert.equal(invoke('floorResult',c).r.price,4000);
+  const p={...item,'product-name':'Example Game [Deluxe Edition]'};
+  const edition=cur(p,{condition:'new',sales:{new:[{title:'Example Game Deluxe Edition PS4 sealed',price:3000}],cib:[]},
+    standardGame:{product:item,sales:{new:[],cib:[{title:'Example Game CIB',price:4500}]}}});
+  assert.equal(invoke('floorResult',edition).r.price,4500,'existing standard-game floor still applies');
+  const stock={...c,product:{...item,'gamestop-price':5999}};
+  assert.equal(invoke('floorResult',{...stock,gamestopStock:{state:'out',title:'Example Game'}}).r.price,4000);
+  assert.equal(invoke('floorResult',{...stock,gamestopStock:{state:'in'}}).r.price,6000);
+});
+
 test('Amazon-driven prices through $80 round down to $5 unless within $2 of the next step', () => {
   for(const [raw,want] of [[1000,1000],[1200,1000],[1299,1000],[1300,1500],[1495,1500],[2500,2500],[2700,2500],[2799,2500],[2800,3000],[2999,3000],[3299,3000],[3300,3500],[7799,7500],[7800,8000],[8000,8000]]) {
     const r=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,offers:[{price:raw}],lowest:raw}}));
@@ -1349,7 +1399,8 @@ test('three-reference baseline applies across tiers and conditions before specif
           const expected = manualMissing && condition === 'cib'
             ? { sale: 13000, amazon: 14000, gamestop: 16000 }[expectedFrom]
             : { sale: 15000, amazon: 16000, gamestop: 18000 }[expectedFrom];
-          assert.equal(r.r.price, expected);
+          assert.equal(r.r.price, condition === 'new' && from === 'gamestop' ? 18000 : expected,
+            'New retains its own baseline, but cannot finish below the complete CIB price');
         }
       }
     }

@@ -3848,10 +3848,11 @@ async function fetchFloorAmazonRetry(product, condition, {
   request = floorAmazonRequest, cancelled = () => false, onRetry = () => {},
   pause = () => new Promise(resolve => setTimeout(resolve, 1000)),
 } = {}) {
-  const failed = value => !!(value?.error || value?.incomplete);
+  const failed = value => !!(value?.error || value?.incomplete || value?.standard && failed(value.standard)
+    || value?.cibComparison && failed(value.cibComparison));
   const attempt = () => fetchFloorAmazon(product, condition, request).catch(err => ({ error: err.message }));
   const first = await attempt();
-  if (cancelled() || !failed(first) && !failed(first.standard)) return first;
+  if (cancelled() || !failed(first)) return first;
   onRetry();
   await pause(); // Brief backoff; server-wide rate limits/cooldowns still apply.
   if (cancelled()) return first;
@@ -3866,7 +3867,14 @@ async function fetchFloorAmazonRetry(product, condition, {
       matchNotes: [...(value.matchNotes || []), 'Amazon was retried once automatically; this check still needs review. Partial offers remain reference-only.'] } : value;
   };
   const result = retain(first, second);
-  return first.standard || second.standard ? { ...result, standard: retain(first.standard, second.standard) } : result;
+  if (first.standard || second.standard) result.standard = retain(first.standard, second.standard);
+  if (first.cibComparison || second.cibComparison) {
+    result.cibComparison = retain(first.cibComparison, second.cibComparison);
+    if (first.cibComparison?.standard || second.cibComparison?.standard) {
+      result.cibComparison.standard = retain(first.cibComparison?.standard, second.cibComparison?.standard);
+    }
+  }
+  return result;
 }
 
 // Always compare barcode and title searches. A priced barcode match must not
@@ -3926,10 +3934,14 @@ async function fetchFloorAmazon(product, condition, request = floorAmazonRequest
   const base = floorStandardGame(product);
   // Independent identities can search together; shared requests still run once.
   // The server serializes and paces uncached Amazon calls across all devices.
-  const [own, standard] = await Promise.all([
+  const compareCib = floorNeedsCibFloor({ product, condition });
+  const [own, standard, cib, standardCib] = await Promise.all([
     fetchFloorAmazonSingle(product, condition, shared).catch(err => ({ error: err.message })),
     base ? fetchFloorAmazonSingle(base, condition, shared).catch(err => ({ error: err.message })) : null,
+    compareCib ? fetchFloorAmazonSingle(product, 'cib', shared).catch(err => ({ error: err.message })) : null,
+    compareCib && base ? fetchFloorAmazonSingle(base, 'cib', shared).catch(err => ({ error: err.message })) : null,
   ]);
+  if (compareCib) own.cibComparison = base ? { ...cib, standard: standardCib } : cib;
   if (!base) { if (own.error) throw Error(own.error); return own; }
   return { ...own, standard, matchNotes: [...(own.matchNotes || []), ...(standard.error ? [`Standard-game Amazon check unavailable: ${standard.error}`] : [])] };
 }
@@ -5370,7 +5382,42 @@ function floorSwitchMsrpBasis(cur) {
 }
 
 // The shelf price for a game being priced (or re-checked): { b: floorBasis, r: floorPrice, shitbox, premium, hw }.
+const floorNeedsCibFloor = cur => cur.condition === 'new' && cur.typed == null
+  && !floorToyFamily(cur.product) && !floorIsHardware(cur.product);
+
+// Same product/edition, evaluated independently as complete CIB. Never let a
+// New sale, manual deduction, picked sale or typed override leak into this floor.
+function floorCibCur(cur) {
+  const saved = cur.cibComparison || {};
+  const amazon = cur.amazon?.cibComparison || (cur.amazon?.loading ? cur.amazon
+    : saved.amazon && !saved.amazon.loading ? saved.amazon : (cur.amazon ? { error: 'CIB Amazon comparison unavailable.' } : null));
+  return { ...cur, ...saved, product: cur.product, condition: 'cib', manualMissing: false,
+    pick: null, typed: null, cibComparison: null, amazon,
+    sales: cur.sales, salesError: cur.salesError, salesLoading: cur.salesLoading, fullLoading: cur.fullLoading,
+    gamestopStock: cur.gamestopStock,
+    standardGame: cur.standardGame ? { ...cur.standardGame, ebayChecks: saved.standardGame?.ebayChecks } : null,
+    directEbay: saved.directEbay, ebayChecks: saved.ebayChecks, ebayRun: saved.ebayRun, targetedEbay: saved.targetedEbay };
+}
+
 function floorResult(cur) {
+  const result = floorConditionResult(cur);
+  if (!floorNeedsCibFloor(cur) || result.b.need) return result;
+  const cibCur = floorCibCur(cur), cib = floorConditionResult(cibCur);
+  const b = { ...result.b, checks: [...result.b.checks], cibReference: { price: cib.r?.price || null } };
+  if (cib.b.waiting || cib.b.ebayChecking) {
+    return { ...result, b: { ...b, waiting: true, cibWaiting: true }, r: null };
+  }
+  const review = !!(cib.b.need || cib.b.ebayReview || [cibCur.amazon, cibCur.amazon?.standard].some(a => a?.error || a?.incomplete));
+  if (review) {
+    b.cibReview = true;
+    b.checks.push('CIB comparison needs review.', ...cib.b.checks.filter(Boolean).map(note => `CIB: ${note}`));
+  }
+  if (!result.r || !(cib.r?.price > result.r.price)) return { ...result, b };
+  b.checks.push(`New price held at the complete CIB recommendation: ${money(cib.r.price)}. Each condition keeps its own pricing rules; no second premium or rounding.`);
+  return { ...result, b, r: { ...result.r, price: cib.r.price, cibFloor: cib.r.price, beforeCibFloor: result.r.price } };
+}
+
+function floorConditionResult(cur) {
   cur = floorConditionCur(cur);
   const p = cur.product;
   const toy = floorToyFamily(p), toyGroup = floorToyGroup(cur);
@@ -5506,6 +5553,20 @@ function renderFloorPricer() {
   if (!floorCur) { el.innerHTML = ''; return; }
   const cur = floorCur = floorConditionCur(floorCur);
   const condition = cur.condition;
+  if (cur.condition === 'new' && cur.typed != null) cur.cibComparison = null;
+  if (floorNeedsCibFloor(cur)) {
+    const comparison = floorCibCur(cur);
+    const cib = cur.cibComparison ||= {};
+    if (cib.standardGame && comparison.standardGame) {
+      Object.assign(cib.standardGame, comparison.standardGame);
+      comparison.standardGame = cib.standardGame;
+    }
+    Object.assign(cib, comparison);
+    const stopped = () => floorCur !== cur || cur.condition !== 'new' || cur.typed != null || cur.cibComparison !== cib;
+    const progress = () => { if (!stopped()) queueFloorPricerRender(cur, 'new'); };
+    void runFloorEbaySearch(cib, progress, stopped);
+    void runFloorTargetedEbay(cib, progress, stopped);
+  }
   void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
   void runFloorTargetedEbay(cur, () => {
     if (floorCur === cur && cur.condition === condition) queueFloorPricerRender(cur, condition);
@@ -5549,7 +5610,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -5572,8 +5633,9 @@ function renderFloorPricer() {
     <div class="floor-price-context">
         ${deadGameNotice(p['product-name'], p['console-name'])}
         ${result ? `<div class="floor-math muted">${esc(floorMath(b, result))}</div>` : ''}
-        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${cur.fullLoading ? 'Checking product…' : b.from === 'msrp' ? 'Checking MSRP…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
+        ${b.waiting ? `<p class="muted small-print"><span class="spinner"></span>${estimate ? 'Estimate may change · ' : ''}${b.cibWaiting ? 'Checking CIB comparison…' : cur.fullLoading ? 'Checking product…' : b.from === 'msrp' ? 'Checking MSRP…' : !cur.sales && !cur.salesError ? 'Checking sold prices…' : cur.salesLoading ? 'Checking related editions…' : floorGs(cur.product) && cur.gamestopStock?.state === 'loading' ? 'Checking GameStop stock…' : cur.directEbay?.loading ? 'Searching eBay sold listings…' : 'Checking Amazon…'}</p>` : ''}
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
+        ${b.cibReview ? '<p class="muted small-print">CIB comparison needs review · see review notes.</p>' : ''}
         <div class="floor-review-summary">
           ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
@@ -5698,6 +5760,7 @@ function floorAmazonHtml(cur, b) {
 }
 
 function floorMath(b, r) {
+  if (r.cibFloor) return `${floorMath(b, { ...r, price: r.beforeCibFloor, cibFloor: null })} → held at CIB price ${money(r.cibFloor)}`;
   if (b.from === 'msrp') return `MSRP ${money(b.msrp)} − $5.00 = ${money(r.price)} · exact price`;
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
@@ -5718,6 +5781,7 @@ function floorMath(b, r) {
 // Where a list item's price came from (kept on the item; shown in the "Based on" column).
 const floorBasisInfo = (b) => ({
   basis: b.basis, from: b.from,
+  ...(b.cibReference ? { cibReference: b.cibReference } : {}),
   saleDate: b.from === 'sale' ? b.sale?.date || '' : '',
   reviewNotes: b.checks || [],
   ...(b.from === 'msrp' ? { msrp: b.msrp, msrpUrl: b.msrpUrl } : {}),
@@ -5749,6 +5813,16 @@ function onFloorPricerClick(e) {
   const cond = e.target.closest('[data-floor-cond]')?.dataset.floorCond;
   if (cond) {
     const amazonChanged = cond !== floorCur.condition;
+    if (amazonChanged && floorCur.condition === 'new') floorCur.cibComparison = null;
+    if (amazonChanged && floorCur.condition === 'cib') {
+      // Preserve completed checks, not an employee's manual price or deduction.
+      const completed = checks => checks ? { loading: false,
+        results: Object.fromEntries(Object.entries(checks.results || {}).filter(([, value]) => value.state !== 'pending')) } : null;
+      floorCur.cibComparison = { amazon: floorCur.amazon?.loading ? null : floorCur.amazon,
+        directEbay: floorCur.directEbay?.loading ? null : floorCur.directEbay,
+        ebayChecks: completed(floorCur.ebayChecks),
+        standardGame: floorCur.standardGame ? { ...floorCur.standardGame, ebayChecks: completed(floorCur.standardGame.ebayChecks) } : null };
+    }
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false, openSaleGroups: {} });
     if (cond !== 'cib') floorCur.manualMissing = false;
     if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
