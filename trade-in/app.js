@@ -1346,11 +1346,21 @@ function tradeTotals() {
     t.cash = adj.cash;
     t.credit = roundTotal((credit * adj.cash) / cash);
   }
+  const creditAdj = trade.creditTotal;
+  if (creditAdj && creditAdj.baseCash === cash && creditAdj.baseCredit === credit
+      && Number.isSafeInteger(creditAdj.credit) && creditAdj.credit >= 0) {
+    t.creditAdjustedFrom = t.credit;
+    t.credit = creditAdj.credit;
+  }
   return t;
 }
 
 // Explains why the totals differ from what the items add up to, or '' when they don't.
 function totalsNote(t) {
+  if (t.creditAdjustedFrom != null) {
+    const cashNote = t.adjustedFrom ? `Cash adjusted from ${money(t.adjustedFrom.cash)} to ${money(t.cash)}. ` : '';
+    return `${cashNote}Store credit adjusted from ${money(t.creditAdjustedFrom)} to ${money(t.credit)}; item prices are unchanged.`;
+  }
   if (t.adjustedFrom) {
     return `Totals adjusted from ${money(t.adjustedFrom.cash)} cash · ${money(t.adjustedFrom.credit)} credit (store credit scaled to match).`;
   }
@@ -1371,6 +1381,32 @@ function setCashTotal(input) {
   input.value = money(tradeTotals().cash);
 }
 
+// The final credit offer is independent of cash and never rewrites item prices.
+function applyCreditTotal(value) {
+  const cents = parseMoney(value);
+  if (cents != null && (!Number.isSafeInteger(cents) || !Number.isSafeInteger(roundTotal(cents)))) return false;
+  const t = tradeTotals(), auto = t.creditAdjustedFrom ?? t.credit;
+  trade.creditTotal = cents == null || !t.count || roundTotal(cents) === auto ? null
+    : { credit: roundTotal(cents), baseCash: t.itemsCash, baseCredit: t.itemsCredit };
+  saveTrade();
+  return true;
+}
+function setCreditTotal(input) {
+  if (!applyCreditTotal(input.value)) { toast('Enter a store credit total like 50', 'error'); return false; }
+  renderTotals();
+  input.value = money(tradeTotals().credit);
+  if ($('#completeDialog').open) { renderCompleteCredit(); updateDialogSplit(); }
+  return true;
+}
+function renderCompleteCredit() {
+  $('#payCredit').value = money(tradeTotals().credit);
+  $('#payCreditReset').hidden = tradeTotals().creditAdjustedFrom == null;
+}
+function resetCreditTotal() {
+  trade.creditTotal = null; saveTrade(); renderTotals();
+  if ($('#completeDialog').open) { renderCompleteCredit(); updateDialogSplit(); }
+}
+
 function renderTotals() {
   let t = tradeTotals();
   if (trade.cashTotal && !t.adjustedFrom) { // items changed since the cash total was typed
@@ -1379,14 +1415,22 @@ function renderTotals() {
     toast('The trade changed, so the adjusted cash total was cleared.');
     t = tradeTotals();
   }
+  if (trade.creditTotal && t.creditAdjustedFrom == null) {
+    trade.creditTotal = null; saveTrade();
+    toast('The trade changed, so the adjusted store credit total was cleared.');
+    t = tradeTotals();
+  }
   $('#itemCount').textContent = t.count;
   const cashInput = $('#totalCash');
   if (document.activeElement !== cashInput) cashInput.value = money(t.cash);
   cashInput.classList.toggle('adjusted', !!t.adjustedFrom);
   $('#cashReset').hidden = !t.adjustedFrom;
-  $('#totalCredit').textContent = money(t.credit);
+  const creditInput = $('#totalCredit');
+  if (document.activeElement !== creditInput) creditInput.value = money(t.credit);
+  creditInput.classList.toggle('adjusted', t.creditAdjustedFrom != null);
+  $('#creditReset').hidden = t.creditAdjustedFrom == null;
   cashInput.title = totalsNote(t) || 'Type a different cash total to adjust the offer. Store credit scales to match.';
-  $('#totalCredit').title = totalsNote(t);
+  creditInput.title = totalsNote(t) || 'Type a different store credit total. Cash stays unchanged.';
   const notes = [];
   if (t.missing) notes.push(`${t.missing} need${t.missing === 1 ? 's' : ''} a price`);
   if (t.notBuying) notes.push(`${t.notBuying} not buying`);
@@ -2497,7 +2541,7 @@ function openComplete() {
   ensureTradeConsoleReferences();
   renderCompletePc();
   $('#payCash').textContent = money(t.cash);
-  $('#payCredit').textContent = money(t.credit);
+  renderCompleteCredit();
   f.payout.value = trade.split ? 'split' : 'credit';
   dialogSplitBy = trade.split?.by || 'cash';
   $(PAY_SPLIT_INPUTS[dialogSplitBy]).value = plain(trade.split?.amount ?? null);
@@ -2531,13 +2575,19 @@ async function saveCompleted(print) {
   const error = $('#completeError');
   error.textContent = '';
   if (consoleMarketPending()) { error.textContent = 'Wait for the console market values to finish checking.'; return; }
-  const t = tradeTotals();
+  let t = tradeTotals();
   const staff = $('#staffName').value.trim();
   const customer = $('#completeCustomer').value.trim();
   if (!staff) { error.textContent = 'Enter your name.'; $('#staffName').focus(); return; }
   if (!customer) { error.textContent = "Enter the customer's name."; $('#completeCustomer').focus(); return; }
   let payout;
   const type = $('#completeForm').elements.payout.value;
+  if (type === 'credit' || type === 'split') {
+    if (!applyCreditTotal($('#payCredit').value)) {
+      error.textContent = 'Enter a valid store credit total.'; $('#payCredit').focus(); return;
+    }
+    t = tradeTotals();
+  }
   if (type === 'cash') payout = { type, cash: t.cash, credit: 0 };
   else if (type === 'credit') payout = { type, cash: 0, credit: t.credit };
   else {
@@ -2557,7 +2607,7 @@ async function saveCompleted(print) {
   saveTrade();
   const record = {
     priceCharting: tradePcSnapshot(),
-    staff, customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom },
+    staff, customer, payout, totals: { cash: t.cash, credit: t.credit, count: t.count, adjustedFrom: t.adjustedFrom, creditAdjustedFrom: t.creditAdjustedFrom },
     idChecked: needsId || undefined, notes: $('#completeNotes').value.trim() || undefined, items: tradeItems(),
   };
   let saved;
@@ -2581,7 +2631,7 @@ async function saveCompleted(print) {
 
 // New trade: empty list, and the staff and customer names start blank again.
 function resetTrade() {
-  Object.assign(trade, { lines: [], customer: '', staff: '', split: null, cashTotal: null, bulk: { counts: {}, lineId: null } });
+  Object.assign(trade, { lines: [], customer: '', staff: '', split: null, cashTotal: null, creditTotal: null, bulk: { counts: {}, lineId: null } });
   $('#customerName').value = '';
   commit();
   focusScan();
@@ -2614,7 +2664,7 @@ function resumeHeld(id) {
   const [h] = heldTrades.splice(i, 1);
   if (trade.lines.length) heldTrades.unshift(heldEntry()); // swap: the open trade goes on hold instead
   store.set(HELD_KEY, heldTrades);
-  Object.assign(trade, { customer: '', staff: '', split: null, cashTotal: null, bulk: { counts: {}, lineId: null } }, h.trade);
+  Object.assign(trade, { customer: '', staff: '', split: null, cashTotal: null, creditTotal: null, bulk: { counts: {}, lineId: null } }, h.trade);
   $('#customerName').value = trade.customer || '';
   commit();
   renderHeld();
@@ -6175,6 +6225,18 @@ function wireEvents() {
     renderTotals();
     cashTotal.value = money(tradeTotals().cash);
   });
+  for (const selector of ['#totalCredit', '#payCredit']) {
+    const input = $(selector);
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('change', () => setCreditTotal(input));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); if (selector === '#totalCredit') focusScan(); }
+      if (e.key === 'Escape') { e.preventDefault(); input.value = money(tradeTotals().credit); input.blur(); }
+    });
+  }
+  $('#payCredit').addEventListener('input', () => { $('#completeForm').elements.payout.value = 'credit'; });
+  $('#creditReset').addEventListener('click', resetCreditTotal);
+  $('#payCreditReset').addEventListener('click', resetCreditTotal);
 
   // A barcode scanner types like a keyboard - if focus drifted off an input, send keystrokes to the scan box.
   document.addEventListener('keydown', (e) => {

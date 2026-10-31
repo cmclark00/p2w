@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261027-history-speed">
+  <link rel="stylesheet" href="styles.css?v=20261031-credit-total">
 </head>
 <body>
   <header class="topbar">
@@ -547,7 +547,10 @@
       <input id="totalCash" class="total-input" type="text" inputmode="decimal" autocomplete="off" value="$0.00" aria-label="Cash total. Type a different amount to adjust the offer.">
       <button id="cashReset" type="button" class="total-reset" title="Back to the calculated total" hidden>↺ auto</button>
     </div>
-    <div class="total credit"><span>Store credit</span><strong id="totalCredit">$0.00</strong></div>
+    <div class="total credit"><span>Store credit</span>
+      <input id="totalCredit" class="total-input" type="text" inputmode="decimal" autocomplete="off" value="$0.00" aria-label="Store credit total. Type a different amount to adjust credit only.">
+      <button id="creditReset" type="button" class="total-reset" title="Back to the calculated store credit total" hidden>↺ auto</button>
+    </div>
     <div class="split">
       <button id="splitBtn" type="button" class="btn small">Split payout</button>
       <div id="splitBox" class="split-box" hidden>
@@ -575,7 +578,9 @@
       <fieldset class="payout">
         <legend>Customer is taking</legend>
         <label class="choice"><input type="radio" name="payout" value="cash"> Cash <strong id="payCash"></strong></label>
-        <label class="choice"><input type="radio" name="payout" value="credit"> Store credit <strong id="payCredit"></strong></label>
+        <label class="choice"><input type="radio" name="payout" value="credit"> Store credit
+          <span class="money-input"><input id="payCredit" type="text" inputmode="decimal" autocomplete="off" aria-label="Final store credit total" title="Edit the final store credit offer. Cash stays unchanged."></span>
+          <button id="payCreditReset" type="button" class="total-reset" hidden>↺ auto</button></label>
         <label class="choice"><input type="radio" name="payout" value="split"> Split:
           <span class="money-input"><span>$</span><input id="paySplitCash" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Split: cash"></span>
           cash +
@@ -609,6 +614,6 @@
 
   <script src="stock-helper-client.js?v=20261028-ebay-retry"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-  <script src="app.js?v=20261028-amazon-retry"></script>
+  <script src="app.js?v=20261031-credit-total"></script>
 </body>
 </html>

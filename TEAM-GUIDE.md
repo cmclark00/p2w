@@ -705,7 +705,11 @@ Everyone in the store shares one internet address, so typos add up.
    total can differ a little from the items added up. **Agreed on a
    different cash amount?** Click the cash total, type the new amount,
    and press Enter. Store credit adjusts to match. **↺ auto** puts it
-   back, and changing the items clears it. **Print quote**
+   back, and changing the items clears it. **Different store credit offer?**
+   Type the credit total in the bottom bar or in **Complete trade**. Credit
+   rounds to whole dollars; cash and item prices stay unchanged. Its **↺ auto**
+   resets it. The adjusted credit is used for split payouts, receipts and the
+   trade log, and changing item totals clears it. **Print quote**
    prints a copy for the customer, and **New trade** clears the list.
    **Customer still shopping, or went to get more games?** Click **Hold**.
    Their trade is set aside and the screen clears for the next person.

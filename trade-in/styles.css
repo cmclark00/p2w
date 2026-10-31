@@ -286,8 +286,8 @@ tr.flash td { animation: flash 1.2s ease-out; }
 .total { display: flex; flex-direction: column; align-items: flex-end; }
 .total span { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .total strong { font-size: 1.9rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.total.credit strong { color: var(--gold); }
-/* Editable cash total: reads like the credit total until hovered/focused. */
+.total.credit strong, .total.credit .total-input { color: var(--gold); }
+/* Editable totals retain their display treatment until hovered/focused. */
 .total-input {
   width: 7.5ch; padding: 0 4px; margin-right: -5px; text-align: right;
   font: 700 1.9rem/1.1 var(--font-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums;

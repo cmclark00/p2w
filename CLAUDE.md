@@ -1472,6 +1472,16 @@ The site's **only server-side code**. Everything else is static.
   Once the items no longer add up to that (added, removed, repriced),
   `renderTotals()` drops the adjustment with a toast so it can't go
   stale. "↺ auto" resets it, and so does typing the calculated total.
+- **Editable final store credit** (`#totalCredit`, `#payCredit`, `trade.creditTotal`):
+  staff can type the whole-dollar credit offer in the totals bar or Complete trade.
+  Cash and item prices stay unchanged; explicit credit takes priority over cash's
+  proportional scaling. Blank/calculated amount or the credit "auto" control
+  restores automatic credit. The override is tied to both raw item totals and
+  clears when those change. It persists with held/current trades and clears for
+  new/completed trades. Split payouts, quotes, receipts and saved log totals use
+  it; `totals.creditAdjustedFrom` explains the adjustment. Save reads/validates
+  the final input directly, including when it has not blurred. Regression coverage:
+  `scripts/test-trade-credit.cjs`.
 - **Editable line cash** (per item, `line.cashOverride`, cents each):
   every line's Cash column is an input. A typed amount is the **final**
   cash offer for that item (deductions and guide flat prices are already
