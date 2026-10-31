@@ -571,6 +571,11 @@ The site's **only server-side code**. Everything else is static.
     editions, languages and condition checks; Four Swords Adventures is not an
     alias. GBA also confirms the Game Boy Advance platform in recovered/Amazon
     titles. Original listing text remains displayed unchanged.
+    The original PS1 Tony Hawk catalog name also matches Tony Hawk's Pro Skater
+    (including apostrophe-free Hawks and an explicit first-game 1). This alias is
+    scoped to that release/platform; sequel numbers, multi-game pairs, editions,
+    imports and packaging still pass the existing exclusions. PSA titles join the
+    existing graded-copy exclusions so correcting the name cannot admit slabs.
     Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
   - **Hands-free by design** (owner request). PriceCharting's listed
     sales *are* eBay sold listings, so they stand in for the sheet's

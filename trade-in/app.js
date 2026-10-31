@@ -3481,7 +3481,7 @@ const FLOOR_SALE_PC_LIMIT_RATIO = 3;
 const FLOOR_TOY_OUTLIER_RATIO = 3;
 const FLOOR_TOY_OUTLIER_GAP = 2500;
 // Sales whose listing title suggests it isn't a normal copy: shown, but never picked automatically.
-const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph)\b/i;
+const ODD_SALE_RE = /\b(lot|lots|bundle|bundled|graded|wata|vga|cgc|psa|repro|reproduction|case only|box only|manual only|empty case|no game|art only|insert only|choose|pick|signed|autographed|autograph)\b/i;
 // "Disc only" / "cart only" is exactly what a loose game is; it's only odd for CIB and New sales (Oct 2026: it was
 // odd everywhere, which threw out 26 of Pokemon Colosseum's 30 loose sales).
 const NOT_COMPLETE_RE = /\b(disc only|disk only|cart only|cartridge only|game only)\b/i;
@@ -4892,6 +4892,16 @@ function floorNumberedGameBundle(title, product) {
 // other games, extras, condition words and edition qualifiers for the filters.
 function floorKnownGameTitle(title, product) {
   const core = floorTitleWords(floorVariantName(product)).filter(w => w !== 'legend').join(' ');
+  // PriceCharting calls the original PS1 Pro Skater simply "Tony Hawk".
+  // Normalize that exact release only; retain sequel numbers and bundle pairs.
+  if (/^(?:playstation|playstation 1|ps1|psx)$/.test(floorGamePlatform(product))
+    && /^tony hawks?(?: pro skater)?(?: 1)?$/.test(core)) {
+    let known = String(title || '').replace(/\btony\s+hawk(?:['’]s|s)?(?:\s+pro[ -]+skater)?\b/gi, 'Tony Hawk');
+    if (!floorNumberedGameBundle(known, { ...product, 'product-name': 'Tony Hawk' })) {
+      known = known.replace(/\bTony Hawk\s+(?:1|I)\b/gi, 'Tony Hawk');
+    }
+    return known;
+  }
   if (!/^(?:game ?boy advance|gba)$/.test(floorGamePlatform(product))
     || !/^zelda link to past(?: 4 swords)?$/.test(core)) return title;
   return String(title || '').replace(/(?:\s*(?:\/|&|\+|\band\b|\bwith\b|\bw\/|\bincludes?\b)\s*)?\b(?:four|4)[\s-]+swords\b(?!\s+(?:adventures?|anniversary)\b)/gi, ' ');

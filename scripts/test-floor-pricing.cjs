@@ -615,6 +615,37 @@ test('named collections cannot raise the standard game price, including the Valo
   run('settings.floorPremiums=savedCollectionTestPremiums');
 });
 
+test('PS1 Tony Hawk accepts its Pro Skater title without admitting sequels, bundles or graded copies', () => {
+  const product = { ...item, id: '12916', 'product-name': 'Tony Hawk', 'console-name': 'Playstation', 'cib-price': 1649 };
+  const titles = ["Tony Hawk's Pro Skater PlayStation PS1 CIB Tested", 'Tony Hawks Pro Skater (Sony PlayStation 1, 1999) Complete',
+    'Tony Hawk’s Pro Skater 1 PS1 CIB', "Tony Hawk's Pro Skater I PS1 CIB", 'Tony Hawk (Sony PlayStation 1 PS1, 1999)',
+    'Tony Hawk Pro-Skater PS1 Complete'];
+  for (const title of titles) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+    const sample = cur(product, { sales: { cib: [{ title, price: 2499, date: '2026-10-19' }] } });
+    assert.equal(invoke('floorSales', sample)[0].odd, false, title);
+    assert.equal(invoke('floorResult', sample).b.basis, 2499, 'Valid full-name sale can set the baseline');
+    assert.equal(invoke('floorAmazonCandidateMismatch', { title, platforms: ['Playstation'] }, product, 'cib', true), null, title);
+  }
+  for (const title of ["Tony Hawk's Pro Skater 2 PS1 CIB", "Tony Hawk's Pro Skater 3 PS1 CIB", "Tony Hawk's Pro Skater IV PS1 CIB",
+    "Tony Hawk's Pro Skater 1 & 2 PlayStation PS1 CIB", 'Tony Hawks Pro Skater I + II PS1 CIB',
+    'Tony Hawk Pro Skater 1 and 2 PS1 CIB', 'Tony Hawk Underground PS1', 'Tony Hawk Pro Skater HD PS1',
+    'Tony Hawk Pro Skater PS4', 'Tony Hawk Pro Skater Italian PS1', 'Tony Hawk Pro Skater Greatest Hits PS1',
+    'Tony Hawk Pro Skater, Crash Bandicoot PS1', 'Nightmare Tony Hawk Pro Skater PS1']) {
+    assert.ok(invoke('floorListingMismatch', title, product), title);
+  }
+  for (const title of ["Tony Hawk’s Pro Skater PlayStation PS1 Original Complete PSA 9.2",
+    'Tony Hawk Pro Skater PS1 WATA 9.0 CIB', 'Tony Hawk Pro Skater PS1 CGC 9.8',
+    'Tony Hawk Pro Skater PS1 New Sealed', 'Tony Hawk Pro Skater PS1 Case Only']) {
+    assert.equal(invoke('floorSales', cur(product, { sales: { cib: [{ title, price: 2499 }] } }))[0].odd, true, title);
+  }
+  assert.ok(invoke('floorListingMismatch', titles[0], { ...product, 'product-name': 'Tony Hawk 2' }), 'Original cannot price sequel');
+  assert.ok(invoke('floorListingMismatch', 'Tony Hawk Pro Skater PS2', { ...product, 'console-name': 'Playstation 2' }), 'Alias is PS1-specific');
+  assert.equal(invoke('floorListingMismatch', titles[4], { ...product, 'product-name': "Tony Hawk's Pro Skater" }), null, 'Alias works both ways');
+  assert.equal(invoke('floorListingMismatch', 'Tony Hawk Pro Skater Greatest Hits PS1', { ...product, 'product-name': 'Tony Hawk [Greatest Hits]' }), null);
+  assert.ok(invoke('floorListingMismatch', titles[0], { ...product, 'product-name': 'Tony Hawk [Greatest Hits]' }), 'Selected reprint still requires its own edition');
+});
+
 test('GBA Link to the Past includes Four Swords without treating it as a sequel or bundle', () => {
   const product = { ...item, 'product-name': 'Zelda Link to the Past', 'console-name': 'GameBoy Advance' };
   const titles = [

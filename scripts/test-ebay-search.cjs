@@ -135,6 +135,20 @@ const flush = () => new Promise(r => setImmediate(r));
 
   const searchCur=()=>({...base(),product:{...wwe,'cib-price':3000},sales:{cib:[]},directEbay:undefined});
   const comp=(n,grade,title)=>({...sold,id:String(100000000000+n),url:`https://www.ebay.com/itm/${100000000000+n}`,title,conditionText:grade,price:5000-n*100,shipping:0});
+  const tony={...searchCur(),product:{id:'12916','product-name':'Tony Hawk','console-name':'Playstation','cib-price':1649}}, tonyPages=[];
+  await invoke(ctx,'runFloorEbaySearch',tony,()=>{},()=>false,{search:async(q,page)=>{
+    tonyPages.push(page);
+    assert.equal(q,'Tony Hawk PS1','Broad search still finds abbreviated titles');
+    return {...ready([
+      {...comp(91,'Pre-Owned',"Tony Hawk's Pro Skater 1 & 2 PS1 CIB"),price:4000},
+      {...comp(92,'New (Other)',"Tony Hawk’s Pro Skater PlayStation PS1 Original Complete PSA 9.2"),price:3500},
+      {...comp(93,'Pre-Owned',"Tony Hawks Pro Skater PS1 Complete Tested"),price:2499},
+    ]),page,more:true};
+  }});
+  assert.deepEqual(tonyPages,[1],'Recognized Pro Skater sale stops the search without scanning lower pages');
+  assert.equal(tony.directEbay.result.stoppedAtMatch,true);
+  assert.equal(result(tony).b.basis,2499,'Bundle and PSA slab cannot outrank the matching ungraded game');
+  assert.equal(rows(tony).filter(s=>!s.odd&&!s.outlier).length,1);
   const pageCalls=[];const paged=searchCur();
   await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{
     pageCalls.push(page);return {...ready(page===1?[comp(1,'Brand New','WWE 2K20 PS4 Brand New'),comp(2,'Pre-Owned','WWE 2K20 & WWE 2K19 PS4 Bundle')]:[comp(3,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
