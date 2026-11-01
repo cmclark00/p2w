@@ -38,6 +38,32 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('sports below $20 round down to $5 across sources without changing exceptions or higher tiers', () => {
+  const product={...item,'product-name':'Madden NFL 17'};
+  for(const [raw,want] of [[499,500],[700,500],[999,500],[1000,1000],[1200,1000],[1495,1000],[1500,1500],[1700,1500],[1999,1500],[2000,2000],[2200,2500],[3495,3500],[14500,15000],[52500,55000]]) {
+    for(const source of ['sale','amazon','gamestop','pricecharting']) {
+      const c=cur({...product,'cib-price':source==='pricecharting'?raw:null,'gamestop-price':source==='gamestop'?raw:0},
+        {sales:{cib:source==='sale'?[{title:'Madden NFL 17 PS4 CIB',price:raw}]:[]},
+          amazon:source==='amazon'?{found:true,condition:'Used',offers:[{price:raw,sub:'very_good'}]}:{found:false}});
+      const r=invoke('floorResult',c);
+      const expected=source==='amazon' && raw===2200?2000:want;
+      assert.equal(r.r.price,expected,`${source} ${raw}`);
+      if(raw>500 && raw<2000 && raw%500)assert.match(invoke('floorMath',r.b,r.r),/sports under \$20/);
+    }
+  }
+  const base=cur(product,{sales:{cib:[{title:'Madden NFL 17 PS4 CIB',price:1999}]}});
+  assert.equal(invoke('floorResult',{...base,product:{...product,'gamestop-price':1999}}).r.price,1500,'market floors receive the same rounding');
+  assert.equal(invoke('floorResult',{...base,typed:1999}).r.price,2000,'typed prices retain existing behavior');
+  for(const name of ['Wii Sports','NFL Street','NBA Street','NFL Blitz','Example Game']) {
+    assert.equal(invoke('floorResult',cur({...item,'product-name':name,'console-name':name==='Wii Sports'?'Wii':'Playstation 2'},{sales:{cib:[{title:name+' CIB',price:1999}]}})).r.price,2000,name);
+  }
+  assert.equal(invoke('floorResult',cur({...item,genre:'Sports'},{sales:{cib:[{title:'Example Game CIB',price:1999}]}})).r.price,1500,'genre classification also works');
+  const premium=invoke('floorPrice',1900,{shitbox:true,sportsRounding:true,premium:{pct:10}});
+  assert.equal(premium.premiumBasis,2090);assert.equal(premium.price,2000,'premium applies before threshold and rounding');
+  assert.equal(invoke('floorPrice',1900,{shitbox:true,sportsRounding:true,manualMissing:true}).price,
+    invoke('floorPrice',1500,{shitbox:true,manualMissing:true}).price,'manual deduction remains after rounding');
+});
+
 test('New games have the complete CIB recommendation as a final floor, with one premium and rounding pass', () => {
   const p = {...item,'product-name':'Resident Evil 3','cib-price':2000,'new-price':3000};
   const input = cur(p,{condition:'new',sales:{new:[{title:'Resident Evil 3 PS4 sealed',price:2999}],
