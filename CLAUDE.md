@@ -891,6 +891,15 @@ The site's **only server-side code**. Everything else is static.
     numeral parsing; platform validation still uses the original title. Farming
     Simulator's 2022/22 year aliases match without admitting other years, and
     numbered bundles (including repeated franchise names) remain excluded.
+    PAL/region matching is relative to the selected catalog release. Recorded
+    PriceCharting rows carry sourcePcConsole; that region can fill omitted title
+    wording, including after deduplication with the same eBay item ID. Explicit
+    conflicts always override catalog context. Standalone eBay/Amazon/GameStop
+    matches still require region evidence for imports. Generic PAL accepts PAL,
+    PEGI/USK and UK/European release labels and European packaging languages;
+    explicitly named language variants still require their own language. Seller
+    geography remains separate: overseas sales stay excluded. Missing game
+    identity is classified before region; the UI says Region / language mismatch.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,

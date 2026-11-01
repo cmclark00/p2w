@@ -4164,7 +4164,7 @@ async function fetchFloorGameSales(product, request) {
     }
   }));
   const accepts = (sale, condition, target, page) => {
-    if (floorListingMismatch(sale.title, target) || floorOdd(sale, condition, rhythmKind(target['product-name']), target)) return false;
+    if (floorListingMismatch(sale.title, target, page['console-name']) || floorOdd(sale, condition, rhythmKind(target['product-name']), target)) return false;
     if (!floorAmazonPlatformConfirmed({ title: sale.title }, target)) return false;
     // A sale recovered from another region must positively identify our region.
     if (norm(page['console-name']) !== norm(target['console-name'])) {
@@ -4184,7 +4184,7 @@ async function fetchFloorGameSales(product, request) {
     sources.push({ id: String(page.id), name: page['product-name'] });
     for (const condition of conditions) for (const sale of data.sales?.[condition] || []) {
       const key = `${condition}|${floorSaleKey(sale)}`;
-      const row = { ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'] };
+      const row = { ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'], sourcePcConsole: page['console-name'] };
       if (!seen.has(key) && (own || accepts(sale, condition, product, page))) {
         seen.add(key); sales[condition].push({ ...row, recovered: !own });
       }
@@ -4194,7 +4194,7 @@ async function fetchFloorGameSales(product, request) {
     }
   }
   const recovered = conditions.reduce((n, c) => n + sales[c].filter(s => s.recovered).length, 0);
-  const salesNotes = [`Checked ${sources.length} related game entries; recovered ${recovered} matching sales. Other editions and regions must match the listing title; duplicate sales count once`];
+  const salesNotes = [`Checked ${sources.length} related game entries; recovered ${recovered} matching sales. Editions must match the title; a matching catalog region fills omitted region wording, never explicit conflicts; duplicate sales count once`];
   const salesError = errors.length ? errors.join('; ') : null;
   if (salesError) salesNotes.push(`Sold-evidence check incomplete: ${salesError}`);
   const standardGame = standard ? { product: standard, sales: baseSales, salesError, gamestopUrl: standardUrl,
@@ -4253,7 +4253,7 @@ async function fetchFloorProductSales(product, request = pcReadRequest) {
           const key = `${targetCondition}|${floorSaleKey(sale)}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          sales[targetCondition].push({ ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'], recovered: related });
+          sales[targetCondition].push({ ...sale, sourceCondition: condition, sourcePcId: String(page.id), sourcePcName: page['product-name'], sourcePcConsole: page['console-name'], recovered: related });
         }
       }
     } catch (err) { errors.push(`${page['product-name']}: ${err.message}`); }
@@ -4349,11 +4349,11 @@ function floorMergedSales(cur, pool) {
     // An otherwise valid PC row already supplies its condition category. A generic
     // used grade adds sold evidence, but must not demote that row merely for brevity.
     if (!condition && previous && cur.condition !== 'new' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
-      && !floorListingMismatch(previous.title, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
+      && !floorSaleListingMismatch(previous, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
     merged.delete(s.id); // The same eBay listing must not count twice or in the wrong condition.
     if (condition && condition !== cur.condition && !cibUsedEvidence) continue;
     const shipping = Number.isSafeInteger(s.shipping) && s.shipping >= 0 ? s.shipping : null;
-    merged.set(s.id, { ...s, itemPrice: s.price, shipping, price: s.price + (shipping || 0), directEbay: true, cibUsedEvidence, conditionUnknown: !condition && !cibUsedEvidence,
+    merged.set(s.id, { ...s, sourcePcId: previous?.sourcePcId, sourcePcName: previous?.sourcePcName, sourcePcConsole: previous?.sourcePcConsole, itemPrice: s.price, shipping, price: s.price + (shipping || 0), directEbay: true, cibUsedEvidence, conditionUnknown: !condition && !cibUsedEvidence,
       searchVerification: { state: s.state, price: s.price, checkedAt: result.checkedAt, source: 'ebay-search' } });
   }
   return [...merged.values()];
@@ -4502,7 +4502,7 @@ function floorDirectSearchHtml(cur) {
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
-  if (!result.title || floorListingMismatch(result.title, product)) return { state: 'mismatch' };
+  if (!result.title || floorSaleListingMismatch(sale, product, result.title)) return { state: 'mismatch' };
   if (floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
   if (result.conditionText) {
     const brandNew = /^(Brand New|New)$/i.test(result.conditionText);
@@ -4709,7 +4709,7 @@ function floorSales(cur = floorCur) {
     rows.filter((s) => floorFigureSaleCondition(s, condition) === cur.condition)) : cur.sales?.[cur.condition] || [];
   const unique = floorMergedSales(cur, floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool);
   const sales = unique.map((s, i) => {
-    const mismatch = floorListingMismatch(s.title, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product)
+    const mismatch = floorSaleListingMismatch(s, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product)
       || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
     const checked = cur.ebayChecks?.results[floorSaleKey(s)];
@@ -4842,10 +4842,33 @@ function floorListingLanguages(title) {
 }
 const FLOOR_REGIONS = [
   ['Japan', /\b(?:ntsc j|japan|jp|jpn|japanese import)\b/],
-  ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|eu version|eu edition|eur)\b/],
+  ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|uk release|uk pal|uk$|eu version|eu edition|eu release|eur|australian version|australian edition|australian release|aus pal)\b/],
   ['Asia', /\b(?:asia|asian|hong kong|korea|china|taiwan)\b/],
   ['North America', /\b(?:ntsc u|ntsc uc|usa|us version|us edition|north america|north american|esrb)\b/],
 ];
+function floorRegionMismatch(title, product, sourceConsole = '') {
+  const name = product?.['product-name'] || '';
+  const expected = `${name} ${product?.['console-name'] || ''}`;
+  const wanted = FLOOR_REGIONS.filter(([, re]) => re.test(norm(expected))).map(([region]) => region);
+  const listed = FLOOR_REGIONS.filter(([, re]) => re.test(norm(title))).map(([region]) => region);
+  const catalog = FLOOR_REGIONS.filter(([, re]) => re.test(norm(sourceConsole))).map(([region]) => region);
+  const languages = floorListingLanguages(title);
+  const wantedLanguages = [...new Set([...floorListingLanguages(name), ...floorListingLanguages(product?.['console-name'])])];
+  const palLanguages = ['English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Dutch', 'Polish'];
+  const unexpected = languages.find(l => !wantedLanguages.includes(l)
+    && !(l === 'English' && !wantedLanguages.length)
+    && !(l === 'Japanese' && wanted.includes('Japan') && !wantedLanguages.length)
+    && !(wanted.includes('Europe') && !wantedLanguages.length && palLanguages.includes(l)));
+  if (unexpected) return `${unexpected} language/packaging variant`;
+  if (wantedLanguages.some(l => !languages.includes(l))) return 'Listing does not confirm the selected language variant';
+  if (listed.some(region => !(wanted.length ? wanted : ['North America']).includes(region))) return 'Different region/import variant';
+  // Explicit conflicts always win. A matching catalog region only fills an
+  // omitted region; never inherit it from an unrelated or direct-search row.
+  if (wanted.length && !listed.some(region => wanted.includes(region))
+    && !catalog.some(region => wanted.includes(region))) return 'Listing does not confirm the selected region variant';
+  if (/\bimport(?:ed)?\b/i.test(title) && !/\bimport(?:ed)?\b/i.test(expected) && !wanted.length) return 'Import variant needs review';
+  return null;
+}
 const FLOOR_EXTRA_ITEMS = ['figurines?|figures?|statues?', 'soundtracks?|music cds?', 'art ?books?', 'steel ?books?',
   'bonus discs?', 'demo discs?', 'amiibo', 'controllers?', 'memory cards?', '(?:light )?guns?|guncons?', 'sensors?', 'another game|extra games?'];
 // Ordinary box contents are not a seller-added bundle. Remove only the connector
@@ -4941,7 +4964,7 @@ function floorKnownGameTitle(title, product) {
 // A title must identify the selected product, not merely share its franchise.
 // Unknown words before or after a game's name are held for review: "Nightmare
 // Creatures" cannot price Creatures, nor can "Halo 3 ODST" price Halo 3.
-const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
+const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|pegi|usk|eur|eu|europe|european|australian|import|imported|dutch|polish|portuguese|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
 // Only for game-title identity/bundle parsing. Full platform matching still uses
 // the original title. Consume the complete Xbox model/compatibility phrase before
 // Roman-numeral conversion or splitting on slashes: Series X is not sequel 10,
@@ -4978,6 +5001,7 @@ function floorNamedGameBundle(title, product) {
 function floorTitleIdentityMismatch(title, product) {
   // Whole descriptive phrases only: never discard arbitrary title words.
   const descriptiveTitle = text => String(text || '').replace(/\bvideo[ -]?game\b/gi, 'video game').replace(/\bgently\s+used\b/gi, 'used')
+    .replace(/\b(pegi|usk)\s*(?:3|6|7|12|16|18)\b/gi, '$1')
     .replace(/\b(?:physical\s+(?=in\s+box\b)|boot\s+(?=tested\b)|(?:4k|8k|uhd|hdr)\b(?:\s+[ETM]\b)?)/gi, ' ');
   title = descriptiveTitle(title);
   const name = descriptiveTitle(product?.['product-name']);
@@ -5049,15 +5073,22 @@ function floorAmazonPlatformConfirmed(candidate, product) {
 // Matching depends on identity, not price or verification state. Background
 // checks render the same titles repeatedly; retain bounded, immutable answers.
 const floorListingMatchCache = new Map();
-function floorListingMismatch(title, product) {
-  const key = JSON.stringify([title, product?.['product-name'], product?.['console-name'], product?.genre, floorIsHardware(product || {})]);
+// Catalog region is supporting evidence only for a recorded PriceCharting row.
+// Direct search/Amazon/retailer titles must establish their own region.
+function floorSaleListingMismatch(sale, product, title = sale.title) {
+  const source = sale.sourcePcConsole
+    || (sale.sourcePcId && String(sale.sourcePcId) === String(product?.id) ? product['console-name'] : '');
+  return floorListingMismatch(title, product, source);
+}
+function floorListingMismatch(title, product, sourceConsole = '') {
+  const key = JSON.stringify([title, product?.['product-name'], product?.['console-name'], product?.genre, floorIsHardware(product || {}), sourceConsole]);
   if (floorListingMatchCache.has(key)) return floorListingMatchCache.get(key);
-  const result = floorComputeListingMismatch(title, product);
+  const result = floorComputeListingMismatch(title, product, sourceConsole);
   floorListingMatchCache.set(key, result);
   if (floorListingMatchCache.size > 2000) floorListingMatchCache.delete(floorListingMatchCache.keys().next().value);
   return result;
 }
-function floorComputeListingMismatch(title, product) {
+function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   title = floorKnownGameTitle(title, product);
   const knownName = floorKnownGameTitle(product?.['product-name'], product);
@@ -5065,7 +5096,6 @@ function floorComputeListingMismatch(title, product) {
   const toyMismatch = floorToyListingMismatch(title, product);
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
-  const expected = `${name} ${product?.['console-name'] || ''}`;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
   if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
   if (floorNamedGameBundle(title, product)) return 'Multiple-game title list — review';
@@ -5073,17 +5103,11 @@ function floorComputeListingMismatch(title, product) {
   if (/\btrilogy\b/i.test(name)) wantedCounts.push('3');
   const collection = /\b(?:collection|compilation|anthology)\b/i.test(name);
   if (!collection && floorGameCounts(title).some((count) => !wantedCounts.includes(count))) return 'Multiple-game lot or bundle';
-  const wantedRegions = FLOOR_REGIONS.filter(([, re]) => re.test(norm(expected))).map(([region]) => region);
-  const languages = floorListingLanguages(title);
-  const wantedLanguages = [...new Set([...floorListingLanguages(name), ...floorListingLanguages(product?.['console-name'])])];
-  const unexpectedLanguage = languages.find((l) => !wantedLanguages.includes(l)
-    && !(l === 'English' && !wantedLanguages.length) && !(l === 'Japanese' && wantedRegions.includes('Japan') && !wantedLanguages.length));
-  if (unexpectedLanguage) return `${unexpectedLanguage} language/packaging variant`;
-  if (wantedLanguages.some((l) => !languages.includes(l))) return 'Listing does not confirm the selected language variant';
-  const regions = FLOOR_REGIONS.filter(([, re]) => re.test(norm(title))).map(([region]) => region);
-  if (regions.some((region) => !(wantedRegions.length ? wantedRegions : ['North America']).includes(region))) return 'Different region/import variant';
-  if (wantedRegions.length && !regions.some((region) => wantedRegions.includes(region))) return 'Listing does not confirm the selected region variant';
-  if (/\bimport(?:ed)?\b/i.test(title) && !/\bimport(?:ed)?\b/i.test(expected) && !wantedRegions.length) return 'Import variant needs review';
+  // Missing game identity should not be reported as a region problem (e.g. a
+  // Farming Simulator 25 joystick while pricing Farming Simulator 22 PAL).
+  if (floorTitleIdentityMismatch(title, product) === 'Listing does not confirm the selected game or product') return 'Listing does not confirm the selected game or product';
+  const regionMismatch = floorRegionMismatch(title, product, sourceConsole);
+  if (regionMismatch) return regionMismatch;
   // Marketing "limited edition" on an already verified special figure is not
   // a separate game edition. Other edition names still require confirmation.
   const packInTitle = floorEditionContentsTitle(title, product);
@@ -5148,7 +5172,7 @@ const RHYTHM_DISC_SALE_CAP = { loose: 3, cib: 3, new: 5 };
 function rhythmDiscSaleCap(cur) {
   const rhythm = rhythmKind(cur.product?.['product-name']);
   if (rhythm !== 'disc') return Infinity;
-  const loose = (cur.sales?.loose || []).filter((s) => !floorOdd(s, 'loose', rhythm) && !floorListingMismatch(s.title, cur.product)).map((s) => s.price).sort((a, b) => a - b);
+  const loose = (cur.sales?.loose || []).filter((s) => !floorOdd(s, 'loose', rhythm) && !floorSaleListingMismatch(s, cur.product)).map((s) => s.price).sort((a, b) => a - b);
   if (loose.length < 3) return Infinity;
   return loose[Math.floor((loose.length - 1) / 2)] * RHYTHM_DISC_SALE_CAP[cur.condition];
 }
@@ -5157,7 +5181,7 @@ function rhythmDiscSaleCap(cur) {
 // their median is under a quarter of the boxed (CIB) sales' median: they're discs nobody titled "game only".
 function looseBundleUnreliable(cur) {
   const median = (cond) => {
-    const a = (cur.sales?.[cond] || []).filter((s) => !floorOdd(s, cond, 'bundle') && !floorListingMismatch(s.title, cur.product)).map((s) => s.price).sort((x, y) => x - y);
+    const a = (cur.sales?.[cond] || []).filter((s) => !floorOdd(s, cond, 'bundle') && !floorSaleListingMismatch(s, cur.product)).map((s) => s.price).sort((x, y) => x - y);
     return a.length >= 3 ? a[Math.floor((a.length - 1) / 2)] : null;
   };
   const loose = median('loose');
@@ -5506,7 +5530,7 @@ function floorStandardHtml(b) {
 }
 
 const FLOOR_SALE_GROUPS = { game: 'Different game / sequel', variant: 'Edition / figure variant',
-  foreign: 'Foreign language / region', platform: 'Different platform', bundle: 'Bundles / extra items',
+  foreign: 'Region / language mismatch', platform: 'Different platform', bundle: 'Bundles / extra items',
   condition: 'Condition / packaging', verification: 'Sale not verified / price unavailable',
   age: 'Older than six months', location: 'Seller outside North America', outlier: 'Possible price outliers', other: 'Other excluded listings' };
 function floorSaleGroup(s) {

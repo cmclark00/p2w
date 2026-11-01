@@ -824,6 +824,13 @@ Guide (the Google Sheet tab).
    X|S category. Download, replace the installed files, Reload the extension, and
    refresh the pricing tool. Xbox model wording no longer marks matching games
    as sequels; two-game listings such as Farming Simulator 19 and 22 stay excluded.
+   **PAL copies:** select the PAL catalog entry. Matching PAL/PEGI/UK releases
+   are eligible; a sale filed under that PAL catalog can omit PAL in its title,
+   but an explicit US/Japanese conflict stays excluded. A direct eBay or Amazon
+   listing must identify the matching region. A specifically named language must
+   also match. The **Region / language mismatch** group describes a mismatch with
+   your selected copy, not a blanket rejection of foreign games. The separate
+   rule excluding sellers outside North America still applies.
 
    **eBay sold** opens a search for the current game
    and condition; the Chrome helper also reads direct sold results.

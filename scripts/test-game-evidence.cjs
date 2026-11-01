@@ -97,5 +97,21 @@ function engine(request) {
   assert.equal(recoveredGba.sales.loose.length, 1);
   assert.equal(recoveredGba.sales.loose[0].price, 5939);
   assert.equal(recoveredGba.sales.loose[0].recovered, true, 'GBA alias also recovers matching sales from sibling entries');
+  const pal = {...base,id:'300','product-name':'Farming Simulator 22','console-name':'PAL Xbox Series X'};
+  const usa = {...pal,id:'301','console-name':'Xbox Series X'};
+  const ordinary = sale('123456789030','Farming Simulator 22 Xbox Series X CIB',2800);
+  const conflicting = sale('123456789031','Farming Simulator 22 Xbox Series X CIB USA ESRB',2900);
+  const recoveredPal = sale('123456789032','Farming Simulator 22 Xbox Series X CIB PAL',2700);
+  const palEngine = engine(async (route,params) => route === 'pc/products' ? {products:[pal,usa]} :
+    {sales:{cib:params.id==='300'?[ordinary,conflicting]:[sale('123456789033',ordinary.title,3100),recoveredPal]}});
+  palEngine.ctx.pal=pal;
+  const palEvidence=await palEngine.run('fetchFloorProductSales(pal,request)');
+  assert.equal(palEvidence.sales.cib.length,3,'unmarked US catalog sale is not recovered');
+  assert.equal(palEvidence.sales.cib[0].sourcePcConsole,'PAL Xbox Series X');
+  palEngine.ctx.palEvidence=palEvidence;
+  const palRows=palEngine.run('floorSales({product:pal,condition:"cib",...palEvidence})');
+  assert.equal(palRows.find(r=>r.price===2800).odd,false,'same PAL page supports omitted region');
+  assert.equal(palRows.find(r=>r.price===2900).odd,true,'US title overrides incorrect PAL filing');
+  assert.equal(palRows.find(r=>r.price===2700).odd,false,'explicit PAL title recovers across regions');
   console.log('Game evidence passed: related sales, duplicates, region/platform/edition/collection filters, GBA title aliases, standard minimum, Amazon/GameStop, premiums, deductions, conditions and failures.');
 })().catch(err => { console.error(err); process.exitCode = 1; });

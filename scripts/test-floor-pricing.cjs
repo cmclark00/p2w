@@ -902,6 +902,43 @@ test('Xbox model wording is not a sequel or bundle, across titles and pricing so
   assert.ok(invoke('floorListingMismatch','Final Fantasy IX Xbox Series X',{...farm,'product-name':'Final Fantasy X'}),'different Roman numeral remains a different game');
 });
 
+test('selected PAL releases use matching region evidence without admitting unrelated imports or games', () => {
+  const pal = {...item,id:'220','product-name':'Farming Simulator 22','console-name':'PAL Xbox Series X','cib-price':2800,'new-price':3700};
+  const us = {...pal,id:'221','console-name':'Xbox Series X'};
+  for (const title of ['Farming Simulator 22 Xbox Series X PAL', 'Farming Simulator 22 Xbox Series X PEGI 3',
+    'Farming Simulator 22 Xbox Series X UK Version', 'Farming Simulator 22 Xbox Series X European',
+    'Farming Simulator 22 Xbox Series X UK', 'Farming Simulator 22 Xbox Series X PAL Italian Version']) {
+    assert.equal(invoke('floorListingMismatch',title,pal),null,title);
+    assert.equal(invoke('floorAmazonMismatch',{product:pal,condition:'cib',amazon:{found:true,title,offers:[]}}),null,title);
+    assert.ok(invoke('floorListingMismatch',title,us),'PAL cannot price US copy: '+title);
+  }
+  const ordinary='Farming Simulator 22 Xbox Series X CIB';
+  assert.match(invoke('floorListingMismatch',ordinary,pal),/region/,'direct listing needs region evidence');
+  assert.match(invoke('floorAmazonMismatch',{product:pal,condition:'cib',amazon:{found:true,title:ordinary}}),/region/,'Amazon cannot borrow PC region');
+  assert.equal(invoke('floorListingMismatch',ordinary,pal,pal['console-name']),null,'recorded PAL catalog fills omitted region');
+  assert.match(invoke('floorListingMismatch',ordinary,pal,us['console-name']),/region/,'US catalog does not prove PAL');
+  for (const suffix of ['USA ESRB','NTSC-J Japanese Import','Asia English Version']) {
+    assert.ok(invoke('floorListingMismatch',ordinary+' '+suffix,pal,pal['console-name']),suffix+' overrides catalog');
+  }
+  const italian={...pal,'product-name':'Farming Simulator 22 [Italian Version]'};
+  assert.ok(invoke('floorListingMismatch',ordinary+' PAL French Version',italian),'named language still must match');
+  assert.match(invoke('floorListingMismatch','Thrustmaster SimTask FarmStick Joystick for Farming Simulator 25, Xbox Series X',pal),/selected game or product/,'wrong game is not a region error');
+  for(const condition of ['cib','new']) {
+    const title=ordinary+(condition==='new'?' Brand New Sealed':'');
+    const row={title,price:3000,date:'2026-10-25',url:'https://www.ebay.com/itm/123456789012',sourcePcId:pal.id,sourcePcConsole:pal['console-name']};
+    const input=cur(pal,{condition,sales:{[condition]:[row]}});
+    assert.equal(invoke('floorSales',input)[0].odd,false,'PAL own page accepted for '+condition);
+    const checked=invoke('floorEbayResult',row,pal,{id:'123456789012',state:'sold',title,price:3000,conditionText:condition==='new'?'Brand New':'Pre-Owned'},condition);
+    assert.equal(checked.state,'sold','same listing check retains catalog context');
+    const direct={...input,directEbay:{result:{state:'ready',sales:[{id:'123456789012',title,price:3000,shipping:0,state:'sold',conditionText:condition==='new'?'Brand New':'Pre-Owned',sellerCountry:'United States'}]}}};
+    assert.equal(invoke('floorSales',direct)[0].odd,false,'deduplicated same ID retains catalog provenance');
+    direct.directEbay.result.sales[0].title=title+' USA ESRB';
+    assert.equal(invoke('floorSales',direct)[0].odd,true,'direct conflict still overrides catalog');
+  }
+  const outside=cur(pal,{directEbay:{result:{state:'ready',sales:[{id:'123456789013',title:ordinary+' PAL',price:3000,shipping:0,state:'sold',conditionText:'Pre-Owned',sellerCountry:'Italy',locationSource:'ebay-located-in'}]}}});
+  assert.ok(invoke('floorSales',outside).find(s=>s.directEbay).odd,'seller-location rule remains independent of game region');
+});
+
 test('two-digit and repeated-series bundles are excluded before selecting a price', () => {
   const p={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
   for(const title of ['Farming Simulator 19 And 22 Xbox Series X W/ Case & Game',
