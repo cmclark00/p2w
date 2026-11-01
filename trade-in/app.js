@@ -4970,7 +4970,17 @@ const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64
 // Roman-numeral conversion or splitting on slashes: Series X is not sequel 10,
 // and Xbox One / Series X is not a second game. Hardware model names stay intact.
 function floorIdentityPlatformTitle(title) {
-  return String(title || '').replace(/\bxbox\s+(?:series\s+[xs](?:\s*(?:[\/|&]|and)\s*(?:series\s+)?[xs])?(?:\s*(?:[\/|&]|and)?\s*(?:xbox\s+)?one)?|one(?:\s*(?:[\/|&]|and)\s*(?:xbox\s+)?series\s+[xs](?:\s*[\/|&]\s*[xs])?)?)\b/gi, 'Xbox');
+  let text = String(title || '');
+  const xbox = /\bxbox\b/i.test(text);
+  text = text.replace(/\b(xbox\s+one\s+[xs])\s+enhanced\b/gi, '$1');
+  // The U/C region slash is not a separator introducing another game title.
+  // Region checks still receive the original, unmodified label.
+  text = text.replace(/\bntsc[\s-]*u\s*\/\s*c\b/gi, 'NTSC');
+  // One X/S and "One Series X/S" are compatibility labels too. Consume their
+  // model letters before Roman-numeral conversion, including a separate Series
+  // label after "(Xbox One)". Otherwise MK11 can borrow the hardware's X as 10.
+  text = text.replace(/\bxbox\s+(?:series\s+[xs](?:\s*(?:[\/|&]|and)\s*(?:series\s+)?[xs])?(?:\s*(?:[\/|&]|and)?\s*(?:xbox\s+)?one)?|one(?:\s+[xs](?:\s*[\/|&]\s*[xs])?)?(?:\s*(?:[\/|&]|and)?\s*(?:xbox\s+)?series\s+[xs](?:\s*[\/|&]\s*[xs])?)?)\b/gi, 'Xbox');
+  return xbox ? text.replace(/\bseries\s+[xs](?:\s*(?:[\/|&]|and)\s*(?:series\s+)?[xs])?\b/gi, 'Xbox') : text;
 }
 // A title list can name a second game without saying "bundle". Require an
 // explicit separator after the selected title. Extra names may be two words,
@@ -5099,6 +5109,8 @@ function floorListingMetadataTitle(title, product) {
     /\blightly\s+used\b/gi, /\bexpertly\s+refurbished\s+product\b/gi,
     /\b(?:shooter|action|simulation|strategy|rpg)\s*,\s*(?:E10\+|E|T|M)(?=\s*[,(-]|$)/gi,
     /\b(?:online\s+)?multi[ -]?player\b/gi];
+  phrases.push(/\bfighting\s+game\b/gi, /\bfighting(?=\s+(?:19|20)\d{2}\b)/gi,
+    /\bunreal\s+engine\b/gi, /\bonline\s+play(?:\s+[ETM]\b)?/gi);
   if (/\bxbox\b/i.test(title)) phrases.push(/\bsmart\s+delivery(?:\s*[,\-]?\s*E\b)?/gi);
   for (const re of phrases) if (!new RegExp(re.source, 'i').test(name)) title = String(title).replace(re, ' ');
   // Distributor credit, delimited from the product name; not arbitrary prefixes.
@@ -5106,12 +5118,28 @@ function floorListingMetadataTitle(title, product) {
     title = String(title).replace(/^\s*U\s+(?:and|&)\s+I\s+Entertainment\b\s*[-:–]?\s*/i, '');
   }
   if (!/^110 Industries\b/i.test(name)) title = String(title).replace(/^\s*110 Industries\b\s*[-:–]?\s*/i, '');
+  if (!/\bWarner Bros\b/i.test(name)) title = String(title).replace(/\bWarner\s+Bros\.?(?:\s+Interactive\s+Entertainment)?\b/gi, '');
+  if (!/\bWHV Games\b/i.test(name)) title = String(title).replace(/\bWHV\s+Games\b/gi, '');
+  title = String(title).replace(/^\s*B2G1\s+Free\b/i, '');
+  // A repeated acronym immediately after the full selected title is redundant,
+  // e.g. "Mortal Kombat X MKX". An acronym alone never establishes a match.
+  const nameWords = norm(floorVariantName(product)).split(' ').filter(Boolean);
+  const acronym = nameWords.map(w => w[0]).join('');
+  if (nameWords.length >= 3 && /^[a-z]{3,8}$/.test(acronym)) {
+    const fullName = nameWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\W+');
+    title = title.replace(new RegExp(`(\\b${fullName}\\s+)${acronym}\\b`, 'gi'), '$1');
+  }
   title = String(title).replace(/\bvideo[ -]?games?\b/gi, 'video game')
     .replace(/\bXbox\s+One\s*,\s*(?:Xbox\s+)?Series\s+([XS])\b/gi, 'Xbox One / Xbox Series $1')
     .replace(/\b(Xbox\s+One)\s+Games\s+(?=Xbox\s+Series\b)/gi, '$1 Game ')
-    .replace(/\bE\s+(?=NTSC\b|PAL\b)/gi, '')
+    .replace(/\b[ETM]\s+(?=NTSC\b|PAL\b)/gi, '')
     .replace(/\bIOB\b/gi, 'in original box')
     .replace(/\bSim\s+(?=Video\s+Game\b)/gi, '');
+  if (!/\bstill sealed\b/i.test(name)) title = title.replace(/\bstill\s+sealed\b/gi, 'sealed');
+  // Repeated product/platform hashtags are metadata; unfamiliar hashtags remain
+  // visible to identity checks instead of hiding a second title.
+  const tags = new Set([name, product?.['console-name']].map(s => norm(s).replace(/\s/g, '')));
+  title = title.replace(/#([a-z0-9]+)/gi, (tag, word) => tags.has(word.toLowerCase()) ? ' ' : tag);
   if (/^pal\b/i.test(product?.['console-name'] || '')) title = title.replace(/\bneuf\b/gi, 'New');
   return title;
 }

@@ -908,6 +908,12 @@ The site's **only server-side code**. Everything else is static.
     Source titles, explicit editions, regions, conditions and pricing rules remain
     unchanged. Regression fixtures include the Nov. 1 Farming Simulator 22 and
     Wanted: Dead exclusion audit.
+    Xbox One X/S, One Series X/S and separate Series X/S compatibility labels
+    are removed before matching Roman numerals, so Mortal Kombat 11 cannot borrow
+    a hardware X to match Mortal Kombat X. The Nov. 1 MKX audit also covers Warner
+    Bros./WHV credits, fighting-game/engine wording, repeated exact title hashtags
+    and a repeated acronym after the full game name. Acronyms alone do not confirm
+    identity; bundles, other editions and condition/region conflicts still fail.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,

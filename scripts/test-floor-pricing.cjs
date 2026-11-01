@@ -38,6 +38,53 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
+  const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
+  const wrong=[
+    'Mortal Kombat 11 Ultimate & Cyberpunk 2077 Xbox One Series x/S Disc',
+    'Mortal Kombat 11 - Xbox One - Rated M - 2019 Fighting - HDR Xbox One X Enhanced',
+    'Mortal Kombat 11 Ultimate Xbox One Series X',
+    'Mortal Kombat 11 Ultimate Xbox One/Series X|S',
+    'Mortal Kombat 11 (Xbox One) Series X/S Video Game',
+    'Mortal Kombat Legacy Kollection Xbox One Series X',
+    'Mortal Kombat XL - Microsoft Xbox One Game (Also Playable on Series X)',
+    'Mortal Kombat X & XL - Microsoft Xbox One',
+    'Mortal Kombat 11 And Mortal Kombat X Xbox One New and Sealed',
+  ];
+  for(const title of wrong) {
+    assert.ok(invoke('floorListingMismatch',title,p),title);
+    assert.equal(invoke('floorAmazonLowest',cur(p,{amazon:{found:true,title,offers:[{price:3004,sub:'very_good'}]}})),null,title);
+    assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':3004},{gamestopStock:{state:'in',title}})),null,title);
+  }
+  for(const title of ['Mortal Kombat X Xbox One X Enhanced','Mortal Kombat X Xbox One Series X/S Disc',
+    'Mortal Kombat X (Xbox One) Series X/S Video Game','Mortal Kombat 10 Xbox One X',
+    'Warner Bros. Mortal Kombat X Online Play M Microsoft Xbox One Fighting 2015',
+    'Warner Bros. Mortal Kombat X (Xbox One) M NTSC-U/C 2015 Multiplayer w/ Case',
+    'Mortal Kombat X For Xbox One Fighting Game','Mortal Kombat X Xbox One STILL SEALED!',
+    'Mortal Kombat X Xbox One Unreal Engine','Mortal Kombat X for Xbox One #MortalKombatX #XboxOne',
+    'Mortal Kombat X MKX Xbox One Series X Tested Original Case Disc 2015 NetherRealm',
+    'Mortal Kombat X Xbox One Warner Bros Tested and Works',
+    'Mortal Kombat X for Xbox One, Whv Games',
+    'B2G1 Free Mortal Kombat X Xbox One Disc In Case Tested Very Good Mint Disc']) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+  }
+  for(const [name,title] of [['Final Fantasy X','Final Fantasy XII Xbox One X'],['Mega Man X','Mega Man 11 Xbox One Series X/S']]) {
+    assert.ok(invoke('floorListingMismatch',title,{...p,'product-name':name}),title);
+  }
+  const direct=wrong.slice(0,2).map((title,i)=>({id:String(100000000000+i),url:'https://www.ebay.com/itm/'+(100000000000+i),title,
+    price:i?700:2397,shipping:i?580:607,conditionText:'Brand New',state:'sold',date:'2026-10-20'}));
+  direct.push({id:'100000000002',url:'https://www.ebay.com/itm/100000000002',title:'Mortal Kombat X Xbox One Brand New Factory Sealed US Version',price:2194,shipping:0,conditionText:'Brand New',state:'sold',date:'2026-10-20'});
+  const c=cur(p,{condition:'new',sales:{new:[],cib:[]},directEbay:{result:{state:'ready',sales:direct}}});
+  assert.equal(invoke('floorSales',c).filter(s=>!s.odd).length,1);
+  assert.equal(invoke('floorResult',c).b.sale.price,2194,'wrong game/bundle cannot set the baseline');
+  assert.equal(invoke('floorResult',c).r.price,2000,'normal rounding and New/CIB floor remain intact');
+  assert.equal(invoke('floorListingMismatch','Mortal Kombat X PS4',p),'Different platform');
+  assert.ok(invoke('floorListingMismatch','Mortal Kombat X Xbox One PAL',p));
+  for(const title of ['MKX Xbox One','Mortal Kombat 11 MKX Xbox One X',
+    'B2G1 Free Mortal Kombat X & Mortal Kombat 11 Xbox One Bundle',
+    'Warner Bros Mortal Kombat X Xbox One + Cyberpunk 2077']) assert.ok(invoke('floorListingMismatch',title,p),title);
+});
+
 test('audited seller metadata does not masquerade as sequels, publishers, or bundles', () => {
   const farm={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
   const wanted={...item,'product-name':'Wanted: Dead'};
