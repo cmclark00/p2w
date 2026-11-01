@@ -876,7 +876,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.9+ and protocol 2/targeted/search/pagination/location/searchRetry capabilities. No response says Not connected, not
+    1.1.10+ and protocol 2/targeted/search/pagination/location/searchRetry capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -885,6 +885,12 @@ The site's **only server-side code**. Everything else is static.
     packages and build/test tooling were removed. Historical Store/managed notes remain
     in browser-helper Markdown; no account or Store listing was deleted. Private signing
     material stays outside the repo. Pricing rules and premiums are independent.
+    Helper 1.1.10 and the PHP fallback accept GameStop's encoded Xbox Series X|S
+    category redirects, retaining same-product ID, host, sender and stock-evidence
+    checks. Game title matching removes whole Xbox model phrases before Roman
+    numeral parsing; platform validation still uses the original title. Farming
+    Simulator's 2022/22 year aliases match without admitting other years, and
+    numbered bundles (including repeated franchise names) remain excluded.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,

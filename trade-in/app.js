@@ -3644,7 +3644,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.9';
+const FLOOR_HELPER_RECOMMENDED = '1.1.10';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -4901,8 +4901,8 @@ function floorNumberedGameBundle(title, product) {
   if (/^\d+$/.test(words.at(-1))) words.pop();
   if (!words.length) return false;
   const series = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\W+(?:(?:a|an|the|of|for|and)\\W+)*');
-  const number = '(?:[1-9]|1[0-6]|XVI|XV|XIV|XIII|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)';
-  const pair = new RegExp(`\\b${series}\\s+(${number})\\s*(?:&|\\+|/|,|\\band\\b)\\s*(${number})\\b`, 'i').exec(String(title || ''));
+  const number = '(?:[1-9]\\d?|XVI|XV|XIV|XIII|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)';
+  const pair = new RegExp(`\\b${series}\\s+(${number})\\s*(?:&|\\+|/|,|\\band\\b)\\s*(?:${series}\\s+)?(${number})\\b`, 'i').exec(String(title || ''));
   return !!pair && floorTitleWords(pair[1]).join(' ') !== floorTitleWords(pair[2]).join(' ');
 }
 
@@ -4916,6 +4916,13 @@ function floorKnownGameTitle(title, product) {
     title = String(title).replace(/\b(?:with\s+|includes?\s+)?(?:free\s+)?(?:ps5|playstation\s*5)\s+upgrade(?:\s+(?:available|included))?\b/gi, ' ');
   }
   const core = floorTitleWords(floorVariantName(product)).filter(w => w !== 'legend').join(' ');
+  // Sellers expand this annual series' two-digit year and include its publisher.
+  // Normalize the whole franchise phrase, retaining the actual year/edition.
+  // This is a title alias, never a pricing exception or a generic year eraser.
+  if (/^farming simulator (?:\d{2}|20\d{2})$/.test(core)) {
+    title = String(title || '').replace(/\bfarming\s+simulator\s+20(\d{2})\b/gi, 'Farming Simulator $1')
+      .replace(/\bgiants\s+software\s+(?=farming\s+simulator\b)/gi, '');
+  }
   // PriceCharting calls the original PS1 Pro Skater simply "Tony Hawk".
   // Normalize that exact release only; retain sequel numbers and bundle pairs.
   if (/^(?:playstation|playstation 1|ps1|psx)$/.test(floorGamePlatform(product))
@@ -4935,6 +4942,13 @@ function floorKnownGameTitle(title, product) {
 // Unknown words before or after a game's name are held for review: "Nightmare
 // Creatures" cannot price Creatures, nor can "Halo 3 ODST" price Halo 3.
 const FLOOR_TITLE_DETAILS = /^(?:nintendo|sony|microsoft|sega|super|nes|snes|n64|gamecube|wii|switch|ds|3ds|nds|gba|gbc|gb|gc|gameboy|game|boy|advance|playstation|ps[1-5]|psx|psp|vita|xbox|pc|ntsc|pal|usa|us|uk|japan|japanese|english|french|spanish|german|italian|version|edition|cib|complete|new|used|sealed|unsealed|opened|open|preowned|pre|owned|brand|factory|authentic|original|tested|working|works|excellent|good|very|great|mint|near|clean|rare|vintage|retro|black|label|disc|disk|cartridge|cart|only|case|box|boxed|manual|manuals|instructions|inserts|registration|reg|card|cards|poster|posters|map|maps|foam|warranty|booklet|booklets|with|w|for|in|on|by|from|not|no|includes|including|free|fast|shipping|ship|ships|read|see|photos|photo|pics|picture|pictures|condition|renewed|refurbished|digital|download|code|compatible|compatibility|video|tested|\d{4})$/;
+// Only for game-title identity/bundle parsing. Full platform matching still uses
+// the original title. Consume the complete Xbox model/compatibility phrase before
+// Roman-numeral conversion or splitting on slashes: Series X is not sequel 10,
+// and Xbox One / Series X is not a second game. Hardware model names stay intact.
+function floorIdentityPlatformTitle(title) {
+  return String(title || '').replace(/\bxbox\s+(?:series\s+[xs](?:\s*(?:[\/|&]|and)\s*(?:series\s+)?[xs])?(?:\s*(?:[\/|&]|and)?\s*(?:xbox\s+)?one)?|one(?:\s*(?:[\/|&]|and)\s*(?:xbox\s+)?series\s+[xs](?:\s*[\/|&]\s*[xs])?)?)\b/gi, 'Xbox');
+}
 // A title list can name a second game without saying "bundle". Require an
 // explicit separator after the selected title. Extra names may be two words,
 // numbered names ("Diablo 3"/"Fallout4"), or several single-word titles.
@@ -4946,7 +4960,7 @@ function floorNamedGameBundle(title, product) {
   const core = floorTitleWords(floorVariantName(product));
   if (!core.length) return false;
   const selected = new Set(floorTitleWords(name));
-  const parts = floorBundleTitle(floorEditionContentsTitle(title, product), true)
+  const parts = floorIdentityPlatformTitle(floorBundleTitle(floorEditionContentsTitle(title, product), true))
     .split(/\s*(?:[,;&+\/|]|\band\b|\bplus\b)\s*/i).map(floorTitleWords);
   const at = parts.findIndex(words => (` ${words.join(' ')} `).includes(` ${core.join(' ')} `));
   if (at < 0) return false;
@@ -4963,7 +4977,8 @@ function floorNamedGameBundle(title, product) {
 }
 function floorTitleIdentityMismatch(title, product) {
   // Whole descriptive phrases only: never discard arbitrary title words.
-  const descriptiveTitle = text => String(text || '').replace(/\bvideo[ -]?game\b/gi, 'video game').replace(/\bgently\s+used\b/gi, 'used');
+  const descriptiveTitle = text => String(text || '').replace(/\bvideo[ -]?game\b/gi, 'video game').replace(/\bgently\s+used\b/gi, 'used')
+    .replace(/\b(?:physical\s+(?=in\s+box\b)|boot\s+(?=tested\b)|(?:4k|8k|uhd|hdr)\b(?:\s+[ETM]\b)?)/gi, ' ');
   title = descriptiveTitle(title);
   const name = descriptiveTitle(product?.['product-name']);
   if (floorToyFamily(product) === 'skylanders') {
@@ -4971,19 +4986,21 @@ function floorTitleIdentityMismatch(title, product) {
     return character && (` ${floorSkyText(title)} `).includes(` ${character} `) ? null : 'Listing does not confirm the selected character';
   }
   const core = floorTitleWords(name.replace(/\[[^\]]*\]|\([^)]*\)/g, ' '));
-  const listed = floorTitleWords(title);
-  if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
   const hardware = !!floorToyFamily(product) || floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
+  const listed = floorTitleWords(hardware ? title : floorIdentityPlatformTitle(title));
+  if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
   if (!hardware && !/\b(?:collection|compilation|anthology|trilogy)\b/i.test(name)) {
-    const text = ` ${floorTitleWords(floorBundleTitle(title, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
+    const identityTitle = floorIdentityPlatformTitle(title);
+    const identityWords = floorTitleWords(identityTitle);
+    const text = ` ${floorTitleWords(floorBundleTitle(identityTitle, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
     const variantWords = floorTitleWords(name);
     // Sharing a short name inside another game's title is not a match. Check
     // the whole prefix, including when sellers insert platform/condition words.
     // Keep the established optional Zelda franchise wording, not arbitrary
     // extra title words. Original seller text remains unchanged for review.
-    const first = listed.indexOf(core[0]);
-    let prefix = (start < 0 ? listed.slice(0, first).join(' ') : text.slice(0, start)).trim();
+    const first = identityWords.indexOf(core[0]);
+    let prefix = (start < 0 ? identityWords.slice(0, first).join(' ') : text.slice(0, start)).trim();
     for (const platform of FLOOR_PLATFORMS) prefix = prefix.replace(new RegExp(platform.source, 'g'), ' ');
     if (core[0] === 'zelda') prefix = prefix.replace(/\blegend\b/g, '').trim();
     // Optional author/brand credits are not new game names. Strip whole
@@ -5013,7 +5030,7 @@ function floorTitleIdentityMismatch(title, product) {
 const FLOOR_PLATFORMS = [
   /\b(?:ps1|psx|playstation 1|playstation(?! [2-5]| portable| vita| vr))\b/, /\b(?:ps2|playstation 2)\b/, /\b(?:ps3|playstation 3)\b/,
   /\b(?:ps4|playstation 4|(?:playstation vr|ps ?vr)(?! ?2))\b/, /\b(?:ps5|playstation 5|(?:playstation vr|ps ?vr) ?2)\b/, /\b(?:psp|playstation portable)\b/,
-  /\b(?:vita)\b/, /\bxbox 360\b/, /\bxbox one\b/, /\bxbox series\b/,
+  /\b(?:vita)\b/, /\bxbox 360\b/, /\bxbox one\b|\bxbox series [xs](?: [xs])? one\b/, /\bxbox (?:one )?series\b/,
   /\bxbox\b(?! (?:360|one|series))/,
   /\b(?:nintendo )?switch 2\b/, /\b(?:nintendo )?switch\b(?! 2)/,
   /\b3ds\b/, /\b(?:nintendo )?ds\b/, /\bwii u\b/, /\bwii\b(?! u)/,

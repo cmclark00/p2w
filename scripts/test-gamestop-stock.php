@@ -27,7 +27,17 @@ foreach ([0, 403, 404, 429, 500] as $status) check(gs_stock_fetch($url, fn() => 
 $calls = 0;
 $result = gs_stock_fetch($url, function () use (&$calls, $in) { return ++$calls === 1 ? [302, '', '/products/game/930799.html'] : [200, $in, null]; });
 check($result['state'] === 'in' && $calls === 2, 'Follow same-product canonical redirect');
-foreach (['https://evil.test/products/game/930799.html', 'https://www.gamestop.com/products/game/123.html', '//evil.test/products/game/930799.html'] as $bad) {
+foreach (['%7C', '%7c', '|'] as $separator) {
+  $canonical = 'https://www.gamestop.com/video-games/xbox-series-x' . $separator . 's/products/farming-simulator-22/930799.html';
+  check(gs_stock_url($canonical)['id'] === '930799', 'Xbox category separator preserves product ID');
+  $calls = 0;
+  $result = gs_stock_fetch($url, function () use (&$calls, $canonical, $in) { return ++$calls === 1 ? [302, '', $canonical] : [200, $in, null]; });
+  check($result['state'] === 'in' && $calls === 2, 'Follow encoded Xbox category redirect');
+}
+foreach (['%2f', '%5c', '%2e', '%00'] as $escape) {
+  check(gs_stock_url('https://www.gamestop.com/video-games/xbox' . $escape . '/products/game/930799.html') === null, 'Other category escapes stay rejected');
+}
+foreach (['https://evil.test/products/game/930799.html', 'https://www.gamestop.com/products/game/123.html', '//evil.test/products/game/930799.html', 'https://www.gamestop.com/video-games/xbox-series-x%7Cs/products/game/123.html'] as $bad) {
   $calls = 0;
   check(gs_stock_fetch($url, function () use (&$calls, $bad) { $calls++; return [302, '', $bad]; })['state'] === 'unknown' && $calls === 1, 'Do not follow untrusted/different-product redirects');
 }

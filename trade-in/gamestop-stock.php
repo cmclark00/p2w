@@ -8,7 +8,7 @@ function gs_stock_url(string $url): ?array {
       || !in_array(strtolower($p['host'] ?? ''), ['gamestop.com', 'www.gamestop.com'], true)
       || isset($p['user']) || isset($p['pass']) || isset($p['port'])) return null;
   $path = $p['path'] ?? '';
-  if (!preg_match('~^/(?:[a-z0-9-]+/)*products/(?:[a-z0-9%-]+/)?(\d{1,12})\.html$~i', $path, $m)) return null;
+  if (!preg_match('~^/(?:(?:[a-z0-9-]|%7c|\|)+/)*products/(?:[a-z0-9%-]+/)?(\d{1,12})\.html$~i', $path, $m)) return null;
   return ['id' => $m[1], 'url' => 'https://www.gamestop.com' . $path];
 }
 
@@ -97,7 +97,7 @@ function gamestop_stock(string $url): void {
   if (!$target) fail(400, 'A matching GameStop product link is required.');
   $dir = data_path('cache');
   if (!is_dir($dir)) @mkdir($dir, 0700);
-  $file = $dir . '/gs-stock-v1-' . $target['id'] . '.json';
+  $file = $dir . '/gs-stock-v2-' . $target['id'] . '.json';
   $lock = fopen($file . '.lock', 'c+');
   if (!$lock || !flock($lock, LOCK_EX)) fail(503, 'Stock check temporarily unavailable.');
   $cached = is_file($file) ? json_decode((string)file_get_contents($file), true) : null;

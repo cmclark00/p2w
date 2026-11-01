@@ -42,5 +42,10 @@ const current = () => ({ product, gamestopUrl: 'https://www.gamestop.com/product
   assert.equal(ctx.cur.gamestopStock.state, 'out', 'Server fallback works without helper');
   ctx.cur = { product }; await run('loadFloorGameStopStock(cur)');
   assert.equal(ctx.cur.gamestopStock, undefined, 'No matched product URL: no request');
+  ctx.cur = { ...current(), product: { 'product-name': 'Farming Simulator 22', 'console-name': 'Xbox Series X', 'gamestop-price': 2999 } };
+  ctx.window.P2WGameStopHelper.check = async () => ({ state:'in', title:'Farming Simulator 22 - Xbox Series X, Xbox One', source:'browser-helper' });
+  await run('loadFloorGameStopStock(cur)');
+  assert.equal(ctx.cur.gamestopStock.state,'in','GameStop Xbox Series X title is not mistaken for a sequel');
+  assert.equal(run('floorGsFor(cur)'),2999,'confirmed matching reference remains available');
   console.log('GameStop stock display, matching and async checks passed.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

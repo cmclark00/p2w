@@ -820,6 +820,10 @@ Guide (the Google Sheet tab).
    A confirmed Not Available becomes Out of stock online; blocked checks still
    say Check stock. Each Chrome profile needs installation; the in-app browser
    cannot run it. Remove or reload it on Chrome's extensions page.
+   **Helper 1.1.10** fixes stock checks when GameStop redirects to its Xbox Series
+   X|S category. Download, replace the installed files, Reload the extension, and
+   refresh the pricing tool. Xbox model wording no longer marks matching games
+   as sequels; two-game listings such as Farming Simulator 19 and 22 stay excluded.
 
    **eBay sold** opens a search for the current game
    and condition; the Chrome helper also reads direct sold results.

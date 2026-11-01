@@ -1,17 +1,21 @@
-Play2Win Market Helper 1.1.9
+Play2Win Market Helper 1.1.10
 
 Update each staff computer/profile manually:
 1. Download the helper ZIP from Floor Pricing and extract it over the helper's
    permanent folder (the folder containing manifest.json).
 2. Open chrome://extensions and click Reload on Play2Win Market Helper.
    Allow eBay search-page access if Chrome asks. Keep only one helper enabled.
-3. Refresh the pricing tool. The header should say Connected - v1.1.9.
+3. Refresh the pricing tool. The header should say Connected - v1.1.10.
 For first installation, enable Developer mode and choose Load unpacked instead.
 Manual guide: https://play2wingames.com/trade-in/helper-setup.html
 Connection checks: https://play2wingames.com/trade-in/helper.html
 Privacy: https://play2wingames.com/trade-in/helper-privacy.html
 
-New in 1.1.9: unreadable or failed sold-search pages get one fresh automatic
+New in 1.1.10: GameStop stock checks recognize Xbox Series X|S category
+redirects while still requiring the same product ID and pre-owned shipping
+controls. No new permissions; pricing rules and premiums are unchanged.
+
+Since 1.1.9: unreadable or failed sold-search pages get one fresh automatic
 retry before a warning. Successful pages stay cached; failed retries keep
 usable evidence and explain what still needs checking. Unknown shipping or
 seller location alone does not trigger more tabs. Pricing and premiums are unchanged.

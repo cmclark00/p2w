@@ -380,7 +380,7 @@ function pc_gamestop_url(string $html): ?string {
           || !in_array(strtolower($parts['host'] ?? ''), ['gamestop.com', 'www.gamestop.com'], true)
           || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) continue;
       $path = $parts['path'] ?? '';
-      if (!preg_match('~^/(?:[a-z0-9-]+/)*products/(?:[a-z0-9%-]+/)?(\d+)\.html$~i', $path, $product)) continue;
+      if (!preg_match('~^/(?:(?:[a-z0-9-]|%7c|\|)+/)*products/(?:[a-z0-9%-]+/)?(\d+)\.html$~i', $path, $product)) continue;
       // Product id is GameStop's identity; duplicate condition rows can use different slugs.
       $urls[$product[1]] = 'https://www.gamestop.com' . $path;
     }

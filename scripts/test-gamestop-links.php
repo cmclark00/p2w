@@ -11,6 +11,8 @@ $product = 'https://www.gamestop.com/video-games/products/-/930799.html';
 $affiliate = 'https://click.linksynergy.com/deeplink?id=example&mid=24348&murl=' . rawurlencode($product);
 check(pc_gamestop_url(row($affiliate)) === $product, 'Decode the product destination from the affiliate URL');
 check(pc_gamestop_url(row($product . '?tracking=example#offers')) === $product, 'Direct product link; strip tracking');
+$xbox = 'https://www.gamestop.com/video-games/xbox-series-x%7Cs/products/farming-simulator-22/316095.html';
+check(pc_gamestop_url(row($xbox)) === $xbox, 'Encoded Xbox category product links are preserved');
 check(pc_gamestop_url(str_replace('"', "'", row($product))) === $product, 'Single-quoted HTML attributes');
 check(pc_gamestop_url(row($product) . row($product)) === $product, 'Repeated condition rows are one product');
 check(pc_gamestop_url('<table class="used-prices condition-comparison">' . row($product) . '</table><table class="new-prices">' . row('https://www.gamestop.com/products/new-copy/456.html') . '</table>') === $product, 'Pre-owned reference uses the used comparison table');

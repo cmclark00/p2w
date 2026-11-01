@@ -6,7 +6,7 @@ function stockTarget(value) {
   try {
     const u = new URL(value);
     if (u.protocol !== 'https:' || !['www.gamestop.com', 'gamestop.com'].includes(u.hostname) || u.port || u.username || u.password) return null;
-    const m = u.pathname.match(/^\/(?:[a-z0-9-]+\/)*products\/(?:[a-z0-9%-]+\/)?(\d{1,12})\.html$/i);
+    const m = u.pathname.match(/^\/(?:(?:[a-z0-9-]|%7c|\|)+\/)*products\/(?:[a-z0-9%-]+\/)?(\d{1,12})\.html$/i);
     return m ? { id: m[1], url: `https://www.gamestop.com${u.pathname}` } : null;
   } catch (_) { return null; }
 }

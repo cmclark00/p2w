@@ -24,12 +24,12 @@ assert.equal(parse([button()], true).state, 'unknown');
 assert.equal(parse([button()], false, 'Verify Address').state, 'unknown');
 assert.equal(parse([button(), button({ state: 'out' })], true).state, 'unknown');
 assert.equal(parse([button({ state: 'out' }), button({ visible: false })], true).state, 'out');
-let handler, removedHandler, nextId = 10, created = [], removed = [], requested = [];
+let handler, removedHandler, nextId = 10, created = [], removed = [], requested = [], readerReady = true;
 const background = vm.createContext({ URL, Date, Map, setTimeout, clearTimeout,
   chrome: { runtime: { onMessage: { addListener(h) { handler = h; } } }, tabs: {
     create: async args => { created.push(args); return { id: nextId++ }; },
     remove: async id => { removed.push(id); },
-    sendMessage: async (id, message) => { requested.push([id, message]); return { state: 'out', title: 'Lollipop Chainsaw - PlayStation 3' }; },
+    sendMessage: async (id, message) => { requested.push([id, message]); if (!readerReady) throw new Error('Reader not ready yet'); return { state: 'out', title: 'Lollipop Chainsaw - PlayStation 3' }; },
     onRemoved: { addListener(h) { removedHandler = h; } },
   } } });
 vm.runInContext(fs.readFileSync(root + 'background.js', 'utf8'), background);
@@ -51,6 +51,27 @@ const send = (message, from = sender) => new Promise(resolve => { const async = 
   assert.equal((await send({ type: 'P2W_GS_CHECK', url })).state, 'out');
   assert.equal(created.length, 1, 'Fresh results reuse the cache');
   removedHandler(999); assert.deepEqual(removed, [10]);
+  // The first send races navigation; READY must recognize the canonical Xbox
+  // path after redirect, without accepting a different product or staff tab.
+  const xboxUrl = 'https://www.gamestop.com/video-games/xbox-series-x%7Cs/products/farming-simulator-22/316095.html';
+  background.xboxUrl = xboxUrl;
+  assert.equal(vm.runInContext('stockTarget(xboxUrl).id',background),'316095');
+  for(const escape of ['%2f','%5c','%2e','%00']) {
+    background.badUrl=xboxUrl.replace('%7C',escape);
+    assert.equal(vm.runInContext('stockTarget(badUrl)',background),null,'Other category escapes remain rejected');
+  }
+  readerReady=false;
+  const redirected=send({type:'P2W_GS_CHECK',url:'https://www.gamestop.com/video-games/products/-/316095.html'});
+  await new Promise(resolve=>setImmediate(resolve));
+  const beforeReady=requested.length;
+  readerReady=true;
+  handler({type:'P2W_GS_READY'},{url:xboxUrl.replace('316095','999'),tab:{id:11},frameId:0},()=>{});
+  handler({type:'P2W_GS_READY'},{url:xboxUrl,tab:{id:999},frameId:0},()=>{});
+  assert.equal(requested.length,beforeReady,'Different product and unrelated tab cannot complete this check');
+  handler({type:'P2W_GS_READY'},{url:xboxUrl,tab:{id:11},frameId:0},()=>{});
+  assert.equal((await redirected).state,'out','Canonical Xbox READY resumes the same-product check');
+  assert.equal(requested.length,beforeReady+1);
+  assert.ok(removed.includes(11),'Redirected helper tab is closed');
   // Exercise both halves of the website/isolated-content-script handshake.
   const listeners = new Set();
   const pageWindow = {

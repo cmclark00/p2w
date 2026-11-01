@@ -856,11 +856,11 @@ test('audit mismatches cannot drive eBay or Amazon baselines', () => {
 test('helper status reports installed versions and capability readiness without claiming absent means uninstalled', () => {
   assert.equal(invoke('floorHelperStatusInfo', null).text, 'Not connected');
   const capability = { available: true, protocol: 2, targeted: 1, search: 1, pagination: 1, location: 1, searchRetry: 1 };
-  for (const version of ['1.1.9', '1.1.10', '1.2.0', '2.0.0']) {
+  for (const version of ['1.1.10', '1.2.0', '2.0.0']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'connected'); assert.equal(status.text, `Connected · v${version}`);
   }
-  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.1.6', '1.1.8', '1.0.99', undefined, '<script>']) {
+  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.1.6', '1.1.8', '1.1.9', '1.0.99', undefined, '<script>']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'update'); assert.ok(status.text.includes('Update needed'));
     assert.ok(!status.text.includes('<script>'));
@@ -868,6 +868,52 @@ test('helper status reports installed versions and capability readiness without 
   assert.equal(invoke('floorHelperStatusInfo', { ...capability, version: '1.1.5', targeted: 0 }).state, 'update');
   assert.equal(invoke('floorHelperStatusInfo', { ...capability, version: '1.1.5', protocol: 1 }).state, 'update');
   assert.equal(invoke('floorHelperStatusInfo', { ...capability, version: '1.1.9', searchRetry: 0 }).state, 'update');
+});
+
+test('Xbox model wording is not a sequel or bundle, across titles and pricing sources', () => {
+  for (const name of ['Farming Simulator 22', 'Halo Infinite', 'Forza Horizon 5']) {
+    const p = { ...item, 'product-name': name, 'console-name': 'Xbox Series X' };
+    for (const platform of ['Xbox Series X', 'Xbox Series S', 'Xbox Series X|S', 'Xbox Series X/S',
+      'Xbox One / Series X', 'Xbox Series X/One', 'Xbox Series X ONE', 'Xbox One & Xbox Series X', 'Xbox Series X and Xbox One']) {
+      for (const title of [`${name} (${platform}, 2021) Complete`, `${platform} Video Game ${name} TESTED COMPLETE w/Manual`, `${name} ${platform} Brand New Sealed`]) {
+        assert.equal(invoke('floorListingMismatch', title, p), null, title);
+        assert.equal(invoke('floorAmazonMismatch', { product: p, condition: /Brand New/.test(title) ? 'new' : 'cib', amazon: {found:true,title,offers:[]} }), null, title);
+      }
+    }
+    for (const title of [`${name} PS5`, `${name} Xbox Series X Reborn`, `Nightmare ${name} Xbox Series X`, `${name} Xbox Series X ITALIAN`, `${name} Xbox Series X Platinum Edition`]) {
+      assert.ok(invoke('floorListingMismatch', title, p), title);
+    }
+  }
+  const farm = { ...item, 'product-name': 'Farming Simulator 22', 'console-name': 'Xbox Series X', 'cib-price': 2217, 'new-price': 3300 };
+  for (const title of ['Farming Simulator 2022 (Xbox Series X / Xbox One) CIB', 'GIANTS Software Farming Simulator 22 Xbox Series X|S/Xbox One 4K E']) {
+    assert.equal(invoke('floorListingMismatch',title,farm),null,title);
+  }
+  for (const title of ['Farming Simulator 2025 Xbox Series X', 'GIANTS Software Farming Simulator 19 Xbox Series X', 'GIANTS Software Halo Infinite Xbox Series X']) {
+    assert.ok(invoke('floorListingMismatch',title,farm),title);
+  }
+  const cibTitle='Farming Simulator 22 Xbox One Xbox Series X Complete w/ Manual Tested';
+  const newTitle='Farming Simulator 22 Xbox Series X Brand New Sealed';
+  const input=cur(farm,{sales:{cib:[{title:cibTitle,price:2869,date:'2026-10-30'}, {title:newTitle,price:5100,date:'2026-10-30'}],new:[{title:newTitle,price:3099,date:'2026-10-30'}]}});
+  const cibSales=invoke('floorSales',input);
+  assert.equal(cibSales.find(s=>s.title===cibTitle).odd,false,'CIB accepts the ordinary Xbox title');
+  assert.equal(cibSales.find(s=>s.title===newTitle).odd,true,'Brand New cannot enter CIB after identity fixes');
+  assert.equal(invoke('floorSales',{...input,condition:'new'})[0].odd,false,'sealed identity is accepted for New');
+  assert.equal(invoke('floorListingMismatch','Final Fantasy X Xbox Series X',{...farm,'product-name':'Final Fantasy X'}),null,'game Roman numeral survives');
+  assert.ok(invoke('floorListingMismatch','Final Fantasy IX Xbox Series X',{...farm,'product-name':'Final Fantasy X'}),'different Roman numeral remains a different game');
+});
+
+test('two-digit and repeated-series bundles are excluded before selecting a price', () => {
+  const p={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
+  for(const title of ['Farming Simulator 19 And 22 Xbox Series X W/ Case & Game',
+    'Farming Simulator 22 & Farming Simulator 19 Platinum - Xbox Series X - Xbox One',
+    'Farming Simulator 2022 & Farming Simulator 2019 Xbox Series X',
+    'Farming Simulator 22 / 25 Xbox Series X']) {
+    assert.equal(invoke('floorListingMismatch',title,p),'Multiple-game lot or bundle',title);
+    assert.equal(invoke('floorAmazonMismatch',{product:p,condition:'cib',amazon:{found:true,title}}),'Multiple-game lot or bundle',title);
+    assert.equal(invoke('floorSales',cur(p,{sales:{cib:[{title,price:3500}]}}))[0].odd,true,title);
+  }
+  assert.equal(invoke('floorListingMismatch','Farming Simulator 22, 2021 Xbox Series X',p),null,'release year is not another game');
+  assert.equal(invoke('floorNumberedGameBundle','Farming Simulator 22 Xbox Series X discs 1 & 2',p),false,'disc numbers are not games');
 });
 
 test('numbered sequel pairs are bundles for single games on both eBay and Amazon', () => {
