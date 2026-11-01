@@ -38,6 +38,43 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('audited seller metadata does not masquerade as sequels, publishers, or bundles', () => {
+  const farm={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
+  const wanted={...item,'product-name':'Wanted: Dead'};
+  const matches=[
+    [farm,'GIANTS Farming Simulator 22 Xbox Series X|S/Xbox One E NTSC-U/C Smart Delivery'],
+    [farm,'GIANTS Software Farming Simulator 22 Smart Delivery, E - Xbox One/Series X|S'],
+    [farm,'Farming Simulator 22 GIANTS Software Xbox Series X|S One 4K Multiplayer Manual'],
+    [farm,'Farming Simulator 22 - Xbox One/ Xbox Series X - Same Day Dispatch T48 !!'],
+    [farm,'Farming Simulator 22 - Xbox One Games Xbox Series X Complete With Instructions'],
+    [farm,'Farming Simulator 22 XBOX Series X/XBOX One!!!!! NEW + original packaging!!!!!'],
+    [farm,'Farming Simulator 22 - Xbox One, Series X | 4K | Lightly Used'],
+    [farm,'Farming Simulator 22 Xbox One & Xbox Series X Sim Video Game & Case Microsoft'],
+    [farm,'Farming Simulator 22 (Xbox Series X) VideoGames Expertly Refurbished Product'],
+    [farm,'Farming Simulator 22 Microsoft Xbox One/Series X Video Game IOB W/Manual'],
+    [wanted,'Wanted: Dead ~ Playstation 4 Videogame, Library Discard, Free Shipping'],
+    [wanted,'U and I Entertainment - Wanted: Dead - PlayStation 4'],
+    [wanted,'110 Industries Wanted: Dead PS4, Shooter, M, (2023) PS5 Upgrade, Disc+Case'],
+  ];
+  for(const [product,title] of matches) {
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+    assert.equal(invoke('floorSales',cur(product,{sales:{cib:[{title,price:2000}]}}))[0].mismatch,null,title);
+  }
+  const pal={...farm,'console-name':'PAL Xbox Series X'};
+  assert.equal(invoke('floorListingMismatch','FARMING SIMULATOR 22 - Neuf Xbox One Xbox Series X',pal,'PAL Xbox Series X'),null);
+  for(const title of [
+    'Farming Simulator 19 And 22 Xbox Series X W/ Case & Game',
+    'GIANTS Farming Simulator 25 Xbox Series X Smart Delivery',
+    'Farming Simulator 22 Xbox Series X Platinum Edition Smart Delivery',
+    'Farming Simulator 22 Xbox Series X + original packaging + Another Game',
+    'Farming Simulator 22 Xbox Series X, Library Discard, Hollow Realization',
+    'Farming Simulator 22 Xbox Series X Italian Version Smart Delivery',
+  ]) assert.ok(invoke('floorListingMismatch',title,farm),title);
+  assert.ok(invoke('floorListingMismatch','110 Industries Wanted: Dead PS5',wanted));
+  assert.ok(invoke('floorLoosePackagingMismatch','Farming Simulator 22 Xbox Series X + original packaging','loose',farm));
+  assert.equal(invoke('floorSales',cur(farm,{condition:'new',sales:{new:[{title:'Farming Simulator 22 Xbox Series X Lightly Used',price:2000}]}}))[0].odd,true,'metadata cannot erase condition checks');
+});
+
 test('sports below $20 use normal rounding then subtract $5 once, preserving exceptions and higher tiers', () => {
   const product={...item,'product-name':'Madden NFL 17'};
   for(const [raw,want] of [[499,500],[700,500],[999,500],[1000,500],[1200,1000],[1495,1000],[1500,1000],[1600,1000],[1700,1500],[1999,1500],[2000,2000],[2200,2500],[3495,3500],[14500,15000],[52500,55000]]) {

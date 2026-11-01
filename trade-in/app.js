@@ -4875,7 +4875,7 @@ const FLOOR_EXTRA_ITEMS = ['figurines?|figures?|statues?', 'soundtracks?|music c
 // and the named paper/packaging item when testing bundle wording; leave every
 // other extra, edition, region, condition and price-outlier check in place.
 const FLOOR_PACK_IN = String.raw`(?:(?:original|included|pack[ -]?in|factory|fold[ -]?out)\s+)*(?:(?:registration|reg\.?|warranty)\s+cards?|registration|instructions?(?:\s+(?:manuals?|booklets?))?|manuals?|(?:instruction|warranty)\s+booklets?|(?:paper|advertising|safety|warranty)\s+inserts?|inserts?|posters?|maps?|foam(?:\s+(?:inserts?|blocks?))?)\b`;
-const FLOOR_GAME_CONTENTS = String.raw`(?:(?:original|included|factory)\s+)*(?:(?:jewel\s+|game\s+)?cases?|box(?:es)?|(?:game\s+)?(?:discs?|disks?|cartridges?|carts?))\b`;
+const FLOOR_GAME_CONTENTS = String.raw`(?:(?:original|included|factory)\s+)*(?:(?:jewel\s+|game\s+)?cases?|box(?:es)?|packaging|(?:game\s+)?(?:discs?|disks?|cartridges?|carts?))\b`;
 function floorBundleTitle(title, gameContents = false) {
   const contents = gameContents ? `${FLOOR_PACK_IN}|${FLOOR_GAME_CONTENTS}` : FLOOR_PACK_IN;
   return String(title || '').replace(new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\binclud(?:es?|ing)\\b|\\band\\b|&)\\s*(?:the\\s+|a\\s+|an\\s+)?(?:${contents})`, 'gi'), ' ');
@@ -4944,7 +4944,7 @@ function floorKnownGameTitle(title, product) {
   // This is a title alias, never a pricing exception or a generic year eraser.
   if (/^farming simulator (?:\d{2}|20\d{2})$/.test(core)) {
     title = String(title || '').replace(/\bfarming\s+simulator\s+20(\d{2})\b/gi, 'Farming Simulator $1')
-      .replace(/\bgiants\s+software\s+(?=farming\s+simulator\b)/gi, '');
+      .replace(/\bgiants(?:\s+software)?\b/gi, '');
   }
   // PriceCharting calls the original PS1 Pro Skater simply "Tony Hawk".
   // Normalize that exact release only; retain sequel numbers and bundle pairs.
@@ -5088,9 +5088,36 @@ function floorListingMismatch(title, product, sourceConsole = '') {
   if (floorListingMatchCache.size > 2000) floorListingMatchCache.delete(floorListingMatchCache.keys().next().value);
   return result;
 }
+// Whole seller/compatibility phrases are metadata, not extra titles. Normalize
+// before both bundle and identity checks, while retaining original sale text,
+// conditions and region evidence. Never erase a phrase in the selected title.
+function floorListingMetadataTitle(title, product) {
+  const name = product?.['product-name'] || '';
+  if (floorToyFamily(product) || floorIsHardware(product)) return title;
+  const phrases = [/\blibrary\s+discard\b/gi, /\badult\s+owned\b/gi,
+    /\b(?:free\s+)?same\s+day\s+dispatch(?:\s+T48)?\b/gi,
+    /\blightly\s+used\b/gi, /\bexpertly\s+refurbished\s+product\b/gi,
+    /\b(?:shooter|action|simulation|strategy|rpg)\s*,\s*(?:E10\+|E|T|M)(?=\s*[,(-]|$)/gi,
+    /\b(?:online\s+)?multi[ -]?player\b/gi];
+  if (/\bxbox\b/i.test(title)) phrases.push(/\bsmart\s+delivery(?:\s*[,\-]?\s*E\b)?/gi);
+  for (const re of phrases) if (!new RegExp(re.source, 'i').test(name)) title = String(title).replace(re, ' ');
+  // Distributor credit, delimited from the product name; not arbitrary prefixes.
+  if (!/^U\s+(?:and|&)\s+I\s+Entertainment\b/i.test(name)) {
+    title = String(title).replace(/^\s*U\s+(?:and|&)\s+I\s+Entertainment\b\s*[-:–]?\s*/i, '');
+  }
+  if (!/^110 Industries\b/i.test(name)) title = String(title).replace(/^\s*110 Industries\b\s*[-:–]?\s*/i, '');
+  title = String(title).replace(/\bvideo[ -]?games?\b/gi, 'video game')
+    .replace(/\bXbox\s+One\s*,\s*(?:Xbox\s+)?Series\s+([XS])\b/gi, 'Xbox One / Xbox Series $1')
+    .replace(/\b(Xbox\s+One)\s+Games\s+(?=Xbox\s+Series\b)/gi, '$1 Game ')
+    .replace(/\bE\s+(?=NTSC\b|PAL\b)/gi, '')
+    .replace(/\bIOB\b/gi, 'in original box')
+    .replace(/\bSim\s+(?=Video\s+Game\b)/gi, '');
+  if (/^pal\b/i.test(product?.['console-name'] || '')) title = title.replace(/\bneuf\b/gi, 'New');
+  return title;
+}
 function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
-  title = floorKnownGameTitle(title, product);
+  title = floorListingMetadataTitle(floorKnownGameTitle(title, product), product);
   const knownName = floorKnownGameTitle(product?.['product-name'], product);
   if (knownName !== product?.['product-name']) product = { ...product, 'product-name': knownName };
   const toyMismatch = floorToyListingMismatch(title, product);

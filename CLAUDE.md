@@ -900,6 +900,14 @@ The site's **only server-side code**. Everything else is static.
     explicitly named language variants still require their own language. Seller
     geography remains separate: overseas sales stay excluded. Missing game
     identity is classified before region; the UI says Region / language mismatch.
+    Seller metadata is normalized before both game-identity and bundle checks:
+    whole Smart Delivery, library-discard, dispatch and genre/rating phrases,
+    Xbox compatibility punctuation, and recognized publisher/distributor credits
+    cannot become phantom sequels. Original packaging is an ordinary box content;
+    loose-condition packaging checks still apply to the untouched listing title.
+    Source titles, explicit editions, regions, conditions and pricing rules remain
+    unchanged. Regression fixtures include the Nov. 1 Farming Simulator 22 and
+    Wanted: Dead exclusion audit.
 
   - **Loose game packaging:** `floorLoosePackagingMismatch` excludes boxed/CIB
     sales and included cases/manuals from loose game evidence before outlier ranking,
