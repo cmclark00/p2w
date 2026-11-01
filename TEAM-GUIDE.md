@@ -833,6 +833,10 @@ Guide (the Google Sheet tab).
    Expand **Review notes**, **Market references**, **Pricing rules**, or
    **Amazon match details** for the full explanation. **Add to list** stays
    disabled until the required price checks finish.
+   **Unrelated eBay results** has its own collapsed section, separate from
+   meaningful exclusions. These titles do not identify the selected game and
+   cannot set its price. Ordinary descriptions such as “Videogame,” “Gently
+   Used,” or PS4 listings mentioning a PS5 upgrade are not different games.
 3. The price fills in by itself from the game's recent eBay sales (the
    ones PriceCharting lists for that condition), highest first:
    - **Loose games:** listings with a box, case, manual, or CIB description are
@@ -894,7 +898,11 @@ Guide (the Google Sheet tab).
    - **Sale age and location:** use sales from the last six months. If fewer
      than three valid matching sales are found, older sales can remain as
      clearly labeled slow-selling evidence. An incomplete search does not prove
-     an item is slow-selling. Open the older-sales review group to inspect dates.
+     an item is slow-selling. **Limited sales history** shows the recent-sale
+     count, latest matching date and PriceCharting fallback when used. While
+     checking is incomplete, **Older matching sales · reference only** keeps
+     those rows available with amber dates without letting them set the automatic
+     price. Open that group to review the history.
      For slow sellers, an old eBay page that only says Ended or cannot be read
      does not erase the PriceCharting history. Beyond eBay's normal 90-day
      completed-search window, retained historical dates show in **amber**, with

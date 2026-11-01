@@ -683,6 +683,13 @@ The site's **only server-side code**. Everything else is static.
     collapse. `onFloorSalesToggle()` retains open groups across pricing renders,
     resets on condition changes, and keeps original row indices/links so review
     actions still work. A manually included price-driving row stays visible.
+    Direct eBay titles missing the selected game identity are displayed separately
+    under **Unrelated eBay results**, outside the excluded-list and mismatch-badge
+    counts. They stay ineligible and available through a lazy-rendered disclosure;
+    this works with existing helpers, without guessing an eBay section boundary.
+    Ordinary `Videogame` / `Gently Used` descriptions are normalized for identity.
+    Explicit PS4 listings may mention a PS5 upgrade; that phrase does not identify
+    a PS5 physical copy or excuse any sequel, edition, bundle or condition mismatch.
     **Recent Nintendo-published Switch fixed price:** Nintendo-published Switch /
     Switch 2 games released within the last 3 calendar years use exactly MSRP minus $5 for
     Loose/CIB. `floorRecentSwitch()` uses the selected edition's full product
@@ -749,6 +756,12 @@ The site's **only server-side code**. Everything else is static.
     eligible matching sales fall within that window. With fewer than three, old
     rows remain labeled slow-selling evidence; incomplete/paginated direct searches
     cannot establish this exception before enough recent matches or exhaustion.
+    Sparse histories show a compact **Limited sales history** summary: usable
+    recent count, latest matching date, incomplete-search status and the PC average
+    fallback when it is the chosen basis. Pending old matching rows stay available
+    under **Older matching sales · reference only**, with amber dates, separate
+    from wrong listings. This presentation does not change automatic eligibility
+    or the completed-search requirement for the slow-selling exception.
     Counting follows identity, condition, origin and verification checks; duplicates
     do not count twice. For sparse completed lookups, PriceCharting rows beyond
     eBay's 90-day completed-search window remain eligible historical evidence even

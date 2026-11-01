@@ -341,6 +341,70 @@ test('shared title matcher rejects other games containing the selected name, inc
   assert.equal(invoke('floorListingMismatch',wrong[0],{...product,'product-name':'Nightmare Creatures'}),null,'The full selected title still matches');
 });
 
+test('seller descriptions and PS4 upgrade wording do not create another title or PS5 copy', () => {
+  const product={...item,'product-name':'Wanted: Dead'};
+  for(const title of ['Wanted: Dead ~ Playstation 4 Videogame - mint FREE US SHIPPING',
+    'Wanted: Dead Playstation 4 / PS4 (PS5 Upgrade Available)',
+    'Wanted: Dead - Sony Playstation 4 (Gently Used)',
+    'Wanted Dead PS4 with free PlayStation 5 upgrade included',
+    'Wanted: Dead ~ Playstation 4 Videogame - PS4']) {
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+    assert.equal(invoke('floorAmazonLowest',cur(product,{amazon:{found:true,title,offers:[{price:2500,sub:'very_good'}]}})),2500,title);
+    assert.equal(invoke('floorGsFor',cur({...product,'gamestop-price':2500},{gamestopStock:{state:'in',title}})),2500,title);
+    assert.equal(invoke('floorSales',cur(product,{sales:{cib:[{title,price:2500,date:'2026-10-01'}]}}))[0].odd,false,title);
+  }
+  for(const title of ['Wanted Dead 2 PS4', 'Wanted Dead Reborn PS4', 'Wanted Dead PS4 + Red Dead Redemption',
+    'Wanted Dead Collector Edition PS4', 'Wanted Dead PS5', 'Wanted Dead PS5 Upgrade Available',
+    'Wanted Dead PS4 PS5 Upgrade Available Reborn'])assert.ok(invoke('floorListingMismatch',title,product),title);
+  assert.equal(invoke('floorListingMismatch','Wanted Dead PS4 PS5 Upgrade Available',{...product,'console-name':'Playstation 5'}),'Different platform');
+  assert.ok(invoke('floorListingMismatch','Example Game PS4 PS5 Upgrade Available Reborn',item));
+  assert.equal(invoke('floorListingMismatch','Example Game PS4 Videogame Gently Used',item),null,'General matching, no Wanted-specific rule');
+});
+
+test('unrelated direct eBay results stay reviewable separately without changing eligibility', () => {
+  const product={...item,'product-name':'Wanted: Dead'};
+  const result={state:'ready',sales:[{id:'123456789099',title:'Red Dead Redemption PS4',price:4500,shipping:500,
+    date:'2026-10-01',state:'sold',conditionText:'Pre-Owned',sellerCountry:'United States'}]};
+  const example=cur(product,{directEbay:{result}}), sales=invoke('floorSales',example), b=invoke('floorBasis',example);
+  assert.ok(sales[0].odd);assert.ok(sales[0].unrelatedSuggestion);assert.equal(b.basis,1999);
+  let html=invoke('floorSalesHtml',example,sales,b);
+  assert.ok(html.includes('Unrelated eBay results (1)'));assert.ok(!html.includes('Different game / sequel'));
+  assert.ok(!html.includes('Red Dead Redemption'));assert.ok(!html.includes('Excluded listings (1)'));
+  example.openSaleGroups={suggestions:true};html=invoke('floorSalesHtml',example,sales,b);
+  assert.ok(html.includes('Red Dead Redemption'));assert.ok(html.includes('data-sale="1"'));
+  context.toggleCur=example;run('floorCur=toggleCur');
+  const body={innerHTML:''}, detail={dataset:{saleGroup:'suggestions',saleCondition:'cib'},open:true,querySelector:()=>body};
+  context.toggleEvent={target:detail};run('onFloorSalesToggle(toggleEvent)');assert.ok(body.innerHTML.includes('Red Dead Redemption'));
+  detail.open=false;run('onFloorSalesToggle(toggleEvent)');assert.equal(body.innerHTML,'');run('floorCur=null');
+});
+
+test('limited history keeps pending old matches accessible and labels PC fallback without changing prices', () => {
+  const previousDate=context.Date;
+  context.Date=class extends Date {static now(){return Date.parse('2026-10-31T12:00:00Z');}};
+  try {
+    const product={...item,'product-name':'Vernal Edge','cib-price':1999};
+    const sales={cib:[{title:'Vernal Edge PS4',price:1999,date:'2026-01-19'},
+      {title:'Vernal Edge Playstation 4',price:1499,date:'2025-06-28'},
+      {title:'Vernal Edge PS5',price:5000,date:'2026-10-10'}]};
+    const example=cur(product,{sales,directEbay:{result:{state:'unknown',sales:[]}}});
+    const rows=invoke('floorSales',example), result=invoke('floorResult',example), before=JSON.stringify(rows);
+    assert.equal(result.r.price,2000);assert.equal(result.b.from,'pricecharting');
+    const html=invoke('floorSalesHtml',example,rows,result.b);
+    assert.ok(html.includes('Limited sales history'));assert.ok(html.includes('0 usable matching sales'));
+    assert.ok(html.includes('2026-01-19'));assert.ok(html.includes('PriceCharting average fallback: $19.99'));
+    assert.ok(html.includes('Older matching sales · reference only (2)'));assert.ok(html.includes('Excluded listings (1)'));
+    assert.equal(JSON.stringify(rows),before,'Presentation must not mutate eligibility');
+    example.openSaleGroups={history:true};
+    const opened=invoke('floorSalesHtml',example,rows,result.b);
+    assert.ok(opened.includes('2025-06-28'));assert.ok(opened.includes('Historical · reference only'));
+    example.directEbay={result:{state:'ready',sales:[]}};
+    assert.ok(invoke('floorSales',example).filter(s=>!s.mismatch).every(s=>s.ageInfo.retained),'Completed sparse search still uses slow-selling rule');
+    const recent=Array.from({length:3},(_,i)=>({title:'Vernal Edge PS4',price:2000+i,date:`2026-10-${10+i}`}));
+    example.sales={cib:[...sales.cib,...recent]};
+    assert.ok(!invoke('floorSalesHtml',example,invoke('floorSales',example),invoke('floorBasis',example)).includes('Limited sales history'));
+  } finally {context.Date=previousDate;}
+});
+
 test('sales display keeps eligible rows visible and groups excluded rows without changing selection', () => {
   const sales = Array.from({length:10},(_,i)=>({i,title:`Eligible ${i}`,price:2000-i,date:'2026-10-01'}));
   const reasons = ['Different game, sequel, or unconfirmed title extension','Different special edition or reprint',

@@ -4725,7 +4725,9 @@ function floorSales(cur = floorCur) {
       && !verification?.confirmedUnsold && (!verification || ['unknown', 'ended', 'pending'].includes(verification.state));
     if (historicalCandidate) verification = { state: 'historical', previousState: verification?.state, previouslyExcluded: floorEbayExcluded(verification) };
     return { ...s, ...(checked?.sellerCountry ? { sellerCountry: checked.sellerCountry, locationSource: checked.locationSource } : {}),
-      i, mismatch, verification, historicalCandidate, odd: invalid || floorEbayExcluded(verification) };
+      i, mismatch, verification, historicalCandidate,
+      unrelatedSuggestion: !!s.directEbay && mismatch === 'Listing does not confirm the selected game or product',
+      odd: invalid || floorEbayExcluded(verification) };
   }).sort((a, b) => b.price - a.price);
   // Keep price plus shipping, including Canadian postage; filter explicit
   // overseas origin instead of using the delivery amount as a proxy.
@@ -4908,6 +4910,11 @@ function floorNumberedGameBundle(title, product) {
 // same cartridge. Normalize only this known title/platform combination, keeping
 // other games, extras, condition words and edition qualifiers for the filters.
 function floorKnownGameTitle(title, product) {
+  // Upgrade eligibility describes the physical PS4 copy, not a second game or
+  // a PS5 disc. Require explicit PS4 evidence before removing this phrase.
+  if (/\b(?:ps4|playstation\s*4)\b/i.test(title || '')) {
+    title = String(title).replace(/\b(?:with\s+|includes?\s+)?(?:free\s+)?(?:ps5|playstation\s*5)\s+upgrade(?:\s+(?:available|included))?\b/gi, ' ');
+  }
   const core = floorTitleWords(floorVariantName(product)).filter(w => w !== 'legend').join(' ');
   // PriceCharting calls the original PS1 Pro Skater simply "Tony Hawk".
   // Normalize that exact release only; retain sequel numbers and bundle pairs.
@@ -4955,7 +4962,10 @@ function floorNamedGameBundle(title, product) {
   return new Set(following.filter(words => words.length === 1 && titleWord(words[0]) && !selected.has(words[0])).map(words => words[0])).size >= 2;
 }
 function floorTitleIdentityMismatch(title, product) {
-  const name = product?.['product-name'] || '';
+  // Whole descriptive phrases only: never discard arbitrary title words.
+  const descriptiveTitle = text => String(text || '').replace(/\bvideo[ -]?game\b/gi, 'video game').replace(/\bgently\s+used\b/gi, 'used');
+  title = descriptiveTitle(title);
+  const name = descriptiveTitle(product?.['product-name']);
   if (floorToyFamily(product) === 'skylanders') {
     const character = floorSkyCharacter(product);
     return character && (` ${floorSkyText(title)} `).includes(` ${character} `) ? null : 'Listing does not confirm the selected character';
@@ -5483,6 +5493,8 @@ const FLOOR_SALE_GROUPS = { game: 'Different game / sequel', variant: 'Edition /
   condition: 'Condition / packaging', verification: 'Sale not verified / price unavailable',
   age: 'Older than six months', location: 'Seller outside North America', outlier: 'Possible price outliers', other: 'Other excluded listings' };
 function floorSaleGroup(s) {
+  if (s.unrelatedSuggestion) return 'suggestions';
+  if (s.ageInfo?.pending || s.historicalInfo?.pending) return 'history';
   if (s.ageInfo && !s.ageInfo.retained) return 'age';
   if (s.historicalInfo && !s.historicalInfo.retained) return 'verification';
   if (s.exclusion === 'Seller outside North America' || s.verification?.state === 'location') return 'location';
@@ -5505,7 +5517,8 @@ function floorSalesSections(sales, b) {
   return { eligible, groups };
 }
 function floorSaleDateHtml(s) {
-  const label = s.historicalInfo?.retained ? 'Historical · not verified' : s.ageInfo?.retained ? 'Older · slow seller' : '';
+  const label = s.ageInfo?.pending || s.historicalInfo?.pending ? 'Historical · reference only'
+    : s.historicalInfo?.retained ? 'Historical · not verified' : s.ageInfo?.retained ? 'Older · slow seller' : '';
   return label ? `<span class="floor-sale-date-old">${esc(s.date)} · ${label}</span>` : esc(s.date || '');
 }
 function floorSaleTable(rows, b) {
@@ -5517,14 +5530,30 @@ function floorSaleTable(rows, b) {
 function floorSalesHtml(cur, sales, b) {
   const { eligible, groups } = floorSalesSections(sales, b);
   const shown = cur.showAll ? eligible : eligible.slice(0, 8);
-  const excluded = Object.values(groups).reduce((n, rows) => n + rows.length, 0);
+  const excluded = Object.entries(groups).filter(([key]) => key !== 'suggestions' && key !== 'history').reduce((n, [, rows]) => n + rows.length, 0);
   const open = cur.openSaleGroups || {};
   const attrs = key => `data-sale-group="${key}" data-sale-condition="${cur.condition}"${open[key] ? ' open' : ''}`;
-  return `${shown.length ? floorSaleTable(shown, b) : '<p class="muted">No eligible sales found. Review excluded listings below.</p>'}
+  const referenceGroup = (key, label, note) => groups[key]?.length ? `<details class="floor-details floor-sale-group" ${attrs(key)}><summary>${label} (${groups[key].length})</summary><p class="muted small-print">${note}</p><div data-sale-group-body>${open[key] ? floorSaleTable(groups[key], b) : ''}</div></details>` : '';
+  return `${floorLimitedHistoryHtml(cur, sales, b)}${shown.length ? floorSaleTable(shown, b) : '<p class="muted">No eligible sales found. Review the history and excluded listings below.</p>'}
     ${eligible.length > 8 ? `<button type="button" class="link" data-floor-act="all">${cur.showAll ? 'Show fewer eligible sales' : `Show all ${eligible.length} eligible sales`}</button>` : ''}
+    ${referenceGroup('history', 'Older matching sales · reference only', 'Recent-sales check incomplete. These dates remain visible for review; the slow-seller rule determines whether they can set the automatic price.')}
     ${excluded ? `<details class="floor-details floor-excluded" ${attrs('excluded')}><summary>Excluded listings (${excluded})</summary>
       ${Object.entries(FLOOR_SALE_GROUPS).filter(([key]) => groups[key]?.length).map(([key, label]) => `<details class="floor-details floor-sale-group" ${attrs(key)}><summary>${label} (${groups[key].length})</summary><div data-sale-group-body>${open.excluded && open[key] ? floorSaleTable(groups[key], b) : ''}</div></details>`).join('')}
-    </details>` : ''}`;
+    </details>` : ''}
+    ${referenceGroup('suggestions', 'Unrelated eBay results', 'Titles missing the selected game name. These often come from eBay’s broader suggestions and cannot set the automatic price.')}`;
+}
+function floorLimitedHistoryHtml(cur, sales, b) {
+  if (!cur.sales || cur.salesLoading) return '';
+  const { cutoff, today } = floorSaleAgeWindow();
+  const comparable = sales.filter(s => !s.outlier && (!s.odd || s.ageInfo?.pending || s.historicalInfo?.pending)
+    && /^\d{4}-\d{2}-\d{2}$/.test(s.date || '') && Number.isFinite(Date.parse(s.date))
+    && new Date(s.date).toISOString().slice(0, 10) === s.date && s.date <= today);
+  const count = new Set(comparable.filter(s => !s.odd && s.date >= cutoff).map(floorSaleKey)).size;
+  if (count >= FLOOR_RECENT_SALE_MIN) return '';
+  const latest = comparable.map(s => s.date).sort().pop();
+  const pending = cur.salesError || cur.directEbay?.loading || cur.directEbay?.result?.more || cur.directEbay?.result?.partial
+    || cur.directEbay?.result && cur.directEbay.result.state !== 'ready';
+  return `<p class="muted small-print"><strong>Limited sales history</strong> · ${count} usable matching sale${count === 1 ? '' : 's'} found in six months${latest ? ` · Latest matching sale: <span${latest < cutoff ? ' class="floor-sale-date-old"' : ''}>${esc(latest)}</span>` : ''}${pending ? ' · Search incomplete' : ''}${b.from === 'pricecharting' ? ` · PriceCharting average fallback: ${money(b.basis)}` : ''}. Review before labeling.</p>`;
 }
 function onFloorSalesToggle(e) {
   const detail = e.target, key = detail.dataset?.saleGroup;
@@ -5536,7 +5565,7 @@ function onFloorSalesToggle(e) {
   const { b } = floorResult(floorCur), { groups } = floorSalesSections(floorSales(floorCur), b);
   const fill = node => {
     const body = node.querySelector('[data-sale-group-body]');
-    if (body) body.innerHTML = floorCur.openSaleGroups.excluded && node.open ? floorSaleTable(groups[node.dataset.saleGroup] || [], b) : '';
+    if (body) body.innerHTML = (['history', 'suggestions'].includes(node.dataset.saleGroup) || floorCur.openSaleGroups.excluded) && node.open ? floorSaleTable(groups[node.dataset.saleGroup] || [], b) : '';
   };
   if (key === 'excluded') detail.querySelectorAll('[data-sale-group]').forEach(node => {
     if (detail.open) fill(node);
@@ -5600,7 +5629,7 @@ function renderFloorPricer() {
 
   const showTyped = !!b.need || cur.typed != null;
   const reviewNotes = [...new Set(b.checks)];
-  const excluded = sales.filter((s) => s.mismatch).length + (cur.amazon?.rejected?.length || 0);
+  const excluded = sales.filter((s) => s.mismatch && !s.unrelatedSuggestion).length + (cur.amazon?.rejected?.length || 0);
   const outliers = sales.filter((s) => s.outlier).length;
   const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.incomplete || cur.amazon?.standard?.error || cur.amazon?.standard?.incomplete);
   el.innerHTML = `
