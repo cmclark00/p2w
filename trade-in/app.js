@@ -3279,7 +3279,7 @@ function renderFulcrum() {
       if (!(basis > 0) || rhythmKind(g.name)) return null;
       const premium = floorPremium(g.name, g.system);
       const reason = autoShitboxReason({ name: g.name });
-      return floorPrice(basis, { shitbox: !!reason, sportsRounding: reason === 'sports game', manualMissing: g.manual, premium: premium?.system ? premium : null }).price;
+      return floorPrice(basis, { shitbox: !!reason, sportsAdjustment: reason === 'sports game', manualMissing: g.manual, premium: premium?.system ? premium : null }).price;
     });
     const different = g.stock.filter((s, i) => s.price != null && suggested[i] != null && Math.abs(s.price - suggested[i]) > FLOOR_STEP);
     return different.length ? { g, different, suggested: [...new Set(suggested.filter((v) => v != null))] } : null;
@@ -3554,23 +3554,25 @@ function floorAmazonLowRound(price) {
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
-function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsRounding = false }) {
+function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsAdjustment = false }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const normalRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
-  const lowRound = value => sportsRounding && value < 2000
-    ? Math.floor(value / FLOOR_STEP) * FLOOR_STEP : normalRound(value);
+  const lowRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
   const full = Math.max(min, premiumBasis <= 8000 ? lowRound(premiumBasis) : premiumBasis);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const roundedReference = (value) => value > 0 ? (value <= 8000 ? lowRound(value) : value) : 0;
   const gsFloor = roundedReference(gs);
   const marketFloor = roundedReference(referenceMin);
   const beforeShelfRound = Math.max(full - ded, gsFloor, marketFloor);
-  const price = beforeShelfRound <= 8000 && premiumBasis > 8000 ? lowRound(beforeShelfRound) : floorShelfRound(beforeShelfRound);
-  return { full, ded, price, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
+  const normalPrice = beforeShelfRound <= 8000 && premiumBasis > 8000 ? lowRound(beforeShelfRound) : floorShelfRound(beforeShelfRound);
+  // Use the existing source-specific rounding first, then subtract once. Keep
+  // the under-$20 boundary on unrounded values and preserve the shelf minimum.
+  const sportsDiscount = sportsAdjustment && Math.max(premiumBasis, gs || 0, referenceMin || 0) < 2000
+    ? Math.min(FLOOR_STEP, Math.max(0, normalPrice - min)) : 0;
+  return { full, ded, price: normalPrice - sportsDiscount, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
-    premium, premiumBasis, amazonRounding, sportsRounding: sportsRounding && premiumBasis < 2000 };
+    premium, premiumBasis, amazonRounding, sportsDiscount };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -5446,7 +5448,7 @@ function floorConditionResult(cur) {
   const specific = !!(premium?.pct || manualMissing);
   const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
     gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
-    sportsRounding: !typed && shitbox === 'sports game',
+    sportsAdjustment: !typed && shitbox === 'sports game',
     amazonRounding: b.from === 'amazon' || b.from === 'standard' && b.standardReference?.from === 'amazon' });
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
@@ -5765,6 +5767,7 @@ function floorAmazonHtml(cur, b) {
 
 function floorMath(b, r) {
   if (r.cibFloor) return `${floorMath(b, { ...r, price: r.beforeCibFloor, cibFloor: null })} → held at CIB price ${money(r.cibFloor)}`;
+  if (r.sportsDiscount) return `${floorMath(b, { ...r, price: r.price + r.sportsDiscount, sportsDiscount: 0 })} → sports under $20 −${money(r.sportsDiscount)}: ${money(r.price)}`;
   if (b.from === 'msrp') return `MSRP ${money(b.msrp)} − $5.00 = ${money(r.price)} · exact price`;
   const parts = [`${FROM_LABELS[b.from] || ''} ${money(b.basis)}`];
   if (r.premium) parts.push(`${premiumText(r.premium)}: ${money(r.premiumBasis)}`);
@@ -5773,8 +5776,7 @@ function floorMath(b, r) {
     if (r.price !== r.beforeShelfRound) parts.push(`rounded to toys-to-life ${r.toy === 'amiibo' || r.beforeShelfRound >= 1500 ? '$5' : '$2 / $15'} step: ${money(r.price)}`);
     return parts.join(' → ');
   }
-  const lowLabel = r.sportsRounding ? 'sports under $20: rounded down to $5'
-    : r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
+  const lowLabel = r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${lowLabel}: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);

@@ -1050,13 +1050,14 @@ The site's **only server-side code**. Everything else is static.
     to $5 (exact multiples stay unchanged). Cents do not affect the ending:
     $11.99 -> $10, $14.95 -> $15, $16.99 -> $15, $17 -> $20, $52 -> $55. The existing $10 minimum ($5 for shitbox games) remains.
     **Sports below $20:** games classified as `sports game` by the existing
-    guide round down to $5 increments after percentage adjustments:
-    $19.99 -> $15, $14.95 -> $10, $9.99 -> $5. The $5 minimum remains.
-    This supersedes normal/Amazon rounding only below $20; market minimums
-    receive the same rounding. Named sports exceptions (Wii Sports, NFL/NBA
+    guide use normal source-specific rounding, then subtract $5 once:
+    $16 -> $15 -> $10, $19.99 -> $20 -> $15, $10 -> $5. The $5 minimum remains.
+    The under-$20 cutoff uses the unrounded price after percentage adjustments
+    and applicable market floors; $20 and above remain unchanged. Amazon keeps
+    its usual rounding before the subtraction. Named sports exceptions (Wii Sports, NFL/NBA
     Street, NFL Blitz) retain normal treatment. Typed prices and exact MSRP
     rules are unchanged; premiums apply before rounding and missing-manual
-    deductions afterward. CIB/New floors still compare final recommendations.
+    deductions keep their existing order. CIB/New floors still compare final recommendations.
     **Amazon-driven exception through $80:** `floorAmazonLowRound()` rounds down
     to $5 unless the amount is within $2 (inclusive) of the higher $5. Thus
     $27/$27.99 -> $25, $28 -> $30, $32.99 -> $30, $33 -> $35. `floorResult()`
