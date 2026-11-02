@@ -1710,14 +1710,27 @@ The site's **only server-side code**. Everything else is static.
     positive finite PriceCharting Loose + Box only market values, capped at CIB
     when available; otherwise positive CIB minus Manual only is the fallback.
     Missing/invalid components require a staff price, never a full CIB fallback.
-    Market-basis categories use the estimate directly; retail-buy categories
-    scale the existing CIB buying basis by estimate / CIB market (maximum 1),
-    then normal category percentages, guide rules, damage deductions and staff
-    overrides apply. Shelf-pricing manual deductions/premiums are unchanged.
+    Cash offers compare the normal CIB cash offer minus the FULL manual
+    replacement cost against an independent Loose + Box as-is offer, using the
+    higher viable offer. `tradeNoManualOffer()` runs after ordinary category
+    percentages/damage deductions; credit uses the adjusted cash and normal
+    category ratio. Manual cost defaults to PC Manual only (an estimate, not a
+    delivered quote); staff may type `line.manualCost` including delivery, or
+    zero for an on-hand manual, and clear it to restore the estimate.
+    The as-is offer uses the component market value for market-basis categories;
+    retail-buy categories scale CIB buying basis by estimate / CIB market (max 1).
+    CIB-minus-manual is NOT independent as-is evidence for this comparison.
+    Unavailable manual cost can fall back to Loose + Box; no viable completion
+    or as-is offer requires staff review, never a negative offer. Guide flat/
+    don't-buy rules and typed value/cash overrides retain priority. Shelf
+    pricing is unchanged. Quoted manual costs prevent merging with automatic
+    lines, persist in drafts, and clear when switching out of this condition.
     Full component prices load once per line when needed, with explicit retry
     after failure and stale-response guards. Completion waits for pending loads.
     Trade log/receipts retain the condition label; PriceCharting completion/log
-    totals use the component estimate and snapshot its method. Tests cover
+    totals use the component estimate and snapshot its method (not cash offer).
+    Trade items also snapshot the offer method, cost source and calculation.
+    Tests cover
     pricing/persistence plus `scripts/test-trade-no-manual.cjs` async recovery.
 
   - **Case only** (`CASE_ONLY` condition on PriceCharting game lines, owner

@@ -674,13 +674,20 @@ Everyone in the store shares one internet address, so typos add up.
    column. Store credit fills in from the type.
 3. Set each game's condition (**Loose / CIB / Game + box, no manual / New**).
    **Game + box, no manual** is for the game with its original case/box and
-   cover art, missing the manual. It estimates value from PriceCharting's
-   **Loose + Box only** prices, never above CIB when that value is available.
-   If those components are missing, it tries **CIB minus Manual only**.
-   The usual trade-in payout calculation then applies; there is no fixed
-   missing-manual deduction. The line shows the calculation. If the data is
-   unavailable, enter an agreed Cash offer. This condition is saved in the
-   trade log and receipt; the completion PriceCharting total uses the estimate.
+   cover art, missing the manual. The offer starts with **normal CIB cash minus
+   the full manual replacement cost**: a $30 CIB offer minus an $8 manual pays
+   $22 cash. Credit follows the adjusted cash at the usual category rate.
+   The tool compares that with an estimated **sell-as-is** offer from
+   PriceCharting Loose + Box only (capped at CIB) and uses the higher offer.
+   The line tells you which approach it chose. Guide rules still take priority.
+   **Manual delivered cost** defaults to PriceCharting's Manual only estimate;
+   check availability and enter the full delivered cost when you have a quote.
+   Enter 0 for a manual you already have at no extra cost; clear the field to
+   use the estimate again. Missing manual data uses the as-is estimate if
+   available; if neither approach can be priced, enter an agreed Cash offer.
+   The trade log saves the calculation. The completion PriceCharting total
+   remains a separate component market estimate (Loose + Box, or CIB minus
+   Manual only when those components are missing), not the cash offer.
    Use **CIB** for a complete release that never came with a manual.
    Choose **Case only**
    for just an empty case: a first-party game's case, like Mario, Zelda,

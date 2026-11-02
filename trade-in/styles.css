@@ -224,6 +224,9 @@ td.cash small, td.credit small { display: block; font-size: 0.75rem; font-weight
 
 .flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
 .flags:empty { display: none; }
+.manual-cost { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 0.8rem; }
+.manual-cost input { width: 76px; padding: 4px 6px; }
+.manual-cost small { color: var(--muted); }
 .badge { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .badge.warn { background: rgba(217, 31, 56, 0.2); color: #ff8a99; }
 .badge.low { background: rgba(154, 154, 166, 0.2); color: var(--paper); }

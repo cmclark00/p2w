@@ -28,13 +28,28 @@ run(`tokenSet=true; var notices=[],calls=0,resolveLookup,rejectLookup;
   assert.equal(run('tradeItems()[0].condition'),'Game + box, no manual');
   assert.equal(run('tradePcSnapshot().items[0].valuation'),'loose-plus-box');
 
+  run(`var originalUpdate=updateRow, originalTotals=renderTotals;
+    updateRow=()=>{};renderTotals=()=>{};
+    var editCost=v=>onLineChange({target:{value:v,dataset:{field:'manualCost'},closest:()=>({dataset:{id:line.id}})}});
+    editCost('2.00');`);
+  assert.equal(run('line.manualCost'),200);
+  assert.equal(JSON.parse(stored.get('p2w-trade')).lines[0].manualCost,200,'Delivered quote survives reload');
+  assert.equal(run('tradeItems()[0].noManualPricing.costSource'),'staff-delivered-cost');
+  assert.equal(run('tradeItems()[0].noManualPricing.method'),'complete-copy');
+  assert.match(run('tradeItems()[0].note'),/CIB cash.*manual/);
+  run("editCost('bad');editCost('-5');");assert.equal(run('line.manualCost'),200,'Invalid edits preserve last quote');
+  run("editCost('');");assert.equal(run('line.manualCost'),null,'Clearing restores PC estimate');
+  run("editCost('0');");assert.equal(run('line.manualCost'),0);
+  run("setTradeCondition(line,'cib');");assert.equal(run('line.manualCost'),undefined,'Condition change clears quote');
+  run('updateRow=originalUpdate;renderTotals=originalTotals;');
+
   run('trade.lines=[fresh()]; line=trade.lines[0]; first=loadTradeManualPrices(line);rejectLookup(Error("Unavailable"));');
   await run('first');assert.equal(run('tradeManualLoads.get(line).error'),true);
   const failures=run('calls');run('loadTradeManualPrices(line);commit();');assert.equal(run('calls'),failures,'Failed requests wait for explicit retry');
   assert.equal(run('priceLine(line).cash'),null,'No silent CIB fallback');
   run('tradeManualLoads.delete(line);first=loadTradeManualPrices(line);resolveLookup({...full,"box-only-price":0});');
   await run('first');assert.equal(run('tradePcReference(line).method'),'cib-minus-manual');
-  assert.equal(run('priceLine(line).base'),1800);
+  assert.equal(run('priceLine(line).base'),2400);
 
   run('trade.lines=[fresh()];line=trade.lines[0];first=loadTradeManualPrices(line);setTradeCondition(line,"loose");resolveLookup(full);');
   await run('first');assert.equal(run('line.condition'),'loose');assert.equal(run('line.manualMissing'),false,'Late data cannot restore old condition');

@@ -24,6 +24,7 @@ const tradeGameConditions = (category) => isGameCat(category)
 function setTradeCondition(line, condition) {
   line.manualMissing = line.source === 'pc' && isGameCat(line.category) && condition === TRADE_NO_MANUAL;
   line.condition = condition === TRADE_NO_MANUAL ? 'cib' : condition;
+  if (!line.manualMissing) delete line.manualCost;
 }
 const HW_FIELDS = ['complete', 'unit', 'parts'];
 const isGameCat = (cat) => GAME_CATEGORIES.includes(cat);
@@ -832,13 +833,49 @@ function normalCreditBonusOf(line, p, s) {
 // resurfacing rule for them, and the waiver would otherwise cancel it on every tier but $1.
 function priceBeforeCredit(line, s = settings) {
   const deds = lineDeductions(line, s);
-  const out = priceWith(line, s, deds);
-  if (!deds.some((d) => d.resurface)) return out;
-  const clean = priceWith(line, s, deds.filter((d) => !d.resurface));
-  if (!clean.dontBuy && !clean.guide?.outlier && clean.cash != null && clean.cash <= SCRATCH_FREE_MAX) {
-    return { ...clean, scratchWaived: true };
+  let out = priceWith(line, s, deds);
+  if (deds.some((d) => d.resurface)) {
+    const clean = priceWith(line, s, deds.filter((d) => !d.resurface));
+    if (!clean.dontBuy && !clean.guide?.outlier && clean.cash != null && clean.cash <= SCRATCH_FREE_MAX) {
+      out = { ...clean, scratchWaived: true };
+    }
   }
-  return out;
+  return tradeNoManualOffer(line, s, out);
+}
+
+// Compare completing the copy against selling it as-is. Reserve the FULL manual
+// cost after the CIB cash calculation, not a percentage of that cost.
+function tradeNoManualOffer(line, s, asIs) {
+  if (!tradeNoManual(line) || line.pending || line.failed || line.override != null || asIs.flat || asIs.dontBuy) return asIs;
+  const estimate = tradeNoManualValue(line);
+  // CIB-minus-manual is useful as a market reference, but is not independent
+  // evidence for an as-is payout competing with the completion-cost deduction.
+  const asIsCash = estimate?.method === 'loose-plus-box' ? asIs.cash : null;
+  const quoted = Number.isFinite(line.manualCost) && line.manualCost >= 0;
+  const pcManual = line.prices?.[MANUAL_KEY];
+  const cost = quoted ? line.manualCost : Number.isFinite(pcManual) && pcManual > 0 ? pcManual : null;
+  const complete = priceBeforeCredit({ ...line, manualMissing: false }, s);
+  if (complete.dontBuy || complete.flat) return complete;
+  const completionCash = cost != null && complete.cash != null ? complete.cash - cost : null;
+  const useCompletion = completionCash > 0 && (asIsCash == null || completionCash >= asIsCash);
+  const calculation = { method: useCompletion ? 'complete-copy' : asIsCash != null ? 'sell-as-is' : 'review',
+    manualCost: cost, costSource: quoted ? 'staff-delivered-cost' : 'pricecharting-estimate',
+    cibCash: complete.cash, asIsCash };
+  if (useCompletion) {
+    const cash = roundOffer(completionCash, s);
+    const ratio = 1 + normalCreditBonusOf(line, complete, s) / 100;
+    return { ...complete, cash, credit: roundOffer(cash * ratio, s), noManual: calculation };
+  }
+  return { ...asIs, cash: asIsCash, credit: asIsCash == null ? null : asIs.credit, noManual: calculation };
+}
+
+function tradeManualNote(p) {
+  const m = p.noManual;
+  if (!m) return '';
+  if (p.cashEdited) return 'Staff cash offer';
+  if (m.method === 'complete-copy') return `CIB cash ${money(m.cibCash)} − manual ${money(m.manualCost)} = ${money(p.cash)}`;
+  if (m.method === 'sell-as-is') return `Sell as-is: ${money(p.cash)} cash${m.manualCost == null ? ' · Manual cost unavailable' : ' · Better offer than completing'}`;
+  return 'Completion not practical or prices missing — review and enter a cash offer';
 }
 
 // value = item value (PriceCharting price or guide price) minus deductions; cash/credit = value x category %.
@@ -918,7 +955,7 @@ function flash(id) {
   tr.classList.add('flash');
 }
 
-const isPlain = (l) => l.override == null && l.cashOverride == null && !(l.deductions || []).length && !l.guideFlag && !l.firstParty && l.creditBonus == null;
+const isPlain = (l) => l.override == null && l.cashOverride == null && l.manualCost == null && !(l.deductions || []).length && !l.guideFlag && !l.firstParty && l.creditBonus == null;
 
 function placeLine(line, replaceId) {
   const i = replaceId ? trade.lines.findIndex((l) => l.id === replaceId) : -1;
@@ -1332,7 +1369,10 @@ function updateRow(tr, line) {
   const flags = [];
   if (tradeNoManual(line)) {
     const estimate = tradeNoManualValue(line), load = tradeManualLoads.get(line);
-    flags.push(`<span class="badge ${estimate ? 'info' : 'warn'}">${estimate ? `No-manual estimate: ${esc(estimate.note)}` : load?.pending ? 'Loading box/manual prices…' : 'No-manual value unavailable — enter a cash offer'}${estimate && p.base == null ? ' · Buying basis unavailable' : ''}</span>`);
+    const note = load?.pending ? 'Loading box/manual prices…' : tradeManualNote(p);
+    if (note) flags.push(`<span class="badge ${p.cash == null ? 'warn' : 'info'}">${esc(note)}</span>`);
+    if (estimate) flags.push(`<span class="badge info" title="Estimated market value, separate from the cash offer">As-is value: ${esc(estimate.note)}</span>`);
+    flags.push(`<label class="manual-cost">Manual delivered cost $<input type="text" inputmode="decimal" data-field="manualCost" aria-label="Manual replacement cost including delivery" value="${plain(line.manualCost)}" placeholder="${plain(line.prices?.[MANUAL_KEY]) || 'Unknown'}"><small>${line.manualCost != null ? 'Staff cost · clear to use estimate' : 'PC estimate · check delivery/availability'}</small></label>`);
     if (load?.error) flags.push('<button type="button" class="link" data-action="retry-no-manual">Retry box/manual prices</button>');
   }
   if (isGameCat(line.category) && line.condition !== CASE_ONLY) flags.push(deadGameNotice(line.name, line.platform, 'Trade-In'));
@@ -1547,7 +1587,7 @@ function onLineChange(e) {
     line.category = v;
     const target = isGameCat(v) ? 'game' : 'hardware';
     line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === target);
-    if (!isGameCat(v)) { delete line.guideFlag; delete line.manualMissing; }
+    if (!isGameCat(v)) { delete line.guideFlag; delete line.manualMissing; delete line.manualCost; }
     if (line.source === 'pc' && line.condition === 'parts' && !isHwCat(v)) line.condition = 'loose';
     if (line.source === 'pc' && line.condition === CASE_ONLY && !isGameCat(v)) line.condition = 'loose';
     commit();
@@ -1556,6 +1596,10 @@ function onLineChange(e) {
   if (field === 'qty') {
     line.qty = Math.max(1, parseInt(v, 10) || 1);
     e.target.value = line.qty;
+  } else if (field === 'manualCost' && tradeNoManual(line)) {
+    const cents = parseMoney(v);
+    if (Number.isNaN(cents) || (cents != null && cents < 0)) toast('Enter a delivered manual cost like 8.00', 'error');
+    else line.manualCost = cents;
   } else if (field === 'value') {
     const auto = autoBase(line, settings.rules[line.category] || settings.rules.other);
     const cents = parseMoney(v);
@@ -2368,6 +2412,7 @@ function tradeItems() {
       deductions: lineDeductions(l).filter((d) => !(p.scratchWaived && d.resurface)).map((d) => d.label), note: p.guide?.note || undefined, upc: l.upc || undefined, serial: l.serial || undefined,
       creditBonus: p.customCredit ? l.creditBonus : undefined,
       cashEdited: p.cashEdited || undefined,
+      ...(p.noManual ? { noManualPricing: { ...p.noManual, staffCashOverride: !!p.cashEdited }, note: [p.guide?.note, tradeManualNote(p)].filter(Boolean).join(' · ') } : {}),
       ...(l.source === 'bulk' ? { type: 'TCG bulk', condition: '', detail: bulkBreakdown(l.bulkItems) } : {}),
     };
   });

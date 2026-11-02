@@ -84,7 +84,8 @@ test('no-manual trade pricing uses game-specific components through the existing
   assert.equal(invoke('priceLine',{...line,condition:'loose'},settings).base,null,'No-manual flag cannot substitute for missing Loose buy price');
   const fallback={...line,prices:{...line.prices,'box-only-price':0}};
   assert.equal(invoke('tradeNoManualValue',fallback).method,'cib-minus-manual');
-  assert.equal(invoke('priceLine',fallback,settings).base,1800);
+  assert.equal(invoke('priceLine',fallback,settings).base,2400);
+  assert.equal(invoke('priceLine',fallback,settings).cash,200,'Full $10 manual cost comes off $12 CIB cash');
   const capped={...line,prices:{...line.prices,'box-only-price':5000}};
   assert.equal(invoke('tradeNoManualValue',capped).value,4000);
   assert.equal(invoke('priceLine',capped,settings).base,2400);
@@ -100,6 +101,33 @@ test('no-manual trade pricing uses game-specific components through the existing
   const flatSettings=JSON.parse(JSON.stringify(settings)); flatSettings.guide.enabled=true;
   const sport={...line,name:'Madden NFL 16',prices:{...line.prices,'loose-price':500,'box-only-price':100,'cib-price':1000}};
   assert.equal(invoke('priceLine',sport,flatSettings).cash,25,'Boxed sports guide rule still has priority');
+});
+
+test('no-manual completion reserves full delivered cost, compares as-is, and preserves overrides', () => {
+  const settings=json('clone(DEFAULT_SETTINGS)'); settings.guide.enabled=false;
+  settings.rules.game={basis:'retail-buy',cashPct:50,creditPct:75};
+  const line={source:'pc',category:'game',condition:'cib',manualMissing:true,name:'Example Adventure',platform:'Playstation 2',qty:1,
+    prices:{'loose-price':1000,'box-only-price':500,'manual-only-price':800,'cib-price':8000,'retail-cib-buy':6000},deductions:[]};
+  let p=invoke('priceLine',line,settings);
+  assert.equal(p.cash,2200); assert.equal(p.credit,3300); assert.equal(p.noManual.method,'complete-copy');
+  assert.equal(invoke('priceLine',{...line,deductions:['broken-case']},settings).cash,2050,'Damage deducted once before manual cost');
+  p=invoke('priceLine',{...line,manualCost:1000},settings);
+  assert.equal(p.cash,2000); assert.equal(p.noManual.costSource,'staff-delivered-cost');
+  assert.equal(invoke('priceLine',{...line,manualCost:0},settings).cash,3000,'An on-hand free manual may cost zero');
+  p=invoke('priceLine',{...line,manualCost:3500},settings);
+  assert.equal(p.cash,562); assert.equal(p.noManual.method,'sell-as-is','Expensive manuals cannot wipe out viable as-is value');
+  p=invoke('priceLine',{...line,manualCost:3500,prices:{...line.prices,'box-only-price':0}},settings);
+  assert.equal(p.cash,null,'No completion budget or independent as-is evidence requires review');
+  p=invoke('priceLine',{...line,prices:{...line.prices,'manual-only-price':0}},settings);
+  assert.equal(p.cash,562); assert.equal(p.noManual.manualCost,null);
+  assert.equal(invoke('priceLine',{...line,cashOverride:2500},settings).cash,2500);
+  assert.equal(invoke('priceLine',{...line,creditBonus:100},settings).credit,4400);
+  assert.equal(invoke('priceLine',{...line,override:2000},settings).cash,1000,'Typed item value remains explicit');
+  const pending=invoke('priceLine',{...line,pending:true},settings); assert.equal(pending.cash,null);
+  const missing={...line,prices:{'manual-only-price':800,'retail-cib-buy':6000}};
+  assert.equal(invoke('priceLine',missing,settings).cash,2200,'Completion offer does not require box-only data');
+  assert.equal(invoke('tradePcValue',missing),null,'No fabricated market reference from the cash offer');
+  assert.equal(invoke('isPlain',{...line,manualCost:800}),false,'Quoted copies do not merge with automatic ones');
 });
 
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
