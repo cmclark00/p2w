@@ -1373,8 +1373,14 @@ The site's **only server-side code**. Everything else is static.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
     All pre-owned inventory selects the cheaper eligible regular Used or New offer,
     including CIB. On equal prices, Used wins. New can also be the only available offer.
-    Only New evidence enters the New source baseline; Like New, Used, Open Box
-    and Renewed do not. The final New shelf recommendation also respects the
+    New Amazon pricing prefers New on any verified regular ASIN. Only after a
+    completed search finds none, `newLikeNewFallback` permits Like New/Mint
+    rows from regular Used offers. No Very Good, Good, Acceptable, Open Box or
+    Renewed fallback is allowed for New. New lookup failures remain incomplete;
+    Used failures block this fallback but stay reference-only when New exists.
+    Read Used even on verified catalog items with no New offer response. Pins
+    label Used · Like new and fallback, never relabel this evidence as New.
+    eBay/PriceCharting condition matching is unchanged. The final New shelf recommendation also respects the
     independently calculated complete-CIB floor described above. Both Used and
     New reads are required for pre-owned inventory: an error leaves the search incomplete and
     retryable, rather than selecting a potentially higher price from partial data.

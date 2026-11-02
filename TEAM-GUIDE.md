@@ -1086,9 +1086,11 @@ Guide (the Google Sheet tab).
      If an edition has no usable Amazon price, **Standard Amazon** in the pinned
      row shows the standard game's verified fallback prices. Its match stays
      separate from your edition; specific premiums still apply.
-     **Keep conditions separate:** only New evidence prices New inventory.
+     **New Amazon fallback:** use New first across all matching listings. If
+     none are available, use **Like New (Mint) only**, clearly labeled fallback.
      Brand-new Amazon offers can price Loose or CIB when cheaper than eligible Used.
-     Like New, open-box and Renewed cannot price New inventory. Used-grade
+     Very Good, Good, Acceptable, open-box and Renewed do not supply this New
+     Amazon fallback. eBay/PriceCharting condition checks remain unchanged. Used-grade
      filters still apply to CIB; all Used grades remain eligible for Loose games. GameStop pre-owned
      cannot set a minimum for New inventory. Specific premiums and rounding remain.
      **Amazon Used and New are shown separately** in the pinned row and each
@@ -1096,7 +1098,8 @@ Guide (the Google Sheet tab).
      **Selected** marks the Amazon reference, while **Sets baseline** in the
      comparison table means Amazon actually sets the shelf baseline. eBay,
      GameStop or a specific rule can still take priority. For New inventory,
-     the Used price is comparison-only and cannot lower the sealed price.
+     Used is comparison-only while New offers exist; if New is unavailable,
+     only Like New can supply the Amazon fallback.
      Renewed matches still need the correct title, platform, language and
      edition; they do not confirm original packaging/inserts and cannot price
      a sealed copy. Specific premiums and deductions still apply.

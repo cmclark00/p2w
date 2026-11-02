@@ -179,6 +179,48 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       }
     }
   });
+  await test('New prefers any matching New offer, otherwise falls back only to Like New across ASINs', async () => {
+    const first=candidate('B000000001'),second=candidate('B000000002');
+    for(const newPrice of [0,6000]) {
+      const e=engine(async(route,p)=>route==='amazon/catalog'?{candidates:[first,second]}:
+        {...offer(p.asin===first.asin?first:second,null),condition:p.cond==='new'?'New':'Used',
+          offers:p.cond==='new'?(p.asin===second.asin&&newPrice?[{price:newPrice,sub:'new'}]:[]):
+            [{price:p.asin===first.asin?4500:3500,sub:p.asin===first.asin?'like_new':'Mint'},{price:1000,sub:'very_good'}]});
+      const result=await e.fetch(product,'new'); e.ctx.result=result;
+      assert.equal(e.run('floorAmazonLowest({product,condition:"new",amazon:result})'),newPrice||3500);
+      assert.equal(result.asin,second.asin);
+      assert.equal(!!result.newLikeNewFallback,!newPrice);
+      const html=e.run('floorAmazonReferencesHtml({product,condition:"new",amazon:result},{from:"amazon"},true)');
+      assert.match(html,newPrice?/Amazon New.*\$60.00.*selected/:/Amazon Used · Like new.*\$35.00.*selected.*fallback/);
+      if(!newPrice) {
+        e.run('amazonSet=true');
+        assert.match(e.run('floorAmazonHtml({product,condition:"new",amazon:result},{from:"amazon"})'),/Amazon Like New fallback offers/);
+      }
+    }
+    for(const sub of ['very_good','good','acceptable','open_box',null]) {
+      const e=engine(async(route,p)=>route==='amazon/catalog'?{candidates:[first]}:
+        {...offer(first,null),condition:p.cond==='new'?'New':'Used',offers:p.cond==='new'?[]:[{price:1000,sub}]});
+      e.ctx.result=await e.fetch(product,'new');
+      assert.equal(e.run('floorAmazonLowest({product,condition:"new",amazon:result})'),null,sub);
+    }
+  });
+  await test('Like New fallback checks unpriced catalog entries and cannot hide failed New or Used reads', async () => {
+    const first=candidate('B000000001');
+    const e=engine(async(route,p)=>route==='amazon/catalog'?{candidates:[first]}:
+      {...offer(first,null),found:p.cond==='used',condition:p.cond==='new'?'New':'Used',offers:p.cond==='used'?[{price:3500,sub:'like_new'}]:[]});
+    e.ctx.result=await e.fetch(product,'new');
+    assert.equal(e.run('floorAmazonLowest({product,condition:"new",amazon:result})'),3500);
+    for(const failCond of ['new','used']) {
+      const failed=engine(async(route,p)=>{
+        if(route==='amazon/catalog')return {candidates:[first]};
+        if(p.cond===failCond)throw Error('temporary failure');
+        return {...offer(first,null),condition:p.cond==='new'?'New':'Used',offers:p.cond==='used'?[{price:3500,sub:'like_new'}]:[]};
+      });
+      const result=await failed.fetch(product,'new').catch(err=>({error:err.message})); failed.ctx.result=result;
+      assert.ok(result.error||result.incomplete);
+      assert.equal(failed.run('floorAmazonLowest({product,condition:"new",amazon:result})'),null);
+    }
+  });
   await test('CIB picks cheaper Very Good or Like New across listings and keeps each condition cache separate', async () => {
     const first=candidate('B000000001'),second=candidate('B000000002');let calls=0;
     const e=engine(async(route,p)=>{calls++;return route==='amazon/catalog'?{candidates:[first,second]}:{...offer(p.asin===first.asin?first:second,null),
