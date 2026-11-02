@@ -38,6 +38,70 @@ const cur = (product = item, extra = {}) => {
   return result;
 };
 
+test('trade game and box without manual is distinct, persists, and totals its component estimate', () => {
+  const result = json(`(() => {
+    const previousLines = trade.lines, previousCommit = commit, previousFlash = flash, previousHardware = hardware;
+    try {
+      trade.lines = []; hardware = []; commit = () => {}; flash = () => {};
+      const product = {id:'no-manual-test','product-name':'Example Adventure','console-name':'Playstation 2',
+        'loose-price':2000,'box-only-price':800,'manual-only-price':1000,'cib-price':4000,'new-price':6000,'retail-loose-buy':1200,'retail-cib-buy':2400,'retail-new-buy':3600};
+      addPcProduct(product, 'cib'); addPcProduct(product, TRADE_NO_MANUAL); addPcProduct(product, TRADE_NO_MANUAL);
+      const saved = JSON.parse(JSON.stringify(trade.lines));
+      const line = {...saved.find(tradeNoManual)}, complete = saved.find(l => !tradeNoManual(l));
+      const selected = conditionSelect(line), label = conditionLabel(line), items = tradeItems();
+      const ref = tradePcValue(line), snap = tradePcSnapshot();
+      setTradeCondition(line,'loose'); const loose = {...line};
+      setTradeCondition(line,TRADE_NO_MANUAL); setTradeCondition(line,'new'); const sealed = {...line};
+      setTradeCondition(line,TRADE_NO_MANUAL); setTradeCondition(line,'cib');
+      return {saved,selected,label,items,ref,snap,loose,sealed,complete,reset:line,
+        hardware:conditionSelect({source:'pc',category:'console',condition:'cib'}),
+        floorConditions:GAME_CONDITIONS,buttonValue:basisPrice(product,TRADE_NO_MANUAL)};
+    } finally { trade.lines=previousLines;commit=previousCommit;flash=previousFlash;hardware=previousHardware; }
+  })()`);
+  assert.equal(result.saved.length,2,'Complete and no-manual copies must not merge');
+  assert.equal(result.saved.find(l=>l.manualMissing).qty,2,'Identical no-manual copies can merge');
+  assert.equal(result.complete.qty,1);
+  assert.equal(result.label,'Game + box, no manual');
+  assert.match(result.selected, /value="no-manual" selected/);
+  assert.ok(result.items.some(i=>i.condition===result.label),'Saved trade and receipt use the explicit label');
+  assert.equal(result.ref,2800,'Component estimate is distinct from full CIB');
+  assert.equal(result.snap.total,9600);
+  assert.equal(result.snap.items.find(i=>i.condition===result.label).valuation,'loose-plus-box');
+  for (const l of [result.loose,result.sealed,result.reset]) assert.equal(l.manualMissing,false,'Changing condition clears missing manual');
+  assert.ok(!result.hardware.includes('no-manual'));
+  assert.deepEqual(Object.keys(result.floorConditions),['loose','cib','new'],'Floor Pricing conditions are unaffected');
+  assert.ok(result.buttonValue>0,'Search result can display the derived buying basis');
+});
+
+test('no-manual trade pricing uses game-specific components through the existing buying rule', () => {
+  const line={source:'pc',category:'game',condition:'cib',manualMissing:true,name:'Example Adventure',platform:'Playstation 2',qty:1,
+    prices:{'loose-price':2000,'box-only-price':800,'manual-only-price':1000,'cib-price':4000,'retail-cib-buy':2400},deductions:[]};
+  const settings=json('clone(DEFAULT_SETTINGS)'); settings.guide.enabled=false;
+  settings.rules.game={basis:'retail-buy',cashPct:50,creditPct:75};
+  let p=invoke('priceLine',line,settings);
+  assert.equal(p.base,1680); assert.equal(p.cash,840); assert.equal(p.credit,1260);
+  assert.equal(invoke('priceLine',{...line,manualMissing:false},settings).base,2400);
+  assert.equal(invoke('priceLine',{...line,condition:'loose'},settings).base,null,'No-manual flag cannot substitute for missing Loose buy price');
+  const fallback={...line,prices:{...line.prices,'box-only-price':0}};
+  assert.equal(invoke('tradeNoManualValue',fallback).method,'cib-minus-manual');
+  assert.equal(invoke('priceLine',fallback,settings).base,1800);
+  const capped={...line,prices:{...line.prices,'box-only-price':5000}};
+  assert.equal(invoke('tradeNoManualValue',capped).value,4000);
+  assert.equal(invoke('priceLine',capped,settings).base,2400);
+  for(const prices of [{...line.prices,'box-only-price':0,'manual-only-price':0},
+    {...line.prices,'box-only-price':0,'manual-only-price':5000},{'loose-price':2000}]) {
+    assert.equal(invoke('tradeNoManualValue',{...line,prices}),null);
+    assert.equal(invoke('priceLine',{...line,prices},settings).cash,null,'Insufficient component evidence requires a price');
+  }
+  assert.equal(invoke('priceLine',{...line,category:'pokemon'},settings).base,2800,'Market-based categories use the estimate directly');
+  assert.equal(invoke('priceLine',{...line,cashOverride:1000},settings).cash,1000,'Agreed cash still wins');
+  assert.equal(invoke('priceLine',{...line,deductions:['broken-case']},settings).base,1680);
+  assert.equal(invoke('priceLine',{...line,deductions:['broken-case']},settings).cash,690,'Existing damage deduction is applied once');
+  const flatSettings=JSON.parse(JSON.stringify(settings)); flatSettings.guide.enabled=true;
+  const sport={...line,name:'Madden NFL 16',prices:{...line.prices,'loose-price':500,'box-only-price':100,'cib-price':1000}};
+  assert.equal(invoke('priceLine',sport,flatSettings).cash,25,'Boxed sports guide rule still has priority');
+});
+
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
   const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
   const wrong=[

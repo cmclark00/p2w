@@ -13,6 +13,18 @@ const CATEGORIES = {
 const GAME_CATEGORIES = ['game', 'pokemon'];
 const HW_CATEGORIES = ['console', 'handheld', 'accessory', 'other'];
 const GAME_CONDITIONS = { loose: 'Loose', cib: 'CIB', new: 'New' };
+// Trade-only presentation: PriceCharting has no game + box/no-manual field.
+// Retain CIB as the reference condition and record missing contents separately.
+const TRADE_NO_MANUAL = 'no-manual';
+const TRADE_NO_MANUAL_LABEL = 'Game + box, no manual';
+const tradeNoManual = (line) => line.source === 'pc' && isGameCat(line.category) && line.condition === 'cib' && !!line.manualMissing;
+const tradeGameConditions = (category) => isGameCat(category)
+  ? [['loose', 'Loose'], ['cib', 'CIB'], [TRADE_NO_MANUAL, TRADE_NO_MANUAL_LABEL], ['new', 'New']]
+  : Object.entries(GAME_CONDITIONS);
+function setTradeCondition(line, condition) {
+  line.manualMissing = line.source === 'pc' && isGameCat(line.category) && condition === TRADE_NO_MANUAL;
+  line.condition = condition === TRADE_NO_MANUAL ? 'cib' : condition;
+}
 const HW_FIELDS = ['complete', 'unit', 'parts'];
 const isGameCat = (cat) => GAME_CATEGORIES.includes(cat);
 const hwConditionLabels = (cat) => (cat === 'accessory'
@@ -46,6 +58,7 @@ const PRICE_KEYS = [...Object.values(PC_FIELDS['retail-buy']), ...Object.values(
 // PriceCharting's "box only" price (an empty case or box), for Case only game lines. Kept when a product has it,
 // but not required (search results may lack it; a Case only line loads it when it needs it).
 const BOX_KEY = 'box-only-price';
+const MANUAL_KEY = 'manual-only-price';
 // Case only: a game's empty case (owner, Oct 2026): a first-party game's case is valued like the game (its box's
 // share of the CIB price, through the game rule, so cash = credit ÷ 1.5); anything else pays settings.cases.amount
 // ($0.25) flat.
@@ -473,7 +486,7 @@ function pcLink(id, text, cls = '') {
 
 function slimProduct(p) {
   const prices = {};
-  for (const k of [...PRICE_KEYS, BOX_KEY]) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
+  for (const k of [...PRICE_KEYS, BOX_KEY, MANUAL_KEY]) if (p[k] != null && p[k] !== '') prices[k] = Number(p[k]);
   const positive = (v) => (Number(v) > 0 ? Number(v) : null); // PriceCharting uses 0 for "GameStop doesn't carry it"
   return {
     id: String(p.id), name: p['product-name'] || 'Unknown item', platform: p['console-name'] || '',
@@ -633,7 +646,7 @@ function guideCheck(line, s) {
 
   const reason = shitboxReason(line, g);
   const loose = line.prices?.['loose-price'];
-  const condMarket = line.prices?.[PC_FIELDS.market[line.condition]];
+  const condMarket = tradeNoManual(line) ? tradeNoManualValue(line)?.value : line.prices?.[PC_FIELDS.market[line.condition]];
   // A loose rhythm-game bundle is the disc plus its instruments, not a disc-only game.
   const discOnly = line.condition === 'loose' && DISC_PLATFORM_RE.test(norm(line.platform)) && rhythmKind(line.name) !== 'bundle';
 
@@ -716,8 +729,32 @@ function caseFirstParty(line, s = settings) {
 }
 const isCaseLine = (line) => line.source === 'pc' && line.condition === CASE_ONLY;
 
+// Component market values are estimates for this condition, not cash offers.
+// Translate their share of CIB through the existing CIB buying basis/category rule.
+function tradeNoManualValue(line) {
+  const price = key => { const n = line.prices?.[key]; return Number.isFinite(n) && n > 0 ? n : null; };
+  const loose = price('loose-price'), box = price(BOX_KEY), cib = price('cib-price'), manual = price(MANUAL_KEY);
+  if (loose != null && box != null) {
+    const sum = loose + box, value = cib != null ? Math.min(sum, cib) : sum;
+    return { value, method: 'loose-plus-box', note: `Loose ${money(loose)} + box ${money(box)}${value < sum ? `, capped at CIB ${money(cib)}` : ''} = ${money(value)}` };
+  }
+  if (cib != null && manual != null && manual < cib) {
+    return { value: cib - manual, method: 'cib-minus-manual', note: `CIB ${money(cib)} − manual ${money(manual)} = ${money(cib - manual)}` };
+  }
+  return null;
+}
+
 function autoBase(line, rule, s = settings) {
   if (line.source === 'bulk') return line.bulkTotal ?? null;
+  if (tradeNoManual(line)) {
+    const value = tradeNoManualValue(line)?.value;
+    if (value == null) return null;
+    if (rule.basis === 'market') return value;
+    const cib = line.prices?.['cib-price'];
+    const complete = autoBase({ ...line, manualMissing: false }, rule, s);
+    return Number.isFinite(cib) && cib > 0 && complete != null
+      ? Math.round(complete * Math.min(1, value / cib)) : null;
+  }
   // A first-party case is valued like the game: the box's share of the CIB market price, applied to the game's own
   // buying basis (retail buy for games). PriceCharting's box-only price is a market price, and paid as-is it beat
   // the whole game (The Last Guardian, PS4, Oct 2026: box $6.40 vs CIB $16.44 market, but the CIB offer comes from
@@ -952,7 +989,11 @@ function addPcProduct(raw, condition, replaceId = null) {
     return;
   }
   const p = slimProduct(raw);
-  const same = trade.lines.find((l) => l.source === 'pc' && l.pcId === p.id && l.condition === condition && isPlain(l) && l.id !== replaceId);
+  const category = guessCategory(p.name);
+  const selected = { source: 'pc', category };
+  setTradeCondition(selected, condition);
+  const same = trade.lines.find((l) => l.source === 'pc' && l.pcId === p.id && l.condition === selected.condition
+    && tradeNoManual(l) === tradeNoManual(selected) && isPlain(l) && l.id !== replaceId);
   if (same) {
     same.qty += 1;
     // An item added again moves to the top of the list.
@@ -964,7 +1005,7 @@ function addPcProduct(raw, condition, replaceId = null) {
   const line = {
     id: replaceId || uid(), source: 'pc', pcId: p.id, name: p.name, platform: p.platform, upc: p.upc, genre: p.genre,
     prices: p.prices, salesVolume: p.salesVolume, gamestop: p.gamestop,
-    condition, category: guessCategory(p.name), qty: 1, override: null, deductions: [],
+    condition: selected.condition, manualMissing: selected.manualMissing, category, qty: 1, override: null, deductions: [],
   };
   placeLine(line, replaceId);
   commit();
@@ -1098,6 +1139,35 @@ async function loadBoxPrice(line) {
   }
 }
 
+// Search responses/older drafts may lack components. One attempt per line;
+// failures expose an explicit retry, never a render-triggered request loop.
+const tradeManualLoads = new WeakMap();
+const tradeManualPending = () => trade.lines.some(l => tradeNoManual(l) && tradeManualLoads.get(l)?.pending);
+function loadTradeManualPrices(line) {
+  if (!tradeNoManual(line) || !tokenSet || !/^\d+$/.test(line.pcId || '')) return null;
+  const fields = [...PRICE_KEYS, BOX_KEY, MANUAL_KEY];
+  if (fields.every(k => k in (line.prices || {}))) return null;
+  const previous = tradeManualLoads.get(line);
+  if (previous?.id === line.pcId) return previous.promise;
+  const attempt = { id: line.pcId, pending: true, error: false };
+  tradeManualLoads.set(line, attempt);
+  attempt.promise = PC.byId(line.pcId).then(full => {
+    if (!full || String(full.id) !== attempt.id) throw Error('No matching product returned');
+    if (!trade.lines.includes(line) || line.pcId !== attempt.id) return;
+    const prices = slimProduct(full).prices;
+    line.prices = { ...line.prices, ...prices };
+    // An omitted component after a full lookup is unavailable, not worth $0.
+    for (const key of fields) if (!(key in line.prices)) line.prices[key] = 0;
+  }).catch(() => { attempt.error = true; }).finally(() => {
+    attempt.pending = false;
+    if (trade.lines.includes(line) && line.pcId === attempt.id) {
+      commit();
+      if ($('#completeDialog').open) renderCompletePc();
+    }
+  });
+  return attempt.promise;
+}
+
 // A hardware line switched to CIB/New whose stored PriceCharting prices lack that condition's price
 // (e.g. it came from a search result with partial prices): fetch the full product once.
 async function loadLinePrices(line) {
@@ -1112,6 +1182,7 @@ async function loadLinePrices(line) {
 }
 
 function conditionLabel(line) {
+  if (tradeNoManual(line)) return TRADE_NO_MANUAL_LABEL;
   if (line.source === 'pc') return line.condition === 'parts' ? 'Parts' : line.condition === CASE_ONLY ? 'Case only' : GAME_CONDITIONS[line.condition];
   if (line.source === 'hw' && line.condition === THIRD_PARTY) return '3rd party';
   if (line.source === 'hw') return HW_PC_CONDITIONS[line.condition] ||hwConditionLabels((hwItem(line) || line).category)[line.condition] || '';
@@ -1124,13 +1195,15 @@ function refLine(line) {
   const gs = line.gamestop || {};
   const gamestop = gs.trade || gs.sell ? `<br>GameStop: pays ${money(gs.trade)} cash · sells for ${money(gs.sell)}` : '';
   const box = p[BOX_KEY] > 0 ? ` · Box only ${money(p[BOX_KEY])}` : '';
-  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}${box}${gamestop}`;
+  const manual = p[MANUAL_KEY] > 0 ? ` · Manual only ${money(p[MANUAL_KEY])}` : '';
+  return `Retail buy: ${fmt('retail-buy')}<br>Market: ${fmt('market')}${box}${manual}${gamestop}`;
 }
 
 function conditionSelect(line) {
-  const opt = ([v, label]) => `<option value="${v}"${v === line.condition ? ' selected' : ''}>${label}</option>`;
+  const selected = tradeNoManual(line) ? TRADE_NO_MANUAL : line.condition;
+  const opt = ([v, label]) => `<option value="${v}"${v === selected ? ' selected' : ''}>${label}</option>`;
   if (line.source === 'pc') {
-    const conds = Object.entries(GAME_CONDITIONS);
+    const conds = tradeGameConditions(line.category);
     if (isHwCat(line.category) || line.condition === 'parts') conds.push(['parts', 'Parts']);
     if (isGameCat(line.category) || line.condition === CASE_ONLY) conds.push([CASE_ONLY, 'Case only']);
     return `<select data-field="condition">${conds.map(opt).join('')}</select>`;
@@ -1257,6 +1330,11 @@ function updateRow(tr, line) {
   $('[data-cell="credit"]', tr).innerHTML = offerCell(p.credit, line.qty);
 
   const flags = [];
+  if (tradeNoManual(line)) {
+    const estimate = tradeNoManualValue(line), load = tradeManualLoads.get(line);
+    flags.push(`<span class="badge ${estimate ? 'info' : 'warn'}">${estimate ? `No-manual estimate: ${esc(estimate.note)}` : load?.pending ? 'Loading box/manual prices…' : 'No-manual value unavailable — enter a cash offer'}${estimate && p.base == null ? ' · Buying basis unavailable' : ''}</span>`);
+    if (load?.error) flags.push('<button type="button" class="link" data-action="retry-no-manual">Retry box/manual prices</button>');
+  }
   if (isGameCat(line.category) && line.condition !== CASE_ONLY) flags.push(deadGameNotice(line.name, line.platform, 'Trade-In'));
   if (p.cash == null) flags.push('<span class="badge warn">Needs a price</span>');
   if (p.dontBuy) flags.push(`<span class="badge danger">Don't buy: ${esc(p.guide.note)}</span>`);
@@ -1303,6 +1381,7 @@ function updateRow(tr, line) {
 }
 
 function renderLines() {
+  for (const line of trade.lines) loadTradeManualPrices(line);
   const body = $('#lineBody');
   body.innerHTML = trade.lines.map(rowHtml).join('');
   for (const line of trade.lines) {
@@ -1468,7 +1547,7 @@ function onLineChange(e) {
     line.category = v;
     const target = isGameCat(v) ? 'game' : 'hardware';
     line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === target);
-    if (!isGameCat(v)) delete line.guideFlag;
+    if (!isGameCat(v)) { delete line.guideFlag; delete line.manualMissing; }
     if (line.source === 'pc' && line.condition === 'parts' && !isHwCat(v)) line.condition = 'loose';
     if (line.source === 'pc' && line.condition === CASE_ONLY && !isGameCat(v)) line.condition = 'loose';
     commit();
@@ -1497,7 +1576,7 @@ function onLineChange(e) {
       openPcPicker(line, v);
       return;
     }
-    line.condition = v;
+    setTradeCondition(line, v);
     if (line.source === 'hw') {
       const rule = settings.rules[line.category] || settings.rules.other;
       if (isPcCondition(v) && !(pcPriceKey(line, rule) in (line.prices || {}))) loadLinePrices(line);
@@ -1530,7 +1609,10 @@ function onLineClick(e) {
     return;
   }
   if (!line) return;
-  if (action === 'reset') {
+  if (action === 'retry-no-manual') {
+    tradeManualLoads.delete(line);
+    commit();
+  } else if (action === 'reset') {
     line.override = null;
     saveTrade();
     updateRow(tr, line);
@@ -1644,6 +1726,8 @@ async function runPcSearch(q) {
 }
 
 function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '')) {
+  if (cond === TRADE_NO_MANUAL) return autoBase({ source: 'pc', category, condition: 'cib', manualMissing: true,
+    name: raw['product-name'], platform: raw['console-name'], prices: slimProduct(raw).prices }, settings.rules[category] || settings.rules.game);
   if (flatItemMatch(raw['product-name'])) return settings.flatItems.amount; // steering wheels etc.
   const rule = settings.rules[category] || settings.rules.game;
   const v = Number(raw[PC_FIELDS[rule.basis || 'retail-buy'][cond]]);
@@ -1709,8 +1793,8 @@ function renderResults() {
         continue;
       }
       const i = search.items.push({ kind: 'pc', product: p }) - 1;
-      let conds = Object.entries(GAME_CONDITIONS).map(([c, label]) => condBtn(c, label, basisPrice(p, c))).join('');
       const category = guessCategory(p['product-name'] || '');
+      let conds = tradeGameConditions(category).map(([c, label]) => condBtn(c, label, basisPrice(p, c))).join('');
       if (isHwCat(category)) {
         const parts = pcPartsPrice({ name: p['product-name'], platform: p['console-name'], category, prices: slimProduct(p).prices });
         conds += condBtn('parts', 'Parts', flatOr(p['product-name'], parts?.price ?? null));
@@ -2395,6 +2479,10 @@ function tradePcCondition(line) {
 }
 
 function tradePcReference(line) {
+  if (tradeNoManual(line)) {
+    const estimate = tradeNoManualValue(line);
+    return estimate ? { ...estimate, id: line.pcId || null, name: line.name } : null;
+  }
   const condition = tradePcCondition(line);
   const key = condition === CASE_ONLY ? BOX_KEY : PC_FIELDS.market[condition];
   if (!['pc', 'hw'].includes(line.source) || !key) return null;
@@ -2505,6 +2593,7 @@ function renderCompletePc() {
   $('#completePcNote').textContent = pending ? 'Matching base console models automatically.' : pc.missing
     ? `Partial total · ${pc.missing} item${pc.missing === 1 ? '' : 's'} without a matching PriceCharting value. Selected condition × quantity; not the payout.`
     : 'Selected condition × quantity; not the payout.';
+  if (trade.lines.some(tradeNoManual)) $('#completePcNote').textContent += ' No-manual games use a component-value estimate.';
   $('#completePcMatches').innerHTML = pending ? '' : trade.lines.filter((l) => !l.pending && !l.failed && l.source === 'hw' && !priceLine(l).dontBuy
     && PC_FIELDS.market[tradePcCondition(l)] && tradePcValue(l) == null)
     .map((l) => `<button type="button" class="link" data-pc-match="${esc(l.id)}">Match ${esc(l.name)} on PriceCharting</button>`).join('<br>');
@@ -2526,12 +2615,14 @@ function tradePriceChartingTotal(lines = trade.lines) {
 function tradePcSnapshot() {
   return { ...tradePriceChartingTotal(), capturedAt: new Date().toISOString(),
     items: trade.lines.filter((l) => !l.pending && !l.failed && !priceLine(l).dontBuy).map((l) => ({
-      name: l.name, qty: l.qty, condition: tradePcCondition(l), value: tradePcValue(l),
+      name: l.name, qty: l.qty, condition: tradeNoManual(l) ? TRADE_NO_MANUAL_LABEL : tradePcCondition(l), value: tradePcValue(l),
+      ...(tradeNoManual(l) ? { valuation: tradeNoManualValue(l)?.method || null } : {}),
       pcId: tradePcReference(l)?.id || null, matchedFrom: tradePcReference(l)?.name || null,
     })) };
 }
 
 function openComplete() {
+  if (tradeManualPending()) { toast('Wait for the box/manual prices to finish loading.'); return; }
   const t = tradeTotals();
   const lines = trade.lines.filter((l) => !l.pending && !l.failed);
   if (!lines.length) { toast('Add some items first.'); return; }
@@ -2575,6 +2666,7 @@ async function saveCompleted(print) {
   const error = $('#completeError');
   error.textContent = '';
   if (consoleMarketPending()) { error.textContent = 'Wait for the console market values to finish checking.'; return; }
+  if (tradeManualPending()) { error.textContent = 'Wait for the box/manual prices to finish loading.'; return; }
   let t = tradeTotals();
   const staff = $('#staffName').value.trim();
   const customer = $('#completeCustomer').value.trim();

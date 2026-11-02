@@ -672,14 +672,24 @@ Everyone in the store shares one internet address, so typos add up.
    **Something the calculator can't find?** Click **+ Custom item**,
    describe it, pick its type, and type the cash offer in the **Cash**
    column. Store credit fills in from the type.
-3. Set each game's condition (**Loose / CIB / New**, or **Case only**
+3. Set each game's condition (**Loose / CIB / Game + box, no manual / New**).
+   **Game + box, no manual** is for the game with its original case/box and
+   cover art, missing the manual. It estimates value from PriceCharting's
+   **Loose + Box only** prices, never above CIB when that value is available.
+   If those components are missing, it tries **CIB minus Manual only**.
+   The usual trade-in payout calculation then applies; there is no fixed
+   missing-manual deduction. The line shows the calculation. If the data is
+   unavailable, enter an agreed Cash offer. This condition is saved in the
+   trade log and receipt; the completion PriceCharting total uses the estimate.
+   Use **CIB** for a complete release that never came with a manual.
+   Choose **Case only**
    for just an empty case: a first-party game's case, like Mario, Zelda,
    Pokémon, God of War or Halo, is valued like the game itself (its box's
    share of the CIB price), so store credit is cash × 1.5 and a case never
    pays more than the game; any other case pays $0.25. If the
    calculator gets first-party wrong, fix it from the line's
    **+ Deduction** menu; managers edit the list under Settings → Case
-   only). Use a line's
+   only. Use a line's
    **+ Deduction** menu for scratches, a broken case, or missing cords and
    controllers. (Parts is a flat price: hardware on **Parts** has no
    deductions, and store credit is the same as cash. Items worth $0.50 or

@@ -1704,6 +1704,22 @@ The site's **only server-side code**. Everything else is static.
     their own items, or pick the bundle"; loose bundle → PriceCharting's
     loose price is often just the disc; CIB/New bundle → check every
     instrument.
+  - **Game + box, no manual** (Nov. 2): games offer this option in search and
+    line conditions. This stores `condition: 'cib', manualMissing: true` on
+    the trade line, distinct from complete copies. `tradeNoManualValue()` uses
+    positive finite PriceCharting Loose + Box only market values, capped at CIB
+    when available; otherwise positive CIB minus Manual only is the fallback.
+    Missing/invalid components require a staff price, never a full CIB fallback.
+    Market-basis categories use the estimate directly; retail-buy categories
+    scale the existing CIB buying basis by estimate / CIB market (maximum 1),
+    then normal category percentages, guide rules, damage deductions and staff
+    overrides apply. Shelf-pricing manual deductions/premiums are unchanged.
+    Full component prices load once per line when needed, with explicit retry
+    after failure and stale-response guards. Completion waits for pending loads.
+    Trade log/receipts retain the condition label; PriceCharting completion/log
+    totals use the component estimate and snapshot its method. Tests cover
+    pricing/persistence plus `scripts/test-trade-no-manual.cjs` async recovery.
+
   - **Case only** (`CASE_ONLY` condition on PriceCharting game lines, owner
     Oct 13 2026): an empty case. First-party games (`caseFirstParty()`:
     name has a phrase from `settings.cases.firstParty`, ~95 Nintendo/Sony/

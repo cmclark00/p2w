@@ -43,6 +43,7 @@ jobs:
           node scripts/test-history-audit.cjs
           node scripts/test-trade-serials.cjs
           node scripts/test-trade-credit.cjs
+          node scripts/test-trade-no-manual.cjs
           node scripts/test-gamestop-stock.cjs
           node scripts/test-gamestop-helper.cjs
           node scripts/test-ebay-helper.cjs
