@@ -4167,7 +4167,16 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const failure = results.find(r => r.status === 'rejected');
         if (failure) throw failure.reason;
       }
-      const priced = () => verified.filter(a => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0);
+      const priced = () => {
+        // Choose a grade across ALL verified ASINs before comparing prices.
+        // A cheap Good offer on one listing cannot displace Very Good elsewhere.
+        for (const renewed of [false, true]) {
+          const used = verified.filter(a => !!a.renewedFallback === renewed && a.offerCondition === 'used');
+          const tier = Math.min(...used.map(a => floorAmazonUsedTier({ product, condition: condition === 'new' ? 'cib' : condition, amazon: a })));
+          used.forEach(a => { a.usedGradeTier = tier; });
+        }
+        return verified.filter(a => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0);
+      };
       try {
         if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
@@ -4221,9 +4230,11 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       // Pre-owned uses the cheaper eligible Used/New; sealed inventory still uses New only.
       const selected = choices[0] || verified.find(a => !a.newReference && !a.displayOnly) || null;
       const matchNotes = [];
+      const conditionFallback = selected && floorAmazonConditionFallback({ product, condition, amazon: selected });
+      if (conditionFallback) matchNotes.push(`${conditionFallback}; preferred Amazon grades were unavailable. Listing identity checks and pricing premiums still apply`);
       if (!floorIsHardware(product) && !floorToyFamily(product) && condition !== 'new') matchNotes.push(condition === 'loose'
         ? 'Loose games: lowest matching regular offer across every Used grade and New, including shipping. No preference for Good over Acceptable or CIB grades'
-        : 'CIB Used offers: lowest Very Good or Like New (Mint) offer; either grade works alone. Good and Acceptable do not price CIB');
+        : 'CIB Used offers: lowest Very Good or Like New (Mint); if neither is available across matching listings, fall back to Good, then Acceptable');
       if (searchError) matchNotes.push(`Amazon search incomplete: ${searchError} Offers found so far are reference-only until the search finishes`);
       if (!choices.length && !searchError) matchNotes.push('No eligible offer for this condition; no Amazon price used.');
       if (rejected.length) matchNotes.push(`Rejected ${rejected.length} Amazon catalog match${rejected.length === 1 ? '' : 'es'} for title, platform or variant mismatch`);
@@ -5409,12 +5420,23 @@ function floorAmazonUsesGrades(cur) {
   return cur.condition !== 'new' && !floorIsHardware(cur.product) && !floorToyFamily(cur.product)
     && !a?.newReference && String(a?.offerCondition || a?.condition || '').toLowerCase() !== 'new';
 }
+const floorAmazonGradeTier = o => ({ very_good: 0, like_new: 0, good: 1, acceptable: 2 })[floorAmazonSub(o)] ?? Infinity;
+function floorAmazonUsedTier(cur) {
+  return Math.min(...(cur.amazon?.offers || []).filter(o => Number(o.price) > 0 && Number.isFinite(Number(o.price)))
+    .map(floorAmazonGradeTier));
+}
 function floorAmazonEligibleOffers(cur) {
   const offers = (cur.amazon?.offers || []).filter(o => Number.isFinite(Number(o.price)) && Number(o.price) > 0
     && (cur.condition !== 'new' || !o.sub || floorAmazonSub(o) === 'new'));
   if (!floorAmazonUsesGrades(cur)) return offers;
   if (cur.condition === 'loose') return offers;
-  return offers.filter(o => ['very_good', 'like_new'].includes(floorAmazonSub(o)));
+  const tier = cur.amazon?.usedGradeTier ?? floorAmazonUsedTier(cur);
+  return Number.isFinite(tier) ? offers.filter(o => floorAmazonGradeTier(o) === tier) : [];
+}
+function floorAmazonConditionFallback(cur) {
+  if (!floorAmazonUsesGrades(cur) || cur.condition === 'loose') return '';
+  const offer = floorAmazonEligibleOffers(cur)[0];
+  return offer && floorAmazonGradeTier(offer) > 0 ? `Lower-condition fallback: ${AMZ_SUB[floorAmazonSub(offer)]}` : '';
 }
 // Shipping included. Loose games use any grade; other conditions retain their filters.
 function floorAmazonLowest(cur, showPartial = false) {
@@ -5943,7 +5965,7 @@ function renderFloorPricer() {
           <ul>
             <li><strong>Good / Acceptable:</strong> treated as loose / disc only.</li>
             <li><strong>Very Good:</strong> game with case / cover art and/or manual. Treated as CIB.</li>
-            <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; either works alone.</li>
+            <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; if neither is available, use Good, then Acceptable.</li>
             <li><strong>Loose pricing:</strong> lowest matching offer across all Used grades and New, including shipping. A cheaper CIB-grade or New copy counts too.</li>
             <li><strong>New:</strong> can price Loose or CIB when cheaper than eligible Used, or when no eligible Used offer exists. New inventory uses only New offers.</li>
             <li><strong>Renewed:</strong> fallback when no eligible regular offer is found (Used or New for Loose); not proof of original sealed condition.</li>
@@ -5987,15 +6009,17 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
     const ref = refs[kind], referenceCur = { ...cur, condition: kind === 'new' ? 'new' : cur.condition === 'new' ? 'cib' : cur.condition, amazon: ref ? { ...ref, displayOnly: false } : ref };
     const selectedOffer = floorAmazonEligibleOffers(referenceCur).sort((x, y) => Number(x.price) - Number(y.price))[0];
     const grade = kind === 'used' && floorAmazonUsesGrades(referenceCur) && selectedOffer ? AMZ_SUB[floorAmazonSub(selectedOffer)] : '';
+    const conditionFallback = floorAmazonConditionFallback(referenceCur);
     const label = { used: 'Used', new: 'New', renewed: 'Renewed' }[kind] + (grade ? ` · ${grade}` : '');
     const price = ref && !a?.error ? floorAmazonLowest(referenceCur, true) : null;
     const selected = price > 0 && floorAmazonLowest(cur) > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting;
     const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
       : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
+    const statusLabel = price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
     const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
-    const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(status)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}` : ''} ↗</a>`;
-    return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(status)}</td></tr>`;
+    const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(statusLabel)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}${price > 0 && conditionFallback ? ' · fallback' : ''}` : ''} ↗</a>`;
+    return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(statusLabel)}</td></tr>`;
   });
   return compact ? rows.join('') : `<table class="floor-sales floor-amazon-references" aria-label="Amazon prices by condition"><tbody>${rows.join('')}</tbody></table><p class="muted small-print">Shipping included. “Selected” identifies the Amazon reference; other sources and specific pricing rules still apply.</p>`;
 }

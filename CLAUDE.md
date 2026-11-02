@@ -1358,8 +1358,12 @@ The site's **only server-side code**. Everything else is static.
     and New**, including shipping, across every verified ASIN. Good has no priority
     over Acceptable, Very Good, Like New/Mint, other or unspecified Used grades.
     Used-grade filtering scopes this to games; hardware/figures keep their grade policy.
-    CIB Used offers use only Very Good/Like New (Mint), with either eligible alone;
-    ungraded offers and summary-only minima cannot price CIB. Loose likewise needs
+    CIB Used offers prefer the cheapest Very Good/Like New (Mint), with either
+    eligible alone. If neither exists across ALL verified matching ASINs, fall
+    back to Good, then Acceptable. `usedGradeTier` records the global tier so a
+    cheap lower-grade listing cannot displace preferred grades on another ASIN.
+    The pinned reference/table label lower-condition fallbacks explicitly.
+    Ungraded offers and summary-only minima cannot price CIB. Loose likewise needs
     actual offer rows, not an ungraded summary minimum. Seller-note/title mismatch
     filters still apply; broad grades do not permit bundles, imports or wrong games.
     Used offers on Renewed ASINs use the same condition policy. Pins show the

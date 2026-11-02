@@ -111,7 +111,11 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     for(const offers of [[{price:1400,sub:'very_good'}],[{price:1300,sub:'like_new'}],[{price:1300,sub:'Mint'}]]) {
       e.ctx.cur.amazon.offers=offers;assert.equal(e.run('floorAmazonLowest(cur)'),offers[0].price);
     }
-    for(const offers of [[],[{price:1000,sub:'good'}],[{price:1000,sub:'acceptable'}],[{price:1000}],[{price:1000,sub:'other'}]]) {
+    for(const offers of [[{price:1000,sub:'good'}],[{price:1000,sub:'acceptable'}]]) {
+      e.ctx.cur.amazon.offers=offers;assert.equal(e.run('floorAmazonLowest(cur)'),1000);
+      assert.match(e.run('floorAmazonConditionFallback(cur)'),/Lower-condition fallback/);
+    }
+    for(const offers of [[],[{price:1000}],[{price:1000,sub:'other'}]]) {
       e.ctx.cur.amazon.offers=offers;assert.equal(e.run('floorAmazonLowest(cur)'),null);
     }
     e.run('cur.condition="loose"');e.ctx.cur.amazon.offers=[{price:1400,sub:'very_good'},{price:1200,sub:'acceptable'}];
@@ -121,6 +125,40 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       e.ctx.cur.amazon.offers=[{price:1000,sub:'acceptable'}];e.ctx.cur.condition='cib';
       assert.equal(e.run('floorAmazonLowest(cur)'),1000,'Game packaging policy leaves figures and hardware unchanged');
     }
+  });
+  await test('CIB fallback uses the best available grade across all ASINs, labels it, and keeps cheaper New', async () => {
+    const first=candidate('B000000001'),second=candidate('B000000002');
+    for(const grade of ['very_good','like_new','good','acceptable',null]) {
+      for(const newPrice of [0,2500]) {
+        const e=engine(async(route,p)=>{
+          if(route==='amazon/catalog') return {candidates:[first,second]};
+          const c=p.asin===first.asin?first:second;
+          return {...offer(c,null),condition:p.cond==='new'?'New':'Used',offers:p.cond==='new'
+            ? newPrice?[{price:newPrice,sub:'new'}]:[]
+            : c===first?[{price:1000,sub:'acceptable'}]:grade?[{price:3000,sub:grade}]:[]};
+        });
+        const result=await e.fetch(product,'cib'); e.ctx.result=result;
+        const usedPrice=['very_good','like_new','good'].includes(grade)?3000:1000;
+        assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),newPrice?Math.min(newPrice,usedPrice):usedPrice);
+        assert.equal(result.references.used.asin,usedPrice===3000?second.asin:first.asin);
+        const html=e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:result},{from:"amazon"},true)');
+        if(!['very_good','like_new'].includes(grade)) assert.match(html,/Lower-condition fallback/);
+        else assert.doesNotMatch(html,/Lower-condition fallback/);
+      }
+    }
+  });
+  await test('lower-grade fallback cannot hide failed preferred-grade checks or bypass identity checks', async () => {
+    const good=candidate('B000000001'),bad=candidate('B000000002','Final Fight 2');
+    const e=engine(async(route,p)=>{
+      if(route==='amazon/catalog')return {candidates:[good,bad]};
+      assert.equal(p.asin,good.asin,'Wrong game never reaches offer lookup');
+      if(p.cond==='new')throw Error('temporary failure');
+      return {...offer(good,null),offers:[{price:3000,sub:'good'},{price:1000,sub:'acceptable'}]};
+    });
+    const result=await e.fetch(product,'cib');e.ctx.result=result;
+    assert.equal(result.incomplete,true);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),null);
+    assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result},true)'),3000);
   });
   await test('Loose compares every Used grade and New across ASINs without Good priority', async () => {
     const first=candidate('B000000001'),second=candidate('B000000002');
