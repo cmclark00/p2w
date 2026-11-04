@@ -1129,6 +1129,33 @@ test('two-digit and repeated-series bundles are excluded before selecting a pric
   assert.equal(invoke('floorNumberedGameBundle','Farming Simulator 22 Xbox Series X discs 1 & 2',p),false,'disc numbers are not games');
 });
 
+test('subtitled sequel bundles cannot drive pricing or stop direct eBay search', () => {
+  const product = { ...item, 'product-name': 'Dark Souls II: Scholar of the First Sin', 'console-name': 'Xbox One' };
+  const titles = [
+    'Xbox One Dark Souls II: Scholar of the First Sin & Dark Souls III',
+    'Xbox One Dark Souls II: Scholar of the First Sin & Dark Souls III The Fire Fades',
+    'Dark Souls 3 and Dark Souls 2 Scholar of the First Sin Xbox One',
+  ];
+  const single = 'Dark Souls II: Scholar of the First Sin Xbox One Complete';
+  for (const title of titles) {
+    assert.equal(invoke('floorListingMismatch', title, product), 'Multiple-game lot or bundle', title);
+    assert.equal(invoke('floorAmazonMismatch', { product, condition: 'cib', amazon: { found: true, title } }), 'Multiple-game lot or bundle', title);
+  }
+  const example = cur(product, { sales: { cib: [{ title: titles[0], price: 3198 }, { title: single, price: 2534 }] } });
+  assert.equal(invoke('floorAutoSale', invoke('floorSales', example)).sale.price, 2534, 'PriceCharting bundle must not set the baseline');
+  example.sales.cib = [];
+  example.directEbay = { result: { state: 'ready', sales: titles.map((title, i) => ({
+    id: String(123456789010 + i), title, price: 3198, shipping: 0, state: 'sold', conditionText: 'Pre-Owned',
+    sellerCountry: 'United States', locationSource: 'ebay-located-in',
+  })) } };
+  assert.ok(invoke('floorSales', example).every(s => s.odd), 'verified sold status cannot make bundled games eligible');
+  for (const title of [single, 'Dark Souls II 2 Scholar of the First Sin Microsoft Xbox One LN PERFECT COMPLETE!',
+    single + ' with Manual & Map', single + ' discs 1 & 2', single + ' / Dark Souls 2 Scholar of the First Sin']) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+  }
+  assert.equal(invoke('floorNumberedGameBundle', titles[0], { ...product, 'product-name': 'Dark Souls Trilogy' }), false);
+});
+
 test('numbered sequel pairs are bundles for single games on both eBay and Amazon', () => {
   const product = { ...item, 'product-name': 'Kingdom Hearts', 'console-name': 'Playstation 2' };
   for (const title of ['Kingdom Hearts 1 & 2 (I & II) PS2 - Sony PlayStation 2, 2005 Greatest Hits CIB',

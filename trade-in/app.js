@@ -5078,6 +5078,23 @@ const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi,
 function floorNumberedGameBundle(title, product) {
   if (floorToyFamily(product) || floorIsHardware(product)) return false;
   const words = floorTitleWords(floorVariantName(product));
+  // A subtitle can separate the sequel number from the next game: "Dark Souls
+  // II: Scholar of the First Sin & Dark Souls III". Compare repeated series
+  // names across a list separator, not arbitrary numbers in packaging/platforms.
+  // Multi-number releases (e.g. Final Fantasy X/X-2) retain their own identity.
+  const numberAt = words.findIndex(w => /^\d+$/.test(w));
+  if (numberAt > 0 && words.filter(w => /^\d+$/.test(w)).length === 1
+    && !/\b(?:collection|compilation|anthology|trilogy|bundle)\b/i.test(product['product-name'] || '')) {
+    const text = floorIdentityPlatformTitle(title);
+    const prefix = words.slice(0, numberAt).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\W+(?:(?:a|an|the|of|for|and)\\W+)*');
+    const mentions = [...text.matchAll(new RegExp(`\\b${prefix}\\s+([1-9]\\d?|XVI|XV|XIV|XIII|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)\\b`, 'gi'))];
+    for (let i = 1; i < mentions.length; i++) {
+      const before = mentions[i - 1], after = mentions[i];
+      const between = text.slice(before.index + before[0].length, after.index);
+      if (/(?:[&+/,;|]|\b(?:and|plus|with)\b)/i.test(between)
+        && floorTitleWords(before[1]).join(' ') !== floorTitleWords(after[1]).join(' ')) return true;
+    }
+  }
   if (/^\d+$/.test(words.at(-1))) words.pop();
   if (!words.length) return false;
   const series = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\W+(?:(?:a|an|the|of|for|and)\\W+)*');

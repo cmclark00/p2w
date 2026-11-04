@@ -664,6 +664,10 @@ The site's **only server-side code**. Everything else is static.
     "Kingdom Hearts 1 & 2" or "God of War I + II") are multi-game bundles
     for both eBay and Amazon. Platform compatibility, disc numbers and a
     selected compilation's own name do not trigger that bundle rule.
+    Repeated series names with different sequel numbers also reject bundles
+    when subtitles separate the numbers (e.g. Dark Souls II: Scholar of the
+    First Sin & Dark Souls III). Roman/Arabic spellings of the same sequel,
+    platform compatibility and original pack-ins remain eligible.
     `floorNamedGameBundle()` also holds separated title lists for review when
     the selected game's full name is followed by another title-like phrase
     (e.g. "Lost Song, Hollow Realization"), even without "bundle" wording.
