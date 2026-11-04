@@ -44,6 +44,32 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       assert.equal(invoke('tradeSerialRequired', hardware(name)), false, name);
     }
   });
+  await test('special-edition 3DS systems are handhelds even without console/system wording', () => {
+    for (const name of ["New Nintendo 3DS XL Majora's Mask Limited Edition",
+      "New Nintendo 3DS XL [Majora's Mask]", 'Nintendo 3DS XL [Pikachu Edition]',
+      'Nintendo 3DS XL Zelda A Link Between Worlds', 'New Nintendo 2DS XL [Poke Ball]']) {
+      assert.equal(invoke('guessCategory', name), 'handheld', name);
+      assert.equal(invoke('tradeSerialRequired', hardware(name, { category: 'handheld', condition: 'loose' })), true);
+    }
+    assert.equal(invoke('guessCategory', 'Majora Edition 3DS XL', 'Systems'), 'handheld');
+    for (const name of ['Nintendo 3DS XL Replacement Shell', 'New Nintendo 3DS XL Carrying Case',
+      'Nintendo 3DS XL Screen Protector', 'Nintendo 3DS XL Charger']) {
+      assert.equal(invoke('guessCategory', name), 'accessory', name);
+      assert.equal(invoke('tradeSerialRequired', hardware(name, { category: 'game' })), false, name);
+    }
+    assert.equal(invoke('guessCategory', "Zelda Majora's Mask 3D"), 'game');
+    assert.equal(invoke('tradeSerialRequired', hardware("Zelda Majora's Mask 3D", { category: 'game', platform: 'Nintendo 3DS' })), false);
+  });
+  await test('existing misclassified special-edition trade lines require serials without altering their value', () => {
+    const line = hardware("New Nintendo 3DS XL [Majora's Mask]", { source: 'pc', pcId: '123',
+      category: 'game', condition: 'loose', qty: 2, platform: 'Nintendo 3DS',
+      prices: { 'loose-price': 45000 }, cashOverride: 27500, creditBonus: 20, deductions: ['test'] });
+    const snapshot = JSON.stringify(line);
+    assert.match(invoke('tradeSerialFields', [line]), /Majora.*required/);
+    assert.match(invoke('tradeSerialIssue', [line]), /2 serial numbers/);
+    assert.equal(invoke('tradePcValue', line), 45000);
+    assert.equal(JSON.stringify(line), snapshot);
+  });
   await test('all sealed hardware requires serials without confusing model names, games or accessories', () => {
     for (const category of ['console', 'handheld']) {
       assert.equal(invoke('tradeSerialRequired', hardware('Sega Game Gear', { category, condition: 'new' })), true);
@@ -158,7 +184,8 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     } finally { run('withFullPrices=oldFull; commit=oldCommit; flash=oldFlash;'); }
   });
   await test('listed models and sealed Genesis require serials and ID for both completion actions', async () => {
-    for (const line of [hardware('PS5'), hardware('Sega Genesis', { condition: 'new' })]) {
+    for (const line of [hardware('PS5'), hardware('Sega Genesis', { condition: 'new' }),
+      hardware("New Nintendo 3DS XL Majora's Mask Limited Edition", { source: 'pc', category: 'game', condition: 'loose' })]) {
       openTrade([line]);
       assert.equal(element('#idCheckRow').hidden, false);
       assert.match(element('#serialFields').innerHTML, /data-serial/);

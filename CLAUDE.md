@@ -1514,6 +1514,9 @@ The site's **only server-side code**. Everything else is static.
   - Complete-trade serial policy uses `tradeSerialRequired`: Switch family,
     Xbox Series S/X, PS4/PS5 families, 3DS family including 2DS, PC handhelds
     and Logitech G Cloud, plus all New/sealed console and handheld lines.
+    Special-edition 3DS/2DS catalog names without "system"/"console" are recognized
+    as handhelds. Existing misclassified trade lines also receive the required
+    serial/ID checks without rewriting their category or agreed payout.
     Other used hardware has no serial fields or photo-ID prompt. Save and
     Save & print require one comma-separated serial per unit only on required
     lines. The photo-ID check uses the same predicate at display and save,

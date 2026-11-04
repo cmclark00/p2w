@@ -497,7 +497,7 @@ function slimProduct(p) {
   };
 }
 
-function guessCategory(name) {
+function guessCategory(name, genre = '') {
   const n = name.toLowerCase();
   if (flatItemMatch(name)) return 'accessory';
   // Rhythm games first: "Rocksmith [With Cable]" and "Taiko … [Controller Bundle]" are games with their
@@ -509,7 +509,14 @@ function guessCategory(name) {
       && !/\b(?:with|bundle|includes|including)\b/.test(n)) return 'accessory';
     return 'handheld';
   }
-  if (/\b(console|system)\b/.test(n)) {
+  // Catalog handheld names often omit "system", including special editions.
+  // Check accessory-only products before accepting the model name.
+  if (/^(?:new )?(?:nintendo )?(?:new )?[23]ds\b/.test(n)) {
+    if (/\b(?:case|cover|protector|skin|stand|grip|replacement|battery|shell|stylus|screen|housing)\b/.test(n)
+      && !/\b(?:with|bundle|includes|including)\b/.test(n)) return 'accessory';
+    return 'handheld';
+  }
+  if (/\b(console|system)\b/.test(n) || /^(?:systems?|consoles?)$/i.test(genre)) {
     return /game ?boy|\bds\b|\b[23]ds\b|\bdsi\b|psp|vita|game gear|switch lite/.test(n) ? 'handheld' : 'console';
   }
   return /pok[eé]mon/.test(n) ? 'pokemon' : 'game';
@@ -1026,7 +1033,7 @@ function addPcProduct(raw, condition, replaceId = null) {
     return;
   }
   const p = slimProduct(raw);
-  const category = guessCategory(p.name);
+  const category = guessCategory(p.name, p.genre);
   const selected = { source: 'pc', category };
   setTradeCondition(selected, condition);
   const same = trade.lines.find((l) => l.source === 'pc' && l.pcId === p.id && l.condition === selected.condition
@@ -1769,7 +1776,7 @@ async function runPcSearch(q) {
   renderResults();
 }
 
-function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '')) {
+function basisPrice(raw, cond, category = guessCategory(raw['product-name'] || '', raw.genre)) {
   if (cond === TRADE_NO_MANUAL) return autoBase({ source: 'pc', category, condition: 'cib', manualMissing: true,
     name: raw['product-name'], platform: raw['console-name'], prices: slimProduct(raw).prices }, settings.rules[category] || settings.rules.game);
   if (flatItemMatch(raw['product-name'])) return settings.flatItems.amount; // steering wheels etc.
@@ -1837,7 +1844,7 @@ function renderResults() {
         continue;
       }
       const i = search.items.push({ kind: 'pc', product: p }) - 1;
-      const category = guessCategory(p['product-name'] || '');
+      const category = guessCategory(p['product-name'] || '', p.genre);
       let conds = tradeGameConditions(category).map(([c, label]) => condBtn(c, label, basisPrice(p, c))).join('');
       if (isHwCat(category)) {
         const parts = pcPartsPrice({ name: p['product-name'], platform: p['console-name'], category, prices: slimProduct(p).prices });
@@ -2494,7 +2501,11 @@ function renderSplit(t) {
 const SERIAL_CATEGORIES = ['console', 'handheld'];
 
 function tradeSerialRequired(line) {
-  if (!SERIAL_CATEGORIES.includes(line.category)) return false;
+  // Older saved trades may have imported a special-edition system as a game.
+  // Recognize it for ID/serial checks without rewriting its agreed payout/category.
+  const category = ['game', 'pokemon', 'other'].includes(line.category)
+    ? guessCategory(line.name || '', line.genre) : line.category;
+  if (!SERIAL_CATEGORIES.includes(category)) return false;
   const name = norm(`${line.name || ''} ${line.platform || ''} ${line.matchedFrom || ''}`);
   const condition = norm(line.condition || '');
   const sealedName = name.replace(/\b(?:not|never) (?:factory )?sealed\b|\bun sealed\b/g, '');
