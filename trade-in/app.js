@@ -3896,6 +3896,7 @@ const FLOOR_XBOX_360_REISSUES = [
 ];
 function floorXboxReissueKey(name) {
   return floorTitleWords(String(name || '').replace(/\bGOTY\b/gi, 'Game of the Year')
+    .replace(/\bgreatest hits\b/gi, '') // Only the platform key; edition matching retains this label.
     .replace(/\bBlack Ops (?:1|I)\b/gi, 'Black Ops')
     .replace(/^Sid Meier['’]?s?\s+/i, '')
     .replace(/\[(?:Greatest Hits|Xbox 360|Xbox One(?:\s*[/|&]\s*Xbox 360)?|Backwards? Compatible)\]/gi, ''))

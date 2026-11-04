@@ -40,6 +40,9 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     e.ctx.result=result;
     assert.equal(e.run('floorAmazonLowest({product:p,condition:"cib",amazon:result})'),896);
     assert.ok(e.run('floorEbaySearchQuery(p)').endsWith('Xbox 360'));
+    e.ctx.hits={...p,'product-name':'Elder Scrolls IV Oblivion [Game Of The Year Edition Greatest Hits]'};
+    assert.equal(e.run('floorXbox360Reissue(hits)'),true);
+    assert.ok(e.run('floorAmazonCandidateMismatch(a,hits,"cib",true)'), 'reprint still needs its own edition evidence');
     for(const title of ['Oblivion Xbox 360', 'Oblivion Remastered Game of the Year Edition Xbox 360',
       'Oblivion Game of the Year Edition Xbox 360 French Version', 'Oblivion Game of the Year Edition PlayStation 3',
       'Oblivion Game of the Year Edition Xbox 360 Digital Code',
