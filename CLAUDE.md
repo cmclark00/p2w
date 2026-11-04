@@ -577,8 +577,10 @@ The site's **only server-side code**. Everything else is static.
     imports and packaging still pass the existing exclusions. PSA titles join the
     existing graded-copy exclusions so correcting the name cannot admit slabs.
     Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
-    Xbox One-boxed Xbox 360 reissues use a release allowlist for Amazon discovery,
-    direct eBay queries and shared platform matching. See
+    Xbox One-boxed Xbox 360 reissues use a release allowlist for Amazon discovery
+    and catalog platform matching. Sold titles must explicitly identify the
+    selected Xbox One/360 generation, including own-page PriceCharting sales;
+    direct eBay queries keep the selected platform. See
     [XBOX-360-REISSUES.md](trade-in/XBOX-360-REISSUES.md) for the sourced 37-release
     catalog and four ambiguous native-port guards. Edition, region, condition,
     bundles and all pricing rules remain independent. Regressions are in

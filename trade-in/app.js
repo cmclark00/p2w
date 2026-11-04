@@ -4383,7 +4383,7 @@ async function fetchFloorGameSales(product, request) {
     }
   }));
   const accepts = (sale, condition, target, page) => {
-    if (floorListingMismatch(sale.title, target, page['console-name']) || floorOdd(sale, condition, rhythmKind(target['product-name']), target)) return false;
+    if (floorSaleListingMismatch({ ...sale, sourcePcConsole: page['console-name'] }, target) || floorOdd(sale, condition, rhythmKind(target['product-name']), target)) return false;
     if (!floorAmazonPlatformConfirmed({ title: sale.title }, target)) return false;
     // A sale recovered from another region must positively identify our region.
     if (norm(page['console-name']) !== norm(target['console-name'])) {
@@ -4537,7 +4537,7 @@ const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatc
 function floorEbaySearchQuery(product) {
   // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
   // packaging adjectives: these are evaluated on results, not demanded in search.
-  const system = String(floorMarketSearchPlatform(product) || '').replace(/playstation\s*([1-5])/i, 'PS$1')
+  const system = String(product['console-name'] || '').replace(/playstation\s*([1-5])/i, 'PS$1')
     .replace(/^playstation$/i, 'PS1').replace(/playstation vita/i, 'PS Vita')
     .replace(/game\s*boy advance/i, 'GBA').replace(/super nintendo/i, 'SNES')
     .replace(/nintendo entertainment system/i, 'NES');
@@ -5338,6 +5338,16 @@ const floorListingMatchCache = new Map();
 // Catalog region is supporting evidence only for a recorded PriceCharting row.
 // Direct search/Amazon/retailer titles must establish their own region.
 function floorSaleListingMismatch(sale, product, title = sale.title) {
+  // A compatible disc is not proof of the selected retail packaging. Sold
+  // evidence must name the selected Xbox generation, even on its own PC page.
+  // Keep the verified Amazon catalog exception separate from seller titles.
+  const system = floorGamePlatform(product), text = norm(title);
+  if (system === 'xbox one' && !/\b(?:xbox ?one|xbone|xb1)\b|\bxbox ?360 (?:and )?one\b/.test(text)) {
+    return 'Platform unconfirmed: sale title must identify Xbox One';
+  }
+  if (system === 'xbox 360' && !/\b360\b|\b(?:xbox360|xb360|x360)\b/.test(text)) {
+    return 'Platform unconfirmed: sale title must identify Xbox 360';
+  }
   const source = sale.sourcePcConsole
     || (sale.sourcePcId && String(sale.sourcePcId) === String(product?.id) ? product['console-name'] : '');
   return floorListingMismatch(title, product, source);

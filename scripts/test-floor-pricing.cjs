@@ -1647,7 +1647,7 @@ test('Halo MCC uses the highest supported sale then low-price rounding across sy
     2997, 2997, 2995, 2995, 2989, 2956, 2900, 2800, 2799, 2775, 2700, 2599, 2500, 2299, 2000, 2000, 2000];
   for (const system of ['Xbox One', 'Playstation 2', 'Unlisted System']) {
     const product = { ...item, 'product-name': 'Halo: The Master Chief Collection', 'console-name': system, 'gamestop-price': 3499 };
-    const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection CIB' })) };
+    const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection ' + (system === 'Xbox One' ? 'Xbox One ' : '') + 'CIB' })) };
     const r = invoke('floorResult', cur(product, { sales }));
     assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5500);
     // Clicking a lower sale cannot undercut the highest valid sale; typed prices are explicit overrides.
@@ -1762,7 +1762,7 @@ test('out-of-stock exclusion preserves premiums, discounts, deductions and pendi
 
 test('Operation Darkness stays $150 despite expensive higher Amazon offers', () => {
   const product = { ...item, 'product-name': 'Operation Darkness', 'console-name': 'Xbox 360', 'gamestop-price': 9999 };
-  const sales = { cib: [15000, 14000, 12000].map((price) => ({ price, title: 'Operation Darkness complete' })) };
+  const sales = { cib: [15000, 14000, 12000].map((price) => ({ price, title: 'Operation Darkness Xbox 360 complete' })) };
   const amazon = { found: true, lowest: 13400, offers: [13400, 20000, 50000, 90000].map((price) => ({ price })) };
   const r = invoke('floorResult', cur(product, { sales, amazon }));
   assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 15000); assert.equal(r.r.price, 15000);
@@ -1775,7 +1775,7 @@ test('three-reference baseline applies across tiers and conditions before specif
       for (const manualMissing of [false, true]) {
         for (const [ebay, amazonLow, gs, from] of [[15000, 13400, 10000, 'sale'], [15000, 16400, 10000, 'amazon'], [15000, 13400, 17999, 'gamestop']]) {
           const product = { ...item, 'console-name': system, 'gamestop-price': gs };
-          const sales = { [condition]: [{ price: ebay, title: 'Example Game ' + ({ loose: 'disc only', cib: 'complete', new: 'sealed' })[condition] }] };
+          const sales = { [condition]: [{ price: ebay, title: 'Example Game ' + (system === 'Xbox 360' ? 'Xbox 360 ' : '') + ({ loose: 'disc only', cib: 'complete', new: 'sealed' })[condition] }] };
           const amazon = { found: true, lowest: amazonLow, offers: [{ price: 90000 }, { price: amazonLow }, { price: 50000 }] };
           const r = invoke('floorResult', cur(product, { condition, manualMissing, sales, amazon }));
           const expectedFrom = condition === 'new' && from === 'gamestop' ? 'sale' : from;

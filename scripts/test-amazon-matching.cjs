@@ -23,6 +23,34 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Xbox sold titles must identify the selected generation independently of Amazon catalog compatibility', async () => {
+    const e=engine(async()=>({candidates:[]}));
+    const name='Elder Scrolls IV: Oblivion [Game of the Year Edition]';
+    e.ctx.p={id:'1268070','product-name':name,'console-name':'Xbox One','cib-price':1348};
+    for(const title of ['The Elder Scrolls IV Oblivion Game of the Year Edition (Xbox 360, 2007) Mint',
+      'Elder Scrolls IV Oblivion Game of the Year Edition Xbox 360 2-disc Set CIB',
+      'Elder Scrolls IV Oblivion Game of the Year Edition CIB',
+      'Elder Scrolls IV Oblivion Game of the Year Edition Xbox CIB']) {
+      e.ctx.sale={title,price:3798,sourcePcId:'1268070',sourcePcConsole:'Xbox One'};
+      assert.match(e.run('floorSaleListingMismatch(sale,p)'),/must identify Xbox One/);
+      e.ctx.cur={product:e.ctx.p,condition:'cib',sales:{cib:[e.ctx.sale]},amazon:null};
+      assert.equal(e.run('floorSales(cur)[0].odd'),true,title);
+    }
+    for(const platform of ['Xbox One','Xbox One / Xbox 360','Xbox 360 / Xbox One','Xbox One/360','Xbox 360/One']) {
+      e.ctx.sale={title:`Elder Scrolls IV Oblivion Game of the Year Edition ${platform} CIB`};
+      assert.equal(e.run('floorSaleListingMismatch(sale,p)'),null,platform);
+    }
+    e.ctx.a=candidate('B000TG72PG','Elder Scrolls IV Oblivion Game of the Year Edition',['Xbox 360']);
+    assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),null,'verified Amazon catalog fallback stays independent');
+    e.ctx.p={...e.ctx.p,'console-name':'Xbox 360'};
+    for(const platform of ['Xbox One','Xbox','']) {
+      e.ctx.sale={title:`Elder Scrolls IV Oblivion Game of the Year Edition ${platform} CIB`};
+      assert.match(e.run('floorSaleListingMismatch(sale,p)'),/must identify Xbox 360/);
+    }
+    e.ctx.sale={title:'Elder Scrolls IV Oblivion Game of the Year Edition Xbox 360 CIB'};
+    assert.equal(e.run('floorSaleListingMismatch(sale,p)'),null);
+    assert.ok(e.run('floorEbaySearchQuery(p)').endsWith('Xbox 360'));
+  });
   await test('Xbox One-boxed 360 reissues search both labels and retain exact edition/condition checks', async () => {
     const p={id:'1268070','product-name':'Elder Scrolls IV: Oblivion [Game of the Year Edition]','console-name':'Xbox One','cib-price':1348};
     const good=candidate('B005FDUSTA','Oblivion - Xbox 360 Game of the Year Edition',['Xbox 360']);
@@ -39,7 +67,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.ok(queries.some(q=>q.includes('Xbox 360')));
     e.ctx.result=result;
     assert.equal(e.run('floorAmazonLowest({product:p,condition:"cib",amazon:result})'),896);
-    assert.ok(e.run('floorEbaySearchQuery(p)').endsWith('Xbox 360'));
+    assert.ok(e.run('floorEbaySearchQuery(p)').endsWith('Xbox One'));
     e.ctx.hits={...p,'product-name':'Elder Scrolls IV Oblivion [Game Of The Year Edition Greatest Hits]'};
     assert.equal(e.run('floorXbox360Reissue(hits)'),true);
     assert.ok(e.run('floorAmazonCandidateMismatch(a,hits,"cib",true)'), 'reprint still needs its own edition evidence');

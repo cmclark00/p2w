@@ -18,8 +18,13 @@ and [Xbox 360](https://www.pricecharting.com/game/xbox-360/elder-scrolls-iv-obli
 
 - `FLOOR_XBOX_360_REISSUES` in `app.js` is the executable release list.
 - For an eligible Xbox One catalog item, Amazon checks both platform labels
-  (including Renewed fallback); direct eBay searches use Xbox 360. Existing
-  PriceCharting/eBay sale matching accepts explicit Xbox 360 platform evidence.
+  (including Renewed fallback). This is an Amazon catalog exception only.
+- Sold listings must explicitly identify the selected generation in their title:
+  Xbox One for Xbox One inventory, 360 for Xbox 360 inventory. Dual-labeled
+  titles can qualify, but a 360-only title cannot price Xbox One packaging.
+  This applies to direct eBay, PriceCharting and recovered sales, even when
+  the source catalog or helper says they match. Direct eBay searches use the
+  selected platform; they no longer substitute Xbox 360 for Xbox One.
 - This changes listing discovery and platform identity only. It does not move
   inventory to another catalog entry, replace the selected PriceCharting market
   value, merge different editions, or change any pricing rule or premium.
