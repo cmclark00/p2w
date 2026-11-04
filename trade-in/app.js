@@ -5075,6 +5075,7 @@ function floorListingLanguages(title) {
   const text = norm(title);
   return FLOOR_LANGUAGES.filter(([, words]) => {
     const long = words.split('|').filter((w) => w.length > 2).join('|');
+    if (new RegExp(`\\b(?:${long}) (?:games?|carts?|cartridges?|discs?|disks?|copies|copy)\\b`, 'i').test(text)) return true;
     // A platform followed by a language is a packaging label even when more
     // seller wording follows ("PlayStation 4 ITALIAN - FIRST PRINT"). Codes
     // remain contextual; ordinary title words and historical settings aren't languages.
@@ -5084,7 +5085,7 @@ function floorListingLanguages(title) {
   }).map(([language]) => language);
 }
 const FLOOR_REGIONS = [
-  ['Japan', /\b(?:ntsc j|japan|jp|jpn|japanese import)\b/],
+  ['Japan', /\b(?:ntsc j|japan|jp|jpn|japanese import|japanese (?:games?|carts?|cartridges?|discs?|disks?|copies|copy))\b/],
   ['Europe', /\b(?:pal|pegi|usk|europe|european|uk import|uk version|uk edition|uk release|uk pal|uk$|eu version|eu edition|eu release|eur|australian version|australian edition|australian release|aus pal)\b/],
   ['Asia', /\b(?:asia|asian|hong kong|korea|china|taiwan)\b/],
   ['North America', /\b(?:ntsc u|ntsc uc|usa|us version|us edition|north america|north american|esrb)\b/],
@@ -5150,7 +5151,9 @@ const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreorder
 // Counts may have a platform between the quantity and "games". A collection's own
 // advertised count is allowed, but unrelated games in a seller's lot are not.
 const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)\s+){0,4}(?:games|titles)\b/gi;
-const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT)].map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
+const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT),
+  ...String(text || '').matchAll(/\b(?:games|titles|cartridges|carts|discs|disks)\s+([2-9]|\d{2,})\s*[x×](?=\s|$)/gi)]
+  .map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
 const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi, '').replace(/['’]/g, '').replace(/\b([IVX]+)\b/gi, (v) => ({ I: '1', II: '2', III: '3', IV: '4', V: '5', VI: '6', VII: '7', VIII: '8', IX: '9', X: '10', XI: '11', XII: '12', XIII: '13', XIV: '14', XV: '15', XVI: '16' }[v.toUpperCase()] || v)))
   .replace(/\bgame boy\b/g, 'gameboy').replace(/\bstar fox\b/g, 'starfox').replace(/\bspider man\b/g, 'spiderman').replace(/\bsteel book\b/g, 'steelbook')
   .replace(/\bworld wide\b/g, 'worldwide').replace(/\bdragon ball\b/g, 'dragonball').replace(/\bu s\b/g, 'us')
@@ -5304,6 +5307,16 @@ function floorTitleIdentityMismatch(title, product) {
     const text = ` ${floorTitleWords(floorBundleTitle(identityTitle, true)).join(' ')} `, phrase = ` ${core.join(' ')} `;
     const start = text.indexOf(phrase);
     const variantWords = floorTitleWords(name);
+    // Finding all words somewhere in a title list is not a product match.
+    // Allow platform/condition words between identity words, not other games.
+    // This also prevents a quantity marker ("17 x") supplying Pokemon X's X.
+    if (start < 0 && core.length > 1) {
+      const positions = core.map(word => identityWords.indexOf(word));
+      const between = identityWords.slice(Math.min(...positions), Math.max(...positions) + 1);
+      if (between.some(word => !variantWords.includes(word) && !FLOOR_TITLE_DETAILS.test(word))) {
+        return /[,;&+|]/.test(identityTitle) ? 'Multiple-game title list — review' : 'Different game or unconfirmed title words';
+      }
+    }
     // Sharing a short name inside another game's title is not a match. Check
     // the whole prefix, including when sellers insert platform/condition words.
     // Keep the established optional Zelda franchise wording, not arbitrary

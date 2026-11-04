@@ -1346,6 +1346,10 @@ The site's **only server-side code**. Everything else is static.
     Title/edition mismatch results use a bounded 2,000-entry cache keyed by title,
     product name, platform, genre and current hardware classification. It caches
     only identity checks, never prices, conditions or eBay verification results.
+    Scattered title words separated by other game names do not establish a
+    match (e.g. Pokemon followed by a list ending in X/Y). Model/condition
+    words may still intervene. Reverse quantities such as "Games 17 x" are
+    lots; language labels before carts/cartridges/discs also establish variants.
     Helper progress queues one background render per event-loop turn instead of
     rendering recursively. Automatic eBay batches yield to browser input/painting
     between pairs, including cached results; the uncapped search and stop rules

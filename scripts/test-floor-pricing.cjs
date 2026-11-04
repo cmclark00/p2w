@@ -1129,6 +1129,39 @@ test('two-digit and repeated-series bundles are excluded before selecting a pric
   assert.equal(invoke('floorNumberedGameBundle','Farming Simulator 22 Xbox Series X discs 1 & 2',p),false,'disc numbers are not games');
 });
 
+test('scattered title words, reverse quantity lots and foreign carts cannot price a single Pokemon game', () => {
+  const product = { ...item, 'product-name': 'Pokemon X', 'console-name': 'Nintendo 3DS', 'cib-price': 3863 };
+  const titles = [
+    'Pokemon Ultra Sun, Ultra Moon, Sun, Moon, X, Y, Alpha, Omega - Unlocked All 807+',
+    'Pokemon Ultra Sun, Ultra Moon, Sun, Moon, X, Y, Alpha, Omega - Unlocked All 807',
+    'Pokemon Games 17 x Nintendo DS NDS 3DS Authentic Japanese Carts Only',
+    'Pokemon Games 17 × Nintendo DS NDS 3DS Authentic Carts Only',
+    'Pokemon X Nintendo 3DS Japanese Carts Only',
+  ];
+  for (const title of titles) {
+    assert.ok(invoke('floorListingMismatch', title, product), title);
+    assert.ok(invoke('floorAmazonMismatch', { product, condition: 'cib', amazon: { found: true, title } }), title);
+  }
+  const single = 'POKEMON X NINTENDO 3DS VIDEO GAME CARTRIDGE WITH CASE BOOKLET DS';
+  for (const title of [single, 'Pokemon X (Nintendo 3DS, 2013) - Complete Original - Used - Tested',
+    'Pokemon Nintendo 3DS X Version Complete', 'Pokemon X Version Complete In Box Nintendo 3DS 2013 Manual Inserts']) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+  }
+  assert.match(invoke('floorRegionMismatch', titles[4], product), /Japanese/);
+  assert.equal(invoke('floorRegionMismatch', titles[4], {...product, 'console-name':'JP Nintendo 3DS'}), null);
+  const example = cur(product, { sales: { cib: [...titles.map(title => ({title,price:56999})), {title:single,price:4995}] } });
+  assert.equal(invoke('floorAutoSale', invoke('floorSales', example)).sale.price, 4995);
+  const priced = invoke('floorResult', {...example, product:{...product,'gamestop-price':5499},
+    amazon:{found:true,title:'Pokemon X Nintendo 3DS',offers:[{price:5654,sub:'like_new'},{price:6499,sub:'new'}]}});
+  assert.equal(priced.b.basis,5654,'matching Amazon reference beats the legitimate single-game sale');
+  assert.equal(priced.r.price,5500,'screenshot references yield $55 with current rounding and unchanged 3DS premium');
+  example.sales.cib = [];
+  example.directEbay = { result: { state:'ready', sales: titles.map((title,i) => ({id:String(123456789010+i),
+    title,price:56999,shipping:0,state:'sold',conditionText:'Pre-Owned',sellerCountry:'United States',locationSource:'ebay-located-in'})) } };
+  assert.ok(invoke('floorSales', example).every(s => s.odd), 'sold badges and specific premiums cannot admit mismatches');
+  assert.equal(invoke('floorAutoSale', invoke('floorSales', example)).sale, null);
+});
+
 test('subtitled sequel bundles cannot drive pricing or stop direct eBay search', () => {
   const product = { ...item, 'product-name': 'Dark Souls II: Scholar of the First Sin', 'console-name': 'Xbox One' };
   const titles = [
