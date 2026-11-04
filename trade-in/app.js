@@ -3875,6 +3875,63 @@ async function floorScanUpc(upc) {
 // preserving title/condition checks and a separate standard-game baseline.
 const floorVariantName = (product) => String(product?.['product-name'] || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
 const floorGamePlatform = (product) => norm(product?.['console-name']).replace(/^(?:pal|jp|asian english|asian|korean) /, '');
+// Physical Xbox 360 discs reissued in Xbox One / Xbox 360 packaging. This is
+// deliberately NOT the full backwards-compatibility list. See the sourced
+// catalog in XBOX-360-REISSUES.md. Edition/region/condition checks still apply.
+const FLOOR_XBOX_360_REISSUES = [
+  "Assassin's Creed Rogue", 'Bioshock Infinite', 'Borderlands Game of the Year Edition',
+  'Bully Scholarship Edition', 'Call of Duty Advanced Warfare', 'Call of Duty Black Ops',
+  'Call of Duty Black Ops II', 'Call of Duty Ghosts', 'Call of Duty World at War',
+  'Call of Duty 4 Modern Warfare', 'Call of Duty Black Ops Combo Pack',
+  'Crysis 3', 'Dead Space 3', 'Doom 3 BFG Edition',
+  'Elder Scrolls IV Oblivion Game of the Year Edition', 'Fallout New Vegas Ultimate Edition',
+  'Fallout 3 Game of the Year Edition', 'Fight Night Champion', 'Grand Theft Auto IV',
+  'Grand Theft Auto IV & Episodes from Liberty City', 'Grand Theft Auto Episodes from Liberty City',
+  'Grand Theft Auto San Andreas', 'Injustice Gods Among Us Ultimate Edition',
+  'Kingdoms of Amalur Reckoning', 'LEGO Batman The Videogame',
+  'Midnight Club Los Angeles Complete Edition', 'MX vs ATV Reflex', 'Rayman Legends',
+  'Rayman Origins', 'Red Dead Redemption Game of the Year Edition', 'Red Dead Redemption Undead Nightmare',
+  "Sid Meier's Civilization Revolution", 'Skate 3', 'Sonic & All-Stars Racing Transformed',
+  'Call of Duty Modern Warfare Trilogy', "Mirror's Edge", 'Rage',
+];
+function floorXboxReissueKey(name) {
+  return floorTitleWords(String(name || '').replace(/\bGOTY\b/gi, 'Game of the Year')
+    .replace(/\bBlack Ops (?:1|I)\b/gi, 'Black Ops')
+    .replace(/^Sid Meier['’]?s?\s+/i, '')
+    .replace(/\[(?:Greatest Hits|Xbox 360|Xbox One(?:\s*[/|&]\s*Xbox 360)?|Backwards? Compatible)\]/gi, ''))
+    .filter(w => !['edition', 'the', 'videogame'].includes(w)).join(' ');
+}
+const floorXboxReissueCatalog = new Map();
+function floorXbox360Reissue(product) {
+  const system = floorGamePlatform(product);
+  if (!/^(?:xbox one|xbox 360|xbox one xbox 360|xbox one and xbox 360)$/.test(system)
+    || floorIsHardware(product) || floorToyFamily(product)) return false;
+  const key = floorXboxReissueKey(product['product-name']);
+  if (!floorXboxReissueCatalog.size) {
+    const ambiguous = new Set(['Borderlands Game of the Year Edition', 'Call of Duty Advanced Warfare',
+      'Call of Duty Ghosts', 'Rayman Legends'].map(floorXboxReissueKey));
+    for (const name of FLOOR_XBOX_360_REISSUES) {
+      const release = floorXboxReissueKey(name);
+      floorXboxReissueCatalog.set(release, { ambiguous: ambiguous.has(release) });
+    }
+  }
+  const release = floorXboxReissueCatalog.get(key);
+  if (!release) return false;
+  // These titles ALSO have a distinct native Xbox One version with the same
+  // name. Only explicit 360 catalog identity may enable the exception.
+  return !release.ambiguous || /\bxbox 360\b/.test(system)
+    || /\[(?:Xbox One\s*[/|&]\s*)?Xbox 360\]/i.test(product['product-name']);
+}
+function floorXboxReissuePlatformMatch(candidate, product) {
+  if (!floorXbox360Reissue(product)) return false;
+  const evidence = [candidate.title, ...(candidate.platforms || [])].map(norm).join(' ');
+  // Require the actual disc platform. "Xbox One compatible" alone must never
+  // turn an ambiguous native release into a 360 disc.
+  return /\bxbox 360\b/.test(evidence);
+}
+const floorMarketSearchPlatform = product => floorXbox360Reissue(product)
+  ? String(product['console-name']).replace(/xbox one(?:\s*(?:[/|&]|and)?\s*xbox 360)?/i, 'Xbox 360')
+  : product['console-name'];
 function floorStandardGame(product) {
   if (floorToyFamily(product) || floorIsHardware(product) || rhythmKind(product['product-name']) === 'bundle') return null;
   const name = floorVariantName(product);
@@ -4180,8 +4237,9 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       };
       try {
         if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
+        const searchPlatforms = [...new Set([product['console-name'], floorMarketSearchPlatform(product)])];
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
-          .map(name => `${name.replace(/[\[\]]/g, ' ')} ${product['console-name']}`.replace(/\s+/g, ' ').trim()))];
+          .flatMap(name => searchPlatforms.map(platform => `${name.replace(/[\[\]]/g, ' ')} ${platform}`.replace(/\s+/g, ' ').trim())))];
         // Fetch independent first pages two at a time, but apply matching in
         // the original barcode/title order. All queries and page tokens still
         // get checked; server-wide pacing/cooldowns remain authoritative.
@@ -4209,8 +4267,10 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         // Pre-owned inventory compares eligible Used and New before trying Renewed.
         if (!priced().length && condition !== 'new') {
           renewedChecked = true;
-          const q = `${product['product-name']} ${product['console-name']} renewed`.trim();
-          await catalog({ q }, true);
+          for (const platform of searchPlatforms) {
+            const q = `${product['product-name']} ${platform} renewed`.trim();
+            await catalog({ q }, true);
+          }
           await finishOffers();
         }
       } catch (err) { await Promise.allSettled(offerChecks); searchError = err.message; }
@@ -4239,6 +4299,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       // Pre-owned compares Used/New; New prefers New, then explicitly labeled Like New.
       const selected = choices[0] || verified.find(a => !a.newReference && !a.displayOnly) || null;
       const matchNotes = [];
+      if (floorXbox360Reissue(product)) matchNotes.push('Xbox One-boxed Xbox 360 reissue: also checked Xbox 360 listings for this release. Edition, region and condition checks still apply.');
       const conditionFallback = selected && floorAmazonConditionFallback({ product, condition, amazon: selected });
       if (conditionFallback) matchNotes.push(`${conditionFallback}; preferred Amazon grades were unavailable. Listing identity checks and pricing premiums still apply`);
       if (!floorIsHardware(product) && !floorToyFamily(product) && condition !== 'new') matchNotes.push(condition === 'loose'
@@ -4475,7 +4536,7 @@ const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatc
 function floorEbaySearchQuery(product) {
   // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
   // packaging adjectives: these are evaluated on results, not demanded in search.
-  const system = String(product['console-name'] || '').replace(/playstation\s*([1-5])/i, 'PS$1')
+  const system = String(floorMarketSearchPlatform(product) || '').replace(/playstation\s*([1-5])/i, 'PS$1')
     .replace(/^playstation$/i, 'PS1').replace(/playstation vita/i, 'PS Vita')
     .replace(/game\s*boy advance/i, 'GBA').replace(/super nintendo/i, 'SNES')
     .replace(/nintendo entertainment system/i, 'NES');
@@ -5107,6 +5168,17 @@ function floorNumberedGameBundle(title, product) {
 // same cartridge. Normalize only this known title/platform combination, keeping
 // other games, extras, condition words and edition qualifiers for the filters.
 function floorKnownGameTitle(title, product) {
+  if (floorXbox360Reissue(product)
+    && floorXboxReissueKey(product['product-name']) === floorXboxReissueKey('Call of Duty Black Ops')) {
+    title = String(title || '').replace(/\bBlack Ops (?:1|I)\b/gi, 'Black Ops');
+  }
+  // Amazon shortens the same Oblivion GOTY release to simply "Oblivion".
+  // Keep all suffixes so remasters, other editions and bundles still fail.
+  if (floorXbox360Reissue(product)
+    && floorXboxReissueKey(product['product-name']) === floorXboxReissueKey('Elder Scrolls IV Oblivion Game of the Year Edition')
+    && !/\belder\s+scrolls\b/i.test(title || '')) {
+    title = String(title || '').replace(/\bOblivion\b/i, 'Elder Scrolls IV Oblivion');
+  }
   // Upgrade eligibility describes the physical PS4 copy, not a second game or
   // a PS5 disc. Require explicit PS4 evidence before removing this phrase.
   if (/\b(?:ps4|playstation\s*4)\b/i.test(title || '')) {
@@ -5174,6 +5246,10 @@ function floorNamedGameBundle(title, product) {
   const contents = /^(?:soundtracks?|music|cds?|slipcovers?|stickers?|art|books?|steelbook|postcards?|patches|pins?|inlays?|inlay|artwork|cover|covers)$/;
   const titleWord = word => !!word && !FLOOR_TITLE_DETAILS.test(word) && !contents.test(word) && !/^\d+$/.test(word);
   const following = parts.slice(at + 1);
+  // The reissue platform exception must not admit a second, single-word game
+  // such as "Oblivion GOTY & Skyrim". Original pack-in terms remain allowed.
+  if (floorXbox360Reissue(product) && following.some(words => words.length === 1
+    && titleWord(words[0]) && !selected.has(words[0]))) return true;
   if (following.some(words => titleWord(words[0]) && !selected.has(words[0])
     && (/^[a-z][a-z\d]*[a-z]\d+$/.test(words[0]) || /^\d+$/.test(words[1] || '')))) return true;
   if (following.some(words => words.length >= 2
@@ -5249,6 +5325,7 @@ const FLOOR_PLATFORMS = [
   /\b(?:gameboy|game boy)\b(?! (?:advance|color))/, /\bsega saturn\b/, /\bdreamcast\b/,
 ];
 function floorAmazonPlatformConfirmed(candidate, product) {
+  if (floorXboxReissuePlatformMatch(candidate, product)) return true;
   const system = norm(product?.['console-name']).replace(/^(?:pal|jp) /, '');
   const wanted = FLOOR_PLATFORMS.filter((re) => re.test(system));
   const evidence = [candidate.title, ...(candidate.platforms || [])].map(norm);
@@ -5326,6 +5403,7 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
+  if (floorXbox360Reissue(product) && /\b(?:strategy guide|walkthrough book)\b/i.test(title)) return 'Guide, not a comparable game listing';
   if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
   if (floorNamedGameBundle(title, product)) return 'Multiple-game title list — review';
   const wantedCounts = floorGameCounts(name);
@@ -5371,7 +5449,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
   const listedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(title)));
-  if (wantedPlatforms.length && listedPlatforms.length && !wantedPlatforms.some((re) => re.test(norm(title)))) return 'Different platform';
+  if (wantedPlatforms.length && listedPlatforms.length && !wantedPlatforms.some((re) => re.test(norm(title)))
+    && !floorXboxReissuePlatformMatch({ title }, product)) return 'Different platform';
   return floorTitleIdentityMismatch(packInTitle, product);
 }
 

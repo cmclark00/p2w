@@ -23,6 +23,67 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Xbox One-boxed 360 reissues search both labels and retain exact edition/condition checks', async () => {
+    const p={id:'1268070','product-name':'Elder Scrolls IV: Oblivion [Game of the Year Edition]','console-name':'Xbox One','cib-price':1348};
+    const good=candidate('B005FDUSTA','Oblivion - Xbox 360 Game of the Year Edition',['Xbox 360']);
+    const queries=[];
+    const e=engine(async(route,params)=> {
+      if(route==='amazon/catalog') { queries.push(params.q || ''); return {candidates: /Xbox 360/.test(params.q)?[good]:[]}; }
+      return {...offer(good,null), offers:params.cond==='used'?[{price:896,sub:'like_new'}]:[{price:3326,sub:'new'}]};
+    });
+    e.ctx.p=p; e.ctx.a=good;
+    assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),null);
+    const result=await e.fetch(p,'cib');
+    assert.equal(result.asin,good.asin);
+    assert.ok(queries.some(q=>q.includes('Xbox One')));
+    assert.ok(queries.some(q=>q.includes('Xbox 360')));
+    e.ctx.result=result;
+    assert.equal(e.run('floorAmazonLowest({product:p,condition:"cib",amazon:result})'),896);
+    assert.ok(e.run('floorEbaySearchQuery(p)').endsWith('Xbox 360'));
+    for(const title of ['Oblivion Xbox 360', 'Oblivion Remastered Game of the Year Edition Xbox 360',
+      'Oblivion Game of the Year Edition Xbox 360 French Version', 'Oblivion Game of the Year Edition PlayStation 3',
+      'Oblivion Game of the Year Edition Xbox 360 Digital Code',
+      'Oblivion Game of the Year Edition Xbox 360 & Skyrim',
+      'Oblivion Game of the Year Edition Xbox 360 Strategy Guide']) {
+      e.ctx.a={...good,title,platforms:[title.includes('PlayStation')?'PlayStation 3':'Xbox 360']};
+      assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),title);
+    }
+    e.ctx.a={...good, title:'Oblivion Xbox 360 Game of the Year Edition (Renewed)',renewedFallback:true};
+    assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"new",true)'));
+    e.ctx.a={...good,offers:[{price:896,sub:'like_new'}]};
+    assert.equal(e.run('floorAmazonLowest({product:p,condition:"new",amazon:a})'),null);
+  });
+  await test('reissue allowlist does not equate native Xbox One ports, remasters, sequels or all backwards-compatible games', async () => {
+    const e=engine(async()=>({candidates:[]}));
+    const names=e.run('FLOOR_XBOX_360_REISSUES');
+    assert.equal(names.length,37);
+    for(const name of names) {
+      e.ctx.p={'product-name':name,'console-name':'Xbox 360'};
+      assert.equal(e.run('floorXbox360Reissue(p)'),true,name);
+      e.ctx.p={'product-name':name,'console-name':'Xbox One'};
+      const ambiguous=['Borderlands Game of the Year Edition','Call of Duty Advanced Warfare','Call of Duty Ghosts','Rayman Legends'].includes(name);
+      assert.equal(e.run('floorXbox360Reissue(p)'),!ambiguous,name);
+      if(!ambiguous) {
+        e.ctx.a=candidate('B000000001',`${name} Xbox 360`,['Xbox 360']);
+        assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),null,name);
+      }
+      if(ambiguous) {
+        e.ctx.a=candidate('B000000001',`${name} Xbox 360`,['Xbox 360']);
+        assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),name);
+        assert.equal(e.run('floorMarketSearchPlatform(p)'),'Xbox One');
+      }
+    }
+    for(const name of ['Halo Reach','Fallout 4','Oblivion Remastered','Assassins Creed Rogue Remastered','BioShock The Collection',
+      'Red Dead Redemption 2','Bully Scholarship Edition [Collectors Edition]']) {
+      e.ctx.p={'product-name':name,'console-name':'Xbox One'};
+      assert.equal(e.run('floorXbox360Reissue(p)'),false,name);
+    }
+    for(const system of ['Playstation 3','Xbox Series X','PAL Xbox One']) {
+      e.ctx.p={'product-name':'Elder Scrolls IV Oblivion [Game of the Year Edition]','console-name':system};
+      e.ctx.a=candidate('B005FDUSTA','Oblivion Game of the Year Edition Xbox 360 NTSC USA',['Xbox 360']);
+      assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"cib",true)'),system);
+    }
+  });
   await test('PSVR catalog labels match PS4 games without accepting PSVR2, headsets or sequels', async () => {
     const p={id:'astro','product-name':'Astro Bot Rescue Mission','console-name':'Playstation 4','cib-price':1500};
     const good=candidate('B07FWG1KC6','ASTRO Bot Rescue Mission - PlayStation VR',['PlayStation 4']);
