@@ -2299,14 +2299,16 @@ Three via **Formspree** (endpoints are public client-side by design):
   screens** — that responsive collapse is the point, don't re-add a
   `max-width` cap (it would force two tiers at every width). Don't remove the
   phone's `flex-shrink:0`/`white-space:nowrap` either, or the number wraps.
-  (Caveat: in the ~700–1100px tablet band the cluster squeezes the nav to 3
-  short tiers until the `≤680px` hamburger kicks in — acceptable, but if it
-  bothers you raise the mobile-nav breakpoint.) `.header-phone`'s
-  `margin-left:auto` is restored only in the `≤680px` mobile block, where the
-  pill instead becomes its own full-width row under the logo/phone/hamburger
-  bar. If you add the pill to a new page,
+  At `≤1100px` the hamburger replaces those navigation links. `.header-phone`'s
+  `margin-left:auto` is restored in that block, where the pill shares a row
+  with social icons under the logo/phone/hamburger bar. If you add the pill to a new page,
   copy the exact `.header-cta` markup from any standard page (15 share it
   identically).
+- Public `.site-header` markup includes Facebook and Discord icon links in
+  `.header-socials` on all standard pages. Use the existing footer destinations;
+  links have accessible names and open in new tabs. At 1100px and below the
+  header uses its hamburger layout, with socials kept visible beside the
+  Community First pill beneath the logo/phone/menu row (outside the menu).
 - `nav.js`: mobile nav toggle + IntersectionObserver scroll-reveal.
 - Accessibility: skip links, `main#main`, visible `:focus-visible` rings.
 - SEO: canonical tags, OG tags + `assets/og-image.jpg` share card, `sitemap.xml`,
