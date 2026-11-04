@@ -1511,6 +1511,10 @@ The site's **only server-side code**. Everything else is static.
     trade and after Complete, so they're never carried over from the last
     trade or remembered per device), payout (`cash` / `credit` / `split` with cents),
     totals, per-item snapshot (incl. serials), `idChecked`, and notes.
+  - The trade list's Sort list control offers Recently added and Value ea.
+    ascending/descending. It sorts a display copy using `priceLine().base`,
+    preserves ties and puts missing/custom values last; saved item order and
+    payouts are untouched. The display preference is remembered on this device.
   - Complete-trade serial policy uses `tradeSerialRequired`: Switch family,
     Xbox Series S/X, PS4/PS5 families, 3DS family including 2DS, PC handhelds
     and Logitech G Cloud, plus all New/sealed console and handheld lines.

@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261102-amazon-condition-fallback">
+  <link rel="stylesheet" href="styles.css?v=20261104-trade-sort">
 </head>
 <body>
   <header class="topbar">
@@ -85,6 +85,14 @@
         <label class="customer">
           <span class="eyebrow">Customer</span>
           <input id="customerName" type="text" autocomplete="off" placeholder="Required to complete" aria-required="true">
+        </label>
+        <label class="trade-sort" for="tradeSort">
+          <span class="eyebrow">Sort list</span>
+          <select id="tradeSort">
+            <option value="added">Recently added</option>
+            <option value="value-desc">Value ea. · Highest first</option>
+            <option value="value-asc">Value ea. · Lowest first</option>
+          </select>
         </label>
       </div>
 
@@ -614,6 +622,6 @@
 
   <script src="stock-helper-client.js?v=20261028-ebay-retry"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-<script src="app.js?v=20261104-handheld-edition-serials"></script>
+<script src="app.js?v=20261104-trade-sort"></script>
 </body>
 </html>

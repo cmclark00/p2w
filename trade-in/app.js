@@ -1427,10 +1427,23 @@ function updateRow(tr, line) {
   $('[data-cell="flags"]', tr).innerHTML = flags.join('');
 }
 
+let tradeSort = store.get('p2w-trade-sort', 'added');
+function sortedTradeLines(lines, mode = tradeSort) {
+  if (!['value-desc', 'value-asc'].includes(mode)) return [...lines];
+  // Sort the displayed Value ea., not quantity or payout. Missing values stay last.
+  // Decorate once: calculating prices inside the comparator is needlessly costly.
+  return lines.map((line, index) => ({ line, index, value: line.pending || line.failed || line.source === 'custom'
+    ? null : priceLine(line).base })).sort((a, b) => {
+    const aKnown = Number.isFinite(a.value), bKnown = Number.isFinite(b.value);
+    if (aKnown !== bKnown) return aKnown ? -1 : 1;
+    return (aKnown ? (a.value - b.value) * (mode === 'value-desc' ? -1 : 1) : 0) || a.index - b.index;
+  }).map(entry => entry.line);
+}
+
 function renderLines() {
   for (const line of trade.lines) loadTradeManualPrices(line);
   const body = $('#lineBody');
-  body.innerHTML = trade.lines.map(rowHtml).join('');
+  body.innerHTML = sortedTradeLines(trade.lines).map(rowHtml).join('');
   for (const line of trade.lines) {
     const tr = $(`tr[data-id="${line.id}"]`, body);
     if (tr) updateRow(tr, line);
@@ -6677,6 +6690,12 @@ function wireEvents() {
   });
   $('#results').addEventListener('click', onResultsClick);
   $('#customBtn').addEventListener('click', addCustom);
+  $('#tradeSort').value = ['value-desc', 'value-asc'].includes(tradeSort) ? tradeSort : 'added';
+  $('#tradeSort').addEventListener('change', (e) => {
+    tradeSort = e.target.value;
+    store.set('p2w-trade-sort', tradeSort);
+    renderLines();
+  });
   // The condition menu that opens the PriceCharting picker must not close it again.
   document.addEventListener('click', (e) => { if (!e.target.closest('.scan, [data-field="condition"]') && !$('#results').hidden) closeResults(); });
 
