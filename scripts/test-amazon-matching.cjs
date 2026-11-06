@@ -25,10 +25,11 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
 (async () => {
   await test('PAL catalog barcode confirms missing region without admitting wrong games or regions', async () => {
     const p = {'product-name':'Alien Isolation','console-name':'PAL Playstation 4',upc:'5055277024889',catalogBarcodes:['5055277024889','5055277023776']};
-    const c = {...candidate('B00HQCQ1RQ','Alien: Isolation (PS4)',['PlayStation 4']),barcodes:['05055277023776']};
+    const c = {...candidate('B00HQCQ1RQ','Alien: Isolation (PS4)',['playstation 3','PlayStation4']),barcodes:['05055277023776']};
     const e=engine(async(route,params)=> route==='amazon/catalog' ? {candidates:[c]} : {...offer(c,2294),offers:[{price:2294,sub:'new'}]});
     e.ctx.p=p;e.ctx.c=c;
     assert.equal(e.run('floorAmazonCandidateMismatch(c,p,"new",true)'),null);
+    assert.ok(e.run('floorAmazonCandidateMismatch({...c,platforms:["PlayStation3"]},p,"new",true)'), 'a different catalog generation stays excluded');
     assert.ok(e.run('floorAmazonCandidateMismatch({...c,barcodes:[]},p,"new",true)'));
     assert.ok(e.run('floorAmazonCandidateMismatch({...c,barcodes:["5055277023000"]},p,"new",true)'));
     for(const title of ['Alien Isolation PS4 USA ESRB','Alien Isolation Nostromo Edition PS4','Aliens Fireteam Elite PS4','Alien Isolation Xbox One','Alien Isolation PS4 + Alien Resurrection']) {

@@ -5383,7 +5383,9 @@ function floorAmazonPlatformConfirmed(candidate, product) {
   if (floorXboxReissuePlatformMatch(candidate, product)) return true;
   const system = norm(product?.['console-name']).replace(/^(?:pal|jp) /, '');
   const wanted = FLOOR_PLATFORMS.filter((re) => re.test(system));
-  const evidence = [candidate.title, ...(candidate.platforms || [])].map(norm);
+  // Amazon sometimes joins the generation to the catalog platform name.
+  // Normalize that spelling without treating another generation as a match.
+  const evidence = [candidate.title, ...(candidate.platforms || [])].map(value => norm(value).replace(/\bplaystation([1-5])\b/g, 'playstation $1'));
   return wanted.length ? wanted.some((re) => evidence.some((s) => re.test(s))) : evidence.some((s) => hasPhrase(s, system));
 }
 // Matching depends on identity, not price or verification state. Background
