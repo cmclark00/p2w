@@ -1852,6 +1852,21 @@ test('lookup failure is visible and typed prices remain explicit overrides', () 
   assert.ok(invoke('floorResult', cur(item, { fullError: true })).b.checks.some((s) => s.includes('lookup failed')));
   assert.equal(invoke('floorResult', cur(item, { typed: 1000, fullLoading: true })).r.price, 1000);
 });
+test('original Elite pricing excludes Series 2 and compatibility cables without changing hardware pricing', () => {
+  const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One',genre:'Accessories','loose-price':5520};
+  const c=cur(p,{condition:'loose',sales:{loose:[
+    {price:15346,title:'XBOX Elite Series 2 Wireless Controller for XBOX Series X|S / XBOX One - Black',date:'2026-10-02'},
+    {price:14468,title:'Xbox Elite Series-2 Core Wireless Controller for Series X|S / Xbox One - White',date:'2026-09-13'},
+    {price:6088,title:'GENUINE MICROSOFT XBOX ONE ELITE WIRELESS CONTROLLER WHITE (Model 1698)',date:'2026-09-30'}
+  ]},amazon:{found:true,title:'Replacement Micro USB Charger Cable Compatible with Xbox One Elite Series 1 Wireless Controller',offers:[{price:499,sub:'new'}],newReference:true}});
+  const sales=invoke('floorSales',c);
+  assert.equal(sales.filter(s=>!s.odd && !s.outlier).length,1);
+  assert.equal(invoke('floorAmazonLowest',c),null);
+  const clean={...c,amazon:null,sales:{loose:[c.sales.loose[2]]}};
+  assert.equal(invoke('floorResult',c).b.basis,6088);
+  assert.equal(invoke('floorResult',c).r.price,invoke('floorResult',clean).r.price);
+  assert.equal(invoke('floorResult',c).r.price,6000);
+});
 test('modern hardware uses sales instead of the game retail-sell rule', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock 4 controller complete', date: '2026-10-01' }] } }));
   assert.equal(r.hw, true); assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 4000);

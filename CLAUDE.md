@@ -1350,6 +1350,13 @@ The site's **only server-side code**. Everything else is static.
     match (e.g. Pokemon followed by a list ending in X/Y). Model/condition
     words may still intervene. Reverse quantities such as "Games 17 x" are
     lots; language labels before carts/cartridges/discs also establish variants.
+    Controller identity checks reject cables, charging accessories and replacement
+    components whose compatibility text merely names the controller. Included
+    cables/cases after "with" remain valid; selected component products still match
+    independently. Xbox Elite generations (Series 1/model 1698 versus Series 2/model
+    1797) and Core packages are checked across Amazon, PriceCharting and direct
+    eBay. The original Xbox One Elite catalog name implies Series 1. These checks
+    filter evidence only; hardware pricing and specific premiums are unchanged.
     Helper progress queues one background render per event-loop turn instead of
     rendering recursively. Automatic eBay batches yield to browser input/painting
     between pairs, including cached results; the uncapped search and stop rules

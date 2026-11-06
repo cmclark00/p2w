@@ -23,6 +23,63 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('controller matching rejects compatibility accessories and wrong Elite generations across sources', async () => {
+    const e=engine(async()=>({candidates:[]}));
+    const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One','loose-price':5520};
+    e.ctx.p=p;
+    const wrong=[
+      'Replacement Micro USB Charger Cable Compatible with PS4, PS4 Slim, PlayStation 4, Dualshock 4, Xbox One S X, Elite Series 1 Wireless Controller, Compatible with Android Phones (5FT)',
+      'Xbox One Elite Wireless Controller USB Charging Cable',
+      'Charging Dock for Xbox One Elite Wireless Controller',
+      'Replacement Paddles for Xbox One Elite Wireless Controller',
+      'Case for Xbox One Elite Wireless Controller',
+      'Xbox One Elite Wireless Controller Replacement Thumbsticks',
+      'XBOX Elite Series 2 Wireless Controller for XBOX Series X|S / XBOX One - Black',
+      'Xbox Elite Series-2 Core Wireless Controller for Series X|S / Xbox One - White',
+      'Xbox One Elite Wireless Controller Model 1797'
+    ];
+    for(const title of wrong) {
+      e.ctx.title=title; e.ctx.a=candidate('B000000001',title,['Xbox One']);
+      assert.ok(e.run('floorAmazonCandidateMismatch(a,p,"loose",true)'),title);
+      assert.ok(e.run('floorSaleListingMismatch({title},p)'),title);
+    }
+    for(const title of ['Xbox One Elite Wireless Controller - Black',
+      'GENUINE MICROSOFT XBOX ONE ELITE WIRELESS CONTROLLER WHITE (Model 1698)',
+      'Official Xbox One Elite Series 1 Wireless Controller Model 1698 With Case',
+      'Xbox One Elite Wireless Controller with USB cable and carrying case',
+      'Xbox One Elite Wireless Controller w/ case',
+      'Xbox One Elite Wireless Controller - Tested & Working']) {
+      e.ctx.a=candidate('B000000002',title,['Xbox One']); e.ctx.title=title;
+      assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"loose",true)'),null,title);
+      assert.equal(e.run('floorSaleListingMismatch({title},p)'),null,title);
+    }
+    e.ctx.p={...p,'product-name':'Xbox One Elite Series 2 Wireless Controller'};
+    e.ctx.title='Xbox One Elite Series 2 Wireless Controller Black';
+    assert.equal(e.run('floorSaleListingMismatch({title},p)'),null);
+    for(const title of ['Xbox One Elite Series 1 Wireless Controller Model 1698',
+      'Xbox One Elite Series 2 Core Wireless Controller']) {
+      e.ctx.title=title;assert.ok(e.run('floorSaleListingMismatch({title},p)'),title);
+    }
+    e.ctx.p={...p,'product-name':'Xbox One Wireless Controller'};
+    e.ctx.title='USB Cable Compatible with Xbox One Wireless Controller';
+    assert.ok(e.run('floorSaleListingMismatch({title},p)'));
+    e.ctx.p={...p,'product-name':'Xbox One Elite Wireless Controller USB Cable'};
+    assert.equal(e.run('floorSaleListingMismatch({title:"Xbox One Elite Wireless Controller USB Cable"},p)'),null);
+  });
+  await test('Amazon discovery skips the cheap cable and continues to a real original Elite controller', async () => {
+    const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One','loose-price':5520};
+    const cable=candidate('B000000001','Replacement Micro USB Charger Cable Compatible with Xbox One Elite Series 1 Wireless Controller',['Xbox One']);
+    const controller=candidate('B000000002','Xbox One Elite Wireless Controller - Black',['Xbox One']);
+    const requests=[];
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/catalog') return {candidates:[cable,controller]};
+      requests.push(params.asin);
+      return offer(params.asin===cable.asin?cable:controller,params.asin===cable.asin?499:6000);
+    });
+    const result=await e.fetch(p,'loose');
+    assert.equal(result.asin,controller.asin);
+    assert.ok(!requests.includes(cable.asin),'a known accessory must never reach offer selection');
+  });
   await test('Xbox sold titles must identify the selected generation independently of Amazon catalog compatibility', async () => {
     const e=engine(async()=>({candidates:[]}));
     const name='Elder Scrolls IV: Oblivion [Game of the Year Edition]';

@@ -5442,6 +5442,31 @@ function floorListingMetadataTitle(title, product) {
   if (/^pal\b/i.test(product?.['console-name'] || '')) title = title.replace(/\bneuf\b/gi, 'New');
   return title;
 }
+// Compatibility text names the device an accessory fits, not the item being sold.
+// Apply this before pricing on every source, including cached Amazon candidates.
+function floorControllerMismatch(title, product) {
+  const name = norm(product?.['product-name']);
+  if (!floorIsHardware(product || {}) || !/\bcontrollers?\b/.test(name)) return null;
+  const parts = /\b(?:cables?|cords?|chargers?|charging (?:dock|station|stand)|adapters?|batter(?:y|ies)|battery (?:cover|door|pack)s?|thumb ?sticks?|joysticks?|paddles?|buttons?|grips?|shells?|faceplates?|skins?|silicone covers?|cases?|replacement parts?|repair kits?)\b/;
+  // A selected replacement component remains a legitimate product of its own.
+  if (parts.test(name)) return null;
+  const text = norm(String(title || '').replace(/\bw\s*\//gi, 'with '));
+  // Controllers can include their ordinary charging cable/case. Only strip
+  // included contents after an actual controller noun, never a cable's "for".
+  const controllerAt = text.search(/\bcontrollers?\b/);
+  const included = /\b(?:with|includes?|including)\s+(?:(?:a|the|original|usb|charging|carrying)\s+)*(?:cables?|cords?|chargers?|cases?|paddles?|thumbsticks?|battery packs?)(?:\s+and\s+(?:(?:usb|charging|carrying)\s+)*(?:cables?|cords?|chargers?|cases?|paddles?|thumbsticks?|battery packs?))?\b/g;
+  const soldItem = text.replace(included, (phrase, offset) => controllerAt >= 0 && offset > controllerAt ? '' : phrase);
+  if (parts.test(soldItem) || /\b(?:case|box) only\b/.test(soldItem)) return 'Controller accessory or replacement part, not the controller';
+  if (/\bxbox\b/.test(name) && /\belite\b/.test(name)) {
+    const generation = value => /\b(?:series|gen(?:eration)?)\s*(?:2|ii)\b|\belite\s*2\b|\b1797\b/.test(value) ? 2
+      : /\b(?:series|gen(?:eration)?)\s*(?:1|i)\b|\belite\s*1\b|\b1698\b/.test(value) ? 1 : null;
+    const wanted = generation(name) || 1, listed = generation(text);
+    if (listed && listed !== wanted) return 'Different Elite controller generation';
+    if (wanted === 2 && listed !== 2) return 'Listing does not confirm Elite Series 2';
+    if (/\bcore\b/.test(name) !== /\bcore\b/.test(text)) return 'Different Elite controller Core package';
+  }
+  return null;
+}
 function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   title = floorListingMetadataTitle(floorKnownGameTitle(title, product), product);
@@ -5450,6 +5475,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   const toyMismatch = floorToyListingMismatch(title, product);
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
+  const controllerMismatch = floorControllerMismatch(title, product);
+  if (controllerMismatch) return controllerMismatch;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
   if (floorXbox360Reissue(product) && /\b(?:strategy guide|walkthrough book)\b/i.test(title)) return 'Guide, not a comparable game listing';
   if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
