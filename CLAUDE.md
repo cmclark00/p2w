@@ -1351,7 +1351,8 @@ The site's **only server-side code**. Everything else is static.
     words may still intervene. Reverse quantities such as "Games 17 x" are
     lots; language labels before carts/cartridges/discs also establish variants.
     Controller identity checks reject cables, charging accessories and replacement
-    components whose compatibility text merely names the controller. Included
+    components whose compatibility text merely names the controller, including
+    component kits, accessory packs, attachment sets and explicit controller-not-included listings. Included
     cables/cases after "with" remain valid; selected component products still match
     independently. Xbox Elite generations (Series 1/model 1698 versus Series 2/model
     1797) and Core packages are checked across Amazon, PriceCharting and direct

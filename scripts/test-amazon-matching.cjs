@@ -34,6 +34,12 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       'Replacement Paddles for Xbox One Elite Wireless Controller',
       'Case for Xbox One Elite Wireless Controller',
       'Xbox One Elite Wireless Controller Replacement Thumbsticks',
+      'Xbox One Gears of War Component Kit for Elite Wireless Controller New - Open Box',
+      'Accessory Pack for Xbox One Elite Wireless Controller',
+      'Xbox One Elite Wireless Controller Attachment Set',
+      'Replacement Kit for Xbox One Elite Wireless Controller',
+      'Spare Parts for Xbox One Elite Wireless Controller',
+      'Xbox One Elite Wireless Controller accessories - controller not included',
       'XBOX Elite Series 2 Wireless Controller for XBOX Series X|S / XBOX One - Black',
       'Xbox Elite Series-2 Core Wireless Controller for Series X|S / Xbox One - White',
       'Xbox One Elite Wireless Controller Model 1797'
@@ -48,6 +54,8 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       'Official Xbox One Elite Series 1 Wireless Controller Model 1698 With Case',
       'Xbox One Elite Wireless Controller with USB cable and carrying case',
       'Xbox One Elite Wireless Controller w/ case',
+      'OEM Microsoft Xbox One Elite Wireless Controller (HM3-00001) Black VG *No USB',
+      'Microsoft Xbox One Black Elite Wireless Controller Series 1 MODEL1698',
       'Xbox One Elite Wireless Controller - Tested & Working']) {
       e.ctx.a=candidate('B000000002',title,['Xbox One']); e.ctx.title=title;
       assert.equal(e.run('floorAmazonCandidateMismatch(a,p,"loose",true)'),null,title);
@@ -65,6 +73,8 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     assert.ok(e.run('floorSaleListingMismatch({title},p)'));
     e.ctx.p={...p,'product-name':'Xbox One Elite Wireless Controller USB Cable'};
     assert.equal(e.run('floorSaleListingMismatch({title:"Xbox One Elite Wireless Controller USB Cable"},p)'),null);
+    e.ctx.p={...p,'product-name':'Xbox One Elite Wireless Controller Component Kit'};
+    assert.equal(e.run('floorSaleListingMismatch({title:"Xbox One Elite Wireless Controller Component Kit"},p)'),null);
   });
   await test('Amazon discovery skips the cheap cable and continues to a real original Elite controller', async () => {
     const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One','loose-price':5520};

@@ -5447,10 +5447,11 @@ function floorListingMetadataTitle(title, product) {
 function floorControllerMismatch(title, product) {
   const name = norm(product?.['product-name']);
   if (!floorIsHardware(product || {}) || !/\bcontrollers?\b/.test(name)) return null;
-  const parts = /\b(?:cables?|cords?|chargers?|charging (?:dock|station|stand)|adapters?|batter(?:y|ies)|battery (?:cover|door|pack)s?|thumb ?sticks?|joysticks?|paddles?|buttons?|grips?|shells?|faceplates?|skins?|silicone covers?|cases?|replacement parts?|repair kits?)\b/;
+  const parts = /\b(?:cables?|cords?|chargers?|charging (?:dock|station|stand)|adapters?|batter(?:y|ies)|battery (?:cover|door|pack)s?|thumb ?sticks?|joysticks?|paddles?|buttons?|grips?|shells?|faceplates?|skins?|silicone covers?|cases?|(?:replacement|spare) parts?|(?:repair|replacement) kits?|(?:component|accessor(?:y|ies)|attachment)s?\s+(?:kits?|packs?|sets?)|controller parts?)\b/;
   // A selected replacement component remains a legitimate product of its own.
   if (parts.test(name)) return null;
   const text = norm(String(title || '').replace(/\bw\s*\//gi, 'with '));
+  if (/\b(?:controller (?:is )?not included|no controller included|without (?:the )?controller)\b/.test(text)) return 'Controller not included';
   // Controllers can include their ordinary charging cable/case. Only strip
   // included contents after an actual controller noun, never a cable's "for".
   const controllerAt = text.search(/\bcontrollers?\b/);

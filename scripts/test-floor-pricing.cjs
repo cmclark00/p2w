@@ -1871,6 +1871,20 @@ test('modern hardware uses sales instead of the game retail-sell rule', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock 4 controller complete', date: '2026-10-01' }] } }));
   assert.equal(r.hw, true); assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 4000);
 });
+test('Elite component kit cannot drive pricing over the actual controller sales', () => {
+  const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One',genre:'Accessories','loose-price':5520};
+  const c=cur(p,{condition:'loose',sales:{loose:[
+    {price:10650,title:'Xbox One Gears of War Component Kit for Elite Wireless Controller New - Open Box',date:'2026-09-08'},
+    {price:9499,title:'OEM Microsoft Xbox One Elite Wireless Controller (HM3-00001) Black VG *No USB',date:'2026-07-15'},
+    {price:8672,title:'Microsoft Xbox One Black Elite Wireless Controller Series 1 MODEL1698',date:'2026-09-13'}
+  ]}});
+  const sales=invoke('floorSales',c);
+  assert.equal(sales.find(s=>s.price===10650).odd,true);
+  assert.equal(sales.filter(s=>!s.odd && !s.outlier).length,2);
+  const result=invoke('floorResult',c);
+  assert.equal(result.b.basis,9499);
+  assert.equal(result.r.price,9000); // Existing >$80 nearest $10/$25 rounding.
+});
 test('configured premiums apply on top of the winning market baseline', () => {
   const product = { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch', 'gamestop-price': 5500 };
   const r = invoke('floorResult', cur(product, { sales: { cib: [{ price: 5000, title: 'Pokemon Shield complete' }] },
