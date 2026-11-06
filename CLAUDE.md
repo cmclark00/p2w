@@ -907,16 +907,29 @@ The site's **only server-side code**. Everything else is static.
     PriceCharting rows carry sourcePcConsole; that region can fill omitted title
     wording, including after deduplication with the same eBay item ID. Explicit
     conflicts always override catalog context. Standalone eBay/Amazon/GameStop
-    matches still require region evidence for imports. Generic PAL accepts PAL,
-    PEGI/USK and UK/European release labels and European packaging languages;
+    matches still require region evidence for imports.
+    Amazon's marketplace-scoped UPC/EAN/GTIN identifiers can supply omitted region
+    wording when they exactly match the selected PriceCharting barcode (leading
+    GTIN zero padding normalized) and the platform is confirmed. They never
+    override conflicting region, title or edition evidence. Catalog and offers
+    caches include these identifiers. US copies remain separate from PAL copies.
+    The existing public sales-page read retains all UPC/EAN/GTIN values in the
+    selected product's details table, since the product API can return only one.
+    Additional identifiers refresh Amazon matching once; sibling/ad barcodes
+    cannot supply identity. Identifier searches use the appropriate UPC/EAN/GTIN type.
+    Generic PAL accepts PAL, PEGI/USK and UK/European release labels and European packaging languages;
     explicitly named language variants still require their own language. Seller
     geography remains separate: overseas sales stay excluded. Missing game
     identity is classified before region; the UI says Region / language mismatch.
     Seller metadata is normalized before both game-identity and bundle checks:
     whole Smart Delivery, library-discard, dispatch and genre/rating phrases,
     Xbox compatibility punctuation, and recognized publisher/distributor credits
-    cannot become phantom sequels. Original packaging is an ordinary box content;
-    loose-condition packaging checks still apply to the untouched listing title.
+    cannot become phantom sequels.
+    The sealed PAL Alien Isolation audit also covers Survival Horror / Shoot 'Em
+    Up genre phrases, Save £s seller wording, and explicitly labelled language
+    lists; language evidence is retained without treating slash separators as games.
+    Original packaging is an ordinary box content; loose-condition packaging
+    checks still apply to the untouched listing title.
     Source titles, explicit editions, regions, conditions and pricing rules remain
     unchanged. Regression fixtures include the Nov. 1 Farming Simulator 22 and
     Wanted: Dead exclusion audit.

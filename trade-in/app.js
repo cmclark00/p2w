@@ -4170,7 +4170,7 @@ async function fetchFloorAmazon(product, condition, request = floorAmazonRequest
   return { ...own, standard, matchNotes: [...(own.matchNotes || []), ...(standard.error ? [`Standard-game Amazon check unavailable: ${standard.error}`] : [])] };
 }
 async function fetchFloorAmazonSingle(product, condition, request) {
-  const upcs = [...new Set(String(product.upc || '').split(/[,\s]+/).filter(v => /^\d{8,14}$/.test(v)))], cond = amazonCond(condition);
+  const upcs = floorCatalogBarcodes(product), cond = amazonCond(condition);
   const key = JSON.stringify([product.id, product['product-name'], product['console-name'], upcs, condition]);
   if (!floorAmazonCache.has(key)) {
     let progress = floorAmazonProgress.get(key);
@@ -4422,7 +4422,7 @@ async function fetchFloorGameSales(product, request) {
     const page = pages[i], data = pageData[i];
     if (!data) continue;
     const own = String(page.id) === String(product.id), baseOwn = standard && String(page.id) === String(standard.id);
-    if (own) gamestopUrl = data.gamestopUrl || null;
+    if (own) { gamestopUrl = data.gamestopUrl || null; product.catalogBarcodes = data.barcodes || []; }
     if (baseOwn) standardUrl = data.gamestopUrl || null;
     sources.push({ id: String(page.id), name: page['product-name'] });
     for (const condition of conditions) for (const sale of data.sales?.[condition] || []) {
@@ -4510,6 +4510,11 @@ async function fetchFloorProductSales(product, request = pcReadRequest) {
   return { sales, salesNotes, salesSources: sources, salesError, gamestopUrl };
 }
 
+function floorCatalogBarcodes(product) {
+  return [...new Set([product?.upc, product?.ean, ...(product?.catalogBarcodes || [])]
+    .flatMap(value => String(value || '').split(/[,\s]+/)).filter(value => /^\d{8,14}$/.test(value)))];
+}
+
 async function loadFloorSales(product) {
   const cur = floorCur;
   const id = String(product.id);
@@ -4527,6 +4532,9 @@ async function loadFloorSales(product) {
   // this same request; stock checking and sales review can begin immediately.
   const primary = request('pc/sales', { id }).then(data => {
     if (floorCur !== cur) return;
+    const previousCodes = floorCatalogBarcodes(product).join(',');
+    product.catalogBarcodes = data.barcodes || [];
+    if (amazonSet && !cur.fullLoading && previousCodes !== floorCatalogBarcodes(product).join(',')) loadFloorAmazon();
     cur.sales = data.sales;
     cur.gamestopUrl = data.gamestopUrl || null;
     loadFloorGameStopStock(cur);
@@ -5418,9 +5426,15 @@ function floorListingMetadataTitle(title, product) {
     /\b(?:shooter|action|simulation|strategy|rpg)\s*,\s*(?:E10\+|E|T|M)(?=\s*[,(-]|$)/gi,
     /\b(?:online\s+)?multi[ -]?player\b/gi];
   phrases.push(/\bfighting\s+game\b/gi, /\bfighting(?=\s+(?:19|20)\d{2}\b)/gi,
-    /\bunreal\s+engine\b/gi, /\bonline\s+play(?:\s+[ETM]\b)?/gi);
+    /\bunreal\s+engine\b/gi, /\bonline\s+play(?:\s+[ETM]\b)?/gi,
+    /\bsurvival\s+horror\b/gi, /\bshoot\s*['’]?em\s+up\b/gi,
+    /\bsave\s*[£$€](?:s|\d+(?:\.\d{2})?)\b/gi);
   if (/\bxbox\b/i.test(title)) phrases.push(/\bsmart\s+delivery(?:\s*[,\-]?\s*E\b)?/gi);
   for (const re of phrases) if (!new RegExp(re.source, 'i').test(name)) title = String(title).replace(re, ' ');
+  // A clearly labelled language list is packaging metadata, not a list of
+  // games. Retain the language names for region/language checks below.
+  title = String(title).replace(/\b(game\s+in|languages?)\s+((?:english|fran[cç]ais|french|german|de|spanish|es|italian|it)(?:\s*[/,|]\s*(?:english|fran[cç]ais|french|german|de|spanish|es|italian|it))+)(?=\s|[).]|$)/gi,
+    (_, label, list) => `${label === 'languages' ? 'language' : label} ${list.split(/\s*[/,|]\s*/).map(word => ({ francais: 'french', français: 'french', de: 'german', es: 'spanish', it: 'italian' }[word.toLowerCase()] || word)).join(' ')}`);
   // Distributor credit, delimited from the product name; not arbitrary prefixes.
   if (!/^U\s+(?:and|&)\s+I\s+Entertainment\b/i.test(name)) {
     title = String(title).replace(/^\s*U\s+(?:and|&)\s+I\s+Entertainment\b\s*[-:–]?\s*/i, '');
@@ -5541,7 +5555,13 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
 
 function floorAmazonMismatch(cur) {
   if (!cur.amazon?.found) return null;
-  const mismatch = floorListingMismatch(cur.amazon.title, cur.product);
+  // An exact catalog GTIN can supply a missing region label, never override
+  // conflicting title/region/edition evidence or substitute for platform proof.
+  const barcode = value => /^\d{8,14}$/.test(String(value || '')) ? String(value).padStart(14, '0') : '';
+  const selectedCodes = floorCatalogBarcodes(cur.product).map(barcode);
+  const sameBarcode = (cur.amazon.barcodes || []).some(code => selectedCodes.includes(barcode(code)));
+  const regionEvidence = sameBarcode && floorAmazonPlatformConfirmed(cur.amazon, cur.product) ? cur.product['console-name'] : '';
+  const mismatch = floorListingMismatch(cur.amazon.title, cur.product, regionEvidence);
   if (mismatch) return mismatch;
   if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);

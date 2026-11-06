@@ -23,6 +23,36 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('PAL catalog barcode confirms missing region without admitting wrong games or regions', async () => {
+    const p = {'product-name':'Alien Isolation','console-name':'PAL Playstation 4',upc:'5055277024889',catalogBarcodes:['5055277024889','5055277023776']};
+    const c = {...candidate('B00HQCQ1RQ','Alien: Isolation (PS4)',['PlayStation 4']),barcodes:['05055277023776']};
+    const e=engine(async(route,params)=> route==='amazon/catalog' ? {candidates:[c]} : {...offer(c,2294),offers:[{price:2294,sub:'new'}]});
+    e.ctx.p=p;e.ctx.c=c;
+    assert.equal(e.run('floorAmazonCandidateMismatch(c,p,"new",true)'),null);
+    assert.ok(e.run('floorAmazonCandidateMismatch({...c,barcodes:[]},p,"new",true)'));
+    assert.ok(e.run('floorAmazonCandidateMismatch({...c,barcodes:["5055277023000"]},p,"new",true)'));
+    for(const title of ['Alien Isolation PS4 USA ESRB','Alien Isolation Nostromo Edition PS4','Aliens Fireteam Elite PS4','Alien Isolation Xbox One','Alien Isolation PS4 + Alien Resurrection']) {
+      e.ctx.c={...c,title};assert.ok(e.run('floorAmazonCandidateMismatch(c,p,"new",true)'),title);
+    }
+    const result=await e.fetch(p,'new');
+    e.ctx.result=result;
+    assert.equal(e.run('floorAmazonLowest({product:p,condition:"new",amazon:result})'),2294,'barcode survives catalog, offers and final price validation');
+  });
+  await test('genre, labelled languages and currency savings are not extra games', async () => {
+    const e=engine(async()=>({candidates:[]}));
+    e.ctx.p={'product-name':'Alien Isolation','console-name':'PAL Playstation 4'};
+    for(const title of ['SEGA Alien: Isolation Survival Horror PS4 PEGI 18 PAL 2014 Online new & sealed',
+      'ALIEN ISOLATION PS4 UK NEW (GAME IN ENGLISH/FRANCAIS/DE/ES/IT)',
+      "Alien: Isolation (PS4) PEGI 18+ Shoot 'Em Up ***NEW*** FREE Shipping, Save £s"]) {
+      e.ctx.title=title;assert.equal(e.run('floorListingMismatch(title,p,"PAL Playstation 4")'),null,title);
+    }
+    for(const title of ['Alien Isolation PS4 PAL & Alien Resurrection','Alien Isolation PS4 PAL, Halo/Portal',
+      'Alien Isolation Survival Horror PS4 PAL, Fallout4','Alien Isolation Nostromo Edition PS4 PAL']) {
+      e.ctx.title=title;assert.ok(e.run('floorListingMismatch(title,p,"PAL Playstation 4")'),title);
+    }
+    e.ctx.p={'product-name':'Survival Horror','console-name':'Playstation 4'};
+    assert.ok(e.run('floorListingMismatch("Alien Isolation PS4",p)'),'selected title words are not erased');
+  });
   await test('controller matching rejects compatibility accessories and wrong Elite generations across sources', async () => {
     const e=engine(async()=>({candidates:[]}));
     const p={'product-name':'Xbox One Elite Wireless Controller','console-name':'Xbox One','loose-price':5520};

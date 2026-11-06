@@ -388,6 +388,19 @@ function pc_gamestop_url(string $html): ?string {
   return count($urls) === 1 ? array_values($urls)[0] : null;
 }
 
+function pc_catalog_barcodes(string $html): array {
+  $codes = [];
+  if (!preg_match('#<[^>]+id=["\']full_details["\'][^>]*>(.*?)</table>#si', $html, $section)) return [];
+  preg_match_all('#<tr\b[^>]*>(.*?)</tr>#si', $section[1], $rows);
+  foreach ($rows[1] as $row) {
+    if (!preg_match('#<td\b[^>]*>\s*(?:UPC|EAN\s*/\s*GTIN|EAN|GTIN):\s*</td>\s*<td\b[^>]*>(.*?)</td>#si', $row, $m)) continue;
+    foreach (preg_split('/[,\s]+/', trim(strip_tags($m[1]))) as $code) {
+      if (preg_match('/^\d{8,14}$/', $code)) $codes[] = $code;
+    }
+  }
+  return array_values(array_unique($codes));
+}
+
 // Floor pricing: the recent sold listings on a game's public PriceCharting page (the API has no
 // sales data). One page read covers Loose, CIB, and New; it's cached for SALES_CACHE_SECONDS.
 // If PriceCharting changes their page, this returns no sales and staff use the page link instead.
@@ -395,7 +408,7 @@ function pc_sales(string $id): void {
   if (!preg_match('/^\d{1,10}$/', $id)) fail(400, 'Pass a PriceCharting product id.');
   $cacheDir = data_path('cache');
   if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700);
-  $cacheFile = $cacheDir . '/sales-v2-' . $id . '.json';
+  $cacheFile = $cacheDir . '/sales-v3-' . $id . '.json';
   if (is_file($cacheFile) && time() - filemtime($cacheFile) < SALES_CACHE_SECONDS) respond_raw(200, (string)file_get_contents($cacheFile));
 
   // Same one-at-a-time gap as the API calls, so a busy pricing session can't hammer their site.
@@ -412,7 +425,7 @@ function pc_sales(string $id): void {
   if ($status === 0) fail(502, 'Could not reach PriceCharting: ' . $error);
   if ($status !== 200) fail(502, "PriceCharting returned HTTP $status.");
 
-  $out = ['status' => 'success', 'sales' => [], 'gamestopUrl' => pc_gamestop_url($html)];
+  $out = ['status' => 'success', 'sales' => [], 'barcodes' => pc_catalog_barcodes($html), 'gamestopUrl' => pc_gamestop_url($html)];
   foreach (['loose' => 'used', 'cib' => 'cib', 'new' => 'new'] as $cond => $cls) {
     $list = [];
     if (preg_match('#<div class="completed-auctions-' . $cls . '"[^>]*>(.*?)</table>#s', $html, $m)) {
@@ -527,6 +540,19 @@ function amazon_candidate(array $item): array {
     }
   }
   $asin = (string)($item['asin'] ?? '');
+  $barcodes = [];
+  foreach ((array)($item['attributes']['externally_assigned_product_identifier'] ?? []) as $a) {
+    if (isset($a['marketplace_id']) && $a['marketplace_id'] !== AMZ_MARKETPLACE) continue;
+    if (in_array(strtolower((string)($a['type'] ?? '')), ['upc', 'ean', 'gtin'], true)
+      && preg_match('/^\d{8,14}$/', (string)($a['value'] ?? ''))) $barcodes[] = (string)$a['value'];
+  }
+  foreach ((array)($item['identifiers'] ?? []) as $group) {
+    if (($group['marketplaceId'] ?? '') !== AMZ_MARKETPLACE) continue;
+    foreach ((array)($group['identifiers'] ?? []) as $id) {
+      if (in_array(strtolower((string)($id['identifierType'] ?? '')), ['upc', 'ean', 'gtin'], true)
+        && preg_match('/^\d{8,14}$/', (string)($id['identifier'] ?? ''))) $barcodes[] = (string)$id['identifier'];
+    }
+  }
   // Do not use brand: Nintendo can be the console brand on third-party games.
   // Prefer explicit publisher metadata, then the game's catalog manufacturer.
   $publishers = []; $publisherSource = null;
@@ -541,6 +567,7 @@ function amazon_candidate(array $item): array {
     if ($values) { $publishers = array_values(array_unique($values)); $publisherSource = 'amazon-' . $field; break; }
   }
   return ['asin' => $asin, 'title' => cut_text((string)($summary['itemName'] ?? ''), 512),
+    'barcodes' => array_values(array_unique($barcodes)),
     'publishers' => $publishers, 'publisherSource' => $publisherSource,
     'platforms' => array_values(array_unique($platforms)), 'url' => 'https://www.amazon.com/dp/' . rawurlencode($asin)];
 }
@@ -548,7 +575,7 @@ function amazon_candidate(array $item): array {
 function amazon_cache_file(array $keys, string $kind, array $query): string {
   $dir = data_path('cache');
   if (!is_dir($dir)) @mkdir($dir, 0700);
-  return $dir . '/amz-' . ($kind === 'offers' ? 'v4' : 'v3') . '-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
+  return $dir . '/amz-' . ($kind === 'offers' ? 'v5' : 'v4') . '-' . $kind . '-' . sha1(json_encode([$query, AMZ_MARKETPLACE, !empty($keys['sandbox']), $keys['refreshToken']])) . '.json';
 }
 
 function amazon_cached(string $file): ?array {
@@ -576,12 +603,12 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
   if ($asin === '' && $upc === '' && (strlen(trim($q)) < 2 || strlen($q) > 240)) fail(400, 'Pass a title/platform search (2–240 characters).');
   if ($upc !== '' && !preg_match('/^\d{8,14}$/', $upc)) fail(400, 'Pass a valid UPC.');
   if ($upc !== '' && $q !== '') fail(400, 'Search by UPC or title, not both.');
-  $query = ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes'];
+  $query = ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes,identifiers'];
   $path = '/catalog/2022-04-01/items';
   if ($asin !== '') $path .= '/' . rawurlencode($asin);
   else {
     $query['pageSize'] = 20;
-    if ($upc !== '') { $query['identifiers'] = $upc; $query['identifiersType'] = 'UPC'; }
+    if ($upc !== '') { $query['identifiers'] = $upc; $query['identifiersType'] = strlen($upc) === 14 ? 'GTIN' : (strlen($upc) === 13 || strlen($upc) === 8 ? 'EAN' : 'UPC'); }
     else { $query['keywords'] = trim($q); $query['keywordsLocale'] = 'en_US'; }
     if ($pageToken !== '') $query['pageToken'] = $pageToken;
   }
@@ -605,7 +632,7 @@ function amazon_catalog_items(array $keys, string $upc = '', string $q = '', str
     // identity in offer checks instead of fetching the same ASIN metadata again.
     foreach ($candidates as $candidate) {
       $identityFile = amazon_cache_file($keys, 'catalog-v3', ['/catalog/2022-04-01/items/' . $candidate['asin'],
-        ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes']]);
+        ['marketplaceIds' => AMZ_MARKETPLACE, 'includedData' => 'summaries,attributes,identifiers']]);
       @file_put_contents($identityFile, json_encode(['status' => 'success', 'candidates' => [$candidate], 'more' => false, 'nextToken' => '']), LOCK_EX);
     }
     return $out;
@@ -636,7 +663,7 @@ function amazon_offer_output(array $item, string $condition, array $payload): ar
   }
   usort($offers, static fn($a, $b) => $a['price'] <=> $b['price']);
   return ['status' => 'success', 'found' => true, 'condition' => $condition, 'asin' => $item['asin'],
-    'title' => $item['title'], 'platforms' => $item['platforms'], 'url' => 'https://www.amazon.com/dp/' . rawurlencode($item['asin']),
+    'title' => $item['title'], 'platforms' => $item['platforms'], 'barcodes' => $item['barcodes'] ?? [], 'url' => 'https://www.amazon.com/dp/' . rawurlencode($item['asin']),
     'publishers' => $item['publishers'] ?? [], 'publisherSource' => $item['publisherSource'] ?? null,
     'count' => (int)($payload['Summary']['TotalOfferCount'] ?? count($offers)), 'lowest' => $offers[0]['price'] ?? null, 'offers' => $offers,
     'msrp' => $msrp, 'msrpSource' => $msrp !== null ? 'amazon-list-price' : null];

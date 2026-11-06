@@ -41,6 +41,17 @@ try {
     check(count($catalog['candidates']) === 2, 'Keep all UPC candidates');
     check($catalog['candidates'][0]['title'] === 'Final Fight - Super Nintendo', 'Use US summary');
     check($catalog['candidates'][0]['platforms'] === ['Super Nintendo'], 'Keep US structured platform');
+    $barcodeItem = $item;
+    $barcodeItem['attributes']['externally_assigned_product_identifier'] = [
+        ['type'=>'ean','value'=>'5055277023776','marketplace_id'=>AMZ_MARKETPLACE],
+        ['type'=>'ean','value'=>'1111111111111','marketplace_id'=>'OTHER'],
+        ['type'=>'isbn','value'=>'2222222222222'], ['type'=>'upc','value'=>'invalid']];
+    $barcodeItem['identifiers'] = [
+        ['marketplaceId'=>AMZ_MARKETPLACE,'identifiers'=>[['identifierType'=>'GTIN','identifier'=>'05055277023776']]],
+        ['marketplaceId'=>'OTHER','identifiers'=>[['identifierType'=>'EAN','identifier'=>'3333333333333']]]];
+    $barcodeCandidate = amazon_candidate($barcodeItem);
+    check($barcodeCandidate['barcodes'] === ['5055277023776','05055277023776'], 'Keep valid marketplace product identifiers only');
+    check(amazon_offer_output($barcodeCandidate, 'New', [])['barcodes'] === $barcodeCandidate['barcodes'], 'Offers preserve exact catalog identifiers');
     check($catalog['candidates'][0]['publishers'] === ['Capcom'] && $catalog['candidates'][0]['publisherSource'] === 'amazon-manufacturer', 'Keep game manufacturer, not Nintendo platform brand');
     $publisherItem = $item;
     $publisherItem['attributes']['publisher'] = [['value'=>'Nintendo','marketplace_id'=>AMZ_MARKETPLACE],['value'=>'Ubisoft','marketplace_id'=>'OTHER']];
@@ -54,12 +65,16 @@ try {
     amazon_catalog_items(amazon_keys(), '123456789012'); check(count($calls) === 1, 'Catalog cache');
     amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo');
     check($calls[1][1]['keywords'] === 'Final Fight Super Nintendo' && !isset($calls[1][1]['identifiers']), 'Keyword fallback query');
-    check($calls[1][1]['pageSize'] === 20 && $calls[1][1]['includedData'] === 'summaries,attributes', 'Bounded catalog evidence');
+    check($calls[1][1]['pageSize'] === 20 && $calls[1][1]['includedData'] === 'summaries,attributes,identifiers', 'Bounded catalog evidence');
     amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', 'more');
     check($calls[2][1]['pageToken'] === 'more' && $calls[2][1]['pageSize'] === 20, 'Forward next token without changing page size');
     $pageCalls = count($calls);
     amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', 'more');
     check(count($calls) === $pageCalls, 'Cache pages separately');
+    foreach (['5055277023776'=>'EAN','05055277023776'=>'GTIN'] as $code => $kind) {
+        amazon_catalog_items(amazon_keys(), (string)$code);
+        check($calls[count($calls)-1][1]['identifiersType'] === $kind, 'Correct identifier type for import barcode');
+    }
     foreach ([str_repeat('x', 2049), "bad\ntoken"] as $token) {
         check(response(fn() => amazon_catalog_items(amazon_keys(), '', 'Final Fight Super Nintendo', '', $token))->status === 400, 'Reject malformed page tokens');
     }

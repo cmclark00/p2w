@@ -22,4 +22,8 @@ foreach (['https://www.gamestop.com/search/?q=game', 'https://gamestop.com.evil.
   check(pc_gamestop_url(row($bad)) === null, 'Reject search or invalid destination: ' . $bad);
 }
 check(pc_gamestop_url('') === null, 'No match remains unavailable');
+// The same public page supplies additional product identifiers omitted by the API.
+$barcodes = '<tr itemprop="identifier"><td class="title">EAN / GTIN:</td><td class="details" itemprop="value">5055277024889,5055277023776</td></tr>';
+check(pc_catalog_barcodes('<div id="full_details"><table>' . $barcodes . '</table></div>') === ['5055277024889','5055277023776'], 'Keep both catalog barcodes');
+check(pc_catalog_barcodes('<table>' . $barcodes . '</table><div id="full_details"><table><tr><td>ePID (eBay):</td><td>123456789012</td></tr></table></div>') === [], 'Never borrow identifiers from ads, sales or another identifier type');
 echo "GameStop product-link extraction checks passed.\n";
