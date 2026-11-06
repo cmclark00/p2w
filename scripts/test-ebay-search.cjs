@@ -57,13 +57,14 @@ assert.equal(result(base()).b.basis, 4612, 'Recovered sale includes known shippi
 assert.equal(result(base()).r.price, 4500, 'Total follows unchanged rounding');
 assert.equal(result(base()).b.basis, 4612, 'Repeated pricing does not add shipping again');
 assert.equal(invoke(ctx, 'floorEbayResult', rows(base())[0], product, { id:sold.id, title:sold.title, state:'sold', price:4000 }, 'cib').state, 'sold', 'Original-item checks compare item price, not delivered total');
-assert.equal(rows(base())[0].verification.state, 'sold');
+assert.equal(rows(base())[0].verification.state, 'search');
 assert.equal(invoke(ctx,'floorEbayResult',rows(base())[0],product,{id:sold.id,title:sold.title,state:'sold',price:4000,sellerCountry:'Rome, Italy',locationSource:'ebay-located-in'},'cib').state,'location');
 const foreignCheck=base();foreignCheck.ebayChecks={results:{[sold.id]:{state:'location',sellerCountry:'Italy',locationSource:'ebay-located-in'}}};
 assert.equal(rows(foreignCheck)[0].odd,true,'Original-item overseas evidence overrides a sold search card');
-assert.equal(invoke(ctx, 'floorEbayCandidates', base(), 2).length, 0, 'Positive sold cards do not need redundant item tabs');
+assert.equal(invoke(ctx, 'floorEbayCandidates', base(), 2).length, 1, 'Price-driving search card needs an original-item check');
 const prior = base(); prior.ebayChecks = { results: { [sold.id]: { state: 'ended' } } };
-assert.equal(rows(prior)[0].verification.state, 'sold', 'Dated sold result is stronger than generic archived ended status');
+assert.equal(rows(prior)[0].verification.state, 'ended', 'Original-item check overrides search status');
+assert.equal(rows(prior)[0].odd, true);
 prior.ebayChecks.results[sold.id] = { state: 'offer' };
 assert.equal(rows(prior)[0].odd, true, 'Known hidden accepted price remains excluded');
 for (const change of [{ title: 'The Order 1886 PS4 Collectors Edition Statue' }, { title: 'The Order 1886 PS4 Steelbook Case Only No Game' },
@@ -155,6 +156,15 @@ const flush = () => new Promise(r => setImmediate(r));
   }});
   assert.deepEqual(pageCalls,[1,2]);assert.equal(paged.directEbay.result.stoppedAtMatch,true);assert.equal(paged.directEbay.result.partial,false,'Unread lower pages are not a failure after a sorted match');
   assert.equal(invoke(ctx,'floorSearchReviewWarnings',paged).length,0,'Intentional stopping has no warning');
+  const rejected = paged.directEbay.result.sales.find(s => s.conditionText === 'Pre-Owned' && !s.title.includes('Bundle'));
+  paged.ebayChecks = { results: { [rejected.id]: { state:'ended', confirmedUnsold:true } } };
+  const resumedPages=[];
+  await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async(q,page)=>{
+    resumedPages.push(page);return {...ready([comp(4,'Pre-Owned','WWE 2K20 PS4 CIB')]),page,more:true};
+  }});
+  assert.deepEqual(resumedPages,[3],'Rejected page candidates resume at the next page without restarting');
+  assert.ok(paged.directEbay.result.sales.some(s=>s.id===rejected.id),'Rejected evidence remains reviewable');
+  await invoke(ctx,'runFloorEbaySearch',paged,()=>{},()=>false,{search:async()=>{throw Error('Must stop with an eligible candidate');}});
   for (const [mode, label] of [['location','Seller location unknown'], ['shipping','Shipping unknown'],
     ['skipped','Some results unreadable'], ['partial','Search details need review']]) {
     const c=searchCur();let readCount=0;

@@ -36,6 +36,9 @@ assert.equal(parse({location:'Located in: Rome, Italy'}).locationSource,'ebay-lo
 assert.equal(parse({location:'Delivery to Italy'}).sellerCountry,undefined);
 assert.equal(parse({ price: 'US $1,300.00' }).price, 130000);
 assert.equal(parse({ status: 'This listing has ended.' }).state, 'ended');
+assert.equal(parse({ status: 'This listing has ended.' }).confirmedUnsold, undefined);
+const sellerEnded = 'This listing was ended by the seller on Tue, Oct 27 at 12:23 AM because the item is no longer available.';
+assert.equal(parse({ status: sellerEnded }).confirmedUnsold, true);
 assert.equal(parse({ offer: true }).state, 'offer', 'SOLD badge must not override accepted offer');
 assert.equal(parse({ strike: true }).state, 'offer');
 assert.equal(parse({ hiddenStrike: true }).state, 'sold', 'Hidden/unrelated old prices do not exclude a sale');
@@ -47,12 +50,14 @@ for (const url of ['https://evil.test/itm/404870222598', 'https://www.ebay.com/i
 function archivedCard(status = 'Ended', hidden = false, missingTitle = false) {
   const card = el('', !hidden);
   card.querySelector = selector => selector.includes('__title') ? (missingTitle ? null : el('Road Redemption - Sony PlayStation 4', !hidden)) : el(status, !hidden);
-  return { querySelector: selector => selector === '.x-vi-evo-cvip-container--condensed .x-item-condensed-card' ? card : null };
+  return { querySelectorAll: () => [], querySelector: selector => selector === '.x-vi-evo-cvip-container--condensed .x-item-condensed-card' ? card : null };
 }
 reader.doc = archivedCard(); reader.href = 'https://www.ebay.com/itm/167370273675?nordt=true&rt=nc';
 const archivedRead = () => vm.runInContext('readEbaySale(doc, "167370273675", href)', reader);
 assert.equal(archivedRead().state, 'ended');
 assert.equal(archivedRead().title, 'Road Redemption - Sony PlayStation 4');
+reader.doc.querySelectorAll = () => [el(sellerEnded)];
+assert.equal(archivedRead().confirmedUnsold, true, 'Seller-ended banner survives condensed archive layout');
 for (const [status, hidden, missingTitle] of [['Sold', false, false], ['Ended', true, false], ['Ended', false, true], ['123 sold', false, false]]) {
   reader.doc = archivedCard(status, hidden, missingTitle);
   assert.equal(archivedRead().state, 'unknown');
@@ -113,12 +118,16 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   pending[1].resolve(result(pending[1], { id: '999999999999' })); assert.equal((await two).state, 'unknown');
   pending[2].resolve(result(pending[2])); assert.equal((await three).price, 1800); await flush();
   assert.equal((await check('404870222598')).state, 'offer'); assert.equal(created.length, 3, 'Cache prevents re-opening checked listings');
+  const endedCheck = check('137429791286'); await flush();
+  pending.at(-1).resolve(result(pending.at(-1), { state: 'ended', confirmedUnsold: true }));
+  assert.equal((await endedCheck).confirmedUnsold, true, 'Worker forwards explicit seller-ended evidence');
+  await flush();
   const timed = check('404870222601'); await flush(); for (const timer of [...watchdogs]) timer();
   assert.equal((await timed).state, 'unknown'); await flush(); assert.equal(watchdogs.size, 0);
-  const closed = check('404870222602'); await flush(); removedHandler(14);
+  const closed = check('404870222602'); await flush(); removedHandler(15);
   assert.equal((await closed).state, 'unknown'); await flush();
   const abandoned = check('404870222603'); await flush(); removedHandler(1); await flush();
-  assert.ok(removed.includes(15), 'Closing requesting page cancels its temporary tabs');
+  assert.ok(removed.includes(16), 'Closing requesting page cancels its temporary tabs');
   void abandoned;
   const listeners = new Set();
   const pageWindow = { addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn),

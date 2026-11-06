@@ -15,6 +15,36 @@ const check = (c, index, helper, progress = () => {}, cancel = () => false) => i
 const result = c => invoke('floorResult', c);
 const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => ({ id, price, title, state });
 (async () => {
+  // Search SOLD cards are candidates, not original-page confirmations. Read the
+  // highest first, then pairs; stop once the highest remaining driver is sold.
+  const direct = cur(product, []);
+  direct.directEbay = { result: { state:'ready', sales:[9499,8672,6088,5999].map((price,i)=>({
+    ...sale(price,String(137429791286+i)), id:String(137429791286+i), state:'sold', shipping:0,
+    date:'2026-07-15', conditionText:'Pre-Owned', sellerCountry:'United States', locationSource:'ebay-located-in'
+  })) } };
+  direct.product = { ...product, 'cib-price':5520 };
+  const directCalls=[];
+  const directHelper = { targetedAvailable:async()=>true, checkTargeted:async url=>{
+    const s=direct.directEbay.result.sales.find(s=>s.url===url);directCalls.push(s.price);
+    return { ...verified(s.id,s.price,s.title,s.price===9499?'ended':'sold'), confirmedUnsold:s.price===9499 };
+  }};
+  await invoke('runFloorTargetedEbay',direct,()=>{},()=>false,directHelper);
+  assert.deepEqual(directCalls,[9499,8672,6088]);
+  assert.equal(result(direct).b.basis,8672);
+  assert.equal(invoke('floorSales',direct)[0].odd,true,'Search status cannot restore seller-ended listing');
+  assert.equal(invoke('floorSales',direct)[0].verification.confirmedUnsold,true);
+  await invoke('runFloorTargetedEbay',direct,()=>{},()=>false,directHelper);
+  assert.equal(directCalls.length,3,'Re-renders never recheck or read below the confirmed driver');
+  const firstReal=cur(product,[]);firstReal.directEbay=direct.directEbay;
+  firstReal.product=direct.product;
+  let firstCalls=0;
+  await invoke('runFloorTargetedEbay',firstReal,()=>{},()=>false,{
+    targetedAvailable:async()=>true,checkTargeted:async()=>{firstCalls++;return verified('137429791286',9499);}
+  });
+  assert.equal(firstCalls,1,'Highest confirmed search sale stops immediately');
+  const sellerArchive=cur(product,[{...sale(4000,'137429791286'),date:'2023-07-15'}]);
+  sellerArchive.ebayChecks={results:{'137429791286':{state:'ended',confirmedUnsold:true}}};
+  assert.equal(invoke('floorSales',sellerArchive)[0].odd,true,'Explicit seller-ended PC evidence cannot use slow-seller exception');
   const c = cur(); let requests = [], release;
   const helper = { available: async () => true, check: url => { requests.push(url); return new Promise(r => { release = r; }); } };
   const task = check(c, 0, helper); await new Promise(r => setTimeout(r, 10));

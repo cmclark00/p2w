@@ -19,6 +19,7 @@ async function finishEbay(job, result) {
     && typeof result.title === 'string' && result.title.length > 0 && result.title.length < 500
     && (result.state !== 'sold' || Number.isSafeInteger(result.price) && result.price > 0 && result.price < 100000000);
   const value = valid ? { state: result.state, id: job.target.id, title: result.title,
+    ...(result.state === 'ended' && result.confirmedUnsold === true ? { confirmedUnsold: true } : {}),
     ...(result.conditionText ? { conditionText: String(result.conditionText).slice(0, 100) } : {}),
     ...(result.sellerCountry && result.locationSource === 'ebay-located-in' ? { sellerCountry: String(result.sellerCountry).slice(0, 120), locationSource: 'ebay-located-in' } : {}),
     price: result.state === 'sold' ? result.price : null, source: 'browser-helper', checkedAt: Math.floor(Date.now() / 1000) } : ebayUnknown();

@@ -888,7 +888,7 @@ The site's **only server-side code**. Everything else is static.
     guide. No separate Recheck button, duplicate sales-row install prompt, Store
     promotion or managed-enrollment flow. Update needed expands the same guide.
     Connection checks run on entering Floor Pricing and window focus; ready requires
-    1.1.10+ and protocol 2/targeted/search/pagination/location/searchRetry capabilities. No response says Not connected, not
+    1.1.11+ and protocol 2/targeted/search/pagination/location/searchRetry capabilities. No response says Not connected, not
     uninstalled. Staff extract to a permanent folder, Load unpacked once, then replace
     files and Reload the extension for later updates. Keep only one copy enabled.
     `helper-setup.html` is a short shareable manual guide; `helper.html` retains the
@@ -970,8 +970,9 @@ The site's **only server-side code**. Everything else is static.
     other North American countries remain eligible with their full shipping.
     High postage is not an origin proxy. Missing location stays unknown/reviewable,
     and known overseas results cannot stop pagination. Original-item verification
-    compares item price, not the delivered total. A search card can resolve generic archived Ended/unknown status;
-    explicit offer/price/identity conflicts retain exclusions/review. Conditions need
+    compares item price, not the delivered total. Search cards are labeled Sold shown
+    in search; the original-item check takes precedence over search evidence,
+    including ended, offer, price, identity and unreadable results. Conditions need
     title/grade evidence (New Other is not sealed; opened figures remain loose).
     Owner clarification Oct. 27: matching used games, including explicit loose/disc-only
     or unspecified packaging, may support a higher CIB price. The reverse remains
@@ -979,7 +980,9 @@ The site's **only server-side code**. Everything else is static.
     Both search links and helper queries use short platform names (e.g. PS4), with
     title/edition identity but no complete/CIB/loose adjectives added to the query.
     Merge by original eBay ID before existing matching/outlier/premium/rounding logic;
-    direct cards need no redundant item checks. Search state is separate from PC sales
+    direct cards that drive pricing receive original-item checks, highest first.
+    If all candidates fail, resume the next search page without repeating earlier
+    pages; stop once the highest eligible driver is confirmed. Search state is separate from PC sales
     so delayed PC loads cannot overwrite it. Conditions reuse cached pages but each condition searches until its own match. No work
     in bulk audits. Capabilities search:1/pagination:1/location:1 gate new messages; older helpers prompt update.
     Search cache: 40 queries, 5 minutes; unknown 20 seconds. Queue max 3, one active;
@@ -1004,6 +1007,9 @@ The site's **only server-side code**. Everything else is static.
     the automatic baseline and a Needs review flag. Missing links behave the same.
     Older generic ended/unreadable PC archives follow the slow-seller exception
     above and skip automatic checks; they are never relabeled verified Sold.
+    Helper 1.1.11 preserves confirmedUnsold on explicit "ended by the seller"
+    banners in condensed and expanded originals. That evidence never receives
+    the historical exception. It does not infer unsold from a generic archive badge.
     Without the helper, provisional evidence
     remains unchanged with Needs review. A market-average fallback after exhausting
     sales also needs review. Manual optional checks retain their original behavior.

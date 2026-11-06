@@ -3805,7 +3805,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.10';
+const FLOOR_HELPER_RECOMMENDED = '1.1.11';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -4549,7 +4549,7 @@ async function loadFloorSales(product) {
   if (floorCur === cur) renderFloorPricer();
 }
 
-const FLOOR_EBAY_LABELS = { sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
+const FLOOR_EBAY_LABELS = { search: 'Sold shown in search — item not checked', sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
   price: 'Sale price differs — review', mismatch: 'eBay item does not match', location: 'Seller outside North America', unknown: 'Unverified — review manually', pending: 'Checking sale…', historical: 'Historical evidence — not verified' };
 function floorOutsideEbayWindow(sale, now = Date.now()) {
   const date = sale?.date;
@@ -4597,29 +4597,38 @@ function floorMergedSales(cur, pool) {
     if (condition && condition !== cur.condition && !cibUsedEvidence) continue;
     const shipping = Number.isSafeInteger(s.shipping) && s.shipping >= 0 ? s.shipping : null;
     merged.set(s.id, { ...s, sourcePcId: previous?.sourcePcId, sourcePcName: previous?.sourcePcName, sourcePcConsole: previous?.sourcePcConsole, itemPrice: s.price, shipping, price: s.price + (shipping || 0), directEbay: true, cibUsedEvidence, conditionUnknown: !condition && !cibUsedEvidence,
-      searchVerification: { state: s.state, price: s.price, checkedAt: result.checkedAt, source: 'ebay-search' } });
+      searchVerification: { state: s.state === 'sold' ? 'search' : s.state, price: s.price, checkedAt: result.checkedAt, source: 'ebay-search' } });
   }
   return [...merged.values()];
 }
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
   if (floorSwitchMsrpBasis(cur)) return; // A fixed MSRP price does not need sold-search tabs.
-  if (cur.directEbay?.condition === cur.condition || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
+  const previous = cur.directEbay;
+  const resume = (result, evidence) => result?.state === 'ready' && result.more && result.stoppedAtMatch
+    && !floorSales({ ...evidence, condition: cur.condition, directEbay: { result } })
+      .some(s => s.directEbay && !s.odd && !s.outlier && ['search', 'sold', 'pending'].includes(s.verification?.state));
+  const same = previous?.condition === cur.condition;
+  const resumeOwn = same && !previous.loading && resume(previous.result, cur);
+  const resumeStandard = same && !previous.loading && cur.standardGame && resume(previous.standard?.result, cur.standardGame);
+  if (same && !resumeOwn && !resumeStandard || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
   if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.8.' } }; return; }
   const condition = cur.condition;
-  const state = cur.directEbay = { condition, loading: true };
+  const state = cur.directEbay = { ...(same ? previous : {}), condition, loading: true };
   const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
   progress();
-  const read = async (product, evidence = {}) => {
+  const read = async (product, evidence = {}, seed = null) => {
     const query = floorEbaySearchQuery(product);
-    const rows = new Map(); let partial = false;
-    const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120' };
+    const rows = new Map((seed?.sales || []).map(s => [s.id, s])); let partial = !!seed?.partial;
+    const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120',
+      ...seed, issues: [...(seed?.issues || [])], retriedPages: [...(seed?.retriedPages || [])] };
+    delete result.stoppedAtMatch;
     const validPage = (value, page) => value?.state === 'ready' && Array.isArray(value.sales) && value.page === page && value.sorted === true;
     const validSales = value => value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
       && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
       && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
     const unreadable = value => !!value.partial || value.skipped > 0 || validSales(value).length !== value.sales.length;
-    for (let page = 1; page <= 50 && !stopped(); page++) {
+    for (let page = (seed?.pages || 0) + 1; page <= 50 && !stopped(); page++) {
       let value, recoveredSales;
       try { value = await helper.search(query, page); } catch (_) { value = null; }
       if (stopped()) return result;
@@ -4666,7 +4675,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       // Use the same identity, condition, offer and outlier rules as pricing.
       // Do not stop for a mismatched bundle, hidden offer, or unreadable condition.
       const candidates = floorSales({ ...evidence, product, condition, directEbay: { result } });
-      const matched = candidates.find(s => !s.odd && !s.outlier && s.verification?.state === 'sold');
+      const matched = candidates.find(s => !s.odd && !s.outlier && ['search', 'sold'].includes(s.verification?.state));
       // Do not infer a slow seller just because its first, highest-price page
       // has old listings. Continue until recent evidence or pagination resolves it.
       const olderPending = candidates.some(s => s.ageInfo?.pending || s.historicalInfo?.pending);
@@ -4688,15 +4697,15 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
     return { ...result, partial: true, reason: 'Search stopped at the pagination safety limit or was cancelled. Review remaining results.' };
   };
   try {
-    const found = await read(cur.product, cur);
+    const found = same && !resumeOwn ? previous.result : await read(cur.product, cur, resumeOwn ? previous.result : null);
     if (stopped()) return;
     const selected = cur.pick == null ? null : floorSales(cur).find(s => s.i === cur.pick);
     state.result = found;
     if (selected) cur.pick = floorSales(cur).find(s => floorSaleKey(s) === floorSaleKey(selected))?.i ?? null;
     if (stopped()) return;
     const standard = floorStandardGame(cur.product);
-    if (standard && state.result.state === 'ready') {
-      const base = await read(standard, cur.standardGame);
+    if (standard && state.result.state === 'ready' && (!same || resumeStandard)) {
+      const base = await read(standard, cur.standardGame, resumeStandard ? previous.standard.result : null);
       if (!stopped()) state.standard = { result: base };
     }
   } catch (_) { state.result = { state: 'unknown', sales: [], reason: 'Direct eBay search failed. Retry or review eBay manually.' }; }
@@ -4755,6 +4764,7 @@ function floorEbayResult(sale, product, result, condition) {
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
   if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
   return { state: result.state, price: result.price, checkedAt: result.checkedAt,
+    ...(result.state === 'ended' && result.confirmedUnsold === true ? { confirmedUnsold: true } : {}),
     ...(result.sellerCountry ? { sellerCountry: result.sellerCountry, locationSource: result.locationSource } : {}) };
 }
 async function verifyFloorEbaySale(cur, index, progress = () => {}, cancelled = () => false,
@@ -4956,10 +4966,9 @@ function floorSales(cur = floorCur) {
       || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
     const checked = cur.ebayChecks?.results[floorSaleKey(s)];
-    // A dated SOLD search card resolves generic ENDED/unreadable archives. Price/identity conflicts still need review.
-    let verification = !invalid ? s.searchVerification && checked && ['price', 'mismatch'].includes(checked.state)
-      ? { state: 'unknown', skipped: true, price: s.price } : ['offer', 'location'].includes(checked?.state) ? checked
-        : s.searchVerification || checked : null;
+    // Search cards discover candidates; the original item's check wins. In
+    // particular a SOLD search card cannot erase an ENDED or unreadable result.
+    let verification = !invalid ? checked || s.searchVerification : null;
     // An old generic Ended/unreadable archive is not proof it failed to sell.
     // Keep this provisional candidate separate from verified Sold evidence;
     // restoring an excluded check requires a completed, sparse search below.

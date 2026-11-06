@@ -1032,11 +1032,11 @@ test('audit mismatches cannot drive eBay or Amazon baselines', () => {
 test('helper status reports installed versions and capability readiness without claiming absent means uninstalled', () => {
   assert.equal(invoke('floorHelperStatusInfo', null).text, 'Not connected');
   const capability = { available: true, protocol: 2, targeted: 1, search: 1, pagination: 1, location: 1, searchRetry: 1 };
-  for (const version of ['1.1.10', '1.2.0', '2.0.0']) {
+  for (const version of ['1.1.11', '1.2.0', '2.0.0']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'connected'); assert.equal(status.text, `Connected · v${version}`);
   }
-  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.1.6', '1.1.8', '1.1.9', '1.0.99', undefined, '<script>']) {
+  for (const version of ['1.1.3', '1.1.4', '1.1.5', '1.1.6', '1.1.8', '1.1.9', '1.1.10', '1.0.99', undefined, '<script>']) {
     const status = invoke('floorHelperStatusInfo', { ...capability, version });
     assert.equal(status.state, 'update'); assert.ok(status.text.includes('Update needed'));
     assert.ok(!status.text.includes('<script>'));
