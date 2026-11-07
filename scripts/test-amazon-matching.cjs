@@ -817,7 +817,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     });
     const failedPartial = await failed.fetch(); assert.equal(failedPartial.incomplete,true); assert.match(failedPartial.searchError,/Later catalog page failed/);
     failed.ctx.result=failedPartial; failed.run('amazonSet=true');
-    const cur='{product,condition:"loose",sales:{loose:[{title:"Final Fight SNES",price:2000}]},amazon:result}';
+    const cur='{product,condition:"loose",sales:{loose:[{title:"Final Fight SNES Cartridge Only",price:2000}]},amazon:result}';
     assert.equal(failed.run(`floorResult(${cur}).r.price`),2000, 'partial Amazon cannot silently raise baseline');
     const html=failed.run(`floorAmazonHtml(${cur},{from:"sale"})`);
     assert.ok(html.includes('$25.00') && html.includes('reference only') && html.includes('Retry Amazon'));

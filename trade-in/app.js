@@ -3757,6 +3757,21 @@ function floorLoosePackagingMismatch(title, condition, product = null) {
       ? 'Printed inserts included — not loose' : null;
 }
 
+// A missing manual/poster is not evidence that the case is missing. PriceCharting's
+// Loose bucket and eBay's generic used grade can both contain boxed copies.
+function floorLooseConditionMismatch(title, condition, product) {
+  const packaging = floorLoosePackagingMismatch(title, condition, product);
+  if (packaging || condition !== 'loose' || !product || floorToyFamily(product) || floorIsHardware(product)) return packaging;
+  let text = ` ${norm(title)} `;
+  const name = norm(product['product-name']);
+  if (name) text = text.replace(` ${name} `, ' ');
+  if (/\bnot loose\b/.test(text)) return 'Loose condition unconfirmed — review';
+  const loose = /\b(?:loose|(?:disc|discs|disk|disks|cart|cartridge|game|umd) only|only (?:the )?(?:disc|disk|cart|cartridge|game|umd))\b/.test(text)
+    || /\b(?:no|without|missing) (?:the )?(?:original |retail |jewel |game )?(?:box|case|packaging)\b/.test(text)
+    || /\b(?:box|case|packaging)(?: and manual)? (?:is |are )?(?:not included|missing|absent)\b/.test(text);
+  return loose ? null : 'Loose condition unconfirmed — review';
+}
+
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
 // Amazon Used catalogs do not distinguish Loose/CIB; apply packaging checks to sold-item evidence only.
 function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging = true) {
@@ -4583,7 +4598,8 @@ function floorDirectCondition(sale, product) {
   if (/^(?:Brand New|New)$/i.test(grade)) return 'new';
   if (!/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(grade)) return null;
   if (floorToyFamily(product)) return floorFigureSaleCondition(sale, 'loose');
-  if (/\b(?:loose|(?:disc|disk|cart|cartridge) only|no (?:case|box|manual))\b/i.test(title)) return 'loose';
+  if (floorIsHardware(product) ? /\b(?:loose|(?:disc|disk|cart|cartridge) only|no (?:case|box|manual))\b/i.test(title)
+    : !floorLooseConditionMismatch(title, 'loose', product)) return 'loose';
   if (/\b(?:cib|complete|steel[ -]?book|with (?:case|box|manual)|w\/\s*(?:case|box|manual)|game and case|disc\s*\+\s*case)\b/i.test(title)) return 'cib';
   // A generic Pre-Owned/New (Other) label does not establish included packaging.
   return floorIsHardware(product) ? 'loose' : null;
@@ -4599,9 +4615,9 @@ function floorMergedSales(cur, pool) {
     // unspecified. This never admits sealed, broken, accessory-only or wrong-game evidence.
     const cibUsedEvidence = cur.condition === 'cib' && !floorToyFamily(cur.product) && !floorIsHardware(cur.product)
       && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText || '') && condition !== 'new';
-    // An otherwise valid PC row already supplies its condition category. A generic
-    // used grade adds sold evidence, but must not demote that row merely for brevity.
-    if (!condition && previous && cur.condition !== 'new' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
+    // CIB retains its higher-used-sale policy. A PC Loose category cannot
+    // establish missing packaging when the actual listing title is ambiguous.
+    if (!condition && previous && cur.condition === 'cib' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
       && !floorSaleListingMismatch(previous, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
     merged.delete(s.id); // The same eBay listing must not count twice or in the wrong condition.
     if (condition && condition !== cur.condition && !cibUsedEvidence) continue;
@@ -4774,6 +4790,7 @@ function floorEbayResult(sale, product, result, condition) {
   } else if (condition === 'new' && !SEALED_RE.test(result.title)) return { state: 'unknown' };
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
+  if (floorLooseConditionMismatch(result.title, condition, product)) return { state: 'unknown' };
   if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
   return { state: result.state, price: result.price, checkedAt: result.checkedAt,
     ...(result.state === 'ended' && result.confirmedUnsold === true ? { confirmedUnsold: true } : {}),
@@ -4974,7 +4991,7 @@ function floorSales(cur = floorCur) {
     rows.filter((s) => floorFigureSaleCondition(s, condition) === cur.condition)) : cur.sales?.[cur.condition] || [];
   const unique = floorMergedSales(cur, floorToyFamily(cur.product) ? [...new Map(pool.map((s) => [floorSaleKey(s), s])).values()] : pool);
   const sales = unique.map((s, i) => {
-    const mismatch = floorSaleListingMismatch(s, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product)
+    const mismatch = floorSaleListingMismatch(s, cur.product) || floorLooseConditionMismatch(s.title, cur.condition, cur.product)
       || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
     let checked = cur.ebayChecks?.results[floorSaleKey(s)];

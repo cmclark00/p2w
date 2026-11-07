@@ -950,8 +950,12 @@ The site's **only server-side code**. Everything else is static.
     (no box/manual, box not included) remains eligible. Product names are removed
     before checking packaging words. Included posters, maps, inserts and registration
     cards likewise cannot price Loose ("Printed inserts included — not loose");
-    explicit absence such as "no poster" remains eligible, and CIB keeps those pack-ins.
-    Original eBay verification uses the same check.
+    CIB keeps those pack-ins. `floorLooseConditionMismatch` additionally requires
+    positive Loose evidence (disc/cart/game/UMD only, loose, or missing case/box).
+    "No poster", "no manual" and generic tested titles do not establish Loose;
+    they remain under Condition / packaging for review, including PC Loose rows.
+    A shared PC category cannot promote an ambiguous direct eBay row. Original
+    eBay verification uses the same checks; ambiguous original titles stay unverified.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
 

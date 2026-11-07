@@ -852,12 +852,13 @@ test('boxed games cannot drive loose pricing, including the Splatterhouse 3 scre
   const boxed = 'Splatterhouse 3 Sega Genesis Authentic Cartridge And Box- Tested+works';
   const example = cur(product, { condition: 'loose', gamestopStock: { state: 'out', title: 'Splatterhouse 3 Sega Genesis' }, sales: { loose: [
     { title: boxed + ' See Proof', price: 17999 }, { title: boxed, price: 14500 },
-    ...[11999, 10999].map(price => ({ title: 'Splatterhouse 3 Sega Genesis 1993 Authentic Game Cartridge Tested Working!', price })),
+    ...[11999, 10999].map(price => ({ title: 'Splatterhouse 3 Sega Genesis 1993 Authentic Game Cartridge Only Tested Working!', price })),
     { title: 'Splatterhouse 3 (Sega Genesis, 1993)', price: 10500 },
   ] } });
   const rows = invoke('floorSales', example);
   assert.ok(rows.slice(0, 2).every(row => row.odd && row.mismatch === 'Box/manual included — not loose' && !row.outlier));
-  assert.ok(rows.slice(2).every(row => !row.odd));
+  assert.ok(rows.slice(2, 4).every(row => !row.odd));
+  assert.match(rows[4].mismatch, /Loose condition unconfirmed/);
   assert.equal(invoke('floorResult', example).b.basis, 11999);
   assert.equal(invoke('floorResult', example).r.price, 12000);
   for (const suffix of ['Cartridge And Box', 'Cart & Original Box', 'Cartridge + Box', 'Game w/Box', 'Game with original case',
@@ -896,6 +897,31 @@ test('printed pack-ins do not drive loose pricing but remain valid CIB evidence'
     assert.equal(invoke('floorLoosePackagingMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), null, suffix);
   const sale = { title, price: 17898, url: 'https://www.ebay.com/itm/407268457499' };
   assert.equal(invoke('floorEbayResult', sale, product, { id: '407268457499', title, state: 'sold', price: 17898 }, 'loose').state, 'mismatch');
+});
+
+test('loose games require explicit packaging evidence across PC, direct search and item checks', () => {
+  const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004 };
+  const title = 'PaRappa the Rapper PS1 No Poster Tested Working';
+  const url = 'https://www.ebay.com/itm/407322258475';
+  const example = cur(product, { condition: 'loose', sales: { loose: [
+    { title, price: 15934, url }, { title: 'PaRappa the Rapper PS1 Disc Only Tested', price: 10000 },
+  ] } });
+  assert.match(invoke('floorSales', example)[0].mismatch, /Loose condition unconfirmed/);
+  assert.equal(invoke('floorResult', example).b.basis, 10000);
+  const direct = { state: 'ready', sales: [{ id: '407322258475', title, url, price: 14999, shipping: 935, conditionText: 'Pre-Owned', state: 'sold' }] };
+  assert.match(invoke('floorSales', { ...example, directEbay: { result: direct } })[0].mismatch, /Loose condition unconfirmed/, 'PC category cannot confirm the matching direct row');
+  const checked = { id: '407322258475', title, state: 'sold', price: 15934 };
+  assert.equal(invoke('floorEbayResult', example.sales.loose[0], product, checked, 'loose').state, 'unknown');
+  for (const suffix of ['No Poster Tested Working', 'No Manual', 'Tested Working', 'Cartridge Tested', 'Disc Tested'])
+    assert.match(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), /unconfirmed/);
+  for (const suffix of ['Disc Only', 'Game Only', 'Loose', 'Cartridge Only', 'UMD Only', 'No Case', 'Without Original Box', 'Box and Manual Not Included', 'Disc Only No Poster'])
+    assert.equal(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), null, suffix);
+  for (const suffix of ['Disc Only With Case', 'Loose CIB', 'No Manual With Case', 'Game Only With Poster'])
+    assert.ok(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), suffix);
+  assert.equal(invoke('floorLooseConditionMismatch', title, 'cib', product), null);
+  assert.equal(invoke('floorLooseConditionMismatch', 'Bash', 'loose', { 'product-name': 'Bash', 'console-name': 'Skylanders' }), null);
+  assert.equal(invoke('floorLooseConditionMismatch', 'Xbox One Controller', 'loose', { 'product-name': 'Xbox One Controller', 'console-name': 'Xbox One', genre: 'Accessories' }), null);
+  assert.equal(invoke('floorSaleGroup', invoke('floorSales', example)[0]), 'condition');
 });
 
 test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
@@ -1002,7 +1028,7 @@ test('GBA Link to the Past includes Four Swords without treating it as a sequel 
     'Zelda Link to the Past and Four Swords GBA',
   ];
   for (const title of titles) {
-    const example = cur(product, { condition: 'loose', sales: { loose: [{ title, price: 5939 }] } });
+    const example = cur(product, { condition: 'loose', sales: { loose: [{ title: title + ' Cartridge Only', price: 5939 }] } });
     assert.equal(invoke('floorListingMismatch', title, product), null, title);
     assert.equal(invoke('floorSales', example)[0].odd, false, title);
     assert.equal(invoke('floorResult', example).b.basis, 5939, title);
@@ -2232,7 +2258,7 @@ test('Skylanders and Infinity accept higher comparable sales while other categor
     const relaxed = ['Skylanders', 'Disney Infinity'].includes(system);
     const product = { ...item, 'product-name': 'Example Figure', 'console-name': system, 'loose-price': 1500 };
     for (const prices of [[4000, 2000, 1900, 1800], [3200, 2600, 2000, 1900, 1800, 1700, 1600, 1500]]) {
-      const example = cur(product, { condition: 'loose', sales: { loose: prices.map((price) => ({ title: 'Example Figure', price })) } });
+      const example = cur(product, { condition: 'loose', sales: { loose: prices.map((price) => ({ title: system === 'Playstation 4' ? 'Example Figure Disc Only' : 'Example Figure', price })) } });
       const r = invoke('floorResult', example);
       const excluded = !relaxed && prices[0] === 4000;
       assert.equal(r.b.basis, excluded ? prices[1] : prices[0], system);
