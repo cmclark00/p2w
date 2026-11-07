@@ -15,6 +15,20 @@ const check = (c, index, helper, progress = () => {}, cancel = () => false) => i
 const result = c => invoke('floorResult', c);
 const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => ({ id, price, title, state });
 (async () => {
+  const imported=cur({...product,'console-name':'PAL Playstation 4'},[]);
+  imported.directEbay={result:{state:'ready',sales:[
+    {id:'111111111111',title:'Example Game PS4 CIB USA ESRB',price:4000,sellerCountry:'United States'},
+    {id:'222222222222',title:'Example Game PS4 CIB PAL',price:3300,sellerCountry:'United Kingdom'},
+    {id:'333333333333',title:'Example Game PS4 CIB PAL',price:3000,sellerCountry:'Canada'}
+  ].map(s=>({...s,url:`https://www.ebay.com/itm/${s.id}`,state:'sold',date:'2026-11-01',shipping:0,conditionText:'Pre-Owned',locationSource:'ebay-located-in'}))}};
+  const importCalls=[];
+  await invoke('runFloorTargetedEbay',imported,()=>{},()=>false,{
+    targetedAvailable:async()=>true,checkTargeted:async url=>{
+      const row=imported.directEbay.result.sales.find(s=>s.url===url);importCalls.push(row.id);return row;
+    }
+  });
+  assert.deepEqual(importCalls,['222222222222'],'skip wrong region; check highest matching overseas sale and stop');
+  assert.equal(result(imported).b.basis,3300);
   // Search SOLD cards are candidates, not original-page confirmations. Read the
   // highest first, then pairs; stop once the highest remaining driver is sold.
   const direct = cur(product, []);

@@ -1112,7 +1112,27 @@ test('selected PAL releases use matching region evidence without admitting unrel
     assert.equal(invoke('floorSales',direct)[0].odd,true,'direct conflict still overrides catalog');
   }
   const outside=cur(pal,{directEbay:{result:{state:'ready',sales:[{id:'123456789013',title:ordinary+' PAL',price:3000,shipping:0,state:'sold',conditionText:'Pre-Owned',sellerCountry:'Italy',locationSource:'ebay-located-in'}]}}});
-  assert.ok(invoke('floorSales',outside).find(s=>s.directEbay).odd,'seller-location rule remains independent of game region');
+  assert.equal(invoke('floorSales',outside).find(s=>s.directEbay).odd,false,'PAL copies can use matching overseas sales');
+  for (const [system, label, country] of [['PAL Playstation 4','PAL','United Kingdom'],['JP Playstation 4','NTSC-J Japanese Import','Japan']]) {
+    const p={...item,'console-name':system};
+    const title='Example Game PS4 CIB '+label;
+    const row={title,price:3000,date:'2026-11-01',url:'https://www.ebay.com/itm/123456789014',sellerCountry:country,locationSource:'ebay-located-in'};
+    const input=cur(p,{sales:{cib:[row]}});
+    assert.equal(invoke('floorSales',input)[0].odd,false,'matching import seller '+country);
+    const result={id:'123456789014',title,price:3000,state:'sold',conditionText:'Pre-Owned',sellerCountry:country,locationSource:'ebay-located-in'};
+    assert.equal(invoke('floorEbayResult',row,p,result,'cib').state,'sold');
+    assert.equal(invoke('floorEbayResult',row,p,{...result,state:'ended'},'cib').state,'ended');
+    assert.equal(invoke('floorEbayResult',row,p,{...result,state:'offer'},'cib').state,'offer');
+    assert.equal(invoke('floorEbayResult',row,p,{...result,conditionText:'Brand New'},'cib').state,'mismatch');
+    assert.equal(invoke('floorEbayResult',row,p,{...result,title:'Example Game PS4 CIB USA ESRB'},'cib').state,'mismatch');
+    input.ebayChecks={results:{'123456789014':{state:'location'}}};
+    assert.equal(invoke('floorSales',input)[0].verification.state,'unknown','saved location exclusion must be rechecked');
+    assert.equal(invoke('floorEbayCandidates',input,1).length,1,'recheck the newly eligible driver');
+  }
+  const domesticRow={title:'Example Game PS4 CIB',price:3000,date:'2026-11-01',url:'https://www.ebay.com/itm/123456789014',sellerCountry:'United Kingdom',locationSource:'ebay-located-in'};
+  assert.equal(invoke('floorSales',cur(item,{sales:{cib:[domesticRow]}}))[0].exclusion,'Seller outside North America','US inventory keeps existing seller rule');
+  const warning=invoke('floorSearchWarnings',{state:'ready',partial:true,issues:[{code:'location'}]},pal);
+  assert.ok(!warning[0].detail.includes('Only North American'));
 });
 
 test('two-digit and repeated-series bundles are excluded before selecting a price', () => {

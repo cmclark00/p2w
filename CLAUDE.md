@@ -919,7 +919,11 @@ The site's **only server-side code**. Everything else is static.
     cannot supply identity. Identifier searches use the appropriate UPC/EAN/GTIN type.
     Generic PAL accepts PAL, PEGI/USK and UK/European release labels and European packaging languages;
     explicitly named language variants still require their own language. Seller
-    geography remains separate: overseas sales stay excluded. Missing game
+    geography remains separate: PAL/import games may use matching copies from
+    sellers worldwide; standard US inventory still excludes overseas sellers.
+    `floorAllowsOverseasSellers` changes seller eligibility only, never the copy's
+    region/language, platform, edition, condition or sold/offer validation. Saved
+    location-only rejections are rechecked, not automatically marked sold. Missing game
     identity is classified before region; the UI says Region / language mismatch.
     Seller metadata is normalized before both game-identity and bundle checks:
     whole Smart Delivery, library-discard, dispatch and genre/rating phrases,

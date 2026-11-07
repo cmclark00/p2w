@@ -4723,12 +4723,14 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
   }
 }
 // Presentation only. Do not use warning text to admit/exclude a sale or change a price.
-function floorSearchWarnings(result) {
+function floorSearchWarnings(result, product) {
   if (!result || result.state === 'ready' && !result.partial) return [];
   const labels = {
     unreadable: ['Some results unreadable', 'Open search and check unreadable result cards for a higher matching sale.'],
     shipping: ['Shipping unknown', 'Open the matched sale and check its delivery charge; the total includes only known shipping.'],
-    location: ['Seller location unknown', 'Open the matched sale and check where the seller is located. Only North American sellers qualify.'],
+    location: ['Seller location unknown', floorAllowsOverseasSellers(product)
+      ? 'Seller location was not reported. Matching import copies can use sellers worldwide; check any unknown shipping charge.'
+      : 'Open the matched sale and check where the seller is located. Only North American sellers qualify.'],
     'page-failed': ['Search page unavailable', 'Retry search. If eBay asks you to sign in, do so in Chrome; otherwise check that page manually.'],
     'page-unverified': ['Search page not verified', 'Retry search or open it and confirm the page and highest-price sorting.'],
     'no-progress': ['No new results on next page', 'Open search and review the remaining pages; the helper received duplicate or unreadable results.'],
@@ -4746,8 +4748,8 @@ function floorSearchWarnings(result) {
   });
 }
 function floorSearchReviewWarnings(cur) {
-  return [[cur.directEbay?.result, ''], [cur.directEbay?.standard?.result, 'Standard game: ']]
-    .flatMap(([result, prefix]) => floorSearchWarnings(result).map(w => ({ label: prefix + w.label, detail: prefix + w.detail })));
+  return [[cur.directEbay?.result, '', cur.product], [cur.directEbay?.standard?.result, 'Standard game: ', cur.standardGame?.product || cur.product]]
+    .flatMap(([result, prefix, product]) => floorSearchWarnings(result, product).map(w => ({ label: prefix + w.label, detail: prefix + w.detail })));
 }
 function floorDirectSearchHtml(cur) {
   const s = cur.directEbay;
@@ -4763,7 +4765,7 @@ function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
   if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
   if (!result.title || floorSaleListingMismatch(sale, product, result.title)) return { state: 'mismatch' };
-  if (floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
+  if (!floorAllowsOverseasSellers(product) && floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
   if (result.conditionText) {
     const brandNew = /^(Brand New|New)$/i.test(result.conditionText);
     if (condition === 'new' ? !brandNew : brandNew || !/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(result.conditionText)) return { state: 'mismatch' };
@@ -4973,7 +4975,10 @@ function floorSales(cur = floorCur) {
     const mismatch = floorSaleListingMismatch(s, cur.product) || floorLoosePackagingMismatch(s.title, cur.condition, cur.product)
       || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
     const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
-    const checked = cur.ebayChecks?.results[floorSaleKey(s)];
+    let checked = cur.ebayChecks?.results[floorSaleKey(s)];
+    // A saved pre-policy location rejection needs a fresh sold/price check,
+    // not automatic promotion to a verified sale.
+    if (checked?.state === 'location' && floorAllowsOverseasSellers(cur.product)) checked = { ...checked, state: 'unknown' };
     // Search cards discover candidates; the original item's check wins. In
     // particular a SOLD search card cannot erase an ENDED or unreadable result.
     let verification = !invalid ? checked || s.searchVerification : null;
@@ -4992,7 +4997,7 @@ function floorSales(cur = floorCur) {
   // Keep price plus shipping, including Canadian postage; filter explicit
   // overseas origin instead of using the delivery amount as a proxy.
   for (const sale of sales) {
-    if (!sale.odd && floorSaleLocation(sale) === 'outside-north-america') {
+    if (!floorAllowsOverseasSellers(cur.product) && !sale.odd && floorSaleLocation(sale) === 'outside-north-america') {
       sale.exclusion = 'Seller outside North America'; sale.odd = true;
     }
   }
@@ -5107,6 +5112,16 @@ const FLOOR_REGIONS = [
   ['Asia', /\b(?:asia|asian|hong kong|korea|china|taiwan)\b/],
   ['North America', /\b(?:ntsc u|ntsc uc|usa|us version|us edition|north america|north american|esrb)\b/],
 ];
+// Import games can use sellers worldwide, but the copy's region/language must
+// still match. This exception belongs to our selected inventory, not a seller.
+function floorAllowsOverseasSellers(product) {
+  if (!product || floorIsHardware(product) || floorToyFamily(product)) return false;
+  const name = product['product-name'] || '', system = product['console-name'] || '';
+  const expected = norm(`${name} ${system}`);
+  return FLOOR_REGIONS.some(([region, re]) => region !== 'North America' && re.test(expected))
+    || /\bimport(?:ed)?\b/.test(expected)
+    || [...floorListingLanguages(name), ...floorListingLanguages(system)].some(language => language !== 'English');
+}
 function floorRegionMismatch(title, product, sourceConsole = '') {
   const name = product?.['product-name'] || '';
   const expected = `${name} ${product?.['console-name'] || ''}`;

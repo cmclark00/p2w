@@ -847,7 +847,9 @@ Guide (the Google Sheet tab).
    listing must identify the matching region. A specifically named language must
    also match. The **Region / language mismatch** group describes a mismatch with
    your selected copy, not a blanket rejection of foreign games. The separate
-   rule excluding sellers outside North America still applies.
+   seller-location rule allows sellers worldwide for PAL/import games, but the
+   copy must still match its region (PAL with PAL, Japanese with Japanese).
+   Standard US inventory still excludes sellers outside North America.
 
    **eBay sold** opens a search for the current game
    and condition; the Chrome helper also reads direct sold results.
