@@ -878,6 +878,26 @@ test('boxed games cannot drive loose pricing, including the Splatterhouse 3 scre
   assert.equal(invoke('floorEbayResult', ebaySale, product, { id: '123456789012', title: boxed, state: 'sold', price: 14500 }, 'loose').state, 'mismatch');
 });
 
+test('printed pack-ins do not drive loose pricing but remain valid CIB evidence', () => {
+  const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004 };
+  const title = 'PaRappa the Rapper (Sony PlayStation 1 PS1 1997) WITH POSTER. TESTED GREAT!';
+  const rows = invoke('floorSales', cur(product, { condition: 'loose', sales: { loose: [
+    { title, price: 17898 }, { title: 'PaRappa the Rapper PS1 Game Only', price: 10000 },
+  ] } }));
+  assert.equal(rows[0].mismatch, 'Printed inserts included — not loose');
+  assert.equal(rows[0].odd, true);
+  assert.equal(rows[1].odd, false);
+  for (const suffix of ['WITH POSTER', 'w/ original map', '+ registration card', 'with inserts']) {
+    const listing = 'PaRappa the Rapper PS1 ' + suffix;
+    assert.ok(invoke('floorLoosePackagingMismatch', listing, 'loose', product), suffix);
+    assert.equal(invoke('floorOdd', { title: listing }, 'cib', null, product), false, suffix);
+  }
+  for (const suffix of ['No Poster Tested Working', 'without original poster or manual', 'Poster not included', 'no inserts', 'missing registration card'])
+    assert.equal(invoke('floorLoosePackagingMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), null, suffix);
+  const sale = { title, price: 17898, url: 'https://www.ebay.com/itm/407268457499' };
+  assert.equal(invoke('floorEbayResult', sale, product, { id: '407268457499', title, state: 'sold', price: 17898 }, 'loose').state, 'mismatch');
+});
+
 test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
   const product = { ...item, 'product-name': 'Terminator', 'console-name': 'Sega CD' };
   for (const title of [
@@ -1775,6 +1795,32 @@ test('Kingdom Hearts uses its higher eligible sale over Renewed and retains eBay
   example.amazon.offers[0].price = 3000;
   assert.equal(invoke('floorResult', example).b.from, 'amazon');
   assert.equal(invoke('floorResult', example).r.price, 3000, 'Renewed can win when it is actually highest');
+});
+
+test('Renewed above twice the selected PC condition is reference-only without changing premiums', () => {
+  const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004, 'cib-price': 14200 };
+  const example = cur(product, { condition: 'loose', sales: { loose: [{ title: 'PaRappa the Rapper PS1 Game Only', price: 10000, url: 'https://www.ebay.com/itm/111111111111' }] },
+    amazon: { found: true, title: 'PaRappa the Rapper (Renewed)', renewedFallback: true, offers: [{ price: 22206 }] } });
+  const result = invoke('floorResult', example);
+  assert.equal(result.b.basis, 10000);
+  assert.equal(result.b.renewedReferenceOnly, true);
+  assert.equal(invoke('floorEbayCandidates', example, 1)[0].sale.price, 10000, 'Ignored Renewed must not prevent checking the actual driver');
+  const html = invoke('floorAmazonReferencesHtml', example, result.b);
+  assert.match(html, /\$222\.06/);
+  assert.match(html, /Reference only · above 2× PriceCharting/);
+  assert.ok(!html.includes('class="picked"'));
+  assert.equal(invoke('floorRenewedReferenceOnly', { ...example, condition: 'cib' }), false, 'Use the selected condition, not loose for every condition');
+  for (const price of [18008, 18009]) {
+    const changed = { ...example, amazon: { ...example.amazon, offers: [{ price, sub: 'good' }] } };
+    assert.equal(invoke('floorRenewedReferenceOnly', changed), price > 18008, 'Strictly above 2×');
+  }
+  assert.equal(invoke('floorRenewedReferenceOnly', { ...example, product: { ...product, 'loose-price': null } }), false);
+  assert.equal(invoke('floorRenewedReferenceOnly', { ...example, amazon: { ...example.amazon, renewedFallback: false, title: product['product-name'] } }), false);
+  assert.equal(invoke('floorResult', { ...example, sales: { loose: [] } }).b.basis, 9004, 'No remaining sources falls back to PC');
+  const pokemon = { ...product, 'product-name': 'Pokemon X', 'console-name': 'Nintendo 3DS' };
+  const premium = cur(pokemon, { condition: 'loose', sales: { loose: [{ title: 'Pokemon X Nintendo 3DS Game Only', price: 10000 }] } });
+  assert.equal(invoke('floorResult', { ...premium, amazon: { ...example.amazon, title: 'Pokemon X Nintendo 3DS (Renewed)' } }).r.price,
+    invoke('floorResult', premium).r.price, 'The specific premium still applies after removing the Renewed reference');
 });
 
 test('confirmed out-of-stock GameStop is reference-only across regular, Renewed and high-value pricing', () => {

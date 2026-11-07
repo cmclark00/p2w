@@ -1069,6 +1069,12 @@ Guide (the Google Sheet tab).
      with the highest eligible eBay sale and applicable GameStop price; use the
      highest. For example, $15.48 Renewed with a $24.95 eligible sale points to
      $25 before any specific adjustment. Renewed does not replace a higher sale.
+     If Renewed is **more than twice the PriceCharting value for the selected
+     condition**, it stays visible for reference but cannot raise the price.
+     The tool then uses the other eligible sources; specific premiums still apply.
+     For Loose games, sales that include posters, maps or other printed inserts
+     are excluded. Those original contents remain valid for CIB; "no poster"
+     does not cause an exclusion.
      Regular eligible Used or New offers take priority over Renewed for all
      pre-owned items. Specific premiums, deductions and the high-value exception remain.
      **Amazon conditions for Loose games:** use the **lowest matching offer

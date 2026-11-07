@@ -3745,14 +3745,16 @@ function floorLoosePackagingMismatch(title, condition, product = null) {
   let text = ` ${norm(title)} `;
   const name = norm(product?.['product-name']);
   if (name) text = text.replace(` ${name} `, ' ');
-  const part = String.raw`(?:(?:original|retail|instruction|jewel|game)\s+)*(?:box(?:es)?|cases?|manuals?|instructions?|booklets?|packaging)\b`;
+  const part = String.raw`(?:(?:original|retail|instruction|jewel|game)\s+)*(?:box(?:es)?|cases?|manuals?|instructions?|booklets?|packaging|posters?|maps?|inserts?|(?:registration|reg)\s+cards?)\b`;
   const parts = `${part}(?:\\s+(?:(?:and|or|nor)\\s+)?${part})*`;
   // Explicit absence is loose evidence. A remaining positive box/manual claim still excludes the sale.
   text = text.replace(new RegExp(`\\b(?:no|without|missing)\\s+(?:the\\s+)?${parts}`, 'g'), ' ')
     .replace(new RegExp(`\\b${parts}\\s+(?:(?:is|are)\\s+)?(?:not included|missing|absent)\\b`, 'g'), ' ')
     .replace(/\bnot (?:in (?:the )?box|boxed|cib|complete)\b/g, ' ');
   return /\b(?:box|boxed|case|manual|instructions|booklet|packaging|cib|c i b|mib|complete)\b/.test(text)
-    ? 'Box/manual included — not loose' : null;
+    ? 'Box/manual included — not loose'
+    : /\b(?:posters?|maps?|inserts?|(?:registration|reg)\s+cards?)\b/.test(text)
+      ? 'Printed inserts included — not loose' : null;
 }
 
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
@@ -5699,6 +5701,11 @@ function floorUnverifiedBasis(cur = floorCur) {
   }
   return { ...own, checks, standardReference };
 }
+function floorRenewedReferenceOnly(cur) {
+  const pc = Number(cur.product?.[PC_FIELDS.market[cur.condition]]);
+  const price = cur.amazon?.renewedFallback && !cur.amazon.error ? floorAmazonLowest(cur) : null;
+  return pc > 0 && price > pc * 2;
+}
 function floorOwnBasis(cur = floorCur) {
   cur = floorConditionCur(cur);
   const sales = floorSales(cur);
@@ -5758,7 +5765,9 @@ function floorOwnBasis(cur = floorCur) {
   if (cur.amazon?.error) checks.push(`Amazon check unavailable: ${cur.amazon.error}`);
   const waiting = !!(amazonSet && (!cur.amazon || cur.amazon.loading));
   if (waiting) return { basis: null, sale, checks, waiting };
-  const amz = cur.amazon?.error ? null : floorAmazonLowest(cur);
+  const renewedReferenceOnly = floorRenewedReferenceOnly(cur);
+  const amz = cur.amazon?.error || renewedReferenceOnly ? null : floorAmazonLowest(cur);
+  if (renewedReferenceOnly) checks.push(`Amazon Renewed ${money(floorAmazonLowest(cur))} is more than 2× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(Number(cur.product[PC_FIELDS.market[cur.condition]]))}; reference only. Eligible sales, GameStop and specific premiums still apply`);
   const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) >= FLOOR_EXPENSIVE_GAME;
   const renewedReference = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
   const toyGroup = floorToyGroup(cur);
@@ -5805,7 +5814,7 @@ function floorOwnBasis(cur = floorCur) {
   if (!options.length && pc > 0) options.push([pc, 'pricecharting']);
   if (options.length) {
     const [basis, from] = options.reduce((a, b) => (b[0] > a[0] ? b : a));
-    return { basis, from, sale, checks, waiting, referenceMin, renewedReference, expensiveGameBasis };
+    return { basis, from, sale, checks, waiting, referenceMin, renewedReference, renewedReferenceOnly, expensiveGameBasis };
   }
   if (waiting) return { basis: null, sale, checks, waiting };
   return { basis: null, sale, checks, need: 'No usable sold evidence or fallback price. Check the links and type a price.' };
@@ -6157,6 +6166,7 @@ function renderFloorPricer() {
         <div class="floor-review-summary">
           ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
+          ${b.renewedReferenceOnly ? '<span class="badge info">Renewed above 2× PriceCharting · reference only</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
           ${outliers ? `<span class="badge warn">${outliers} possible outlier${outliers === 1 ? '' : 's'} · review notes</span>` : ''}
@@ -6240,11 +6250,12 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
     const conditionFallback = floorAmazonConditionFallback(referenceCur);
     const label = { used: 'Used', new: 'New', renewed: 'Renewed' }[kind] + (grade ? ` · ${grade}` : '');
     const price = ref && !a?.error ? floorAmazonLowest(referenceCur, true) : null;
-    const selected = price > 0 && floorAmazonLowest(cur) > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting;
+    const renewedReferenceOnly = kind === 'renewed' && floorRenewedReferenceOnly(cur);
+    const selected = price > 0 && floorAmazonLowest(cur) > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting && !renewedReferenceOnly;
     const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
       : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
-    const statusLabel = price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
+    const statusLabel = renewedReferenceOnly ? 'Reference only · above 2× PriceCharting' : price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
     const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
     const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(statusLabel)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}${price > 0 && conditionFallback ? ' · fallback' : ''}` : ''} ↗</a>`;
     return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(statusLabel)}</td></tr>`;

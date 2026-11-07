@@ -948,7 +948,10 @@ The site's **only server-side code**. Everything else is static.
     sales and included cases/manuals from loose game evidence before outlier ranking,
     with the visible reason "Box/manual included — not loose". Explicit absence
     (no box/manual, box not included) remains eligible. Product names are removed
-    before checking packaging words. Original eBay verification uses the same check.
+    before checking packaging words. Included posters, maps, inserts and registration
+    cards likewise cannot price Loose ("Printed inserts included — not loose");
+    explicit absence such as "no poster" remains eligible, and CIB keeps those pack-ins.
+    Original eBay verification uses the same check.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
 
@@ -1451,7 +1454,11 @@ The site's **only server-side code**. Everything else is static.
     The lowest usable Renewed offer is tagged `renewedFallback` and
     visibly labeled. Renewed uses the normal three-source maximum:
     `max(highest eligible eBay sale, lowest Renewed, applicable GameStop)`, before
-    specific premiums/deductions and rounding. A higher eBay sale remains eligible
+    specific premiums/deductions and rounding, except that Renewed strictly above
+    2× the selected-condition PriceCharting value is reference-only. Its price/link
+    remain visible with an explanation; it cannot set a market floor or suppress
+    verification of the winning sale. Missing/zero PC values do not invent a cutoff.
+    A higher eBay sale remains eligible
     for targeted verification. The high-value game exception still makes Amazon
     reference-only. `renewedReference` labels the source, not a separate price rule.
     New offers on a renewed ASIN do not establish original
