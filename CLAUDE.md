@@ -2347,10 +2347,12 @@ Three via **Formspree** (endpoints are public client-side by design):
 
 ## Pending content (placeholders, marked with HTML comments)
 
-- `team.html`: **all in** — every individual plus the full-crew group shot
-  (`assets/team/full-crew.jpg`) have real photos, and **all bios are written**
-  (Mark, Josiah, Nick, Justin, Corey, Travis, Keith). Keith's bio also appears
-  on `repairs.html` (same text in both spots).
+- `team.html`: the displayed individuals plus the full-crew group shot
+  (`assets/team/full-crew.jpg`) have real photos and written bios
+  (Mark, Josiah, Nick, Corey, Travis, Keith). The event manager card is omitted
+  while the role is open; `careers.html` lists Event Manager in the role cards
+  and application choices. Keith's bio also appears on `repairs.html`
+  (same text in both spots).
 - **`showcase/` partially re-shot; `upgrades/` restored from the old shots.**
   All photos were originally deleted to be re-shot (saved ~50 MB); each card
   keeps the original `<img>` in an HTML comment below its placeholder.
