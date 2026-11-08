@@ -6064,13 +6064,19 @@ function floorStandardHtml(b) {
   const ref = b.standardReference;
   if (!ref || !(ref.basis > 0)) return '';
   const cur = ref.cur, p = cur.product;
-  const rows = floorSales(cur).filter(s => !s.odd && !s.outlier).slice(0, 8);
-  return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} baseline${b.from === 'standard' ? ' · used' : ''}</summary>
+  const sales = floorSales(cur);
+  const rows = sales.filter(s => !s.odd && !s.outlier).slice(0, 8);
+  const rejected = sales.filter(s => floorEbayExcluded(s.verification));
+  const unverified = ref.from === 'sale' && ref.sale?.verification?.state !== 'sold';
+  const status = unverified ? ref.sale?.verification?.state === 'pending' ? 'candidate · checking sale' : 'candidate · unverified' : 'baseline';
+  return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} ${status}${b.from === 'standard' && !unverified ? ' · used' : ''}</summary>
     <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
     Specific premiums and deductions apply afterward.</p>
+    ${unverified ? '<p class="muted small-print">This standard-game sale is not verified. The price may change after checking its original eBay listing; a Sold search result alone is not confirmation.</p>' : ''}
     ${cur.amazon ? `<div class="eyebrow">Standard-game Amazon</div>${floorAmazonReferencesHtml(cur, ref)}${cur.amazon.incomplete || cur.amazon.error ? '<button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>' : ''}` : ''}
     ${cur.gamestopUrl ? `<p class="muted small-print"><a href="${esc(cur.gamestopUrl)}" target="_blank" rel="noopener noreferrer">Standard-game GameStop ${money(floorGs(p))} · ${floorGameStopStock(cur)} ↗</a></p>` : ''}
-    <table class="floor-sales"><tbody>${rows.map(s => `<tr><td class="num">${money(s.price)}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title)}${s.recovered ? ` <span class="muted">Filed under ${esc(s.sourcePcName)}</span>` : ''}</td><td>${floorSaleDateHtml(s)}</td></tr>`).join('')}</tbody></table>
+    ${floorSaleTable(rows, ref, false)}
+    ${rejected.length ? `<details><summary>Standard-game sales not verified / excluded (${rejected.length})</summary>${floorSaleTable(rejected, ref, false)}</details>` : ''}
     </details>`;
 }
 
@@ -6107,8 +6113,8 @@ function floorSaleDateHtml(s) {
     : s.historicalInfo?.retained ? 'Historical · not verified' : s.ageInfo?.retained ? 'Older · slow seller' : '';
   return label ? `<span class="floor-sale-date-old">${esc(s.date)} · ${label}</span>` : esc(s.date || '');
 }
-function floorSaleTable(rows, b) {
-  return `<table class="floor-sales"><tbody>${rows.map(s => `<tr data-sale="${s.i}" class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
+function floorSaleTable(rows, b, selectable = true) {
+  return `<table class="floor-sales"><tbody>${rows.map(s => `<tr${selectable ? ` data-sale="${s.i}"` : ''} class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
     <td class="num">${money(s.price)}</td>
     <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
     <td class="muted">${floorSaleDateHtml(s)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;

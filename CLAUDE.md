@@ -1049,6 +1049,9 @@ The site's **only server-side code**. Everything else is static.
     Each original item ID is checked once per condition; changing item/condition
     invalidates the run. No repeated attempts on unreadable pages or render loops.
     Add to list waits only while the targeted check runs; typed overrides remain.
+    Standard-game details show original-item verification and shipping for each
+    row, label unchecked/pending drivers as candidates, and retain rejected item
+    checks in a disclosure. These reference rows cannot select main-edition sales.
     No browser work in bulk audits/rechecks. Specific premiums, minimums,
     deductions and rounding stay in the shared downstream pricing engine.
     The helper accepts only original HTTPS ebay.com/itm item IDs, keeps

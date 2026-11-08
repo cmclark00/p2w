@@ -230,6 +230,41 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   assert.equal(standardCalls, 1); assert.equal(result(variant).b.from, 'standard');
   assert.equal(variant.standardGame.ebayChecks.results['111111111111'].state, 'sold');
   assert.equal(result(variant).b.ebayReview, undefined, 'Standard baseline driver verification is retained');
+  // Mass Effect's standard search card says Sold, but its original page only
+  // says out of stock. It must be skipped even when used through an edition.
+  const massBase = { id:'37337', 'product-name':'Mass Effect Andromeda', 'console-name':'Xbox One', 'cib-price':639 };
+  const mass = cur({ ...massBase, id:'37339', 'product-name':'Mass Effect Andromeda [Deluxe Edition]', 'cib-price':901 }, []);
+  mass.standardGame = { product:massBase, sales:{cib:[]} };
+  const baseRows = [[636,1190,'168703227892'],[775,850,'168433959071']].map(([price,shipping,id]) => ({
+    ...sale(price,id,'Mass Effect Andromeda Xbox One Complete In Box'), id, shipping,
+    date:id==='168703227892'?'2026-11-03':'2026-10-24', state:'sold', conditionText:'Pre-Owned',
+    sellerCountry:id==='168703227892'?'Canada':'United States', locationSource:'ebay-located-in'
+  }));
+  mass.directEbay = { result:{state:'ready',sales:[]}, standard:{result:{state:'ready',sales:baseRows}} };
+  const massCalls=[];
+  await invoke('runFloorTargetedEbay', mass, () => {
+    const b=result(mass).b;
+    if (b.basis===1826) {
+      assert.equal(b.ebayChecking,true,'Standard candidate remains pending while its item is checked');
+      const html=invoke('floorStandardHtml',b);
+      assert.match(html,/candidate · (?:unverified|checking sale)/);
+      assert.doesNotMatch(html,/data-sale=/,'Standard rows must not select unrelated main-edition indices');
+    }
+  }, () => false, { targetedAvailable:async()=>true, checkTargeted:async url=>{
+    const row=baseRows.find(s=>s.url===url); massCalls.push(row.id);
+    return verified(row.id,row.price,row.title,row.id==='168703227892'?'unknown':'sold');
+  }});
+  assert.deepEqual(massCalls,['168703227892','168433959071']);
+  assert.equal(result(mass).b.basis,1625,'Unverified $18.26 cannot raise the standard baseline');
+  assert.equal(result(mass).r.price,1500,'Confirmed $16.25 standard baseline rounds normally');
+  const massHtml=invoke('floorStandardHtml',result(mass).b);
+  assert.match(massHtml,/Sold price verified/);
+  assert.match(massHtml,/Unverified — review manually/);
+  assert.match(massHtml,/Standard-game sales not verified \/ excluded \(1\)/);
+  let repeatCalls=0;
+  await invoke('runFloorTargetedEbay',mass,()=>{},()=>false,{targetedAvailable:async()=>true,checkTargeted:async()=>{repeatCalls++;return null;}});
+  assert.equal(repeatCalls,0,'Stop once the highest remaining standard sale is confirmed');
+  assert.equal(result(mass).b.basis,1625,'Completed original-page exclusion survives re-renders');
   const pendingTarget = old([3000, 2900]); const finishTarget = [];
   const running = invoke('runFloorTargetedEbay', pendingTarget, () => {}, () => false, {
     targetedAvailable: async () => true, checkTargeted: () => new Promise(r => { finishTarget.push(r); })
