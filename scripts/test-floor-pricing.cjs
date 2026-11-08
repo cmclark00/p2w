@@ -2040,6 +2040,39 @@ test('original Elite pricing excludes Series 2 and compatibility cables without 
   assert.equal(invoke('floorResult',c).r.price,invoke('floorResult',clean).r.price);
   assert.equal(invoke('floorResult',c).r.price,6000);
 });
+test('Wireless N adapter aliases preserve model and accessory identity across sales sources', () => {
+  const p = {'product-name':'Xbox 360 Wireless Network Adapter ABG & N','console-name':'Xbox 360','loose-price':2297};
+  const valid = ['Authentic OEM Xbox 360 Wireless N Network Adapter Dual Antenna Wifi Nice Shape!',
+    'OEM Microsoft Xbox 360 Wireless Network Adapter WiFi Dual Antenna Model 1398',
+    'Xbox 360 Wireless Network Adaptor (Dual Antenna)',
+    'Microsoft Xbox 360 Wireless N Networking Adapter Model 1398',
+    'Microsoft Xbox 360 Wireless N Adapter',
+    'Xbox 360 Wireless Network Adapter A/B/G & N Networks'];
+  for (const title of valid) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+    assert.equal(invoke('floorSaleListingMismatch',{title,source:'direct-ebay'},p),null,title);
+    assert.equal(invoke('floorOdd',{title},'loose',null,p),false,title);
+  }
+  for (const title of ['Microsoft Xbox 360 Wireless a/b/g Network Adapter White',
+    'Microsoft Xbox 360 Wireless Network Adapter Model 1086',
+    'Microsoft Xbox 360 Wireless Network Adapter',
+    'Wireless USB Gaming Receiver Adapter for Xbox 360 Controllers PC Windows',
+    'Xbox 360 Wireless N Network Adapter replacement antenna only',
+    'Xbox 360 Wireless N Network Adapter internal circuit board',
+    'Xbox 360 Wireless N Network Adapter Model 1398 untested',
+    'Xbox 360 Wireless N Network Adapter Model 1398 for parts',
+    'Xbox 360 250GB console with Wireless N Network Adapter',
+    'Lot of 2 Xbox 360 Wireless N Network Adapters',
+    'Datel Xbox 360 Wireless N Network Adapter']) {
+    assert.ok(invoke('floorListingMismatch',title,p),title);
+  }
+  assert.equal(invoke('floorEbaySearchQuery',p),'Xbox 360 Wireless Network Adapter');
+  assert.ok(!invoke('floorLinks',p,'loose').ebay.includes('_sacat=139973'),'Hardware must not be restricted to video game discs');
+  assert.ok(invoke('floorLinks',item,'cib').ebay.includes('_sacat=139973'),'Games keep the game category');
+  const result=invoke('floorResult',cur(p,{condition:'loose',sales:{loose:[{title:valid[0],price:2999,date:new Date().toISOString().slice(0,10)}]}}));
+  assert.equal(result.b.basis,2999,'Recovered matching sales feed the unchanged hardware baseline');
+});
+
 test('modern hardware uses sales instead of the game retail-sell rule', () => {
   const r = invoke('floorResult', cur({ ...item, 'product-name': 'DualShock 4 Controller', genre: 'Accessories', 'cib-price': 3000 }, { sales: { cib: [{ price: 4000, title: 'DualShock 4 controller complete', date: '2026-10-01' }] } }));
   assert.equal(r.hw, true); assert.equal(r.b.from, 'sale'); assert.equal(r.r.price, 4000);

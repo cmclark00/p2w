@@ -3845,10 +3845,10 @@ function floorLinks(p, condition) {
   const q = (s) => encodeURIComponent(s.replace(/\s+/g, ' ').trim());
   return {
     // Short identity query, highest total first; do not require CIB/complete words.
-    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(floorEbaySearchQuery(p))}&_sacat=139973&LH_Sold=1&LH_Complete=1&_sop=16`
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${q(floorEbaySearchQuery(p))}${floorIsHardware(p) ? '' : '&_sacat=139973'}&LH_Sold=1&LH_Complete=1&_sop=16`
       + `&LH_ItemCondition=${encodeURIComponent(EBAY_CONDITIONS[condition] || EBAY_CONDITIONS.loose)}`,
     gamestop: `https://www.gamestop.com/search/?q=${q(name)}`,
-    amazon: `https://www.amazon.com/s?k=${q(`${name} ${sys}`)}`,
+    amazon: `https://www.amazon.com/s?k=${q(floorNetworkAdapterProduct(p) ? floorEbaySearchQuery(p) : `${name} ${sys}`)}`,
     pc: /^\d+$/.test(String(p.id)) ? pcUrl(p.id) : '',
   };
 }
@@ -4325,6 +4325,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         const searchPlatforms = [...new Set([product['console-name'], floorMarketSearchPlatform(product)])];
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .flatMap(name => searchPlatforms.map(platform => `${name.replace(/[\[\]]/g, ' ')} ${platform}`.replace(/\s+/g, ' ').trim())))];
+        if (floorNetworkAdapterProduct(product)) queries.push(floorEbaySearchQuery(product));
         // Fetch independent first pages two at a time, but apply matching in
         // the original barcode/title order. All queries and page tokens still
         // get checked; server-wide pacing/cooldowns remain authoritative.
@@ -4627,6 +4628,7 @@ function floorOutsideEbayWindow(sale, now = Date.now()) {
 }
 const floorEbayExcluded = (verification) => ['ended', 'offer', 'price', 'mismatch', 'location'].includes(verification?.state) || !!verification?.skipped;
 function floorEbaySearchQuery(product) {
+  if (floorNetworkAdapterProduct(product)) return 'Xbox 360 Wireless Network Adapter';
   // Seller titles commonly use PS4/GBA/etc. Keep edition identity, but no
   // packaging adjectives: these are evaluated on results, not demanded in search.
   const system = String(product['console-name'] || '').replace(/playstation\s*([1-5])/i, 'PS$1')
@@ -5381,6 +5383,7 @@ function floorNamedGameBundle(title, product) {
   return new Set(following.filter(words => words.length === 1 && titleWord(words[0]) && !selected.has(words[0])).map(words => words[0])).size >= 2;
 }
 function floorTitleIdentityMismatch(title, product) {
+  if (floorNetworkAdapterProduct(product)) return floorNetworkAdapterMismatch(title);
   // Whole descriptive phrases only: never discard arbitrary title words.
   const descriptiveTitle = text => String(text || '').replace(/\bvideo[ -]?game\b/gi, 'video game').replace(/\bgently\s+used\b/gi, 'used')
     .replace(/\b(pegi|usk)\s*(?:3|6|7|12|16|18)\b/gi, '$1')
@@ -5544,6 +5547,25 @@ function floorListingMetadataTitle(title, product) {
   if (/^pal\b/i.test(product?.['console-name'] || '')) title = title.replace(/\bneuf\b/gi, 'New');
   return title;
 }
+// PriceCharting's "ABG & N" describes the Wireless N adapter's supported
+// standards, not literal words sellers must use. Keep model evidence mandatory:
+// a generic wireless receiver or the older white A/B/G adapter is not this item.
+function floorNetworkAdapterProduct(product) {
+  const name = norm(product?.['product-name']).replace(/\bxbox360\b/g, 'xbox 360');
+  return /\bxbox 360\b/.test(name) && /\bwireless\b/.test(name)
+    && /\bnetwork(?:ing)?\b/.test(name) && /\badapt[eo]r\b/.test(name) && /\bn\b/.test(name);
+}
+function floorNetworkAdapterMismatch(title) {
+  const text = norm(title).replace(/\bxbox360\b/g, 'xbox 360').replace(/\bwi fi\b/g, 'wifi');
+  if (!/\bxbox 360\b/.test(text) || !/\badapt[eo]r\b/.test(text)
+    || !/\b(?:wireless|wifi|network(?:ing)?)\b/.test(text)) return 'Listing does not confirm the selected game or product';
+  if (/\b(?:controllers?|gaming receiver|for (?:windows|pc)|internal|motherboard|circuit board|replacement antenna|antenna only|cable only|box only|power supply|chargers?|datel|mcbazel|ostent|cakuuma|third party)\b/.test(text)
+    || /\b(?:console|system)\s+(?:bundle|with)|\b\d+\s*(?:gb|tb)\b/.test(text)) return 'Different accessory or replacement part';
+  if (/\b(?:untested|not working|non working|for parts|parts only|broken|faulty|works poorly)\b/.test(text)) return 'Faulty or untested adapter';
+  if (/\b(?:1086|white|single antenna)\b/.test(text)) return 'Different wireless network adapter model';
+  if (!/\b(?:n|1398)\b|\b(?:dual|two|2) antenn(?:a|as|ae)\b/.test(text)) return 'Wireless N adapter model unconfirmed — review';
+  return null;
+}
 // Compatibility text names the device an accessory fits, not the item being sold.
 // Apply this before pricing on every source, including cached Amazon candidates.
 function floorControllerMismatch(title, product) {
@@ -5636,6 +5658,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
 
 function floorAmazonMismatch(cur) {
   if (!cur.amazon?.found) return null;
+  if (floorNetworkAdapterProduct(cur.product) && cur.amazon.publishers?.length
+    && !cur.amazon.publishers.some(name => /\b(?:microsoft|xbox)\b/i.test(name))) return 'Different adapter manufacturer';
   // An exact catalog GTIN can supply a missing region label, never override
   // conflicting title/region/edition evidence or substitute for platform proof.
   const barcode = value => /^\d{8,14}$/.test(String(value || '')) ? String(value).padStart(14, '0') : '';

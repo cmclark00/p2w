@@ -23,6 +23,27 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Wireless N adapters recover Amazon naming variants without admitting other devices', async () => {
+    const p={'product-name':'Xbox 360 Wireless Network Adapter ABG & N','console-name':'Xbox 360','loose-price':2297};
+    const exact=candidate('B002RS7NB2','Xbox 360 Wireless Network Adapter A/B/G & N Networks',['Xbox 360']);
+    const alias=candidate('B000000139','Microsoft Wireless N Network Adaptor (Xbox 360)',['Xbox 360']);
+    const wrong=candidate('B000000108','Microsoft Xbox 360 Wireless a/b/g Network Adapter',['Xbox 360']);
+    const calls=[];
+    const e=engine(async(route,params)=>{
+      calls.push({route,...params});
+      if(route==='amazon/catalog') return {candidates: params.q==='Xbox 360 Wireless Network Adapter' ? [exact,alias,wrong] : []};
+      const c=params.asin===exact.asin?exact:alias;
+      return {...offer(c,5555),offers:[{price:5555,sub:params.cond==='new'?'new':'good'}]};
+    });
+    const result=await e.fetch(p,'loose');
+    assert.equal(result.found,true);
+    e.ctx.result=result;
+    assert.equal(e.run('floorAmazonLowest({product:p,condition:"loose",amazon:result})'),5555);
+    assert.ok(calls.some(c=>c.q==='Xbox 360 Wireless Network Adapter'));
+    assert.ok(!calls.some(c=>c.asin===wrong.asin),'The older A/B/G-only model never reaches offer lookup');
+    e.ctx.c={...exact,publishers:['Datel']};
+    assert.ok(e.run('floorAmazonCandidateMismatch(c,p,"loose",true)'),'Conflicting manufacturer is rejected');
+  });
   await test('PAL catalog barcode confirms missing region without admitting wrong games or regions', async () => {
     const p = {'product-name':'Alien Isolation','console-name':'PAL Playstation 4',upc:'5055277024889',catalogBarcodes:['5055277024889','5055277023776']};
     const c = {...candidate('B00HQCQ1RQ','Alien: Isolation (PS4)',['playstation 3','PlayStation4']),barcodes:['05055277023776']};

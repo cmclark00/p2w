@@ -1395,6 +1395,15 @@ The site's **only server-side code**. Everything else is static.
     1797) and Core packages are checked across Amazon, PriceCharting and direct
     eBay. The original Xbox One Elite catalog name implies Series 1. These checks
     filter evidence only; hardware pricing and specific premiums are unchanged.
+    Xbox 360 Wireless Network Adapter ABG & N uses model-aware aliases across
+    all sources: A/B/G & N, Wireless N, model 1398 and dual-antenna wording.
+    Network/networking and adapter/adaptor spellings are equivalent for this
+    product. Generic titles without N/model evidence remain reviewable; white,
+    1086/single-antenna adapters, controller receivers, internal boards, parts,
+    untested units and conflicting Amazon manufacturers remain excluded.
+    A short adapter query supplements Amazon catalog searches and drives eBay;
+    hardware's manual eBay link no longer restricts results to the game category.
+    Pricing, premiums, sold verification, location and condition rules still apply.
     Helper progress queues one background render per event-loop turn instead of
     rendering recursively. Automatic eBay batches yield to browser input/painting
     between pairs, including cached results; the uncapped search and stop rules
