@@ -3766,10 +3766,25 @@ function floorLooseConditionMismatch(title, condition, product) {
   const name = norm(product['product-name']);
   if (name) text = text.replace(` ${name} `, ' ');
   if (/\bnot loose\b/.test(text)) return 'Loose condition unconfirmed — review';
-  const loose = /\b(?:loose|(?:disc|discs|disk|disks|cart|cartridge|game|umd) only|only (?:the )?(?:disc|disk|cart|cartridge|game|umd))\b/.test(text)
+  // Sellers also use "game only" for a game in its original case/artwork.
+  // Black label identifies a print, not packaging; neither phrase proves Loose.
+  const loose = /\b(?:loose|(?:disc|discs|disk|disks|cart|cartridge|umd) only|only (?:the )?(?:disc|disk|cart|cartridge|umd))\b/.test(text)
     || /\b(?:no|without|missing) (?:the )?(?:original |retail |jewel |game )?(?:box|case|packaging)\b/.test(text)
     || /\b(?:box|case|packaging)(?: and manual)? (?:is |are )?(?:not included|missing|absent)\b/.test(text);
   return loose ? null : 'Loose condition unconfirmed — review';
+}
+
+// Explicit playability faults cannot establish the value of a working game.
+// Keep bare "READ", cosmetic wear and negated faults out of this rejection.
+function floorGameFaultMismatch(title, product) {
+  if (!product || floorToyFamily(product) || floorIsHardware(product)) return null;
+  let text = ` ${norm(title)} `;
+  const name = norm(product['product-name']);
+  if (name) text = text.replace(` ${name} `, ' ');
+  text = text.replace(/\b(?:no|without) (?:skipping|freezing|playback issues|read errors|disc rot)(?: (?:and |or )?(?:skipping|freezing|playback issues|read errors|disc rot))*\b/g, ' ')
+    .replace(/\b(?:does not|doesnt|doesn t) (?:skip|freeze)\b/g, ' ');
+  return /\b(?:partially works|works partially|partially working|only partially works|not (?:fully )?working|non working|does not (?:work|play|load|read)|doesn t (?:work|play|load|read)|doesnt (?:work|play|load|read)|won t (?:work|play|load|read)|wont (?:work|play|load|read)|unplayable|for parts|parts only|skips|skipping|freezes|freezing|read errors|disc rot)\b/.test(text)
+    ? 'Faulty / partially working condition' : null;
 }
 
 // rhythm = rhythmKind() of the product: a rhythm-game bundle keeps its instruments, a disc doesn't have them.
@@ -5529,6 +5544,8 @@ function floorControllerMismatch(title, product) {
 }
 function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
+  const fault = floorGameFaultMismatch(title, product);
+  if (fault) return fault;
   title = floorListingMetadataTitle(floorKnownGameTitle(title, product), product);
   const knownName = floorKnownGameTitle(product?.['product-name'], product);
   if (knownName !== product?.['product-name']) product = { ...product, 'product-name': knownName };

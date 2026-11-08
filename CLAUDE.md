@@ -951,13 +951,20 @@ The site's **only server-side code**. Everything else is static.
     before checking packaging words. Included posters, maps, inserts and registration
     cards likewise cannot price Loose ("Printed inserts included — not loose");
     CIB keeps those pack-ins. `floorLooseConditionMismatch` additionally requires
-    positive Loose evidence (disc/cart/game/UMD only, loose, or missing case/box).
-    "No poster", "no manual" and generic tested titles do not establish Loose;
+    positive Loose evidence (disc/cart/UMD only, loose, or missing case/box).
+    "Game only", "black label", "no poster", "no manual" and generic tested titles do not establish Loose;
     they remain under Condition / packaging for review, including PC Loose rows.
     A shared PC category cannot promote an ambiguous direct eBay row. Original
     eBay verification uses the same checks; ambiguous original titles stay unverified.
     Toys-to-life opened packaging and hardware are exempt; Amazon's shared Used
     catalog still does not imply a Loose/CIB split. Premiums remain downstream.
+    The Nov. 7 PaRappa audit confirmed a $150 "Game Only ... Black Label" photo
+    contained original case/artwork. Ambiguous rows cannot regain eligibility
+    through the historical-sale exception. Black-label disc-only copies remain
+    eligible. `floorGameFaultMismatch` also rejects explicit partially-working,
+    unreadable, skipping/freezing and parts-only game titles in the shared matcher
+    (including Amazon and original eBay item checks). Cosmetic wear, bare READ,
+    negated faults and words belonging to the selected game name are not faults.
 
   - **Direct eBay discovery (helper 1.1.8):** live pricing automatically searches
     sold+completed results for the selected edition and, when applicable, the standard

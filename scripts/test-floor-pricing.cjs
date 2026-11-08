@@ -883,7 +883,7 @@ test('printed pack-ins do not drive loose pricing but remain valid CIB evidence'
   const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004 };
   const title = 'PaRappa the Rapper (Sony PlayStation 1 PS1 1997) WITH POSTER. TESTED GREAT!';
   const rows = invoke('floorSales', cur(product, { condition: 'loose', sales: { loose: [
-    { title, price: 17898 }, { title: 'PaRappa the Rapper PS1 Game Only', price: 10000 },
+    { title, price: 17898 }, { title: 'PaRappa the Rapper PS1 Disc Only', price: 10000 },
   ] } }));
   assert.equal(rows[0].mismatch, 'Printed inserts included — not loose');
   assert.equal(rows[0].odd, true);
@@ -912,9 +912,9 @@ test('loose games require explicit packaging evidence across PC, direct search a
   assert.match(invoke('floorSales', { ...example, directEbay: { result: direct } })[0].mismatch, /Loose condition unconfirmed/, 'PC category cannot confirm the matching direct row');
   const checked = { id: '407322258475', title, state: 'sold', price: 15934 };
   assert.equal(invoke('floorEbayResult', example.sales.loose[0], product, checked, 'loose').state, 'unknown');
-  for (const suffix of ['No Poster Tested Working', 'No Manual', 'Tested Working', 'Cartridge Tested', 'Disc Tested'])
+  for (const suffix of ['No Poster Tested Working', 'No Manual', 'Tested Working', 'Cartridge Tested', 'Disc Tested', 'Game Only', 'Only the Game', 'Game Only Tested Black Label Z', 'Black Label'])
     assert.match(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), /unconfirmed/);
-  for (const suffix of ['Disc Only', 'Game Only', 'Loose', 'Cartridge Only', 'UMD Only', 'No Case', 'Without Original Box', 'Box and Manual Not Included', 'Disc Only No Poster'])
+  for (const suffix of ['Disc Only', 'Game Only No Case', 'Disc Only Black Label', 'Loose', 'Cartridge Only', 'UMD Only', 'No Case', 'Without Original Box', 'Box and Manual Not Included', 'Disc Only No Poster'])
     assert.equal(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), null, suffix);
   for (const suffix of ['Disc Only With Case', 'Loose CIB', 'No Manual With Case', 'Game Only With Poster'])
     assert.ok(invoke('floorLooseConditionMismatch', 'PaRappa the Rapper PS1 ' + suffix, 'loose', product), suffix);
@@ -922,6 +922,49 @@ test('loose games require explicit packaging evidence across PC, direct search a
   assert.equal(invoke('floorLooseConditionMismatch', 'Bash', 'loose', { 'product-name': 'Bash', 'console-name': 'Skylanders' }), null);
   assert.equal(invoke('floorLooseConditionMismatch', 'Xbox One Controller', 'loose', { 'product-name': 'Xbox One Controller', 'console-name': 'Xbox One', genre: 'Accessories' }), null);
   assert.equal(invoke('floorSaleGroup', invoke('floorSales', example)[0]), 'condition');
+});
+
+test('ambiguous game-only history cannot beat an explicit loose sale or stop its verification', () => {
+  const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004 };
+  const title = 'PaRappa the Rapper PS1 Game Only NTSC-U/C Tested Black Label Z';
+  const url = 'https://www.ebay.com/itm/398247034954';
+  const example = cur(product, { condition: 'loose', sales: { loose: [{ title, price: 15000, date: '2026-08-04', url }] },
+    directEbay: { result: { state: 'ready', sales: [{ id: '298560637650',
+      title: 'PaRappa The Rapper (PS1 1997) - Rhythm Game - Disc ONLY - TESTED',
+      url: 'https://www.ebay.com/itm/298560637650', price: 9999, shipping: 607,
+      conditionText: 'Pre-Owned', state: 'sold', date: '2026-08-22' }] } } });
+  for (const checks of [undefined, { results: { '398247034954': { state: 'ended' } } }]) {
+    const evaluated = { ...example, ebayChecks: checks };
+    const sales = invoke('floorSales', evaluated);
+    assert.match(sales[0].mismatch, /Loose condition unconfirmed/);
+    assert.equal(sales[0].odd, true);
+    assert.equal(sales[0].historicalCandidate, false, 'Age cannot restore an invalid condition');
+    assert.equal(invoke('floorResult', evaluated).b.basis, 10606);
+    assert.equal(invoke('floorSaleKey', invoke('floorEbayDriver', evaluated).sale), '298560637650', 'Verify the real loose candidate next');
+  }
+});
+
+test('explicitly faulty games are excluded across sources without rejecting cosmetic or negated faults', () => {
+  const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004 };
+  const bad = ['READ PARTIALLY WORKS', 'Partially Working', 'Not Working', 'Not Fully Working',
+    'Does Not Read', "Doesn't Play", 'Wont Load', 'Skips', 'Freezing', 'Read Errors', 'For Parts', 'Unplayable'];
+  for (const suffix of bad) {
+    const title = `PaRappa the Rapper PS1 Disc Only ${suffix}`;
+    assert.match(invoke('floorListingMismatch', title, product), /Faulty/, suffix);
+    for (const condition of ['loose', 'cib']) {
+      const example = cur(product, { condition, sales: { [condition]: [{ title, price: 5995 }] } });
+      const sale = invoke('floorSales', example)[0];
+      assert.equal(sale.odd, true, suffix);
+      assert.equal(invoke('floorSaleGroup', sale), 'condition');
+    }
+    const sale = { title, price: 5995, url: 'https://www.ebay.com/itm/128121297341' };
+    assert.equal(invoke('floorEbayResult', sale, product, { id: '128121297341', title, state: 'sold', price: 5995 }, 'loose').state, 'mismatch');
+  }
+  for (const suffix of ['READ', 'Light Scratches Tested Working', 'No Skipping', 'Without Freezing', 'Does Not Skip', "Doesn't Freeze", 'No Read Errors', 'No Disc Rot', 'No Skipping or Freezing'])
+    assert.equal(invoke('floorGameFaultMismatch', `PaRappa the Rapper PS1 Disc Only ${suffix}`, product), null, suffix);
+  assert.equal(invoke('floorGameFaultMismatch', 'Broken Sword PS1 Disc Only', { ...product, 'product-name': 'Broken Sword' }), null);
+  const pokemon = { ...product, 'product-name': 'Pokemon X', 'console-name': 'Nintendo 3DS' };
+  assert.match(invoke('floorListingMismatch', 'Pokemon X Nintendo 3DS Cartridge Only Partially Works', pokemon), /Faulty/, 'Premiums cannot admit defective evidence');
 });
 
 test('pack-ins do not excuse separate extras, variants, incomplete copies or high-sale outliers', () => {
@@ -1825,7 +1868,7 @@ test('Kingdom Hearts uses its higher eligible sale over Renewed and retains eBay
 
 test('Renewed above twice the selected PC condition is reference-only without changing premiums', () => {
   const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004, 'cib-price': 14200 };
-  const example = cur(product, { condition: 'loose', sales: { loose: [{ title: 'PaRappa the Rapper PS1 Game Only', price: 10000, url: 'https://www.ebay.com/itm/111111111111' }] },
+  const example = cur(product, { condition: 'loose', sales: { loose: [{ title: 'PaRappa the Rapper PS1 Disc Only', price: 10000, url: 'https://www.ebay.com/itm/111111111111' }] },
     amazon: { found: true, title: 'PaRappa the Rapper (Renewed)', renewedFallback: true, offers: [{ price: 22206 }] } });
   const result = invoke('floorResult', example);
   assert.equal(result.b.basis, 10000);
@@ -1844,7 +1887,7 @@ test('Renewed above twice the selected PC condition is reference-only without ch
   assert.equal(invoke('floorRenewedReferenceOnly', { ...example, amazon: { ...example.amazon, renewedFallback: false, title: product['product-name'] } }), false);
   assert.equal(invoke('floorResult', { ...example, sales: { loose: [] } }).b.basis, 9004, 'No remaining sources falls back to PC');
   const pokemon = { ...product, 'product-name': 'Pokemon X', 'console-name': 'Nintendo 3DS' };
-  const premium = cur(pokemon, { condition: 'loose', sales: { loose: [{ title: 'Pokemon X Nintendo 3DS Game Only', price: 10000 }] } });
+  const premium = cur(pokemon, { condition: 'loose', sales: { loose: [{ title: 'Pokemon X Nintendo 3DS Cartridge Only', price: 10000 }] } });
   assert.equal(invoke('floorResult', { ...premium, amazon: { ...example.amazon, title: 'Pokemon X Nintendo 3DS (Renewed)' } }).r.price,
     invoke('floorResult', premium).r.price, 'The specific premium still applies after removing the Renewed reference');
 });

@@ -1075,9 +1075,12 @@ Guide (the Google Sheet tab).
      For Loose games, sales that include posters, maps or other printed inserts
      are excluded. Those original contents remain valid for CIB. Loose sales
      need clear evidence such as "disc only", "cartridge only", "loose" or "no case".
-     "No poster", "no manual" or "tested" alone do not prove a loose copy; these
+     "Game only", "black label", "no poster", "no manual" or "tested" alone do not prove a loose copy; these
      stay under **Excluded listings → Condition / packaging** for staff review.
      This applies to both PriceCharting sales and direct eBay results.
+     "Black label" is a printing description, not proof of packaging. Check the
+     photos when the title is ambiguous. Explicit partially-working, skipping,
+     unreadable or parts-only games are also excluded from working-copy pricing.
      Regular eligible Used or New offers take priority over Renewed for all
      pre-owned items. Specific premiums, deductions and the high-value exception remain.
      **Amazon conditions for Loose games:** use the **lowest matching offer
