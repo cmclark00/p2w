@@ -497,9 +497,22 @@ function slimProduct(p) {
   };
 }
 
+// Standalone toys-to-life readers are hardware, even when cataloged under a disc console.
+// Keep starter/game bundles and the actual software out of this classification.
+function toyPortalAccessory(name) {
+  const n = norm(name);
+  if (/\b(?:starter|bundle|game only|disc only|disk only|software only)\b/.test(n)
+    || /\b(?:with|includes|including|and|plus) (?:the )?(?:game|disc|software)\b/.test(n)
+    || /\b(?:game|disc|software) (?:with|and|plus)\b/.test(n)) return false;
+  return /\bdisney infinity\b/.test(n) && /\b(?:portal|base)\b/.test(n)
+    || /\bskylanders\b/.test(n) && /\bportal\b/.test(n)
+    || /\b(?:portal of power|traptanium portal)\b/.test(n)
+    || /\blego dimensions\b/.test(n) && /\b(?:toy pad|toypad|portal|base)\b/.test(n);
+}
+
 function guessCategory(name, genre = '') {
   const n = name.toLowerCase();
-  if (flatItemMatch(name)) return 'accessory';
+  if (flatItemMatch(name) || toyPortalAccessory(name)) return 'accessory';
   // Rhythm games first: "Rocksmith [With Cable]" and "Taiko … [Controller Bundle]" are games with their
   // instrument; "Rock Band Drum Kit" and "DJ Hero Turntable" are instruments.
   if (RHYTHM_RE.test(name) && !RHYTHM_CONSOLE_RE.test(name)) return rhythmKind(name) ? 'game' : 'accessory';
@@ -645,7 +658,7 @@ function guideCheck(line, s) {
   const flatKey = (line.source === 'pc' || line.source === 'hw') && flatItemMatch(line.name, s);
   if (flatKey) return { flat: s.flatItems.amount, note: `${flatKey} → ${money(s.flatItems.amount)}` };
   const g = s.guide;
-  if (!g.enabled || line.source !== 'pc' || !isGameCat(line.category)) return null;
+  if (!g.enabled || line.source !== 'pc' || !isGameCat(line.category) || toyPortalAccessory(line.name)) return null;
   if (/\bpc games?\b/.test(norm(line.platform))) return { dontBuy: true, note: "PC game – we don't buy PC games" };
   const title = baseTitle(line.name);
   if (g.deadGames.some((t) => baseTitle(t) === title)) return { dontBuy: true, note: 'Manager title-wide override - do not buy' };
@@ -1001,6 +1014,21 @@ function applyHardwareMatches() {
       prices: l.prices, cashOverride: l.cashOverride, creditBonus: l.creditBonus, // an agreed price or credit % stays
     };
   });
+  if (changed) saveTrade();
+}
+
+// Repair previously inferred game categories on unfinished trades without resetting staff prices.
+function migrateToyPortalLines() {
+  let changed = false;
+  for (const line of trade.lines) {
+    if (line.source !== 'pc' || !isGameCat(line.category) || !toyPortalAccessory(line.name)) continue;
+    line.category = 'accessory';
+    line.deductions = (line.deductions || []).filter((id) => settings.deductions.find((d) => d.id === id)?.appliesTo === 'hardware');
+    delete line.guideFlag; delete line.manualMissing; delete line.manualCost;
+    if (line.condition === CASE_ONLY) line.condition = 'loose';
+    // Preserve quantity, condition, reference prices and any staff-entered offer.
+    changed = true;
+  }
   if (changed) saveTrade();
 }
 
@@ -7271,6 +7299,7 @@ async function startApp(status) {
   }
   $('#view-auth').hidden = true;
   migrateCustomLines();
+  migrateToyPortalLines();
   applyHardwareMatches();
   applyRole();
   renderTokenStatus();

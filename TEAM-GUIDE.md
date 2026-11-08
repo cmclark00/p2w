@@ -714,6 +714,9 @@ Everyone in the store shares one internet address, so typos add up.
    go back to normal.
    **Loose PSP games use normal loose-game trade pricing**, including imports.
    They do not get the disc-only flat offers used for other disc systems.
+   **Infinity bases, Skylanders portals and LEGO Dimensions toy pads are accessories.**
+   They do not get disc-only offers either. Refreshing repairs these items in an
+   unfinished trade while preserving prices staff have typed in.
 4. Read the badges. They explain guide rules (disc-only, shitbox game,
    don't buy), Pokémon authenticity checks, and "over $100, ask Keith or
    Mark".

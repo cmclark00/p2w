@@ -1834,6 +1834,11 @@ The site's **only server-side code**. Everything else is static.
   - **Loose PSP trade-ins:** PSP, PAL PSP and JP PSP games bypass the disc-only
     flat-price tiers and use the normal loose-game offer. Other disc systems,
     CIB/New rules, manager overrides and Dead Games restrictions are unchanged.
+  - **Toys-to-life readers:** standalone Disney Infinity portals/bases, Skylanders
+    portals and LEGO Dimensions toy pads are accessories, not disc games. Starter
+    packs/game bundles keep game classification. Startup repairs old PriceCharting
+    game-category portal lines in unfinished trades, removes game-only deductions,
+    and preserves quantities, reference values and staff-entered prices.
   - Buying-guide flat rules: dead games, disc-only tiers, shitbox games, the
     ÷5 resurfacing rule, and the $0.25 stack. **Scratches are free at
     $0.50 or less** (`SCRATCH_FREE_MAX`): `priceLine()` prices the line

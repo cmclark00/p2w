@@ -390,6 +390,44 @@ test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing
   assert.ok(invoke('floorRecentSwitch',{...base,product:{...product,'release-date':'2021-02-28'}},Date.parse('2024-02-29T12:00:00Z')).release);
 });
 
+test('toys-to-life portals are accessories, including unfinished trades, without disc-only offers', () => {
+  const settings = json('DEFAULT_SETTINGS');
+  for (const name of ['Disney Infinity Portal', 'Disney Infinity Base', 'Disney Infinity 3.0 USB Base',
+    'Skylanders Giants Portal of Power', 'Skylanders Trap Team Traptanium Portal', 'Portal of Power',
+    'LEGO Dimensions Toy Pad', 'LEGO Dimensions Toypad']) {
+    assert.equal(invoke('guessCategory', name), 'accessory', name);
+    const line = {source:'pc', category:'accessory', name, platform:'Xbox One', condition:'loose', qty:1,
+      prices:{'loose-price':1396,'retail-loose-buy':380}, deductions:[]};
+    assert.equal(invoke('guideCheck', {...line,category:'game'}, settings), null, 'Old game classification must not trigger disc tiers');
+    const price = invoke('priceLine', line, settings);
+    assert.equal(price.cash,380); assert.equal(price.credit,456); assert.equal(price.flat,false);
+  }
+  for (const name of ['Portal', 'Portal 2', 'Disney Infinity', 'Disney Infinity 3.0', 'Skylanders Trap Team',
+    'Disney Infinity Starter Pack with Portal', 'Disney Infinity Game with Portal', 'Skylanders Portal Bundle',
+    'LEGO Dimensions Starter Pack', 'Skylanders Portal with Game']) {
+    assert.equal(invoke('guessCategory',name),'game',name);
+  }
+  const migrated=json(`(() => {
+    const oldLines=trade.lines;
+    try {
+      trade.lines=[{id:'portal',source:'pc',name:'Disney Infinity Portal',category:'game',condition:'loose',qty:2,
+        prices:{'retail-loose-buy':380,'loose-price':1396},override:450,cashOverride:300,creditBonus:25,
+        deductions:['resurface'],manualMissing:true,manualCost:100,guideFlag:'sports'},
+        {id:'game',source:'pc',name:'Portal 2',category:'game',condition:'loose',qty:1},
+        {id:'custom',source:'custom',name:'Disney Infinity Portal',category:'other',cashOverride:200}];
+      migrateToyPortalLines(); const first=JSON.stringify(trade.lines); migrateToyPortalLines();
+      return {lines:trade.lines,unchanged:JSON.stringify(trade.lines)===first};
+    } finally {trade.lines=oldLines;}
+  })()`);
+  const portal=migrated.lines[0];
+  assert.equal(portal.category,'accessory'); assert.equal(portal.condition,'loose'); assert.equal(portal.qty,2);
+  assert.equal(portal.override,450); assert.equal(portal.cashOverride,300); assert.equal(portal.creditBonus,25);
+  assert.equal(portal.prices['retail-loose-buy'],380); assert.deepEqual(portal.deductions,[]);
+  assert.ok(!('guideFlag' in portal)); assert.ok(!('manualMissing' in portal));
+  assert.equal(migrated.lines[1].category,'game'); assert.equal(migrated.lines[2].category,'other');
+  assert.equal(migrated.unchanged,true);
+});
+
 test('loose PSP games use normal trade offers while other disc-only tiers stay intact', () => {
   const settings = json('DEFAULT_SETTINGS');
   const line = { source: 'pc', category: 'game', name: 'LocoRoco', platform: 'PSP', condition: 'loose',
