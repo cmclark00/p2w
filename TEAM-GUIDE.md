@@ -1093,7 +1093,10 @@ Guide (the Google Sheet tab).
      either eligible alone. If neither is available across matching Amazon
      listings, it falls back to **Good**, then **Acceptable**, labeled **fallback**.
      It compares the selected Used grade against **New** and uses the lower
-     price. New is also usable when eligible Used offers are absent. A lower
+     price. If **only New is available**, it stays visible for reference but
+     does not price Loose/CIB inventory. Use the normal sales/PriceCharting
+     fallback and applicable specific rules instead. Sealed/New inventory
+     still uses New offers. A lower
      grade is a pricing reference, not confirmation that a seller includes the
      case/manual. Check seller notes when exact contents matter.
      Hardware and figures keep their existing rules. The Amazon Used reference

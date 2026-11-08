@@ -633,7 +633,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       if(fail)assert.match(html,/Check failed/);else assert.match(html,/\$10\.00/);
     }
   });
-  await test('CIB uses regular New before searching Renewed when eligible Used is absent', async () => {
+  await test('CIB keeps regular New reference-only when eligible Used is absent', async () => {
     for(const [newPrice,renewedPrice] of [[7394,7024],[6000,7024],[6000,null]]) {
       const regular=candidate('B000000001'),renewed=candidate('B000000002','Final Fight SNES (Renewed)');let renewedChecked=false;
       const e=engine(async(route,params)=>{
@@ -642,18 +642,39 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
         return {...offer(item,item===regular?(params.cond==='new'?newPrice:null):renewedPrice),condition:params.cond==='new'?'New':'Used'};
       });
       const result=await e.fetch(product,'cib');assert.equal(renewedChecked,false);assert.equal(result.newReference,true);
-      e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),newPrice);
+      e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),null);
       assert.equal(result.references.new.offers[0].price,newPrice);
     }
   });
-  await test('New can price CIB while wrong games and foreign editions remain excluded', async () => {
+  await test('New-only CIB reference still excludes wrong games and foreign editions', async () => {
     const good=candidate('B000000001','Final Fight SNES Factory Sealed'),bad=candidate('B000000002','Final Fight Guy SNES Factory Sealed'),french=candidate('B000000003','Final Fight French Version SNES Factory Sealed');
     const e=engine(async(route,params)=>{
       if(route==='amazon/catalog') return {candidates:[good,bad,french]};
       assert.equal(params.asin,good.asin);return {...offer(good,params.cond==='new'?6000:null),condition:params.cond==='new'?'New':'Used'};
     });
-    const result=await e.fetch(product,'cib');assert.equal(result.references.new.asin,good.asin);e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),6000);
+    const result=await e.fetch(product,'cib');assert.equal(result.references.new.asin,good.asin);e.ctx.result=result;assert.equal(e.run('floorAmazonLowest({product,condition:"cib",amazon:result})'),null);
     assert.ok(result.rejected.some(r=>r.asin===bad.asin));assert.ok(result.rejected.some(r=>r.asin===french.asin));
+  });
+  await test('New-only Amazon does not raise Loose/CIB, retains display, and still prices sealed inventory', async () => {
+    const p={'product-name':'LEGO Marvel Super Heroes 2','console-name':'Xbox One','loose-price':814,'cib-price':814,'new-price':1200};
+    const good=candidate('B000000001','LEGO Marvel Super Heroes 2 Xbox One',['Xbox One']);
+    for(const condition of ['loose','cib','new']) {
+      const e=engine(async(route,params)=>route==='amazon/catalog'?{candidates:[good]}:
+        {...offer(good,params.cond==='new'?2400:null),condition:params.cond==='new'?'New':'Used'});
+      e.ctx.result=await e.fetch(p,condition);e.ctx.p=p;e.ctx.condition=condition;e.run('amazonSet=true');
+      const cur='{product:p,condition,amazon:result,sales:{loose:[],cib:[],new:[]}}';
+      assert.equal(e.run(`floorAmazonLowest(${cur})`),condition==='new'?2400:null);
+      const priced=e.run(`floorResult(${cur})`);
+      assert.equal(priced.b.from,condition==='new'?'amazon':'pricecharting');
+      assert.equal(priced.b.basis,condition==='new'?2400:814);
+      const html=e.run(`floorAmazonReferencesHtml(${cur},floorResult(${cur}).b)`);
+      assert.match(html,/\$24\.00/);
+      if(condition!=='new') {
+        assert.match(html,/Reference only · no eligible Used offer/);
+        assert.doesNotMatch(html,/Sets baseline/);
+        assert.match(e.run(`floorAmazonHtml(${cur},floorResult(${cur}).b)`),/New only; reference only/);
+      }
+    }
   });
   await test('Loose waits for New failures to recover and does not reuse an incomplete higher Used price', async () => {
     const good=candidate('B000000001');let fail=true,usedCalls=0;
@@ -667,7 +688,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     fail=false;e.ctx.result=await e.fetch();assert.equal(e.ctx.result.incomplete,undefined);
     assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),2800);assert.equal(usedCalls,1);
   });
-  await test('Loose uses regular New before considering Renewed and retains Renewed when both regular conditions lack offers', async () => {
+  await test('Loose leaves New-only reference-only and retains Renewed when both regular conditions lack offers', async () => {
     for(const fresh of [3000,null]) {
       const regular=candidate('B000000001'),renewed=candidate('B000000002','Final Fight SNES (Renewed)');let renewedChecked=false;
       const e=engine(async(route,p)=>{
@@ -675,7 +696,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
         return {...offer(p.asin===regular.asin?regular:renewed,p.asin===regular.asin?(p.cond==='new'?fresh:null):2000),condition:p.cond==='new'?'New':'Used'};
       });
       e.ctx.result=await e.fetch();assert.equal(renewedChecked,fresh===null);
-      assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),fresh||2000);
+      assert.equal(e.run('floorAmazonLowest({product,condition:"loose",amazon:result})'),fresh ? null : 2000);
     }
   });
   await test('CIB waits for a failed New check, then resumes to select the cheaper New price', async () => {

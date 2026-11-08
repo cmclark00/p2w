@@ -4398,7 +4398,7 @@ async function fetchFloorAmazonSingle(product, condition, request) {
       const listingCount = new Set(choices.map((a) => a.asin)).size;
       if (listingCount > 1) matchNotes.push(`Compared ${listingCount} verified Amazon listings; compared the lowest matching offers by condition${searchError ? ' found so far' : ''}`);
       if (selected?.renewedFallback && !searchError) matchNotes.push('Renewed fallback: no usable regular Used or New Amazon offer found. Renewed is used/refurbished evidence, never factory-new evidence');
-      matchNotes.push(condition === 'new' ? 'New inventory uses New offers first. If none are available, Like New (Mint) is the only lower-grade fallback; Renewed and other Used grades cannot supply this Amazon reference.' : 'Pre-owned inventory uses the lower eligible Used or New Amazon offer. Used grades still follow the selected condition.');
+      matchNotes.push(condition === 'new' ? 'New inventory uses New offers first. If none are available, Like New (Mint) is the only lower-grade fallback; Renewed and other Used grades cannot supply this Amazon reference.' : 'Pre-owned inventory compares Used and New only when eligible Used exists. New alone is reference-only; use the other pricing sources. Used grades still follow the selected condition.');
       const references = {};
       for (const kind of ['used', 'new', 'renewed']) {
         const matches = verified.filter(a => kind === 'renewed' ? a.renewedFallback : !a.renewedFallback && a.offerCondition === kind);
@@ -5754,10 +5754,17 @@ function floorAmazonConditionFallback(cur) {
   const offer = floorAmazonEligibleOffers(cur)[0];
   return offer && floorAmazonGradeTier(offer) > 0 ? `Lower-condition fallback: ${AMZ_SUB[floorAmazonSub(offer)]}` : '';
 }
+function floorAmazonNewOnlyReference(cur) {
+  const a = cur.amazon;
+  if (cur.condition === 'new' || !a?.newReference || !a.references) return false;
+  const used = a.references.used;
+  return !(used && floorAmazonLowest({ ...cur, amazon: used }) > 0);
+}
 // Shipping included. Loose games use any grade; other conditions retain their filters.
 function floorAmazonLowest(cur, showPartial = false) {
   if (cur.amazon?.incomplete && !showPartial) return null;
   if (!cur.amazon?.found || floorAmazonMismatch(cur)) return null;
+  if (floorAmazonNewOnlyReference(cur)) return null;
   const a = cur.amazon, offerCondition = String(a.offerCondition || a.condition || '').toLowerCase();
   if (cur.condition === 'new' ? a.renewedFallback || (offerCondition === 'used' && !a.newLikeNewFallback) || a.displayOnly
     : a.displayOnly) return null;
@@ -5853,6 +5860,7 @@ function floorOwnBasis(cur = floorCur) {
   if (waiting) return { basis: null, sale, checks, waiting };
   const renewedReferenceOnly = floorRenewedReferenceOnly(cur);
   const amz = cur.amazon?.error || renewedReferenceOnly ? null : floorAmazonLowest(cur);
+  if (floorAmazonNewOnlyReference(cur)) checks.push('Amazon has only a New offer for this pre-owned item; reference only. Use eligible sales and PriceCharting fallback with applicable GameStop and specific pricing rules.');
   if (renewedReferenceOnly) checks.push(`Amazon Renewed ${money(floorAmazonLowest(cur))} is more than 2× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(Number(cur.product[PC_FIELDS.market[cur.condition]]))}; reference only. Eligible sales, GameStop and specific premiums still apply`);
   const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) >= FLOOR_EXPENSIVE_GAME;
   const renewedReference = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
@@ -6291,7 +6299,7 @@ function renderFloorPricer() {
             <li><strong>Very Good:</strong> game with case / cover art and/or manual. Treated as CIB.</li>
             <li><strong>Like New (Mint):</strong> better-condition CIB. CIB uses the cheaper of Very Good and Like New; if neither is available, use Good, then Acceptable.</li>
             <li><strong>Loose pricing:</strong> lowest matching offer across all Used grades and New, including shipping. A cheaper CIB-grade or New copy counts too.</li>
-            <li><strong>New:</strong> can price Loose or CIB when cheaper than eligible Used. New inventory uses New first; if unavailable, Like New (Mint) only is the lower-condition Amazon fallback.</li>
+            <li><strong>New:</strong> can price Loose or CIB when cheaper than eligible Used. If no eligible Used offer exists, New is reference-only. New inventory uses New first; if unavailable, Like New (Mint) only is the lower-condition Amazon fallback.</li>
             <li><strong>Renewed:</strong> fallback when no eligible regular offer is found (Used or New for Loose); not proof of original sealed condition.</li>
           </ul>
           <p class="muted small-print">These are our pricing categories; check seller notes for exact contents. Prices include shipping. Specific pricing rules and premiums still apply.</p>
@@ -6341,7 +6349,7 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
     const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
       : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
-    const statusLabel = renewedReferenceOnly ? 'Reference only · above 2× PriceCharting' : price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
+    const statusLabel = renewedReferenceOnly ? 'Reference only · above 2× PriceCharting' : kind === 'new' && price > 0 && !a?.incomplete && floorAmazonNewOnlyReference(cur) ? 'Reference only · no eligible Used offer' : price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
     const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
     const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(statusLabel)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}${price > 0 && conditionFallback ? ' · fallback' : ''}` : ''} ↗</a>`;
     return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(statusLabel)}</td></tr>`;
@@ -6373,7 +6381,7 @@ function floorAmazonHtml(cur, b) {
   const more = a.count > offers.length ? `<p class="muted small-print">Showing Amazon's ${offers.length} lowest of ${a.count} offers.</p>` : '';
   return `${head}<table class="floor-sales"><tbody>${offers.map((o, i) => `<tr class="${i === usedAt ? 'picked' : !eligible.includes(o) ? 'muted' : ''}">
       <td class="num">${money(o.price)}</td><td>${esc(AMZ_SUB[floorAmazonSub(o)] || AMZ_SUB[o.sub] || o.sub || 'Unknown grade')}${o.fba ? ' <span class="badge info">Prime</span>' : ''}</td><td class="muted nowrap">${!eligible.includes(o) ? 'Not used for this condition' : i === lowestAt ? a.incomplete ? 'lowest found so far' : 'lowest eligible' : ''}</td></tr>`).join('')}</tbody></table>
-    <p class="muted small-print">Shipping included · ${a.incomplete ? 'partial search; offers not used for automatic pricing' : 'lowest matching offer used'}.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
+    <p class="muted small-print">Shipping included · ${a.incomplete ? 'partial search; offers not used for automatic pricing' : floorAmazonNewOnlyReference(cur) ? 'New only; reference only for pre-owned inventory' : 'lowest matching offer used'}.${amazonSandbox ? ' Sandbox keys: sample data, not real prices.' : ''}</p>${more}`;
 }
 
 function floorMath(b, r) {

@@ -1442,7 +1442,12 @@ The site's **only server-side code**. Everything else is static.
     condition reloads selection and stale requests cannot replace the new condition.
     Loose/CIB checks both Used and New offers on every verified regular ASIN.
     All pre-owned inventory selects the cheaper eligible regular Used or New offer,
-    including CIB. On equal prices, Used wins. New can also be the only available offer.
+    including CIB. On equal prices, Used wins. If no eligible regular Used offer
+    exists, a regular New-only result is reference-only for pre-owned inventory.
+    `floorAmazonNewOnlyReference()` checks the completed result's Used reference;
+    `floorAmazonLowest()` then excludes New from automatic pricing while keeping
+    its price/link visible. Normal eligible sales, PC fallback, applicable GameStop
+    and specific premiums remain in force. Sealed/New inventory is unchanged.
     New Amazon pricing prefers New on any verified regular ASIN. Only after a
     completed search finds none, `newLikeNewFallback` permits Like New/Mint
     rows from regular Used offers. No Very Good, Good, Acceptable, Open Box or
