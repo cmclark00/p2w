@@ -74,6 +74,38 @@ function checkPairingsHelpers() {
     }
 
     const adminHtml = readFileSync(join(root, 'pairings-admin.html'), 'utf8');
+    const ocrContext = {};
+    runInNewContext(
+      adminHtml.slice(adminHtml.indexOf('function cleanCell'), adminHtml.indexOf('// Mirror-fill')) +
+        adminHtml.slice(adminHtml.indexOf('function reconstructRows'), adminHtml.indexOf('var tessWorkerPromise')) +
+        '\nthis.ocr = { parsePairingLines, reconstructRows };',
+      ocrContext
+    );
+    const { parsePairingLines, reconstructRows } = ocrContext.ocr;
+    const cells = reconstructRows(['3', 'Casey (1/0/0 - JR)', 'Bye'].map((text, index) => ({
+      text, bbox: { x0: index * 100, y0: 10, y1: 20 }
+    })));
+    const parsed = parsePairingLines(cells.concat([
+      { text: '4 Alex vs BYE' },
+      { text: 'BYE: Blake' },
+      { text: 'Cameron (Bye)' },
+      { text: '5 Drew' },
+      { text: '6 Taylor Bye vs Jordan' },
+      { text: '7 vs BYE' },
+      { text: 'BYE' }
+    ]));
+    const pairingRows = parsed.map((row) => [row.table, row.p1, row.p2]);
+    const expectedPairingRows = [
+      ['BYE', 'Casey (1/0/0 - JR)', ''],
+      ['BYE', 'Alex', ''],
+      ['BYE', 'Blake', ''],
+      ['BYE', 'Cameron', ''],
+      ['5', 'Drew', ''],
+      ['6', 'Taylor Bye', 'Jordan']
+    ];
+    if (JSON.stringify(pairingRows) !== JSON.stringify(expectedPairingRows)) {
+      throw new Error('OCR bye detection misread a bye, a name, or an incomplete row');
+    }
     for (const marker of [
       'pa-main-rows-body',
       'pa-junior-rows-body',
@@ -196,6 +228,23 @@ function checkPairingsHelpers() {
     renderContext.renderRows([{ table: 1, p1: 'A', p2: 'B' }]);
     if (matchesRoot.children.length !== 1 || matchesRoot.children[0].tagName !== 'ul') {
       throw new Error('events without age divisions no longer render as a flat list');
+    }
+    renderContext.renderRows([
+      { division: 'junior', table: 'BYE', p1: 'Casey (1/0/0 - JR)', p2: '' },
+      { division: 'junior', table: '', p1: 'Alex', p2: 'bye' },
+      { division: 'junior', table: 5, p1: 'Drew', p2: '' }
+    ]);
+    const [ocrBye, manualBye, incomplete] = matchesRoot.children[0].children[1].children;
+    for (const [row, player] of [[ocrBye, 'casey'], [manualBye, 'alex']]) {
+      const [badge, players] = row.children;
+      if (badge.children.length !== 1 || badge.children[0].textContent !== 'Bye' ||
+          players.children.length !== 1 || players.children[0].children.at(-1).textContent !== 'No match this round' ||
+          !row.dataset.names.startsWith(player)) {
+        throw new Error('bye card is missing its player, badge, or round status');
+      }
+    }
+    if (incomplete.children[0].children[0].textContent !== 'Table') {
+      throw new Error('a missing opponent was incorrectly rendered as a bye');
     }
   } catch (error) {
     failures.push(`pairings helper checks\n${error.message}`);

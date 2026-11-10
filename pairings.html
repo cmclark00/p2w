@@ -385,30 +385,48 @@
         }
 
         function matchEl(pair) {
+          var bye = /^(?:bye|\(bye\))$/i;
+          var p1 = (pair.p1 || '').trim();
+          var p2 = (pair.p2 || '').trim();
+          var byePlayer = '';
+          if (bye.test(p1) && !bye.test(p2)) byePlayer = p2;
+          if (bye.test(p2) && !bye.test(p1)) byePlayer = p1;
+          if (bye.test(pair.table) && (!p1 || !p2) && !bye.test(p1 || p2)) byePlayer = p1 || p2;
+
           var li = document.createElement('li');
           li.className = 'pr-match';
           li.dataset.division = pairingDivision(pair);
           var badge = document.createElement('span');
-          badge.className = 'pr-table-badge' + (pair.table ? '' : ' tb-unknown');
-          var lbl = document.createElement('span');
-          lbl.className = 'tb-label';
-          lbl.textContent = 'Table';
+          badge.className = 'pr-table-badge' + (pair.table || byePlayer ? '' : ' tb-unknown');
+          if (!byePlayer) {
+            var lbl = document.createElement('span');
+            lbl.className = 'tb-label';
+            lbl.textContent = 'Table';
+            badge.appendChild(lbl);
+          }
           var num = document.createElement('span');
           num.className = 'tb-num';
-          num.textContent = pair.table ? pair.table : '—';
-          badge.appendChild(lbl);
+          num.textContent = byePlayer ? 'Bye' : (pair.table || '—');
           badge.appendChild(num);
           li.appendChild(badge);
           var players = document.createElement('div');
           players.className = 'pr-players';
-          players.appendChild(playerEl(pair.p1));
-          var vs = document.createElement('span');
-          vs.className = 'pr-vs';
-          vs.textContent = 'vs';
-          players.appendChild(vs);
-          players.appendChild(playerEl(pair.p2));
+          if (byePlayer) {
+            var player = playerEl(byePlayer);
+            var note = document.createElement('small');
+            note.textContent = 'No match this round';
+            player.appendChild(note);
+            players.appendChild(player);
+          } else {
+            players.appendChild(playerEl(pair.p1));
+            var vs = document.createElement('span');
+            vs.className = 'pr-vs';
+            vs.textContent = 'vs';
+            players.appendChild(vs);
+            players.appendChild(playerEl(pair.p2));
+          }
           li.appendChild(players);
-          li.dataset.names = ((pair.p1 || '') + ' ' + (pair.p2 || '')).toLowerCase();
+          li.dataset.names = (byePlayer || p1 + ' ' + p2).toLowerCase();
           return li;
         }
 

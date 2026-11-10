@@ -349,6 +349,9 @@ the Konami leaderboard (`p2w-leaderboard`).
   division" parenthetical (e.g. "(1/1/0 (3) - MA)") is **deliberately kept**
   in displayed names (owner wants records + JR/SR/MA labels visible to
   players; an earlier version stripped it and that was reversed by request).
+  Explicit bye labels in the screenshot produce a row with `table: "BYE"`,
+  the assigned player in `p1`, and an empty `p2`. Those rows skip table
+  recovery. Staff can add a missed bye by entering BYE in Player 2.
   Missing table numbers get **three recovery passes**, in order:
   (1) `recoverTableNumbers` — a second, targeted OCR pass per missing row:
   the row's table cell (everything left of the name column, located via the
@@ -428,6 +431,8 @@ the Konami leaderboard (`p2w-leaderboard`).
   name** (`.pr-hit`) so your own row jumps out of the pair; an empty result
   shows `#pr-nomatch`. The list is only rebuilt when the doc id changes —
   the 25s auto-refresh must not clear a search someone is mid-typing.
+  Explicit byes show a **Bye** badge and **No match this round** and remain
+  searchable by the assigned player's name.
   Falls back to the **original image view** (unchanged tap-to-zoom
   `#pr-figure`) when `pairs` is empty/absent, so older docs and any round
   where OCR/staff didn't produce rows still display fine. The source photo

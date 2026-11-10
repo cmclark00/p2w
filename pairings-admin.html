@@ -262,7 +262,7 @@
 
       <div class="pa-card" id="pa-rows-card" hidden>
         <h2 class="pa-card-title">Extracted pairings</h2>
-        <p class="pa-rows-intro">Each selected screenshot is read separately. Check names and table numbers, fix typos, delete junk rows, or add anything that was missed before publishing.</p>
+        <p class="pa-rows-intro">Check the names, tables, and byes against each screenshot before publishing. To add a missed bye, leave the table blank, put the player&rsquo;s name in Player 1, and enter BYE in Player 2.</p>
 
         <div class="pa-division-editors">
           <section class="pa-division-editor" id="pa-main-rows-section" aria-labelledby="pa-main-rows-title" hidden>
@@ -517,11 +517,22 @@
           var reVsSplit = /\s+(?:vs\.?|v\.?)\s+/i;
           var reLeadTable = /^(?:table\s*)?#?\s*(\d{1,3})\s*[:.\-]?\s+/i;
           var reNum = /^(?:table\s*)?#?\s*(\d{1,3})\s+(.+)$/i;
+          var reBye = /^(?:bye|\(bye\))$/i;
+          var reByePrefix = /^(?:table\s+)?(?:bye|\(bye\))(?:\s*[:|]\s*|\s+)/i;
+          var reByeSuffix = /(?:\s+\(bye\)|\s+[-–—|]\s*bye|\s{2,}bye)$/i;
           var out = [];
           rowObjs.forEach(function (row) {
             var line = (row.text || '').trim();
             if (!line) return;
             function push(table, p1, p2) {
+              p1 = cleanCell(p1);
+              p2 = cleanCell(p2);
+              if (reBye.test(p1) || reBye.test(p2)) {
+                table = 'BYE';
+                p1 = reBye.test(p1) ? p2 : p1;
+                p2 = '';
+              }
+              if (table === 'BYE' && (!p1 || reBye.test(p1) || /^(?:table\s*)?#?\s*\d+$/i.test(p1))) return;
               out.push({ table: table, p1: p1, p2: p2,
                          y0: row.y0 != null ? row.y0 : null,
                          y1: row.y1 != null ? row.y1 : null,
@@ -535,16 +546,28 @@
               var table = '';
               var tm = left.match(reLeadTable);
               if (tm) { table = tm[1]; left = left.slice(tm[0].length); }
-              push(table, cleanCell(left), cleanCell(right));
+              push(table, left, right);
+              return;
+            }
+            // Keep a separate Bye cell meaningful even when the reconstructed
+            // row joins its text with single spaces.
+            var cells = row.cells || [];
+            var last = cells[cells.length - 1];
+            var withoutSuffix = cells.length > 1 && reBye.test(cleanCell(last))
+              ? cells.slice(0, -1).join(' ')
+              : line.replace(reByeSuffix, '');
+            var withoutBye = withoutSuffix.replace(reByePrefix, '');
+            if (withoutBye !== line) {
+              push('BYE', withoutBye.replace(reLeadTable, ''), '');
               return;
             }
             var m = line.match(reNum);
             if (!m) return;
             var restParts = m[2].split(/\s{2,}|\t/).filter(Boolean);
             if (restParts.length >= 2) {
-              push(m[1], cleanCell(restParts[0]), cleanCell(restParts.slice(1).join(' ')));
+              push(m[1], restParts[0], restParts.slice(1).join(' '));
             } else {
-              push(m[1], cleanCell(m[2]), '');
+              push(m[1], m[2], '');
             }
           });
           return out;
@@ -766,8 +789,10 @@
           });
           return rows.map(function (row) {
             row.items.sort(function (a, b) { return a.x0 - b.x0; });
+            var cells = row.items.map(function (it) { return it.text; });
             return {
-              text: row.items.map(function (it) { return it.text; }).join(' '),
+              text: cells.join(' '),
+              cells: cells,
               y0: row.y0, y1: row.y1,
               x0: row.items[0].x0
             };
@@ -799,7 +824,7 @@
         // Bumped on every OCR-pipeline change — logged at the start of each
         // run so a console paste immediately shows whether the browser is
         // executing current code or a cached copy.
-        var OCR_BUILD = 'v12';
+        var OCR_BUILD = 'v13';
         var $build = document.getElementById('pa-build');
         if ($build) $build.textContent = OCR_BUILD;
 
