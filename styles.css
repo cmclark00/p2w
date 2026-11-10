@@ -1634,6 +1634,57 @@ h3 {
   color: var(--paper);
 }
 
+.cf-callout {
+  padding: clamp(18px, 3vw, 28px);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--gold);
+  border-radius: 14px;
+}
+
+.cf-callout h2,
+.cf-callout h3 {
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+}
+
+.cf-callout p:last-child {
+  margin-bottom: 0;
+}
+
+.cf-example {
+  margin-top: 24px;
+}
+
+.cf-example-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cf-example-products li {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.cf-events {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 28px;
+}
+
+.cf-events > div {
+  flex: 1 1 540px;
+}
+
 @media (max-width: 860px) {
   .cf-rules--row {
     grid-template-columns: 1fr;
@@ -2749,7 +2800,13 @@ h3 {
     margin-left: auto;
   }
 
-  /* Keep social links visible beside the CTA below the logo / phone / menu. */
+  /* Start a second row for the CTA and social links. */
+  .site-header::before {
+    content: "";
+    order: 1;
+    flex-basis: 100%;
+  }
+
   .header-cta {
     order: 1;
     flex: 1 1 0;
