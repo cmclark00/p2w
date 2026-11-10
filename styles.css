@@ -1088,8 +1088,36 @@ h3 {
   gap: 8px;
 }
 
+.events-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 14px;
+}
+
+.events-date-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.events-date-filter select {
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--paper);
+  color-scheme: dark;
+  font: inherit;
+}
+
 .events-tz-note {
-  margin: 14px 0 0;
+  margin: 0;
   font-size: 0.85rem;
   color: var(--muted);
   opacity: 0.85;

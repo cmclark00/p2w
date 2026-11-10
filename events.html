@@ -107,14 +107,22 @@
             <button class="filter-btn" data-filter="riftbound">Riftbound</button>
             <button class="filter-btn" data-filter="other">Other</button>
           </div>
-          <p class="events-tz-note">All times Eastern (ET).</p>
+          <div class="events-filter-options">
+            <label class="events-date-filter" for="events-date-filter">
+              Filter by date
+              <select id="events-date-filter" disabled>
+                <option value="">All Dates</option>
+              </select>
+            </label>
+            <p class="events-tz-note">All times Eastern (ET).</p>
+          </div>
         </div>
 
         <div class="events-grid" id="events-grid" aria-live="polite"></div>
         <div class="events-empty" id="events-empty" hidden>
           <img class="events-empty-mascot" src="assets/bulky-mascot.webp" alt="" aria-hidden="true" width="140" height="157">
           <p>
-            No upcoming events in this category right now. Check back soon or
+            No upcoming events match your selection. Check back soon or
             <a href="https://www.facebook.com/P2WGames/" target="_blank" rel="noopener">follow us on Facebook</a>
             for announcements.
           </p>
@@ -365,15 +373,23 @@
       // ─── Render & filter ────────────────────────────────────────────────────────
       const grid   = document.getElementById("events-grid");
       const empty  = document.getElementById("events-empty");
+      const dateFilter = document.getElementById("events-date-filter");
       let activeFilter = "all";
 
-      function render() {
-        const list = EVENTS
+      function upcomingEvents() {
+        return EVENTS
           .filter(ev => {
             const days = daysUntil(ev.date);
-            return days >= 0 && days <= 7 && (activeFilter === "all" || safeGame(ev.game) === activeFilter);
+            return days >= 0 && days <= 7;
           })
-          .sort((a, b) => new Date(a.date) - new Date(b.date));
+          .sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      function render() {
+        const list = upcomingEvents().filter(ev =>
+          (activeFilter === "all" || safeGame(ev.game) === activeFilter) &&
+          (!dateFilter.value || ev.date === dateFilter.value)
+        );
         grid.innerHTML = list.map(renderCard).join("");
         empty.hidden = list.length > 0;
         grid.hidden  = list.length === 0;
@@ -387,6 +403,8 @@
         activeFilter = btn.dataset.filter;
         render();
       });
+
+      dateFilter.addEventListener("change", render);
 
       grid.addEventListener("click", e => {
         const btn = e.target.closest(".cal-btn");
@@ -451,6 +469,11 @@
         .then(data => {
           if (!Array.isArray(data)) throw new Error("events.json is not an array");
           EVENTS = data;
+          const dates = new Set(upcomingEvents().map(ev => ev.date));
+          for (const date of dates) {
+            dateFilter.add(new Option(formatDate(date), date));
+          }
+          dateFilter.disabled = dates.size === 0;
           render();
           injectEventSchema(data);
         })
