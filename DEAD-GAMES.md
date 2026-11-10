@@ -65,6 +65,20 @@ ordinary shelf holds remain. The prior 27 entries, pricing and trade math are
 unchanged. Front Mission Online PS2 remains excluded pending safe retail/beta
 matching approval; this is still a reviewed subset, not full Page synchronization.
 
+Revision 7 adds only the original North American Xbox One Hunt: Showdown
+retail disc (UPC 816819017128; PriceCharting 93605) from source sequence 35,
+reviewed 10 November 2026, bringing website coverage to 29 entries. Crytek
+confirms no Xbox One gameplay after 15 August 2024. Its 18 February 2020
+physical-release announcement takes precedence over the catalog's 2018 date.
+Xbox physical discs had no automatic disc-to-digital upgrade: Crytek's
+support-review requests closed 30 September 2024. Do not promise a current
+upgrade entitlement to used-disc buyers. This exact-title Xbox One entry
+flags both checkpoints and holds ordinary playable stock; it does not match
+Hunt: Showdown 1896, PS4, newer console clients or unverified named editions.
+The prior 28 entries, explicit manager overrides and calculation/holding
+policy are preserved. This is one bounded addition from the Page; other
+Page changes are not imported and this is not full Page synchronization.
+
 - Unplayable: confirmed no normal-console gameplay; do not shelve that edition
   as playable. PC revivals do not restore console discs.
 - Conditional: unofficial console setups or closed playtests; hold from normal

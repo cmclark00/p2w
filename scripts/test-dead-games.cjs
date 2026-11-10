@@ -9,13 +9,13 @@ const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../trade-in/dead-g
 const clone = (s) => JSON.parse(JSON.stringify(s));
 let checks = 0;
 const test = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
-test('all 28 reviewed source-register entries and four categories survive generation', () => {
+test('all 29 reviewed source-register entries and four categories survive generation', () => {
   assert.deepEqual(reg.data, data);
-  assert.equal(data.revision, 6); assert.equal(data.sourceSequence, 9);
-  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [17, 8, 2, 1]);
+  assert.equal(data.revision, 7); assert.equal(data.sourceSequence, 35);
+  assert.deepEqual(Object.keys(reg.labels).map((k) => data.entries.filter((e) => e.category === k).length), [18, 8, 2, 1]);
   for (const e of data.entries) {
     assert.ok(e.sources.length);
-    assert.equal(e.reviewedAt, ['monster-hunter-frontier-g-ps3', 'phantasy-star-online-2-vita-special',
+    assert.equal(e.reviewedAt, e.id === 'hunt-showdown-xbox-one' ? '2026-11-10' : ['monster-hunter-frontier-g-ps3', 'phantasy-star-online-2-vita-special',
       'monster-hunter-frontier-g-wii-u', 'monster-hunter-frontier-online-xbox360-beginners',
       'monster-hunter-frontier-g-vita'].includes(e.id) ? '2026-10-20' : '2026-10-19');
   }
@@ -54,8 +54,22 @@ test('Wii U and Xbox 360 match only their verified Beginner packages with indepe
     ['Monster Hunter Frontier G', 'Xbox 360'], ["Monster Hunter Frontier Online Beginner's Package", 'PC Games'],
     ['Front Mission Online', 'PS2'], ['Front Mission Online SLPM-65981', 'PS2'], ['Front Mission Online SLPM-68514', 'PS2'],
   ]) assert.equal(reg.match(name, p), null, name + ' @ ' + p);
-  assert.match(data.notice, /Reviewed subset of source sequence 9/);
+  assert.match(data.notice, /Reviewed subset of source sequence 35/);
   assert.match(data.notice, /Front Mission Online PS2 remains outside website coverage/);
+});
+const huntOutOfScope = [['Hunt: Showdown 1896','Xbox One'], ['Hunt: Showdown 1896','Xbox Series X'],
+  ['Hunt: Showdown 1896 Deluxe Edition','PS5'], ['Hunt: Showdown','PS4'], ['Hunt: Showdown','PS5'],
+  ['Hunt: Showdown','Xbox Series X'], ['Hunt: Showdown','PC Games'],
+  ['Hunt: Showdown Gold Edition','Xbox One'], ['Hunt: Showdown Digital Download','Xbox One']];
+test('Hunt matches only the original Xbox One title and preserves the expired physical upgrade limitation', () => {
+  const e = reg.match('Hunt: Showdown','Xbox One');
+  assert.equal(e.id,'hunt-showdown-xbox-one'); assert.equal(e.category,'unplayable');
+  assert.equal(reg.match('HUNT SHOWDOWN','Xbox One').id,e.id);
+  for (const text of ['North American','816819017128','93605','18 February 2020']) assert.ok(e.edition.includes(text),text);
+  assert.equal(e.closureDate,'2024-08-15'); assert.equal(e.reviewedAt,'2026-11-10');
+  assert.match(e.caveats,/did not receive an automatic disc-to-digital upgrade/);
+  assert.match(e.caveats,/30 September 2024/); assert.match(e.caveats,/Do not promise a current upgrade entitlement/);
+  for (const [name,p] of huntOutOfScope) assert.equal(reg.match(name,p),null,name+' @ '+p);
 });
 const vitaOutOfScope = ['Monster Hunter Frontier G Beta', 'Monster Hunter Frontier G Trial',
   'Monster Hunter Frontier G Free Trial', 'Monster Hunter Frontier G Download Code',
@@ -248,7 +262,7 @@ test('both rendered checkpoints prominently flag confirmed and special-setup exa
     ['Final Fantasy XI','PS2'], ['EverQuest Online Adventures Frontiers','PS2'], ['Monster Hunter: Frontier G','JP Playstation 3'],
     ['Phantasy Star Online 2 [Special Package]','JP Playstation Vita'],
     ['Monster Hunter: Frontier G','JP Wii U'], ["Monster Hunter Frontier Online [Beginner's Package]",'JP Xbox 360'],
-    ['Monster Hunter: Frontier G','JP Playstation Vita']];
+    ['Monster Hunter: Frontier G','JP Playstation Vita'], ['Hunt: Showdown','Xbox One']];
   ctx.policyRow = { classList: { toggle() {} }, querySelector: element, querySelectorAll: () => [] };
   for (const [name, platform] of cases) {
     ctx.policyLine = line(name, platform);
@@ -260,6 +274,32 @@ test('both rendered checkpoints prominently flag confirmed and special-setup exa
     ctx.policyCurrent = cur(name, platform); run('floorCur = policyCurrent; renderFloorPricer();');
     assert.match(element('#floorPricer').innerHTML, /Pricing checkpoint/);
     assert.match(element('#floorPricer').innerHTML, /data-floor-act="add" disabled/);
+  }
+});
+test('Hunt flags both checkpoints and holds ordinary shelves while preserving manual offers and saved prices', () => {
+  const name='Hunt: Showdown', platform='Xbox One', l=line(name,platform);
+  assert.equal(call('guideCheck',l,run('settings')).dontBuy,true);
+  assert.equal(call('priceLine',l).cash,0);
+  l.cashOverride=777; assert.equal(call('priceLine',l).cash,777);
+  run('settings.guide.enabled = false;');
+  ctx.policyLine=l; run('updateRow(policyRow, policyLine);');
+  assert.match(element('[data-cell="flags"]').innerHTML,/STOP: completely unplayable on this console/);
+  assert.match(element('[data-cell="flags"]').innerHTML,/30 September 2024/);
+  assert.equal(call('priceLine',l).cash,777);
+  assert.equal(call('floorResult',cur(name,platform)).r,null);
+  ctx.huntCurrent=cur(name,platform); run('floorCur = huntCurrent; renderFloorPricer();');
+  assert.match(element('#floorPricer').innerHTML,/Pricing checkpoint/);
+  assert.match(element('#floorPricer').innerHTML,/data-floor-act="add" disabled/);
+  run('settings.guide.enabled = true;');
+  run("floor.items = [{name:'Hunt: Showdown',platform:'Xbox One',price:3000,recheck:{price:4000}}];");
+  run('printFloorLabels(); printFloorList(); copyFloorList(); useRecheck(floor.items[0]);');
+  assert.equal(run('floor.items[0].price'),3000);
+  const custom=clone(run('settings')); custom.guide.deadGames=['Hunt Showdown'];
+  assert.equal(call('guideCheck',line(name,'PS4'),custom).dontBuy,true);
+  for (const [title,p] of huntOutOfScope) {
+    assert.equal(call('deadGameNotice',title,p,'Trade-In'),'');
+    assert.equal(call('deadGameNotice',title,p,'Pricing'),'');
+    assert.equal(call('deadGameHeld',title,p),false);
   }
 });
 test('Frontier platform packages preserve offer rules, saved prices and exact-edition shelf holds', () => {
@@ -394,7 +434,7 @@ test('register UI renders counts, filters, source caveats and custom-policy conf
   assert.match(element('#deadEntries').innerHTML, /Sandstorm/);
   assert.match(element('#deadOverrides').innerHTML, /Conflict with offline-playable evidence/);
   element('#deadSearch').value = 'Evolve'; element('#deadCategory').value = 'offline'; run('showDeadGames();');
-  assert.match(element('#deadCount').textContent, /^1 of 28/);
+  assert.match(element('#deadCount').textContent, /^1 of 29/);
   element('#deadSearch').value = 'impossible'; run('showDeadGames();');
   assert.match(element('#deadEntries').innerHTML, /No entries match/);
   assert.ok(!call('deadGameNotice', '<img src=x onerror=alert(1)>', 'PS4').includes('<img'));

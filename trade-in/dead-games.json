@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "revision": 6,
-  "updatedAt": "2026-10-20",
+  "revision": 7,
+  "updatedAt": "2026-11-10",
   "sourceRegister": "https://chatgpt.com/space/page_c94411bf174481919079d67dd49537b3",
-  "sourceSequence": 9,
-  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup. Reviewed subset of source sequence 9: Front Mission Online PS2 remains outside website coverage pending safe retail/beta matching.",
+  "sourceSequence": 35,
+  "notice": "Source-verified starter register, not exhaustive. Absence is not a playability check. These are linked-source classifications, not fresh Play2Win hardware tests. Match the exact console, edition and setup. Reviewed subset of source sequence 35: this revision adds only the original Xbox One Hunt: Showdown disc; other Page changes are not imported by this revision. Front Mission Online PS2 remains outside website coverage pending safe retail/beta matching.",
   "changes": [
     {
       "date": "2026-10-19",
@@ -51,6 +51,12 @@
       "type": "coverage",
       "entryId": "monster-hunter-frontier-g-vita",
       "summary": "Added the Japanese Vita Beginner's Package card (VLJM-35137; JAN 4976219056304) after reconciling PriceCharting 2156539 by its cover/date and serial/JAN-linked sales against AmiAmi/CDJapan. This is cross-source identity inference, not a PriceCharting model/JAN field or a verified barcode route. Historical official closure on 18 December 2019; unofficial setup remains conditional and original-card compatibility is unverified. New coverage, not a new shutdown. Website covers 28 of source sequence 9's 29 rows; Front Mission Online PS2 remains excluded."
+    },
+    {
+      "date": "2026-11-10",
+      "type": "coverage",
+      "entryId": "hunt-showdown-xbox-one",
+      "summary": "Added only the original North American Xbox One Hunt: Showdown retail disc (UPC 816819017128; PriceCharting 93605) from source sequence 35. Historical Xbox One closure on 15 August 2024, not a new shutdown. Physical-disc support-review upgrade requests ended 30 September 2024; no current used-disc upgrade entitlement is promised. The prior 28 entries and handling policy are preserved; other Page changes are not imported."
     }
   ],
   "entries": [
@@ -963,6 +969,42 @@
       ],
       "reviewedAt": "2026-10-20",
       "firstListed": "2026-10-20"
+    },
+    {
+      "id": "hunt-showdown-xbox-one",
+      "title": "Hunt: Showdown",
+      "platforms": [
+        "Xbox One"
+      ],
+      "aliases": [
+        "Hunt Showdown"
+      ],
+      "edition": "Original North American Xbox One retail disc; UPC 816819017128; verified PriceCharting record 93605. Physical release 18 February 2020 per Crytek, rather than the catalog's 2018 date. Not Hunt: Showdown 1896; this entry does not classify PS4 discs or newer console clients.",
+      "category": "unplayable",
+      "classification": "No normal Xbox One gameplay",
+      "closureDate": "2024-08-15",
+      "effective": "Xbox One gameplay ended 15 August 2024",
+      "caveats": "Crytek confirms the original game is no longer playable on Xbox One; no usable offline, LAN or bot mode or released Xbox One revival verified. Hunt: Showdown 1896 is a separate client for newer hardware. Xbox physical discs did not receive an automatic disc-to-digital upgrade: Crytek required support review, with requests accepted only through 30 September 2024. Do not promise a current upgrade entitlement to a used-disc buyer. Keep off ordinary playable shelves. This entry does not classify PS4 discs, 1896, digital editions or unverified named packages. No fresh Play2Win hardware test was performed.",
+      "sources": [
+        {
+          "label": "Crytek Xbox One closure notice",
+          "url": "https://www.huntshowdown.com/news/hunt-showdown-to-sunset-on-ps4-xbox-one-from-15th-of-august"
+        },
+        {
+          "label": "Crytek physical-disc upgrade limits and expired request deadline",
+          "url": "https://www.huntshowdown.com/news/important-update-regarding-physical-copies-of-hunt-showdown-on-xbox-o"
+        },
+        {
+          "label": "Crytek physical retail launch: 18 February 2020",
+          "url": "https://www.crytek.com/news/hunt-showdown-out-now-on-playstationr-4-and-microsoft-xboxr"
+        },
+        {
+          "label": "Exact North American Xbox One catalog: 93605 / UPC 816819017128",
+          "url": "https://www.pricecharting.com/game/xbox-one/hunt-showdown"
+        }
+      ],
+      "reviewedAt": "2026-11-10",
+      "firstListed": "2026-11-10"
     }
   ]
 }
