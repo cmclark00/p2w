@@ -209,8 +209,8 @@ single source of truth and every push deploys straight to GoDaddy. (The
 | File | Purpose |
 |---|---|
 | `index.html` | Home. Has `GameStore` JSON-LD. |
-| `about.html` | About the shop; links to team page. Its **"Meet the mascot" Bulky split-section** carries a `.coin-hunt-teaser` card (cut-out coin + copy) linking to `bulky-coin-hunt.html`. |
-| `bulky-coin-hunt.html` | **Bulky's Coin Hunt** — every Saturday Bulky loses a coin within a 5-mile radius of the shop; find it + bring it in = **$50 store credit**. Bad weather = Bulky stays indoors, no coin that week. Floating hero coin, 3 "how it works" cards (reuses `.community-first`/`.cf-rules` styling), and a `.weather-note` rain-check callout. Reached from the about-page teaser; not in primary nav. |
+| `about.html` | About the shop, with a link to the team page and a **"Meet the mascot"** section. |
+| `bulky-coin-hunt.html` | **Bulky's Coin Hunt is paused.** Existing links show a `noindex` pause notice. To resume, recover the active page, the About page teaser, and the sitemap entry from `cc5e6f4`. |
 | `sell-trade.html` | Buy/sell/trade info **+ merged showcase galleries** (Video Games / TCG / Toys-to-Life) with lightbox. |
 | `bulk-rates.html` | Standalone buylist page — what we pay for English TCG bulk (Pokémon full breakdown, per-1k rates for MTG, YGO, Lorcana, One Piece, Riftbound, Digimon, Gundam, FAB, and **graded slab** bulk rates). Promoted to its own primary nav item. **The rate cards are rendered by an inline script from `assets/bulk-rates.json`**, the single source of truth shared with the trade-in calculator's TCG Bulk tab. Edit rates there, never in this page. Shape: `groups[] → { id, name, note?, items[] → { id, name, price (dollars), per (1000 or 1) } }`. Item `id`s must stay stable (the calculator snapshots them on trade lines). Groups with no items are hidden. On fetch failure it shows a call-us message. |
 | `card-conditions.html` | Standalone card condition guide — Near Mint / LP / MP / HP / Damaged with photo reference and criteria for each grade. Reachable from the FAQ ("How do you grade card condition?"). Not in the primary nav. Images live in `assets/conditions/`. |
@@ -2457,8 +2457,8 @@ Three via **Formspree** (endpoints are public client-side by design):
   their keep in *empty states, brand stamps, and narrative intros*, not as
   gratuitous decoration. The current set is deliberate; expand only with a
   reason. (Separate asset: `assets/bulky-coin.webp` — a background-removed
-  cut-out of the 3D-printed Play2Win Bulky coin, used in the about-page
-  `.coin-hunt-teaser` and as the floating hero on `bulky-coin-hunt.html`.
+  cut-out of the 3D-printed Play2Win Bulky coin for the paused Coin Hunt's
+  About page teaser and floating hero.
   It was cut from a photo with a feathered circular PIL mask, not rembg.)
 - **Trade-in store-credit bumps (tiered).** Store credit pays more than
   cash on trade-ins, by category: **video games 50% more**, **consoles &
