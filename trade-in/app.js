@@ -5248,6 +5248,8 @@ const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreorder
 // advertised count is allowed, but unrelated games in a seller's lot are not.
 const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)\s+){0,4}(?:games|titles)\b/gi;
 const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT),
+  ...String(text || '').matchAll(/\b(?:games?|titles?)\s+(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\b/gi),
+  ...String(text || '').matchAll(/\b(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:games?|titles?)\b/gi),
   ...String(text || '').matchAll(/\b(?:games|titles|cartridges|carts|discs|disks)\s+([2-9]|\d{2,})\s*[x×](?=\s|$)/gi)]
   .map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
 const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi, '').replace(/['’]/g, '').replace(/\b([IVX]+)\b/gi, (v) => ({ I: '1', II: '2', III: '3', IV: '4', V: '5', VI: '6', VII: '7', VIII: '8', IX: '9', X: '10', XI: '11', XII: '12', XIII: '13', XIV: '14', XV: '15', XVI: '16' }[v.toUpperCase()] || v)))
@@ -5369,6 +5371,16 @@ function floorNamedGameBundle(title, product) {
   if (at < 0) return false;
   const contents = /^(?:soundtracks?|music|cds?|slipcovers?|stickers?|art|books?|steelbook|postcards?|patches|pins?|inlays?|inlay|artwork|cover|covers)$/;
   const titleWord = word => !!word && !FLOOR_TITLE_DETAILS.test(word) && !contents.test(word) && !/^\d+$/.test(word);
+  // A separate franchise/base title can be a second game even though all its
+  // words occur in the selected sequel: "Doom & Doom Eternal", in either order.
+  // Require a delimited title segment, not a shared word in ordinary metadata.
+  const identity = core.filter(titleWord);
+  if (identity.length > 1 && parts.some((words, index) => {
+    if (index === at) return false;
+    const other = words.filter(titleWord);
+    return other.length > 0 && other.length < identity.length
+      && other.every((word, i) => word === identity[i]);
+  })) return true;
   const following = parts.slice(at + 1);
   // The reissue platform exception must not admit a second, single-word game
   // such as "Oblivion GOTY & Skyrim". Original pack-in terms remain allowed.

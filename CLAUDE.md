@@ -828,6 +828,9 @@ The site's **only server-side code**. Everything else is static.
     variants, incomplete conditions and high-price outliers still get checked.
     In particular, "Complete Disc + Case + Manual" is normal CIB, in any order;
     adding a controller, bonus disc, another game or special edition still excludes it.
+    Game-count wording such as "Game Set of 2"/"set of two games" is a bundle,
+    as are separated base/sequel titles such as "Doom & Doom Eternal" in either
+    order. Shared franchise words do not make those a single-game match.
     For a selected special edition, `floorEditionContentsTitle()` also permits
     plausible original contents named after with/includes/+/and: bonus posters,
     art books/cards, soundtracks, steelbook cases, figures/statues, pins, patches,

@@ -1262,6 +1262,44 @@ test('selected PAL releases use matching region evidence without admitting unrel
   assert.ok(!warning[0].detail.includes('Only North American'));
 });
 
+test('game sets and a separate base game cannot price a single subtitled sequel', () => {
+  const product = {...item, 'product-name':'Doom Eternal', 'console-name':'Xbox One', 'cib-price':1461};
+  const titles = [
+    'Doom & Doom Eternal Xbox One Game Set of 2. Excellent Condition w Manual. Tested',
+    'Doom Eternal Xbox One Game Set of Two',
+    'Doom Eternal Xbox One set of 2 games',
+    'Doom Eternal Xbox One game pack of 3',
+    'Doom & Doom Eternal Xbox One CIB',
+    'Doom Eternal & Doom Xbox One CIB',
+  ];
+  for (const title of titles) {
+    assert.match(invoke('floorListingMismatch',title,product),/^Multiple-game/,title);
+    assert.match(invoke('floorAmazonMismatch',{product,condition:'cib',amazon:{found:true,title}}),/^Multiple-game/,title);
+  }
+  for (const title of ['Doom Eternal - Microsoft Xbox One - Video Game',
+    'Doom Eternal Xbox One Complete Disc + Case + Manual',
+    'Doom Eternal Xbox One CIB with 2 inserts']) {
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+  }
+  assert.equal(invoke('floorNamedGameBundle','Ratchet & Clank PS4 CIB',
+    {...product,'product-name':'Ratchet & Clank','console-name':'Playstation 4'}),false,'official title conjunction is not a bundle');
+  assert.equal(invoke('floorNamedGameBundle','Doom & Doom Eternal Collection Xbox One',
+    {...product,'product-name':'Doom & Doom Eternal Collection'}),false,'selected compilation retains its titles');
+  assert.deepEqual(Array.from(invoke('floorGameCounts','Final Fantasy 2 games')),['2']);
+  assert.deepEqual(Array.from(invoke('floorGameCounts','Example Game set of two')),['2']);
+  assert.deepEqual(Array.from(invoke('floorGameCounts','Doom Eternal Xbox One 2 disc set')),[],'multiple discs are not multiple games');
+  const single='Doom Eternal - Microsoft Xbox One - Video Game';
+  const input=cur(product,{sales:{cib:[{title:titles[0],price:3800},{title:single,price:3046}]}});
+  assert.equal(invoke('floorAutoSale',invoke('floorSales',input)).sale.price,3046,'PriceCharting must skip the two-game set');
+  input.sales.cib=[];
+  input.directEbay={result:{state:'ready',sales:[titles[0],single].map((title,i)=>({
+    id:String(123456789060+i),title,price:i ? 2499 : 3000,shipping:i ? 547 : 800,state:'sold',
+    conditionText:'Pre-Owned',sellerCountry:'United States',locationSource:'ebay-located-in',
+  }))}};
+  assert.equal(invoke('floorAutoSale',invoke('floorSales',input)).sale.price,3046,'verified direct-search bundle must not drive pricing');
+  assert.equal(invoke('floorResult',input).r.price,3000,'normal rounding and premiums stay intact');
+});
+
 test('two-digit and repeated-series bundles are excluded before selecting a price', () => {
   const p={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
   for(const title of ['Farming Simulator 19 And 22 Xbox Series X W/ Case & Game',
