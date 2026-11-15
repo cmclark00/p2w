@@ -5645,7 +5645,10 @@ function floorConsoleListingMismatch(title, product) {
   const text = norm(title);
   const name = norm(product['product-name']);
   const parts = /\b(?:screw (?:sets?|kits?)|rubber feet|hole covers?|soft covers?|screen protectors?|protective (?:cases?|covers?)|carrying cases?|replacement (?:shells?|housing|screens?|parts?)|housing shells?|digitizers?|lcd screens?|battery (?:covers?|doors?)|button (?:sets?|kits?)|silicone (?:cases?|covers?))\b/;
-  if (!parts.test(name) && parts.test(text)) return 'Console accessory or replacement part, not the console';
+  const systemAt = text.search(/\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/);
+  const componentTitle = text.replace(/\b(?:with|includes?) (?:a )?(?:carrying case|protective case|screen protector)\b/g,
+    (phrase, offset) => systemAt >= 0 && offset > systemAt ? '' : phrase);
+  if (!parts.test(name) && parts.test(componentTitle)) return 'Console accessory or replacement part, not the console';
   if (/\b(?:stylus|styli|chargers?|cables?|cases?|covers?|batter(?:y|ies)|screens?|shells?)\b.*\b(?:for|compatible with)\b.*\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/.test(text)) return 'Console accessory or replacement part, not the console';
   // A modified console is not the stock system, even when its model/color match.
   const modifications = [/\bcapture (?:card|board|kit)\b/, /\b(?:loopy|katsukity)\b/, /\b(?:modded|modified|modchip|jailbroken|rgh|jtag)\b/];

@@ -391,6 +391,7 @@ test('stock handhelds exclude capture modifications and other named editions acr
     assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':50000},{condition:'loose',gamestopStock:{state:'in',title}})),null,title);
   }
   for(const title of ['New Nintendo 3DS XL Red Console US Model - Tested! Charger Stylus',
+    'New Nintendo 3DS XL Red with carrying case', 'New Nintendo 3DS XL Red with screen protector',
     'New Nintendo 3DS XL Red RED-001 Tested', 'Nintendo New 3DS XL 4GB Handheld Gaming System - Red - (Fair Condition)']) {
     assert.equal(invoke('floorListingMismatch',title,p),null,title);
   }
