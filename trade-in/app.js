@@ -5643,6 +5643,21 @@ function floorConsoleContentsTitle(title, product) {
 function floorConsoleListingMismatch(title, product) {
   if (!floorConsoleProduct(product)) return null;
   const text = norm(title);
+  const name = norm(product['product-name']);
+  const parts = /\b(?:screw (?:sets?|kits?)|rubber feet|hole covers?|soft covers?|screen protectors?|protective (?:cases?|covers?)|carrying cases?|replacement (?:shells?|housing|screens?|parts?)|housing shells?|digitizers?|lcd screens?|battery (?:covers?|doors?)|button (?:sets?|kits?)|silicone (?:cases?|covers?))\b/;
+  if (!parts.test(name) && parts.test(text)) return 'Console accessory or replacement part, not the console';
+  if (/\b(?:stylus|styli|chargers?|cables?|cases?|covers?|batter(?:y|ies)|screens?|shells?)\b.*\b(?:for|compatible with)\b.*\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/.test(text)) return 'Console accessory or replacement part, not the console';
+  // A modified console is not the stock system, even when its model/color match.
+  const modifications = [/\bcapture (?:card|board|kit)\b/, /\b(?:loopy|katsukity)\b/, /\b(?:modded|modified|modchip|jailbroken|rgh|jtag)\b/];
+  if (modifications.some(re => re.test(text) && !re.test(name))) return 'Modified console, not the selected stock model';
+  // Model RED-001 is shared by New 3DS XL colors; it is not proof of red casing.
+  if (/\b3ds\b/.test(name)) {
+    const editions = [/\bhappy home designer\b/, /\bmajoras? mask\b/, /\bhyrule\b/, /\bpikachu\b/, /\bpokemon\b/, /\bfire emblem\b/, /\bmonster hunter\b/, /\bsamus\b/, /\bgalaxy\b/, /\bsuper (?:mario|nintendo)\b/, /\bsnes\b/, /\byoshi\b/];
+    if (editions.some(re => re.test(text) && !re.test(name))) return 'Different console special edition';
+    const color = name.match(/\b(red|blue|black|white|pink|silver|gold)\b/)?.[1];
+    const withoutModel = text.replace(/\bred\s*001\b/g, '');
+    if (color && !new RegExp(`\\b${color}\\b`).test(withoutModel)) return 'Listing does not confirm the selected console color';
+  }
   if (/\b(?:untested|not tested|broken|faulty|not working|non working|for parts|parts only|repair only|powers on only)\b/.test(text)) return 'Faulty or untested console condition';
   const soldItem = text.replace(/\b(?:with|includes?) (?:original |factory )?(?:stickers?|decals?|skins?)\b|\b(?:serial(?: number)?|warranty) stickers?\b|\b(?:original |factory )?stickers? (?:intact|removed|present)\b/g, ' ');
   if (/\b(?:stickers?|decals?|skins?|replacement shell|motherboard|diagnostic (?:cart|cartridge)|test cartridge)\b/.test(soldItem)

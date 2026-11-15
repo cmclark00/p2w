@@ -23,6 +23,23 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('handheld Amazon search rejects components and modified or named editions before reading offers', async () => {
+    const p={'product-name':'New Nintendo 3DS XL Red','console-name':'Nintendo 3DS',genre:'Systems','loose-price':27930};
+    const wrong=[
+      candidate('B0BDM5RYS4','for LCD Screws Hole Soft Cover for Nintendo New 3DS XL LL Console Front Back Screw Rubber Feet Cover (Red OEM)',['Nintendo 3DS']),
+      candidate('B000000003','New Nintendo 3DS XL Red Loopy Capture Card',['Nintendo 3DS']),
+      candidate('B000000004','New Nintendo 3DS XL RED-001 Happy Home Designer',['Nintendo 3DS'])];
+    const exact=candidate('B000000005','New Nintendo 3DS XL Red',['Nintendo 3DS']);
+    const requested=[];
+    const e=engine(async(route,params)=>{
+      if(route==='amazon/catalog') return {candidates:[...wrong,exact]};
+      requested.push(params.asin);return offer(exact,30000);
+    });
+    const result=await e.fetch(p,'loose');
+    assert.equal(result.asin,exact.asin);
+    assert.ok(requested.length);
+    assert.ok(requested.every(asin=>asin===exact.asin),'Parts and mismatched models never reach offer selection');
+  });
   await test('Wireless N adapters recover Amazon naming variants without admitting other devices', async () => {
     const p={'product-name':'Xbox 360 Wireless Network Adapter ABG & N','console-name':'Xbox 360','loose-price':2297};
     const exact=candidate('B002RS7NB2','Xbox 360 Wireless Network Adapter A/B/G & N Networks',['Xbox 360']);

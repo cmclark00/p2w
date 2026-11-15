@@ -674,6 +674,12 @@ The site's **only server-side code**. Everything else is static.
     An unnamed added game ("& Game Tested Working") also counts as a bundle.
     Optional VCS adapters and trackballs are separate peripheral bundles unless
     explicitly part of the selected product; normal RF/power adapters remain.
+    Stock consoles exclude capture-card/Loopy/Katsukity modifications and other
+    explicit modded systems. 3DS matching rejects conflicting named console
+    editions (including Happy Home Designer) and requires a selected color;
+    RED-001 is a model code, not red-color evidence. Console replacement parts
+    and accessory compatibility titles cannot pass Amazon discovery or cached
+    pricing, PC/eBay sale matching, or GameStop comparison. Premiums are unchanged.
     Targeted sale checks recover once from a missed helper capability response
     when direct search returned rows, including partial searches. A second failure
     shows a separate verification-unavailable status and Retry sale checks action;

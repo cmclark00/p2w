@@ -369,6 +369,39 @@ test('console exclusion audit keeps normal equipment and rejects accessories, fa
   assert.equal(invoke('floorOdd',{title:'Example Game PS4 with controller'},'loose',null,item),true,'game bundle exclusions stay intact');
 });
 
+test('stock handhelds exclude capture modifications and other named editions across sources', () => {
+  const p={'product-name':'New Nintendo 3DS XL Red','console-name':'Nintendo 3DS',genre:'Systems','loose-price':27930};
+  const wrong=[
+    'New Nintendo 3DS XL With Pre Installed - Loopy Capture Card, Red',
+    'New Nintendo 3DS XL Handheld Game Console RED-001 Happy Home Designer',
+    'New Nintendo 3DS XL Red Capture Board Installed',
+    'New Nintendo 3DS XL Red Katsukity',
+    'New Nintendo 3DS XL Red Modded',
+    'New Nintendo 3DS XL Handheld Console RED-001 Blue',
+    'New Nintendo 3DS XL Handheld Console RED-001',
+    'New Nintendo 3DS XL Red Pokemon Edition',
+    'for LCD Screws Hole Soft Cover for Nintendo New 3DS XL LL Console Front Back Screw Rubber Feet Cover (Red OEM)',
+    'Replacement Housing Shell for New Nintendo 3DS XL Red',
+    'Stylus for New Nintendo 3DS XL Red',
+    'Carrying Case for New Nintendo 3DS XL Red',
+  ];
+  for(const title of wrong) {
+    assert.ok(invoke('floorSaleListingMismatch',{title},p),title);
+    assert.equal(invoke('floorAmazonLowest',cur(p,{condition:'loose',amazon:{found:true,title,offers:[{price:50000,sub:'good'}]}})),null,title);
+    assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':50000},{condition:'loose',gamestopStock:{state:'in',title}})),null,title);
+  }
+  for(const title of ['New Nintendo 3DS XL Red Console US Model - Tested! Charger Stylus',
+    'New Nintendo 3DS XL Red RED-001 Tested', 'Nintendo New 3DS XL 4GB Handheld Gaming System - Red - (Fair Condition)']) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+  }
+  const rows=invoke('floorSales',cur(p,{condition:'loose',sales:{loose:[
+    ...wrong.map(title=>({title,price:50153,date:'2026-11-01'})),
+    {title:'New Nintendo 3DS XL Red Console Tested',price:35000,date:'2026-11-01'}]}}));
+  assert.equal(invoke('floorAutoSale',rows).sale.price,35000,'Only stock red system may drive the recommendation');
+  assert.equal(invoke('floorConsoleListingMismatch','New Nintendo 3DS XL Happy Home Designer', {...p,'product-name':'New Nintendo 3DS XL Happy Home Designer'}),null);
+  assert.equal(invoke('floorConsoleListingMismatch','New Nintendo 3DS XL Red Loopy Capture Card', {...p,'product-name':'New Nintendo 3DS XL Red Loopy Capture Card'}),null);
+});
+
 test('console cart counts and named games cannot hide in ordinary equipment lists', () => {
   const p={'product-name':'Atari 5200 System','console-name':'Atari 5200',genre:'Systems','loose-price':6896};
   const wrong=[

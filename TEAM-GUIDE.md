@@ -911,6 +911,9 @@ Guide (the Google Sheet tab).
      lists, such as "14 game carts" or "controllers, PSU, and Pac Man".
      An added unnamed game, VCS adapter or trackball also makes a separate bundle;
      normal RF and power adapters remain eligible.
+     Stock handhelds also exclude capture-card modifications and other special
+     console editions. A model number such as RED-001 does not prove the color.
+     Replacement parts and accessories cannot set the console's market price.
      If the helper's first sale-check connection fails but search returned rows,
      the tool retries the connection once. **Individual sale verification unavailable**
      means those listings still need checking; **Retry sale checks** resumes that
