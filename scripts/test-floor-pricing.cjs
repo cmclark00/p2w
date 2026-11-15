@@ -130,6 +130,57 @@ test('no-manual completion reserves full delivered cost, compares as-is, and pre
   assert.equal(invoke('isPlain',{...line,manualCost:800}),false,'Quoted copies do not merge with automatic ones');
 });
 
+test('PriceCharting console buying values pay credit with cash divided by 1.2, preserving guide offers', () => {
+  const settings=json('DEFAULT_SETTINGS');
+  const line={id:'ps3-credit-test',source:'pc',name:'Playstation 3 System 60GB',platform:'Playstation 3',
+    category:'console',condition:'cib',qty:1,deductions:[],prices:{
+      'retail-loose-buy':19550,'retail-cib-buy':36660,'retail-new-buy':165000,
+      'loose-price':35500,'cib-price':55500,'new-price':250000}};
+  for(const [condition,value] of [['loose',19550],['cib',36660],['new',165000]]) {
+    const p=invoke('priceLine',{...line,condition},settings);
+    assert.equal(p.base,value); assert.equal(p.credit,value);
+    assert.equal(p.cash,Math.floor(value/1.2+1e-9));
+  }
+  const guide={...line,source:'hw',hwId:'ps3-test-guide',hwPrices:{complete:20000,unit:15000,parts:2000}};
+  for(const condition of ['cib','new']) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.credit,line.prices['retail-'+condition+'-buy']);
+    assert.equal(p.cash,Math.floor(p.credit/1.2+1e-9));
+  }
+  for(const [condition,cash,credit] of [['complete',20000,24000],['unit',15000,18000],['parts',2000,2000]]) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.cash,cash);assert.equal(p.credit,credit,'fixed guide payouts stay unchanged');
+  }
+  for(const category of ['handheld','accessory']) {
+    const p=invoke('priceLine',{...line,category},settings);
+    assert.equal(p.cash,36660);assert.equal(p.credit,43992,'other hardware categories retain their rules');
+  }
+  const deducted=invoke('priceLine',{...line,deductions:['no-power']},settings);
+  assert.equal(deducted.credit,35160);assert.equal(deducted.cash,29300);
+  const typed=invoke('priceLine',{...line,cashOverride:30000},settings);
+  assert.equal(typed.cash,30000);assert.equal(typed.credit,36000);
+  const bonus=invoke('priceLine',{...line,creditBonus:30},settings);
+  assert.equal(bonus.cash,30550);assert.equal(bonus.credit,39715);
+  const override=invoke('priceLine',{...line,override:36000},settings);
+  assert.equal(override.cash,30000);assert.equal(override.credit,36000);
+  const parts=invoke('priceLine',{...line,condition:'parts'},settings);
+  assert.equal(parts.cash,5325);assert.equal(parts.credit,5325);
+  for(const extra of [{pending:true},{failed:true},{prices:{}}]) {
+    const p=invoke('priceLine',{...line,...extra},settings);
+    assert.equal(p.cash,null);assert.equal(p.credit,null);
+  }
+  // Restored open/held lines use the corrected rule; market totals are not payouts.
+  const saved=run('trade.lines');
+  try {
+    context.ps3Line=JSON.parse(JSON.stringify({...line,qty:2}));run('trade.lines=[ps3Line]');
+    assert.equal(run('tradeTotals().cash'),61100);
+    assert.equal(run('tradeTotals().credit'),73300,'existing whole-dollar total rounding remains');
+    assert.equal(run('tradeItems()[0].cash'),30550);
+    assert.equal(run('tradeItems()[0].credit'),36660);
+    assert.equal(invoke('tradePcValue',line),55500,'market value stays separate');
+  } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
+});
+
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
   const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
   const wrong=[

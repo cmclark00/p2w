@@ -842,9 +842,18 @@ function normalCreditBonus(line, s = settings) {
 }
 
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
+// PriceCharting console values are credit offers, not the guide's cash prices.
+// Keep guide conditions, Parts, handhelds and accessories on their own rules.
+const pcConsoleCreditBasis = line => line.category === 'console' && line.condition !== 'parts'
+  && (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition)));
+function tradeOfferRule(line, s = settings) {
+  const rule = s.rules[line.category] || s.rules.other;
+  return pcConsoleCreditBasis(line) ? { ...rule, cashPct: 100 / 1.2, creditPct: 100 } : rule;
+}
+
 function normalCreditBonusOf(line, p, s) {
   if (isPartsLine(line) || line.source === 'bulk' || p.flat) return 0;
-  const rule = s.rules[line.category] || s.rules.other;
+  const rule = tradeOfferRule(line, s);
   return rule.cashPct > 0 ? (rule.creditPct / rule.cashPct - 1) * 100 : 0;
 }
 
@@ -903,7 +912,7 @@ function tradeManualNote(p) {
 function priceWith(line, s, deds) {
   const out = { base: null, cash: null, credit: null, guide: null, flat: false, dontBuy: false };
   if (line.pending || line.failed) return out;
-  const rule = s.rules[line.category] || s.rules.other;
+  const rule = tradeOfferRule(line, s);
   out.base = line.override ?? autoBase(line, rule, s);
   // Case only: a first-party case pays its value (see autoBase, or a typed Value) through the game's own rule, so
   // store credit is cash × 1.5 and it can't beat the game; any other case, or one PriceCharting has no box or CIB
