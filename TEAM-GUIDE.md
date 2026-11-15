@@ -901,6 +901,12 @@ Guide (the Google Sheet tab).
      then checks further eBay sales **in pairs**. There is **no three-sale cap**:
      it stops at a verified price-driving sale, when another source determines the
      price, or when eligible listings run out. Amazon can finish in parallel.
+     **Historical evidence — not verified** does not stop these checks: the tool
+     keeps that reference and checks the next eligible sales, highest first,
+     without reopening old archive pages. Historical evidence still needs review.
+     Console comparisons allow ordinary controllers, power supplies and cables.
+     Separate accessories, explicitly broken/untested consoles and extra-game
+     bundles cannot set the console price; excluded rows remain available to review.
      A verified highest sale settles the eBay check without waiting for its backup;
      the final price still waits for the other sources. Ended listings and hidden
      accepted-offer prices are excluded. Unreadable checked listings are skipped

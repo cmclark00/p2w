@@ -119,6 +119,52 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   standardArchive.standardGame=archive;
   assert.equal((await targeted(standardArchive,['sold'])).length,0,'Standard-game historical driver also skips tabs');
   assert.equal(result(standardArchive).b.ebayReview,true);
+  // A higher archive reference must not hide lower, checkable evidence. It
+  // remains historical in real pricing; only the planner temporarily skips it.
+  const historyThenRecent=old([3000,2900,2800,2700,2600]);
+  historyThenRecent.sales.cib[0].date=new Date(Date.now()-120*864e5).toISOString().slice(0,10);
+  historyThenRecent.sales.cib[1].date=historyThenRecent.sales.cib[0].date;
+  const historyCalls=await targeted(historyThenRecent,['ended','sold','sold']);
+  assert.deepEqual(historyCalls,historyThenRecent.sales.cib.slice(2).map(s=>s.url),'Skip both archives, check next highest then its pair');
+  assert.equal(historyThenRecent.ebayChecks.results['111111111111'],undefined,'Planning must not write fake archive exclusions');
+  assert.equal(historyThenRecent.ebayChecks.results['111111111112'],undefined);
+  assert.equal(invoke('floorSales',historyThenRecent)[0].verification.state,'historical');
+  assert.equal(result(historyThenRecent).b.basis,3000,'Historical eligibility and pricing rules stay intact');
+  assert.equal(result(historyThenRecent).b.ebayReview,true);
+  assert.equal((await targeted(historyThenRecent,['sold'])).length,0,'Renders stop at the verified next eligible sale');
+  const historicalOnly=cur(product,[{...sale(3000,'111111111111'),date:new Date(Date.now()-120*864e5).toISOString().slice(0,10)},
+    {...sale(2900,'222222222222'),date:new Date(Date.now()-121*864e5).toISOString().slice(0,10)}]);
+  assert.equal((await targeted(historicalOnly,['sold'])).length,0,'All archives exhaust cleanly without tabs or loops');
+  const standardHistory=cur({...product,id:'variant','cib-price':2000,'product-name':'Example Game [Deluxe Edition]'},[]);
+  standardHistory.standardGame=old([3000,2900,2800]);
+  standardHistory.standardGame.sales.cib[0].date=new Date(Date.now()-120*864e5).toISOString().slice(0,10);
+  const standardHistoryCalls=[];
+  await invoke('runFloorTargetedEbay',standardHistory,()=>{},()=>false,{
+    targetedAvailable:async()=>true,checkTargeted:async url=>{
+      standardHistoryCalls.push(url);const row=standardHistory.standardGame.sales.cib.find(s=>s.url===url);
+      assert.equal(result(standardHistory).b.ebayChecking,true,'Historical driver still shows the active next-sale check');
+      return verified(invoke('floorSaleKey',row),row.price,row.title);
+    }
+  });
+  assert.deepEqual(standardHistoryCalls,[standardHistory.standardGame.sales.cib[1].url]);
+  assert.equal(standardHistory.standardGame.ebayChecks.results['111111111112'].state,'sold');
+  assert.equal(standardHistory.standardGame.ebayChecks.results['111111111111'],undefined);
+  assert.equal(result(standardHistory).b.ebayReview,true);
+  const atari=cur({'product-name':'Atari 5200 System','console-name':'Atari 5200',genre:'Systems','loose-price':6896},[]);
+  atari.condition='loose';atari.pick=0;
+  atari.sales={loose:[{...sale(17000,'111111111111','Atari 5200 4 Port Console'),date:new Date(Date.now()-120*864e5).toISOString().slice(0,10)}]};
+  const directAtari={id:'222222222222',url:'https://www.ebay.com/itm/222222222222',
+    title:'Atari 5200 Console - Console Only - Tested',price:12610,shipping:3150,
+    date:new Date(Date.now()-30*864e5).toISOString().slice(0,10),state:'sold',conditionText:'Pre-Owned',sellerCountry:'Canada',locationSource:'ebay-located-in'};
+  atari.directEbay={result:{state:'ready',sales:[directAtari]}};
+  const atariCalls=[];
+  await invoke('runFloorTargetedEbay',atari,()=>{},()=>false,{targetedAvailable:async()=>true,checkTargeted:async url=>{
+    atariCalls.push(url);return directAtari;
+  }});
+  assert.deepEqual(atariCalls,[directAtari.url],'Selected historical row also permits checking the next direct-search sale');
+  assert.equal(atari.ebayChecks.results[directAtari.id].state,'sold');
+  assert.equal(atari.pick,0,'Do not change staff selection');
+  assert.equal(result(atari).b.basis,17000,'Checking more evidence does not remove the selected historical reference');
   const good = old([3000, 2900, 2800, 2700]); const original = result(good).r.price;
   assert.equal((await targeted(good, ['sold'])).length, 1);
   assert.equal(result(good).r.price, original); assert.equal(result(good).b.ebayReview, undefined);

@@ -334,6 +334,41 @@ test('hyphenated game counts reject console bundles across sources without exclu
   assert.equal(eligible.length,1);assert.equal(eligible[0].price,15760,'bundles cannot remain eligible to set the price');
 });
 
+test('console exclusion audit keeps normal equipment and rejects accessories, faults, and game bundles', () => {
+  const p={'product-name':'Atari 5200 System','console-name':'Atari 5200',genre:'Systems','loose-price':6896};
+  const valid=[
+    'Atari 5200 Game Console with Power Supply & Controllers',
+    'Atari 5200 Super system 2 Port Console With Controllers tested and working',
+    'Atari 5200 2 Port Console 1 Joystick Controller and OEM Power Adapter RF Box',
+    'Atari 5200 Video Game Console System - Black (CX5200)',
+    'Atari 5200 Video Game Console Black (System) Console w/ cables AO4077663 working',
+    'Atari 5200 Console with Power Supply + Controller',
+    'Atari 5200 Console with original stickers',
+    'Atari 5200 Console original sticker intact',
+  ];
+  for(const title of valid) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+    const rows=invoke('floorSales',cur(p,{condition:'loose',sales:{loose:[{title,price:8000,date:'2026-11-01'}]}}));
+    assert.equal(rows[0].odd,false,title);
+  }
+  const wrong=[
+    'Competition Pro Joystick Controller for Atari 5200 System 15 Pin - TESTED',
+    'Vintage OEM Atari 5200 Console Controller Keypad Joystick EP 163 Untested',
+    'Test Cartridge Atari 5200 Video Game Console Diagnostic Cart Salt 1.1 Atari Age',
+    'Atari 5200 Gaming System American Superhero Sticker (3.25" x 3")',
+    'Atari 5200 System Untested',
+    'Broken Atari 5200 Console',
+    'Atari 5200 Console And Games. Tested Working',
+  ];
+  for(const title of wrong) {
+    assert.ok(invoke('floorListingMismatch',title,p),title);
+    assert.equal(invoke('floorSales',cur(p,{condition:'loose',sales:{loose:[{title,price:8000,date:'2026-11-01'}]}}))[0].odd,true,title);
+    assert.equal(invoke('floorAmazonLowest',cur(p,{condition:'loose',amazon:{found:true,title,offers:[{price:8000,sub:'good'}]}})),null,title);
+    assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':8000},{condition:'loose',gamestopStock:{state:'in',title}})),null,title);
+  }
+  assert.equal(invoke('floorOdd',{title:'Example Game PS4 with controller'},'loose',null,item),true,'game bundle exclusions stay intact');
+});
+
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
   const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
   const wrong=[

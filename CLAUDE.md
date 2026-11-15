@@ -662,6 +662,11 @@ The site's **only server-side code**. Everything else is static.
     preorders/presales, counted multi-game lots (including platform words
     between the count and "games", and hyphenated counts such as "8-games"), unknown named/numbered editions, and
     gun/sensor/accessory extras are held for review on both eBay and Amazon.
+    Console/handheld comparisons retain ordinary controllers, power supplies,
+    cables and switch boxes; game-only hardware-bundle regexes do not reject the
+    console itself. Standalone console accessories, stickers, diagnostic carts,
+    explicitly faulty/untested consoles, and extra-game bundles remain excluded
+    across sources. These identity checks precede history retention and outliers.
     The extension check applies to long names too (Dynasty Warriors: Gundam
     vs Reborn), while known aliases, normal condition/platform words, selected
     edition qualifiers and actual compilations retain their existing handling.
@@ -788,7 +793,10 @@ The site's **only server-side code**. Everything else is static.
     same historical label beyond 90 days; this does not add a 90-day exclusion.
     Known offer/price/identity/location exclusions, invalid dates and the 3x market
     guard still apply. No automatic original-item tabs for historical drivers;
-    manual checks remain available. Confirmed Sold rows keep their verified status.
+    the planner skips them without changing real evidence and continues checking
+    the next eligible sales highest-first, including standard-game references.
+    Historical evidence is never a verified stopping point. Manual checks remain
+    available. Confirmed Sold rows keep their verified status.
     Old exclusions and overseas origin have their own collapsed
     review groups. Specific premiums and explicit manual choices remain downstream.
     The flagged row stays visible with a badge and a review explanation.

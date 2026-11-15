@@ -3839,7 +3839,7 @@ function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging
   if (rhythm === 'bundle') {
     return ODD_SALE_FOR_BUNDLES_RE.test(t) || CONSOLE_BUNDLE_RE.test(t) || NO_INSTRUMENTS_RE.test(t) || (condition !== 'new' && sealed);
   }
-  return ODD_SALE_RE.test(t) || BUNDLE_RE.test(t) || (rhythm === 'disc' && WITH_INSTRUMENTS_RE.test(t))
+  return ODD_SALE_RE.test(t) || (!floorConsoleProduct(product) && BUNDLE_RE.test(t)) || (rhythm === 'disc' && WITH_INSTRUMENTS_RE.test(t))
     || (condition === 'loose' ? LOOSE_EXTRAS_RE.test(t) : !(condition === 'cib' && sale.cibUsedEvidence) && NOT_COMPLETE_RE.test(t))
     || (condition !== 'new' && sealed);
 }
@@ -4903,14 +4903,14 @@ function floorBasis(cur = floorCur) {
   if (b.from === 'msrp') return b;
   const state = cur.targetedEbay;
   const historical = !!(driver?.sale.historicalInfo?.retained);
-  const checking = !!(driver && !historical && state?.running && driver.sale.verification?.state !== 'sold');
+  const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
   const skipped = [cur, b.standardReference?.cur].filter(Boolean).some(c => floorSales(c).some(s => s.verification?.skipped && (!b.basis || s.price >= b.basis)));
   const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
   if (cur.typed != null) return b;
   const searchReview = cur.directEbay && !cur.directEbay.loading && [cur.directEbay.result, cur.directEbay.standard?.result].filter(Boolean).some(r => r.state !== 'ready' || r.partial);
   const review = historical || searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
-  const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); stopping at a verified price-driving sale.`
+  const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); historical references do not stop checks of the next eligible sales.`
     : searchReview ? floorSearchReviewWarnings(cur).map(w => w.detail).join(' ')
     : historical ? 'Historical PriceCharting sale retained. Its date is highlighted; current eBay sold status is unavailable. Review the evidence or Product Research before labeling.'
     : 'Price needs review: some eBay evidence could not be verified. Recent unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
@@ -4936,12 +4936,17 @@ function floorEbayCandidates(cur, limit, early = false) {
   const candidates = [], keys = new Set();
   while (candidates.length < limit) {
     const driver = floorEbayDriver(shadow);
-    if (!driver || ['sold', 'pending', 'historical'].includes(driver.sale.verification?.state)) break;
+    if (!driver || ['sold', 'pending'].includes(driver.sale.verification?.state)) break;
     const key = floorSaleKey(driver.sale);
     if (keys.has(key)) break;
     keys.add(key);
+    // Historical evidence stays eligible in the real result, but is not a
+    // verified stopping point. Mask it only in this planning copy and continue
+    // down the prices without opening an unavailable archive page. Mark the
+    // hypothetical rejection definitive so the history exception cannot restore it.
+    driver.holder.ebayChecks.results[key] = { state: 'ended', confirmedUnsold: true };
+    if (driver.sale.verification?.state === 'historical') continue;
     candidates.push({ ...driver, holder: driver.holder === shadow ? cur : cur.standardGame, key });
-    driver.holder.ebayChecks.results[key] = { state: 'ended' };
   }
   return candidates;
 }
@@ -5048,7 +5053,8 @@ function floorSales(cur = floorCur) {
   const sales = unique.map((s, i) => {
     const mismatch = floorSaleListingMismatch(s, cur.product) || floorLooseConditionMismatch(s.title, cur.condition, cur.product)
       || (s.conditionUnknown ? 'Packaging/condition unconfirmed — review' : null);
-    const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap || HOME_CONSOLE_RE.test(s.title);
+    const invalid = !!mismatch || floorOdd(s, cur.condition, rhythm, cur.product) || s.price > cap
+      || (!floorConsoleProduct(cur.product) && HOME_CONSOLE_RE.test(s.title));
     let checked = cur.ebayChecks?.results[floorSaleKey(s)];
     // A saved pre-policy location rejection needs a fresh sold/price check,
     // not automatic promotion to a verified sale.
@@ -5614,6 +5620,28 @@ function floorControllerMismatch(title, product) {
   }
   return null;
 }
+function floorConsoleProduct(product) {
+  return !!product && ['console', 'handheld'].includes(guessCategory(product['product-name'] || '', product.genre || ''));
+}
+// Normal operating equipment is not an extra-game bundle. Only remove explicit
+// included-equipment phrases after the console itself, never accessory compatibility.
+function floorConsoleContentsTitle(title, product) {
+  if (!floorConsoleProduct(product)) return title;
+  return String(title || '').replace(/(?:\bwith\b|\bw\/|\+|&|\band\b|\bincludes?\b)\s*(?:(?:all|the|a|an|original|oem|one|two|\d+)\s+)*(?:controllers?|joysticks?|cables?|cords?|power (?:supply|adapter|cord)|ac adapter|rf (?:adapter|box)|switch box)\b/gi,
+    (phrase, offset, text) => /\b(?:console|system|handheld)\b/i.test(text.slice(0, offset)) ? ' ' : phrase);
+}
+function floorConsoleListingMismatch(title, product) {
+  if (!floorConsoleProduct(product)) return null;
+  const text = norm(title);
+  if (/\b(?:untested|not tested|broken|faulty|not working|non working|for parts|parts only|repair only|powers on only)\b/.test(text)) return 'Faulty or untested console condition';
+  const soldItem = text.replace(/\b(?:with|includes?) (?:original |factory )?(?:stickers?|decals?|skins?)\b|\b(?:serial(?: number)?|warranty) stickers?\b|\b(?:original |factory )?stickers? (?:intact|removed|present)\b/g, ' ');
+  if (/\b(?:stickers?|decals?|skins?|replacement shell|motherboard|diagnostic (?:cart|cartridge)|test cartridge)\b/.test(soldItem)
+    || /\b(?:controller|joystick|keypad|power supply|power adapter|cable|cord)\b.*\b(?:for|compatible with)\b.*\b(?:console|system)\b/.test(text)
+    || /\b(?:console|system) (?:controller|joystick|keypad)\b/.test(text)) return 'Console accessory or replacement part, not the console';
+  // A console "and games" is a seller bundle even without a numeric count.
+  if (/\b(?:with|and|includes?)\s+(?:(?:some|several|assorted|extra)\s+)?games\b|[&+]\s*games\b/.test(text)) return 'Console and games bundle';
+  return null;
+}
 function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   const fault = floorGameFaultMismatch(title, product);
@@ -5626,6 +5654,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   const name = product?.['product-name'] || '';
   const controllerMismatch = floorControllerMismatch(title, product);
   if (controllerMismatch) return controllerMismatch;
+  const consoleMismatch = floorConsoleListingMismatch(title, product);
+  if (consoleMismatch) return consoleMismatch;
   if (FLOOR_PREORDER.test(title)) return 'Preorder/presale is not comparable sold inventory';
   if (floorXbox360Reissue(product) && /\b(?:strategy guide|walkthrough book)\b/i.test(title)) return 'Guide, not a comparable game listing';
   if (floorNumberedGameBundle(title, product)) return 'Multiple-game lot or bundle';
@@ -5667,8 +5697,9 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
     .some((word) => !listedEditionWords.includes(word)))) return 'Different named edition';
   if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(packInTitle) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
-  if (floorExtraMismatch(packInTitle, name)) return 'Bundled extra item';
-  const bundleTitle = /\bbonus content\b/i.test(name) ? packInTitle.replace(/\bwith bonus content\b/gi, '') : packInTitle;
+  const equipmentTitle = floorConsoleContentsTitle(packInTitle, product);
+  if (floorExtraMismatch(equipmentTitle, name)) return 'Bundled extra item';
+  const bundleTitle = /\bbonus content\b/i.test(name) ? equipmentTitle.replace(/\bwith bonus content\b/gi, '') : equipmentTitle;
   if ((/\b(?:bundle|bundled|lot of|with bonus|with extras)\b|\s\+\s/i.test(floorBundleTitle(floorToyFamily(product) ? floorFigurePackagingTitle(bundleTitle) : bundleTitle, !floorToyFamily(product) && !floorIsHardware(product))))
     && !/\b(?:bundle|lot)\b|\s\+\s/i.test(name) && rhythmKind(name) !== 'bundle') return 'Bundle or extra items';
   const wantedPlatforms = FLOOR_PLATFORMS.filter((re) => re.test(norm(product?.['console-name'])));
