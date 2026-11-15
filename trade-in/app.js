@@ -842,13 +842,13 @@ function normalCreditBonus(line, s = settings) {
 }
 
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
-// PriceCharting console values are credit offers, not the guide's cash prices.
-// Keep guide conditions, Parts, handhelds and accessories on their own rules.
-const pcConsoleCreditBasis = line => line.category === 'console' && line.condition !== 'parts'
+// PriceCharting console and handheld values are credit offers, not the guide's cash prices.
+// Keep guide conditions, Parts and accessories on their own rules.
+const pcSystemCreditBasis = line => ['console', 'handheld'].includes(line.category) && line.condition !== 'parts'
   && (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition)));
 function tradeOfferRule(line, s = settings) {
   const rule = s.rules[line.category] || s.rules.other;
-  return pcConsoleCreditBasis(line) ? { ...rule, cashPct: 100 / 1.2, creditPct: 100 } : rule;
+  return pcSystemCreditBasis(line) ? { ...rule, cashPct: 100 / 1.2, creditPct: 100 } : rule;
 }
 
 function normalCreditBonusOf(line, p, s) {

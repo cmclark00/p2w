@@ -151,7 +151,7 @@ test('PriceCharting console buying values pay credit with cash divided by 1.2, p
     const p=invoke('priceLine',{...guide,condition},settings);
     assert.equal(p.cash,cash);assert.equal(p.credit,credit,'fixed guide payouts stay unchanged');
   }
-  for(const category of ['handheld','accessory']) {
+  for(const category of ['accessory']) {
     const p=invoke('priceLine',{...line,category},settings);
     assert.equal(p.cash,36660);assert.equal(p.credit,43992,'other hardware categories retain their rules');
   }
@@ -178,6 +178,40 @@ test('PriceCharting console buying values pay credit with cash divided by 1.2, p
     assert.equal(run('tradeItems()[0].cash'),30550);
     assert.equal(run('tradeItems()[0].credit'),36660);
     assert.equal(invoke('tradePcValue',line),55500,'market value stays separate');
+  } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
+});
+
+test('PriceCharting handhelds use credit as the buying value, including restored and guide CIB/New lines', () => {
+  const settings=json('DEFAULT_SETTINGS');
+  const line={id:'handheld-credit-test',source:'pc',name:'New Nintendo 3DS XL Majora Special Edition',
+    platform:'Nintendo 3DS',category:'handheld',condition:'cib',qty:1,deductions:[],prices:{
+      'retail-loose-buy':24000,'retail-cib-buy':36660,'retail-new-buy':48000,
+      'loose-price':40000,'cib-price':55500,'new-price':65000}};
+  for(const [condition,value] of [['loose',24000],['cib',36660],['new',48000]]) {
+    const p=invoke('priceLine',{...line,condition},settings);
+    assert.equal(p.base,value);assert.equal(p.credit,value);
+    assert.equal(p.cash,Math.floor(value/1.2+1e-9));
+  }
+  const guide={...line,source:'hw',hwId:'handheld-test-guide',hwPrices:{complete:20000,unit:15000,parts:2000}};
+  for(const condition of ['cib','new']) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.credit,line.prices['retail-'+condition+'-buy']);
+    assert.equal(p.cash,Math.floor(p.credit/1.2+1e-9));
+  }
+  for(const [condition,cash,credit] of [['complete',20000,24000],['unit',15000,18000],['parts',2000,2000]]) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.cash,cash);assert.equal(p.credit,credit,'fixed handheld guide payouts stay unchanged');
+  }
+  const parts=invoke('priceLine',{...line,condition:'parts'},settings);
+  assert.equal(parts.cash,6000);assert.equal(parts.credit,6000);
+  const typed=invoke('priceLine',{...line,cashOverride:30000},settings);
+  assert.equal(typed.cash,30000);assert.equal(typed.credit,36000);
+  const saved=run('trade.lines');
+  try {
+    context.handheldLine=JSON.parse(JSON.stringify(line));run('trade.lines=[handheldLine]');
+    assert.equal(run('tradeItems()[0].cash'),30550);
+    assert.equal(run('tradeItems()[0].credit'),36660);
+    assert.equal(invoke('tradePcValue',line),55500,'market reference remains independent of the offer');
   } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
 });
 

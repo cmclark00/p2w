@@ -646,11 +646,11 @@ Everyone in the store shares one internet address, so typos add up.
    hardware, set the line's condition to **CIB** or **New**. Those use
    PriceCharting prices: a search opens in the big box, and you click the
    exact model/color that matches what the customer brought in.
-   **Consoles priced from PriceCharting:** its retail-buy value is the store
+   **Consoles and handhelds priced from PriceCharting:** its retail-buy value is the store
    credit offer; cash is that value divided by 1.2. For example, $366.60 credit
    means $305.50 cash before whole-dollar trade-total rounding. This includes
-   Loose/CIB/New console catalog entries and guide consoles switched to CIB/New.
-   Fixed buying-guide prices, Parts, handhelds and controllers keep their rules.
+   Loose/CIB/New console and handheld catalog entries and guide systems switched to CIB/New.
+   Fixed buying-guide prices, Parts and controllers keep their rules.
    Controllers always pay more boxed: CIB is at least the Working price
    + 10%, and New at least CIB + 10% (or PriceCharting's price, if higher).
    **Special editions** (a Spider-Man PS4, a Halo controller) come from
