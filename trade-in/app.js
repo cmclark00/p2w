@@ -843,9 +843,9 @@ function normalCreditBonus(line, s = settings) {
 }
 
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
-// PriceCharting hardware values are credit offers, not the guide's cash prices.
+// PriceCharting hardware/Other values are credit offers, not the guide's cash prices.
 // Keep guide conditions and Parts on their own rules.
-const pcHardwareCreditBasis = line => isHwCat(line.category) && line.condition !== 'parts'
+const pcHardwareCreditBasis = line => HW_CATEGORIES.includes(line.category) && line.condition !== 'parts'
   && (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition)));
 function tradeOfferRule(line, s = settings) {
   const rule = s.rules[line.category] || s.rules.other;
@@ -5256,7 +5256,7 @@ function floorExtraMismatch(title, name) {
 const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreordered\b/i;
 // Counts may have a platform between the quantity and "games". A collection's own
 // advertised count is allowed, but unrelated games in a seller's lot are not.
-const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)\s+){0,4}(?:games|titles)\b/gi;
+const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)[\s\u2010-\u2015-]+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)[\s\u2010-\u2015-]+){0,4}(?:games|titles)\b/gi;
 const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT),
   ...String(text || '').matchAll(/\b(?:games?|titles?)\s+(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\b/gi),
   ...String(text || '').matchAll(/\b(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:games?|titles?)\b/gi),

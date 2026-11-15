@@ -660,7 +660,7 @@ The site's **only server-side code**. Everything else is static.
     spelling aliases and Roman numerals normalized. Unconfirmed title
     extensions/sequels (Final Fight vs Final Fight Guy, Halo 3 vs ODST),
     preorders/presales, counted multi-game lots (including platform words
-    between the count and "games"), unknown named/numbered editions, and
+    between the count and "games", and hyphenated counts such as "8-games"), unknown named/numbered editions, and
     gun/sensor/accessory extras are held for review on both eBay and Amazon.
     The extension check applies to long names too (Dynasty Warriors: Gundam
     vs Reborn), while known aliases, normal condition/platform words, selected
@@ -1739,11 +1739,11 @@ The site's **only server-side code**. Everything else is static.
   - **Hardware CIB / New** (`HW_PC_CONDITIONS`): hardware lines offer
     CIB and New next to the guide conditions, priced from a PriceCharting
     product attached to the line (`matchedPcId`/`matchedFrom`/`prices`)
-    through the category rule. For consoles, handhelds and accessories priced from PriceCharting (all
+    through the category rule. For consoles, handhelds, accessories and Other items priced from PriceCharting (all
     non-Parts PC conditions and guide lines switched to CIB/New), retail buy
     is the credit value and cash is that value divided by 1.2. `tradeOfferRule()`
     scopes this to those lines, including restored trades; fixed guide prices,
-    Parts and saved completed trades remain unchanged.
+    Parts, custom items, TCG bulk and saved completed trades remain unchanged.
     Deductions reduce the value before conversion; typed cash and custom credit
     overrides still apply. Scan-matched lines already carry the product. A guide line
     without one opens a **picker** instead (`openPcPicker`), which fills

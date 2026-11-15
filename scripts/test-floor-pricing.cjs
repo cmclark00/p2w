@@ -260,6 +260,80 @@ test('PriceCharting accessories use credit buying values while guide cash minimu
   } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
 });
 
+test('every trade category separates PC credit from cash while explicit guide and flat payouts stay intact', () => {
+  // Exercise persisted settings too: the old Other 100/100 setting must not
+  // turn a PC credit quote back into cash, or change manually entered offers.
+  const settings=invoke('mergeSettings',json('DEFAULT_SETTINGS'));
+  const line={id:'category-audit',source:'pc',name:'Example Adventure',platform:'Nintendo DS',
+    category:'other',condition:'cib',qty:1,deductions:[],prices:{
+      'retail-loose-buy':12000,'retail-cib-buy':12000,'retail-new-buy':12000,
+      'loose-price':20000,'cib-price':20000,'new-price':20000}};
+  const expected={game:[8400,12600],pokemon:[10000,15000],console:[10000,12000],
+    handheld:[10000,12000],accessory:[10000,12000],other:[10000,12000]};
+  assert.deepEqual(Object.keys(expected),Object.keys(json('CATEGORIES')),'cover every selectable category');
+  for(const [category,[cash,credit]] of Object.entries(expected)) {
+    for(const condition of ['loose','cib','new']) {
+      const p=invoke('priceLine',{...line,category,condition},settings);
+      assert.equal(p.cash,cash,category+' '+condition);assert.equal(p.credit,credit,category+' '+condition);
+    }
+  }
+  const guide={...line,source:'hw',hwId:'other-audit',hwPrices:{complete:10000,unit:8000,parts:1000}};
+  for(const condition of ['cib','new']) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.cash,10000);assert.equal(p.credit,12000);
+  }
+  for(const [condition,value] of [['complete',10000],['unit',8000],['parts',1000]]) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.cash,value);assert.equal(p.credit,value,'Other guide retains its explicit flat payout');
+  }
+  for(const extra of [{source:'custom',cashOverride:5000},{source:'bulk',bulkTotal:5000}]) {
+    const p=invoke('priceLine',{...line,...extra},settings);
+    assert.equal(p.cash,5000);assert.equal(p.credit,5000);
+  }
+  const override=invoke('priceLine',{...line,cashOverride:5000},settings);
+  assert.equal(override.cash,5000);assert.equal(override.credit,6000);
+  const parts=invoke('priceLine',{...line,condition:'parts'},settings);
+  assert.equal(parts.cash,3000);assert.equal(parts.credit,3000);
+  const saved=run('trade.lines');
+  try {
+    context.otherAuditLine=JSON.parse(JSON.stringify(line));run('trade.lines=[otherAuditLine]');
+    assert.equal(run('tradeItems()[0].cash'),10000);assert.equal(run('tradeItems()[0].credit'),12000);
+    assert.equal(invoke('tradePcValue',line),20000);
+  } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
+});
+
+test('hyphenated game counts reject console bundles across sources without excluding normal console equipment', () => {
+  const p={'product-name':'Atari 5200 Console','console-name':'Atari 5200',genre:'Systems','loose-price':10000};
+  const wrong=[
+    'Atari 5200 Console 4 Port w/ Power Adapter/Switch /2 joysticks, 8-games, Manuals',
+    'ATARI 5200 SUPER SYSTEM w/ POWER ADAPTER/SWITCH /2 JOYSTICKS, 5-GAMES, MANUALS',
+    'Atari 5200 Console with eight-games and manuals',
+    'Atari 5200 Console with 5–games',
+    'Atari 5200 Console with 5—video-games',
+    'Atari 5200 Console with 8 games',
+  ];
+  for(const title of wrong) {
+    assert.equal(invoke('floorListingMismatch',title,p),'Multiple-game lot or bundle',title);
+    assert.equal(invoke('floorSaleListingMismatch',{title,sourcePcId:'atari'},p),'Multiple-game lot or bundle');
+    assert.equal(invoke('floorAmazonLowest',cur(p,{condition:'loose',amazon:{found:true,title,offers:[{price:19800,sub:'good'}]}})),null);
+    assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':19800},{condition:'loose',gamestopStock:{state:'in',title}})),null);
+  }
+  for(const title of ['Atari 5200 Console 4 Port with Power Adapter and 2 joysticks, Manuals',
+    'Atari 5200 Console - Console Only - Tested','Atari 5200 Console 2-Port Tested']) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+    assert.equal(invoke('floorGameCounts',title).length,0);
+  }
+  const compilation={'product-name':'Example 8-Game Collection','console-name':'Nintendo Switch'};
+  assert.notEqual(invoke('floorListingMismatch','Example 8-Game Collection Nintendo Switch',compilation),'Multiple-game lot or bundle');
+  const c=cur(p,{condition:'loose',sales:{loose:[
+    {title:wrong[0],price:19800,date:'2026-11-04'},
+    {title:wrong[1],price:17500,date:'2026-11-01'},
+    {title:'Atari 5200 Console - Console Only - Tested',price:15760,date:'2026-10-06'},
+  ]}});
+  const eligible=invoke('floorSales',c).filter(s=>!s.odd);
+  assert.equal(eligible.length,1);assert.equal(eligible[0].price,15760,'bundles cannot remain eligible to set the price');
+});
+
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
   const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
   const wrong=[
