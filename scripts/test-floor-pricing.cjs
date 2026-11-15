@@ -151,10 +151,6 @@ test('PriceCharting console buying values pay credit with cash divided by 1.2, p
     const p=invoke('priceLine',{...guide,condition},settings);
     assert.equal(p.cash,cash);assert.equal(p.credit,credit,'fixed guide payouts stay unchanged');
   }
-  for(const category of ['accessory']) {
-    const p=invoke('priceLine',{...line,category},settings);
-    assert.equal(p.cash,36660);assert.equal(p.credit,43992,'other hardware categories retain their rules');
-  }
   const deducted=invoke('priceLine',{...line,deductions:['no-power']},settings);
   assert.equal(deducted.credit,35160);assert.equal(deducted.cash,29300);
   const typed=invoke('priceLine',{...line,cashOverride:30000},settings);
@@ -212,6 +208,55 @@ test('PriceCharting handhelds use credit as the buying value, including restored
     assert.equal(run('tradeItems()[0].cash'),30550);
     assert.equal(run('tradeItems()[0].credit'),36660);
     assert.equal(invoke('tradePcValue',line),55500,'market reference remains independent of the offer');
+  } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
+});
+
+test('PriceCharting accessories use credit buying values while guide cash minimums and exceptions survive', () => {
+  const settings=json('DEFAULT_SETTINGS');
+  const line={id:'accessory-credit-test',source:'pc',name:'Xbox One Elite Wireless Controller',
+    platform:'Xbox One',category:'accessory',condition:'cib',qty:1,deductions:[],prices:{
+      'retail-loose-buy':3600,'retail-cib-buy':4800,'retail-new-buy':6000,
+      'loose-price':6000,'cib-price':8000,'new-price':10000}};
+  for(const name of [line.name,'Xbox 360 Wireless Network Adapter','Nintendo GameCube Memory Card','Disney Infinity Portal']) {
+    assert.equal(invoke('guessCategory',name),'accessory');
+    for(const [condition,value] of [['loose',3600],['cib',4800],['new',6000]]) {
+      const p=invoke('priceLine',{...line,name,condition},settings);
+      assert.equal(p.base,value);assert.equal(p.credit,value);assert.equal(p.cash,value/1.2);
+    }
+  }
+  const guide={...line,source:'hw',hwId:'accessory-test-guide',hwPrices:{unit:2000,parts:500}};
+  for(const [condition,cash,credit] of [['unit',2000,2400],['thirdparty',400,480],['parts',500,500],['cib',4000,4800],['new',5000,6000]]) {
+    const p=invoke('priceLine',{...guide,condition},settings);
+    assert.equal(p.cash,cash,condition);assert.equal(p.credit,credit,condition);
+  }
+  for(const prices of [{},{'retail-cib-buy':1800,'retail-new-buy':2000}]) {
+    const cib=invoke('priceLine',{...guide,prices,condition:'cib'},settings);
+    assert.equal(cib.cash,2200);assert.equal(cib.credit,2640,'Working cash +10% minimum preserved');
+    const sealed=invoke('priceLine',{...guide,prices,condition:'new'},settings);
+    assert.equal(sealed.cash,2420);assert.equal(sealed.credit,2904,'New remains CIB +10%');
+  }
+  const newFloor=invoke('priceLine',{...guide,condition:'new',prices:{'retail-cib-buy':4800,'retail-new-buy':4000}},settings);
+  assert.equal(newFloor.cash,4400);assert.equal(newFloor.credit,5280,'higher PC CIB value also raises New minimum');
+  const parts=invoke('priceLine',{...line,condition:'parts'},settings);
+  assert.equal(parts.cash,900);assert.equal(parts.credit,900);
+  const flat=invoke('priceLine',{...line,name:'Logitech G29 Steering Wheel'},settings);
+  assert.equal(flat.cash,500);assert.equal(flat.credit,500,'fixed wheel exception wins');
+  const typed=invoke('priceLine',{...line,cashOverride:3000},settings);
+  assert.equal(typed.cash,3000);assert.equal(typed.credit,3600);
+  const bonus=invoke('priceLine',{...line,creditBonus:30},settings);
+  assert.equal(bonus.cash,4000);assert.equal(bonus.credit,5200);
+  const deducted=invoke('priceLine',{...line,deductions:['no-power']},settings);
+  assert.equal(deducted.cash,2750);assert.equal(deducted.credit,3300);
+  for(const extra of [{pending:true},{failed:true},{prices:{}}]) {
+    const p=invoke('priceLine',{...line,...extra},settings);
+    assert.equal(p.cash,null);assert.equal(p.credit,null);
+  }
+  const saved=run('trade.lines');
+  try {
+    context.accessoryLine=JSON.parse(JSON.stringify({...line,qty:2}));run('trade.lines=[accessoryLine]');
+    assert.equal(run('tradeTotals().cash'),8000);assert.equal(run('tradeTotals().credit'),9600);
+    assert.equal(run('tradeItems()[0].cash'),4000);assert.equal(run('tradeItems()[0].credit'),4800);
+    assert.equal(invoke('tradePcValue',line),8000,'market reference remains unchanged');
   } finally { context.savedLines=saved;run('trade.lines=savedLines'); }
 });
 
@@ -485,7 +530,7 @@ test('toys-to-life portals are accessories, including unfinished trades, without
       prices:{'loose-price':1396,'retail-loose-buy':380}, deductions:[]};
     assert.equal(invoke('guideCheck', {...line,category:'game'}, settings), null, 'Old game classification must not trigger disc tiers');
     const price = invoke('priceLine', line, settings);
-    assert.equal(price.cash,380); assert.equal(price.credit,456); assert.equal(price.flat,false);
+    assert.equal(price.cash,316); assert.equal(price.credit,380); assert.equal(price.flat,false);
   }
   for (const name of ['Portal', 'Portal 2', 'Disney Infinity', 'Disney Infinity 3.0', 'Skylanders Trap Team',
     'Disney Infinity Starter Pack with Portal', 'Disney Infinity Game with Portal', 'Skylanders Portal Bundle',

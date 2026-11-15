@@ -1739,11 +1739,11 @@ The site's **only server-side code**. Everything else is static.
   - **Hardware CIB / New** (`HW_PC_CONDITIONS`): hardware lines offer
     CIB and New next to the guide conditions, priced from a PriceCharting
     product attached to the line (`matchedPcId`/`matchedFrom`/`prices`)
-    through the category rule. For consoles and handhelds priced from PriceCharting (all
+    through the category rule. For consoles, handhelds and accessories priced from PriceCharting (all
     non-Parts PC conditions and guide lines switched to CIB/New), retail buy
     is the credit value and cash is that value divided by 1.2. `tradeOfferRule()`
     scopes this to those lines, including restored trades; fixed guide prices,
-    Parts, accessories and saved completed trades remain unchanged.
+    Parts and saved completed trades remain unchanged.
     Deductions reduce the value before conversion; typed cash and custom credit
     overrides still apply. Scan-matched lines already carry the product. A guide line
     without one opens a **picker** instead (`openPcPicker`), which fills
@@ -1753,7 +1753,9 @@ The site's **only server-side code**. Everything else is static.
     (`hwConditionFor`), so the guide price wins unless staff pick CIB or New.
     **Controller minimums** (`boxedPrice()`, `settings.boxedStepPct`,
     default 10%): for guide **accessories**, CIB pays at least Working +
-    10% and New at least that CIB + 10%. PriceCharting is used when higher,
+    10% and New at least that CIB + 10%. The Working cash minimum is converted
+    to credit before comparison with PriceCharting's credit buying value.
+    PriceCharting is used when higher,
     because PC's buy price for some colors was below the Working price. A
     "CIB/New minimum" badge shows when the minimum wins. Consoles are
     unaffected. Search/picker buttons show the same numbers.

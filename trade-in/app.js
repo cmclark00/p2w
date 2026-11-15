@@ -730,14 +730,15 @@ function pcPartsPrice(line, s = settings) {
   return { price: Math.max(pct ?? 0, regular?.parts ?? 0), pct, regular };
 }
 
-// A guide controller bought CIB/New: PriceCharting's price, but CIB at least Working + boxedStepPct
-// and New at least that CIB + boxedStepPct, so boxed never pays less than loose.
+// A guide controller bought CIB/New: compare credit values. Convert the guide's
+// cash minimum to credit so CIB cash stays at least Working + boxedStepPct,
+// and New at least that CIB + boxedStepPct.
 function boxedPrice(prices, unit, category, condition, s = settings) {
   const rule = s.rules[category] || s.rules.other;
   const pc = (c) => { const v = prices?.[PC_FIELDS[rule.basis || 'retail-buy'][c]]; return v > 0 ? v : null; };
   if (category !== 'accessory' || unit == null) return pc(condition);
   const step = 1 + (Number(s.boxedStepPct) || 0) / 100;
-  const cib = Math.max(pc('cib') ?? 0, Math.round(unit * step));
+  const cib = Math.max(pc('cib') ?? 0, Math.round(Math.round(unit * step) * 1.2));
   return condition === 'cib' ? cib : Math.max(pc('new') ?? 0, Math.round(cib * step));
 }
 
@@ -842,13 +843,13 @@ function normalCreditBonus(line, s = settings) {
 }
 
 // Exact, from the category rule: flat guide prices, Parts, and TCG bulk pay the same in cash and credit.
-// PriceCharting console and handheld values are credit offers, not the guide's cash prices.
-// Keep guide conditions, Parts and accessories on their own rules.
-const pcSystemCreditBasis = line => ['console', 'handheld'].includes(line.category) && line.condition !== 'parts'
+// PriceCharting hardware values are credit offers, not the guide's cash prices.
+// Keep guide conditions and Parts on their own rules.
+const pcHardwareCreditBasis = line => isHwCat(line.category) && line.condition !== 'parts'
   && (line.source === 'pc' || (line.source === 'hw' && isPcCondition(line.condition)));
 function tradeOfferRule(line, s = settings) {
   const rule = s.rules[line.category] || s.rules.other;
-  return pcSystemCreditBasis(line) ? { ...rule, cashPct: 100 / 1.2, creditPct: 100 } : rule;
+  return pcHardwareCreditBasis(line) ? { ...rule, cashPct: 100 / 1.2, creditPct: 100 } : rule;
 }
 
 function normalCreditBonusOf(line, p, s) {
