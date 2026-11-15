@@ -660,13 +660,17 @@ The site's **only server-side code**. Everything else is static.
     spelling aliases and Roman numerals normalized. Unconfirmed title
     extensions/sequels (Final Fight vs Final Fight Guy, Halo 3 vs ODST),
     preorders/presales, counted multi-game lots (including platform words
-    between the count and "games", and hyphenated counts such as "8-games"), unknown named/numbered editions, and
+    between the count and "games", hyphenated counts such as "8-games", and
+    cartridge counts such as "14 game carts"), unknown named/numbered editions, and
     gun/sensor/accessory extras are held for review on both eBay and Amazon.
     Console/handheld comparisons retain ordinary controllers, power supplies,
     cables and switch boxes; game-only hardware-bundle regexes do not reject the
     console itself. Standalone console accessories, stickers, diagnostic carts,
     explicitly faulty/untested consoles, and extra-game bundles remain excluded
     across sources. These identity checks precede history retention and outliers.
+    Added game names at the end of console equipment lists (e.g. controllers,
+    PSU, RF switch box, and Pac Man) are excluded as unconfirmed bundle contents;
+    selected package names and ordinary equipment/condition descriptions remain.
     The extension check applies to long names too (Dynasty Warriors: Gundam
     vs Reborn), while known aliases, normal condition/platform words, selected
     edition qualifiers and actual compilations retain their existing handling.

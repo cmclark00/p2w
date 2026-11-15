@@ -369,6 +369,49 @@ test('console exclusion audit keeps normal equipment and rejects accessories, fa
   assert.equal(invoke('floorOdd',{title:'Example Game PS4 with controller'},'loose',null,item),true,'game bundle exclusions stay intact');
 });
 
+test('console cart counts and named games cannot hide in ordinary equipment lists', () => {
+  const p={'product-name':'Atari 5200 System','console-name':'Atari 5200',genre:'Systems','loose-price':6896};
+  const wrong=[
+    'Atari 5200 4 Port Console + OEM Power Supply 14 Game Carts, Manuels',
+    'Atari 5200 Console with 14 carts',
+    'Atari 5200 Console with 14-cartridges',
+    'Atari 5200 Console + two game cartridges',
+    'Atari 5200 Console + set of 14 game carts',
+    'Atari 5200 Console + cartridges pack of 14',
+    'Atari 5200 2 Port Console with 2 Controllers, PSU, and Pac Man Cartridge',
+    'Atari 5200 4 Port Console with 2 Controllers, PSU, RF Switch Box, and Pac Man',
+    'Atari 5200 Console with 2 Controllers, PSU, and Space Invaders',
+    'Atari 5200 Console + Super Breakout Cartridge',
+  ];
+  for (const title of wrong) {
+    assert.match(invoke('floorListingMismatch',title,p),/bundle/i,title);
+    assert.match(invoke('floorSaleListingMismatch',{title,sourcePcId:'31661'},p),/bundle/i,title);
+    assert.equal(invoke('floorAmazonLowest',cur(p,{condition:'loose',amazon:{found:true,title,offers:[{price:20000,sub:'good'}]}})),null,title);
+    assert.equal(invoke('floorGsFor',cur({...p,'gamestop-price':20000},{condition:'loose',gamestopStock:{state:'in',title}})),null,title);
+  }
+  const valid=[
+    'Atari 5200 4 Port Console with 2 Controllers, PSU, RF Switch Box',
+    'Atari 5200 SuperSystem Console Original Box Power Supply Manual No Joysticks',
+    'Atari 5200 4 Port Console + OEM Power Supply TESTED WORKS needs controllers',
+    'Atari 5200 Console with 2 controllers, PSU, tested and working perfectly',
+    'Atari 5200 Console with controller and no game cartridges',
+    'Atari 5200 Console with controller and cartridge slot cleaned',
+  ];
+  for (const title of valid) {
+    assert.equal(invoke('floorListingMismatch',title,p),null,title);
+    assert.equal(invoke('floorSales',cur(p,{condition:'loose',sales:{loose:[{title,price:10000,date:'2026-11-01'}]}}))[0].odd,false,title);
+  }
+  const rows=invoke('floorSales',cur(p,{condition:'loose',sales:{loose:[
+    ...wrong.map((title,i)=>({title,price:20000-i,date:'2026-11-01'})),
+    {title:valid[0],price:10000,date:'2026-11-01'},
+  ]}}));
+  assert.equal(rows.filter(s=>!s.odd&&!s.outlier).length,1,'Only the actual console can set pricing or stop the search');
+  assert.equal(invoke('floorAutoSale',rows).sale.price,10000);
+  const packIn={...p,'product-name':'Atari 5200 Console [Pac Man Bundle]'};
+  assert.equal(invoke('floorConsoleExtraGame','Atari 5200 Console Pac Man Bundle with controllers and Pac Man Cartridge',packIn),false,'Selected factory package contents remain recognized');
+  assert.equal(invoke('floorGameCounts','Final Fantasy VIII 4 discs PS1 CIB').length,0,'Normal multi-disc games are not cartridge lots');
+});
+
 test('Xbox model letters cannot satisfy a game Roman numeral or admit another numbered game', () => {
   const p={...item,id:'35676','product-name':'Mortal Kombat X','console-name':'Xbox One','new-price':1100};
   const wrong=[

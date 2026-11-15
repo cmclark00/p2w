@@ -3832,7 +3832,8 @@ function floorOdd(sale, condition, rhythm = null, product = null, checkPackaging
   if (condition === 'new' && /\b(?:pre[ -]?owned|used|unsealed|opened|open box|new\s*\(other\)|like new|not sealed|no seal)\b/i.test(sale.title || '')) return true;
   if (checkPackaging && floorLoosePackagingMismatch(sale.title, condition, product)) return true;
   // Opened packaging is valid used-figure evidence, not a sealed collectible.
-  const t = toy ? floorFigureTitle(sale.title) : sale.title;
+  const t = toy ? floorFigureTitle(sale.title) : floorConsoleProduct(product)
+    ? String(sale.title || '').replace(/\bno games?(?:\s+(?:carts?|cartridges?))?\b/gi, '') : sale.title;
   const sealed = toy ? floorFigureSaleCondition(sale, condition) === 'new' : SEALED_RE.test(t);
   if (toy && (floorFigureSaleCondition(sale, condition) !== floorCondition(product, condition)
     || condition === 'new' && /\b(?:used|opened|unsealed|like new)\b/i.test(t))) return true;
@@ -5262,10 +5263,10 @@ function floorExtraMismatch(title, name) {
 const FLOOR_PREORDER = /\bpre[\s-]?(?:order|sale)s?\b|\bpreordering\b|\bpreordered\b/i;
 // Counts may have a platform between the quantity and "games". A collection's own
 // advertised count is allowed, but unrelated games in a seller's lot are not.
-const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)[\s\u2010-\u2015-]+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)[\s\u2010-\u2015-]+){0,4}(?:games|titles)\b/gi;
+const FLOOR_GAME_COUNT = /\b([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)[\s\u2010-\u2015-]+(?:(?:sega|cd|nintendo|sony|microsoft|playstation|ps[1-5]|[1-5]|xbox|360|one|switch|wii|u|ds|3ds|gamecube|n64|snes|nes|video|different|more)[\s\u2010-\u2015-]+){0,4}(?:games|titles|(?:game[\s-]+)?(?:carts|cartridges))\b/gi;
 const floorGameCounts = (text) => [...String(text || '').matchAll(FLOOR_GAME_COUNT),
-  ...String(text || '').matchAll(/\b(?:games?|titles?)\s+(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\b/gi),
-  ...String(text || '').matchAll(/\b(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:games?|titles?)\b/gi),
+  ...String(text || '').matchAll(/\b(?:games?|titles?|(?:game\s+)?(?:carts?|cartridges?))\s+(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\b/gi),
+  ...String(text || '').matchAll(/\b(?:set|pack)\s+of\s+([2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:games?|titles?|(?:game\s+)?(?:carts?|cartridges?))\b/gi),
   ...String(text || '').matchAll(/\b(?:games|titles|cartridges|carts|discs|disks)\s+([2-9]|\d{2,})\s*[x×](?=\s|$)/gi)]
   .map((m) => ({ two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' }[m[1].toLowerCase()] || m[1]));
 const floorTitleWords = (text) => norm(String(text || '').replace(/['’]s\b/gi, '').replace(/['’]/g, '').replace(/\b([IVX]+)\b/gi, (v) => ({ I: '1', II: '2', III: '3', IV: '4', V: '5', VI: '6', VII: '7', VIII: '8', IX: '9', X: '10', XI: '11', XII: '12', XIII: '13', XIV: '14', XV: '15', XVI: '16' }[v.toUpperCase()] || v)))
@@ -5642,6 +5643,26 @@ function floorConsoleListingMismatch(title, product) {
   if (/\b(?:with|and|includes?)\s+(?:(?:some|several|assorted|extra)\s+)?games\b|[&+]\s*games\b/.test(text)) return 'Console and games bundle';
   return null;
 }
+// Seller equipment lists can end with a game name without saying "bundle":
+// "with 2 Controllers, PSU, RF Switch Box, and Pac Man". Inspect the added
+// segments before stripping ordinary equipment, retaining selected pack-in names.
+function floorConsoleExtraGame(title, product) {
+  if (!floorConsoleProduct(product)) return false;
+  const selected = new Set(floorTitleWords(product['product-name']));
+  const parts = String(title || '').split(/\s*(?:[,;&+]|\band\b|\bwith\b|\bw\/)\s*/i);
+  const equipment = /\b(?:controllers?|joysticks?|psu|power (?:supply|adapter)|rf (?:switch )?box|cables?|cords?)\b/i;
+  const normal = /^(?:controllers?|joysticks?|psu|power|supply|adapter|adaptor|rf|switch|cables?|cords?|oem|ac|av|hdmi|usb|all|two|three|four|ports?|port|silver|gray|grey|white|red|light|lights|led|front|back|serial|matching|numbers?|number|intact|present|removed|needs|missing|without|no|not|tested|test|perfect|perfectly|functional|fully|operational|cleaned|clean|shape|cosmetic|wear|scratches|scuffs)$/;
+  return parts.some((part, index) => {
+    if (!index) return false;
+    const text = norm(part);
+    // Empty slots/no cartridge are descriptions, not included software.
+    if (/\b(?:no|without|missing) (?:games?|carts?|cartridges?)\b|\b(?:cart|cartridge) (?:slot|port|connector|reader)\b/.test(text)) return false;
+    const words = floorTitleWords(part);
+    const extra = words.filter(w => !selected.has(w) && !FLOOR_TITLE_DETAILS.test(w) && !normal.test(w) && !/^\d+$/.test(w));
+    if (/\b(?:cart|cartridge|game)\b/.test(text) && extra.length) return true;
+    return equipment.test(parts.slice(0, index).join(' ')) && extra.length >= 2;
+  });
+}
 function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (!String(title || '').trim()) return 'Missing listing title; match needs review';
   const fault = floorGameFaultMismatch(title, product);
@@ -5664,6 +5685,7 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (/\btrilogy\b/i.test(name)) wantedCounts.push('3');
   const collection = /\b(?:collection|compilation|anthology)\b/i.test(name);
   if (!collection && floorGameCounts(title).some((count) => !wantedCounts.includes(count))) return 'Multiple-game lot or bundle';
+  if (floorConsoleExtraGame(title, product)) return 'Console with additional game or unconfirmed bundle contents';
   // Missing game identity should not be reported as a region problem (e.g. a
   // Farming Simulator 25 joystick while pricing Farming Simulator 22 PAL).
   if (floorTitleIdentityMismatch(title, product) === 'Listing does not confirm the selected game or product') return 'Listing does not confirm the selected game or product';
