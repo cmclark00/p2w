@@ -28,6 +28,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
     const wrong=[
       candidate('B0BDM5RYS4','for LCD Screws Hole Soft Cover for Nintendo New 3DS XL LL Console Front Back Screw Rubber Feet Cover (Red OEM)',['Nintendo 3DS']),
       candidate('B0BDXMN2WB','Replacement Full Buttons Set ABXY L R ZL ZR D-pad Home Power Buttons for Nintendo New 3DS XL LL Console Buttons (Red)',['Nintendo 3DS']),
+      candidate('B0HMVRQ57F','Compatible with Nintendo New 3DS XL, Magnetic Hard Shell Case，red',['Nintendo 3DS']),
       candidate('B000000003','New Nintendo 3DS XL Red Loopy Capture Card',['Nintendo 3DS']),
       candidate('B000000004','New Nintendo 3DS XL RED-001 Happy Home Designer',['Nintendo 3DS'])];
     const exact=candidate('B000000005','New Nintendo 3DS XL Red',['Nintendo 3DS']);
