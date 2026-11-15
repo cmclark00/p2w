@@ -5644,7 +5644,7 @@ function floorConsoleListingMismatch(title, product) {
   if (!floorConsoleProduct(product)) return null;
   const text = norm(title);
   const name = norm(product['product-name']);
-  const parts = /\b(?:screw (?:sets?|kits?)|rubber feet|hole covers?|soft covers?|screen protectors?|protective (?:cases?|covers?)|carrying cases?|replacement (?:shells?|housing|screens?|parts?)|housing shells?|digitizers?|lcd screens?|battery (?:covers?|doors?)|button (?:sets?|kits?)|silicone (?:cases?|covers?))\b/;
+  const parts = /\b(?:screw (?:sets?|kits?)|rubber feet|hole covers?|soft covers?|screen protectors?|protective (?:cases?|covers?)|carrying cases?|replacement (?:shells?|housing|screens?|parts?)|housing shells?|digitizers?|lcd screens?|battery (?:covers?|doors?)|buttons? (?:sets?|kits?)|silicone (?:cases?|covers?))\b/;
   const systemAt = text.search(/\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/);
   const componentTitle = text.replace(/\b(?:with|includes?) (?:a )?(?:carrying case|protective case|screen protector)\b/g,
     (phrase, offset) => systemAt >= 0 && offset > systemAt ? '' : phrase);
