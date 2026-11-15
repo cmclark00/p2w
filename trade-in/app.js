@@ -4953,8 +4953,15 @@ function floorEbayCandidates(cur, limit, early = false) {
 }
 async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
-  if (cur.targetedEbay?.running || cur.targetedEbay?.unavailable || cur.ebayChecks?.loading || cancelled() || cur.typed != null) return;
+  if (cur.targetedEbay?.running || cur.ebayChecks?.loading || cancelled() || cur.typed != null) return;
   const previous = cur.targetedEbay;
+  // A search that returned actual rows proves the bridge can respond. Recover
+  // once from a missed initial capability ping instead of latching off forever.
+  // A partial/failed later page must not block checking rows already received.
+  const recover = previous?.unavailable && !previous.recoveryAttempted
+    && cur.directEbay?.result?.state === 'ready' && cur.directEbay.result.sales?.length > 0
+    && helper?.targetedAvailable;
+  if (previous?.unavailable && !recover) return;
   // Reserve one slot for GameStop initially. Amazon/catalog work can keep loading
   // alongside the checks; each new source render re-evaluates the actual driver.
   const ready = () => cur.gamestopStock?.state !== 'loading';
@@ -4962,9 +4969,11 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
   if (!next().length) return;
   const state = cur.targetedEbay = previous || { attempts: 0, checked: new Map() };
   state.running = true;
+  if (recover) { state.recoveryAttempted = true; state.unavailable = false; }
   const stopped = () => cancelled() || cur.targetedEbay !== state;
   progress();
   try {
+    if (recover) { await delay(250); if (stopped()) return; }
     if (!helper?.targetedAvailable || !await helper.targetedAvailable()) { state.unavailable = true; return; }
     while (!stopped()) {
       if (state.attempts && !ready()) break; // A later source-completion render resumes this run.
@@ -5649,6 +5658,11 @@ function floorConsoleListingMismatch(title, product) {
 function floorConsoleExtraGame(title, product) {
   if (!floorConsoleProduct(product)) return false;
   const selected = new Set(floorTitleWords(product['product-name']));
+  // Optional peripherals are not ordinary operating equipment. A VCS adapter
+  // adds another console's games; a trackball is a separate specialty controller.
+  const extras = [/\bvcs adapt(?:er|or)\b/i, /\btrack[ -]?ball\b/i];
+  const included = String(title || '').replace(/\b(?:no|without|missing) (?:vcs adapt(?:er|or)|track[ -]?ball)\b/gi, '');
+  if (extras.some(re => re.test(included) && !re.test(product['product-name'] || ''))) return true;
   const parts = String(title || '').split(/\s*(?:[,;&+]|\band\b|\bwith\b|\bw\/)\s*/i);
   const equipment = /\b(?:controllers?|joysticks?|psu|power (?:supply|adapter)|rf (?:switch )?box|cables?|cords?)\b/i;
   const normal = /^(?:controllers?|joysticks?|psu|power|supply|adapter|adaptor|rf|switch|cables?|cords?|oem|ac|av|hdmi|usb|all|two|three|four|ports?|port|silver|gray|grey|white|red|light|lights|led|front|back|serial|matching|numbers?|number|intact|present|removed|needs|missing|without|no|not|tested|test|perfect|perfectly|functional|fully|operational|cleaned|clean|shape|cosmetic|wear|scratches|scuffs)$/;
@@ -5657,6 +5671,9 @@ function floorConsoleExtraGame(title, product) {
     const text = norm(part);
     // Empty slots/no cartridge are descriptions, not included software.
     if (/\b(?:no|without|missing) (?:games?|carts?|cartridges?)\b|\b(?:cart|cartridge) (?:slot|port|connector|reader)\b/.test(text)) return false;
+    // "& Game Tested Working" is an extra game even when every following
+    // word is ordinary condition metadata and no game name was supplied.
+    if (/^(?:a |one |1 )?(?:game|cart|cartridge)\b(?! (?:console|system|slot|port|connector|reader|controller)\b)/.test(text)) return true;
     const words = floorTitleWords(part);
     const extra = words.filter(w => !selected.has(w) && !FLOOR_TITLE_DETAILS.test(w) && !normal.test(w) && !/^\d+$/.test(w));
     if (/\b(?:cart|cartridge|game)\b/.test(text) && extra.length) return true;
@@ -6289,6 +6306,7 @@ function renderFloorPricer() {
   const sales = floorSales(cur);
   let salesHtml;
   const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || (b.from === 'standard' ? floorAutoSale(sales).sale : b.sale);
+  const checkSelected = saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : '';
   if (!cur.sales && !cur.salesError) salesHtml = '<p class="muted"><span class="spinner"></span>Reading recent sales from PriceCharting…</p>';
   else if (cur.salesError && !sales.length) salesHtml = `<p class="muted">${esc(cur.salesError)}${links.pc ? ` <a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer">Open the PriceCharting page</a> to see its sales.` : ''}</p>`;
   else if (!sales.length) salesHtml = `<p class="muted">No recent ${esc(GAME_CONDITIONS[cur.condition])} sales in the checked sources.</p>`;
@@ -6369,7 +6387,7 @@ function renderFloorPricer() {
       <div class="floor-sales-wrap">
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
         ${floorDirectSearchHtml(cur)}
-        <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : `${saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : ''}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
+        <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : cur.targetedEbay?.unavailable ? `${checkSelected}Individual sale verification unavailable. <button type="button" class="link" data-floor-act="ebay-resume">Retry sale checks</button> · Check the helper connection; search results alone are not verified sales.` : `${checkSelected}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
         ${salesHtml}
         ${floorStandardHtml(b)}
         ${amazonSet && !floorIsHardware(cur.product) && !toy ? `<details class="floor-details floor-amazon-details">
@@ -6545,6 +6563,14 @@ function onFloorPricerClick(e) {
   if (act === 'all') { floorCur.showAll = !floorCur.showAll; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }
   if (act === 'amazon') { loadFloorAmazon(); return; }
+  if (act === 'ebay-resume') {
+    if (floorCur.targetedEbay?.unavailable && !floorCur.targetedEbay.running) {
+      floorCur.targetedEbay.unavailable = false;
+      floorCur.targetedEbay.recoveryAttempted = false;
+      renderFloorPricer();
+    }
+    return;
+  }
   if (act === 'ebay-search') { if (!floorCur.directEbay?.loading) { floorCur.directEbay = null; renderFloorPricer(); } return; }
   if (act === 'ebay') { if (!floorCur.ebayChecks?.loading && !floorCur.targetedEbay?.running) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
   if (act === 'type') {

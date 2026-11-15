@@ -671,6 +671,13 @@ The site's **only server-side code**. Everything else is static.
     Added game names at the end of console equipment lists (e.g. controllers,
     PSU, RF switch box, and Pac Man) are excluded as unconfirmed bundle contents;
     selected package names and ordinary equipment/condition descriptions remain.
+    An unnamed added game ("& Game Tested Working") also counts as a bundle.
+    Optional VCS adapters and trackballs are separate peripheral bundles unless
+    explicitly part of the selected product; normal RF/power adapters remain.
+    Targeted sale checks recover once from a missed helper capability response
+    when direct search returned rows, including partial searches. A second failure
+    shows a separate verification-unavailable status and Retry sale checks action;
+    it never loops or treats search-card evidence as item verification.
     The extension check applies to long names too (Dynasty Warriors: Gundam
     vs Reborn), while known aliases, normal condition/platform words, selected
     edition qualifiers and actual compilations retain their existing handling.

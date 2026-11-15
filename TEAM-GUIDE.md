@@ -909,6 +909,12 @@ Guide (the Google Sheet tab).
      bundles cannot set the console price; excluded rows remain available to review.
      This includes counted carts/cartridges and added game names in equipment
      lists, such as "14 game carts" or "controllers, PSU, and Pac Man".
+     An added unnamed game, VCS adapter or trackball also makes a separate bundle;
+     normal RF and power adapters remain eligible.
+     If the helper's first sale-check connection fails but search returned rows,
+     the tool retries the connection once. **Individual sale verification unavailable**
+     means those listings still need checking; **Retry sale checks** resumes that
+     step without rereading the search pages. A partial search does not block it.
      A verified highest sale settles the eBay check without waiting for its backup;
      the final price still waits for the other sources. Ended listings and hidden
      accepted-offer prices are excluded. Unreadable checked listings are skipped

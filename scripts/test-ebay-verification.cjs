@@ -245,6 +245,27 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   assert.equal(result(priceUnchanged).b.basis, 3000);
   const absentTarget = old([3000]); await invoke('runFloorTargetedEbay', absentTarget, () => {}, () => false, null);
   assert.equal(result(absentTarget).b.ebayReview, true); assert.equal(absentTarget.targetedEbay.running, false);
+  const recovered=cur(product,[]);
+  recovered.directEbay={result:{...direct.directEbay.result,partial:true,issues:[{code:'page-failed',page:2},{code:'unreadable',page:1}]}};
+  recovered.product=direct.product;
+  let probes=0;const recoveryCalls=[];
+  const recoveringHelper={targetedAvailable:async()=>++probes>1,checkTargeted:async url=>{
+    recoveryCalls.push(url);const row=recovered.directEbay.result.sales.find(s=>s.url===url);
+    return verified(row.id,row.price,row.title);
+  }};
+  await invoke('runFloorTargetedEbay',recovered,()=>{},()=>false,recoveringHelper);
+  assert.equal(recovered.targetedEbay.unavailable,true);
+  await invoke('runFloorTargetedEbay',recovered,()=>{},()=>false,recoveringHelper);
+  assert.deepEqual(recoveryCalls,[recovered.directEbay.result.sales[0].url],'Partial search still verifies its highest candidate after a missed capability response');
+  assert.equal(recovered.targetedEbay.unavailable,false);
+  assert.equal(recovered.targetedEbay.recoveryAttempted,true);
+  assert.equal(result(recovered).b.ebayReview,true,'Unreadable search cards still require review after item verification');
+  const staysUnavailable=cur(recovered.product,[]);staysUnavailable.directEbay=recovered.directEbay;
+  let unavailableProbes=0;
+  for(let i=0;i<5;i++) await invoke('runFloorTargetedEbay',staysUnavailable,()=>{},()=>false,{
+    targetedAvailable:async()=>{unavailableProbes++;return false;},checkTargeted:async()=>{throw Error('must not open tabs');}
+  });
+  assert.equal(unavailableProbes,2,'One recovery only; repeated renders cannot create a retry loop');
   const cancelled = old([3000]); assert.equal((await targeted(cancelled, ['sold'], () => true)).length, 0);
   const recent = cur(product, [sale(3000, '111111111111')]); recent.sales.cib[0].date = new Date().toISOString().slice(0, 10);
   assert.equal((await targeted(recent, ['sold'])).length, 1, 'Recent price-driving sales are checked too');
@@ -340,6 +361,8 @@ const verified = (id, price, title = 'Example Game PS4 CIB', state = 'sold') => 
   await invoke('loadFloorSales', automatic.product); assert.equal(forbiddenCalls, 0);
   const html = element('#floorPricer').innerHTML;
   assert.match(html, /Check selected sale/); assert.doesNotMatch(html, /Recheck sales|Verifying eBay sales/);
+  assert.match(html, /Individual sale verification unavailable/);
+  assert.match(html, /data-floor-act="ebay-resume"/);
   assert.doesNotMatch(html, /data-floor-act="add" disabled/, 'Ordinary Add to list is available without eBay checking');
   console.log('Targeted and optional eBay checks passed: uncapped paired driver checks, condition cancellation, unknown review, standard baseline, helper compatibility and premiums preserved.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

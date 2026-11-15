@@ -382,6 +382,10 @@ test('console cart counts and named games cannot hide in ordinary equipment list
     'Atari 5200 4 Port Console with 2 Controllers, PSU, RF Switch Box, and Pac Man',
     'Atari 5200 Console with 2 Controllers, PSU, and Space Invaders',
     'Atari 5200 Console + Super Breakout Cartridge',
+    'Atari 5200 2-Port Console with 2 Joystick & Game Tested Working with RF Adapter',
+    'Atari 5200 Console with a cartridge',
+    'Atari 5200 4 Port Console Rare * Model W/ VCS Adapter Tested All Wires & Ctrls',
+    'J-437 VINTAGE ORIGINAL ATARI 5200 GAME CONSOLE WITH TRACK BALL & CONTROLLERS',
   ];
   for (const title of wrong) {
     assert.match(invoke('floorListingMismatch',title,p),/bundle/i,title);
@@ -396,6 +400,8 @@ test('console cart counts and named games cannot hide in ordinary equipment list
     'Atari 5200 Console with 2 controllers, PSU, tested and working perfectly',
     'Atari 5200 Console with controller and no game cartridges',
     'Atari 5200 Console with controller and cartridge slot cleaned',
+    'Atari 5200 Console with controller and no VCS adapter',
+    'Atari 5200 Console with controller without trackball',
   ];
   for (const title of valid) {
     assert.equal(invoke('floorListingMismatch',title,p),null,title);
