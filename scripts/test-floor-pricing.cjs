@@ -2189,7 +2189,7 @@ test('Halo MCC uses the highest supported sale then low-price rounding across sy
     const product = { ...item, 'product-name': 'Halo: The Master Chief Collection', 'console-name': system, 'gamestop-price': 3499 };
     const sales = { cib: prices.map((price) => ({ price, title: 'Halo The Master Chief Collection ' + (system === 'Xbox One' ? 'Xbox One ' : '') + 'CIB' })) };
     const r = invoke('floorResult', cur(product, { sales }));
-    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5500);
+    assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5000);
     // Clicking a lower sale cannot undercut the highest valid sale; typed prices are explicit overrides.
     assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5500);
   }
@@ -2508,6 +2508,40 @@ test('low-price rounding respects dollar endings, cents, market references and t
   const rounded = invoke('floorPrice', 5200, {});
   assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('low-price rounding: $55.00'));
   assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
+});
+
+test('one eligible sale just above a low-price step rounds down without altering specific rules', () => {
+  const product = {...item, 'product-name':'The Evil Within', 'console-name':'Xbox One', 'cib-price':809, 'gamestop-price':999};
+  const input = (prices, p = product) => cur(p, {sales:{cib:prices.map((price,i)=>({
+    title:p['product-name']+' '+p['console-name']+' CIB', price, url:`https://www.ebay.com/itm/${100000000000+i}`
+  }))}});
+  const sample=input([2200,1917,1795,1785,1780]);
+  const result=invoke('floorResult',sample);
+  assert.equal(result.b.basis,2200,'Evidence price is preserved');
+  assert.equal(result.r.price,2000,'Screenshot case must not jump to $25');
+  assert.match(invoke('floorMath',result.b,result.r),/single sale just above step.*\$20.00/);
+  for(const [prices,expected] of [[[2200,2100,1900],2500],[[2201,1900],2500],[[2499,1900],2500],[[2200],2500]])
+    assert.equal(invoke('floorResult',input(prices,{...product,'cib-price':1000})).r.price,expected,JSON.stringify(prices));
+  assert.equal(invoke('floorResult',{...sample,typed:2200}).r.price,2500,'Typed override remains deliberate');
+  assert.equal(invoke('floorResult',{...sample,pick:0}).r.price,2500,'Manual sale selection remains deliberate');
+  assert.equal(invoke('floorResult',{...sample,product:{...product,'gamestop-price':2199}}).r.singleSaleRound,null,'Independent market floor remains');
+  const amazon=cur(product,{...sample,amazon:{found:true,offers:[{price:2199,sub:'very_good'}]}});
+  assert.equal(invoke('floorResult',amazon).r.singleSaleRound,null,'Amazon support remains');
+  const excluded=input([2200,2300,1917]); excluded.sales.cib[1].title='The Evil Within 2 CIB';
+  assert.equal(invoke('floorResult',excluded).r.price,2000,'Wrong game cannot count as supporting evidence');
+  const duplicate=input([2200,2200,1917]); duplicate.sales.cib[1].url=duplicate.sales.cib[0].url;
+  assert.equal(invoke('floorResult',duplicate).r.price,2000,'Same sale cannot count twice');
+  for(const p of [{...item,'product-name':'Pokemon X','console-name':'Nintendo 3DS'},
+    {...item,'product-name':'Pokemon Yellow','console-name':'GameBoy'},
+    {...item,'product-name':'Madden NFL 17'}, {...item,'product-name':'Atari 5200 System'}]) {
+    assert.equal(invoke('floorResult',input([2200,1900],p)).r.singleSaleRound,null,p['product-name']);
+  }
+  assert.equal(invoke('floorResult',{...sample,manualMissing:true}).r.singleSaleRound,null,'Manual rule keeps its ordering');
+  assert.equal(invoke('floorResult',input([8200,7900],{...item})).r.price,8000,'Higher tiers unchanged');
+  assert.equal(invoke('floorResult',input([7700,7400],{...item})).r.price,7500,'Applies across the existing low-price tier');
+  const standard={...item,id:'200'}, variant={...item,id:'201','product-name':'Example Game [Limited Edition]',standardGame:standard};
+  const v=cur(variant,{sales:{cib:[]},standardGame:input([2200,1900],standard)});
+  assert.equal(invoke('floorResult',v).r.price,2000,'Standard-edition sale floor uses its own eligible evidence');
 });
 
 test('LEGO DC Super Villains PS4 CIB rounds its winning $14.95 sale to $15', () => {

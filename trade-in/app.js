@@ -3753,11 +3753,12 @@ function floorAmazonLowRound(price) {
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
-function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsAdjustment = false }) {
+function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsAdjustment = false, singleSaleRound = null }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const lowRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
+  const ordinaryRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
+  const lowRound = value => singleSaleRound != null && value === basis ? singleSaleRound : ordinaryRound(value);
   const full = Math.max(min, premiumBasis <= 8000 ? lowRound(premiumBasis) : premiumBasis);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const roundedReference = (value) => value > 0 ? (value <= 8000 ? lowRound(value) : value) : 0;
@@ -3771,7 +3772,7 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
     ? Math.min(FLOOR_STEP, Math.max(0, normalPrice - min)) : 0;
   return { full, ded, price: normalPrice - sportsDiscount, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
-    premium, premiumBasis, amazonRounding, sportsDiscount };
+    premium, premiumBasis, amazonRounding, sportsDiscount, singleSaleRound };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -6131,6 +6132,26 @@ function floorResult(cur) {
   return { ...result, b, r: { ...result.r, price: cib.r.price, cibFloor: cib.r.price, beforeCibFloor: result.r.price } };
 }
 
+// A lone sale just above a $5 step should not create an unsupported higher
+// shelf step. Count only the shared eligible, deduplicated evidence, including
+// the standard edition when it drives a variant. Never change specific rules.
+function floorSingleSaleRound(cur, b) {
+  const source = b.from === 'standard' ? b.standardReference : b;
+  const evidence = b.from === 'standard' ? b.standardReference?.cur : cur;
+  if (!evidence || source?.from !== 'sale' || cur.typed != null || cur.pick != null || cur.manualMissing
+    || floorIsHardware(cur.product) || floorToyFamily(cur.product)
+    || autoShitboxReason({ name: cur.product['product-name'], genre: cur.product.genre }) === 'sports game'
+    || [cur, evidence].some(c => floorPricingRule(c.product['product-name'], c.product['console-name']))) return null;
+  const basis = b.basis, lower = Math.floor(basis / FLOOR_STEP) * FLOOR_STEP;
+  if (!(basis > lower && basis <= 8000 && basis - lower <= 200) || floorLowRound(basis) <= lower) return null;
+  // Independent market references can still justify the higher step.
+  if (floorGsFor(evidence) > lower || floorAmazonLowest(evidence) > lower || floorGsFor(cur) > lower || floorAmazonLowest(cur) > lower) return null;
+  const eligible = floorSales(evidence).filter(s => !s.odd && !s.outlier && s.price > 0);
+  const sales = [...new Map(eligible.map(s => [floorSaleKey(s), s])).values()];
+  return sales.length >= 2 && sales.filter(s => s.price > lower).length === 1
+    && sales[0].price === basis ? lower : null;
+}
+
 function floorConditionResult(cur) {
   cur = floorConditionCur(cur);
   const p = cur.product;
@@ -6158,6 +6179,7 @@ function floorConditionResult(cur) {
   const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
     gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
     sportsAdjustment: !typed && shitbox === 'sports game',
+    singleSaleRound: floorSingleSaleRound(cur, b),
     amazonRounding: b.from === 'amazon' || b.from === 'standard' && b.standardReference?.from === 'amazon' });
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
@@ -6515,7 +6537,7 @@ function floorMath(b, r) {
     if (r.price !== r.beforeShelfRound) parts.push(`rounded to toys-to-life ${r.toy === 'amiibo' || r.beforeShelfRound >= 1500 ? '$5' : '$2 / $15'} step: ${money(r.price)}`);
     return parts.join(' → ');
   }
-  const lowLabel = r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
+  const lowLabel = r.singleSaleRound != null ? 'single sale just above step — rounded down' : r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${lowLabel}: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);

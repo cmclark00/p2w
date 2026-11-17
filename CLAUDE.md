@@ -1176,6 +1176,16 @@ The site's **only server-side code**. Everything else is static.
     dollar endings 2/3/4 and 7/8/9 up to the next $5; other endings round down
     to $5 (exact multiples stay unchanged). Cents do not affect the ending:
     $11.99 -> $10, $14.95 -> $15, $16.99 -> $15, $17 -> $20, $52 -> $55. The existing $10 minimum ($5 for shitbox games) remains.
+    **Lone sale near a lower step:** `floorSingleSaleRound()` uses the lower $5
+    step for automatic sale-driven games through $80 when the top eligible sale
+    is at most $2 above it and all other eligible sales (at least one) are at or
+    below the step. $22 above $19.17/$17.95 -> $20, not $25. Deduplicate by sale
+    identity; excluded/outlier rows do not count. Standard-edition sale baselines
+    use their own evidence. Any matching specific pricing rule (including 0%),
+    sports, hardware, toys, manual deductions, picked sales and typed prices
+    retain existing treatment. A qualifying Amazon/GameStop reference above the
+    lower step preserves normal rounding. No sale is excluded by this rule;
+    the explanation identifies the rounding adjustment, applied once.
     **Sports below $20:** games classified as `sports game` by the existing
     guide use normal source-specific rounding, then subtract $5 once:
     $16 -> $15 -> $10, $19.99 -> $20 -> $15, $10 -> $5. The $5 minimum remains.

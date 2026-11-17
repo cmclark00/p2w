@@ -1197,6 +1197,14 @@ Guide (the Google Sheet tab).
    Cents do not change the ending: $11.99 → $10, $14.95 → $15, $16.99 → $15,
    $17 → $20, and $52 → $55. This applies to the
    winning baseline after any premium or discount, except when Amazon sets it.
+   **One sale just above a step:** for automatic game prices through $80, if
+   only one eligible sale is above the lower $5 step, by no more than $2, and
+   at least one other eligible sale is at or below that step, use the lower
+   step. For example, $22 above $19.17/$17.95 gives **$20**, not $25.
+   Duplicate/excluded listings do not provide support. A matching Amazon or
+   GameStop reference above that step keeps normal rounding. Specific pricing
+   rules, sports, toys, hardware, manual deductions and staff overrides keep
+   their existing treatment. This also works for a standard-game sale baseline.
    **Amazon-driven prices through $80 round down to $5 unless within $2 of
    the higher $5:** $27.99 → $25, $28 → $30, $32.99 → $30, $33 → $35. This
    includes Renewed and an Amazon-driven standard-game fallback. Merely showing
