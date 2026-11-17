@@ -4659,6 +4659,12 @@ function floorMergedSales(cur, pool) {
   for (const s of result.sales) {
     const previous = merged.get(s.id);
     let condition = floorDirectCondition(s, cur.product);
+    // A generic used hardware title is not evidence that its original box is
+    // missing. Retain the same listing's known CIB category rather than moving
+    // it into Loose just because the direct-search title omits packaging.
+    if (condition === 'loose' && floorIsHardware(cur.product)
+      && !/\b(?:loose|console only|system only|(?:disc|disk|cart|cartridge) only|no (?:case|box|manual))\b/i.test(s.title || '')
+      && (cur.sales?.cib || []).some(row => floorSaleKey(row) === s.id)) condition = 'cib';
     // CIB can use a higher-priced used copy even when loose or packaging is
     // unspecified. This never admits sealed, broken, accessory-only or wrong-game evidence.
     const cibUsedEvidence = cur.condition === 'cib' && !floorToyFamily(cur.product) && !floorIsHardware(cur.product)
@@ -5426,9 +5432,9 @@ function floorTitleIdentityMismatch(title, product) {
     const character = floorSkyCharacter(product);
     return character && (` ${floorSkyText(title)} `).includes(` ${character} `) ? null : 'Listing does not confirm the selected character';
   }
-  const core = floorTitleWords(name.replace(/\[[^\]]*\]|\([^)]*\)/g, ' '));
+  const core = floorTitleWords(floorConsoleIdentityTitle(name, product).replace(/\[[^\]]*\]|\([^)]*\)/g, ' '));
   const hardware = !!floorToyFamily(product) || floorIsHardware(product) || /\b(?:console|controller|handheld|nintendo (?:3?ds|dsi)|game ?boy|psp)\b/i.test(name);
-  const listed = floorTitleWords(hardware ? title : floorIdentityPlatformTitle(title));
+  const listed = floorTitleWords(hardware ? floorConsoleIdentityTitle(title, product) : floorIdentityPlatformTitle(title));
   if (!core.length || core.some((word) => !listed.includes(word))) return 'Listing does not confirm the selected game or product';
   if (!hardware && !/\b(?:collection|compilation|anthology|trilogy)\b/i.test(name)) {
     const identityTitle = floorIdentityPlatformTitle(title);
@@ -5634,6 +5640,19 @@ function floorConsoleContentsTitle(title, product) {
   return String(title || '').replace(/(?:\bwith\b|\bw\/|\+|&|\band\b|\bincludes?\b)\s*(?:(?:all|the|a|an|original|oem|one|two|\d+)\s+)*(?:controllers?|joysticks?|cables?|cords?|power (?:supply|adapter|cord)|ac adapter|rf (?:adapter|box)|switch box)\b/gi,
     (phrase, offset, text) => /\b(?:console|system|handheld)\b/i.test(text.slice(0, offset)) ? ' ' : phrase);
 }
+// This hardware edition uniquely identifies the New 3DS XL. Sellers often
+// omit Nintendo, Zelda, New or Limited, and spell the possessive without an
+// apostrophe. Require the actual model + edition before dropping those labels;
+// never apply this relaxation to games, generic gold consoles or other models.
+function floorMajoraConsoleTitle(title) {
+  const text = norm(title).replace(/\bmajora(?: s|s)?\b/g, 'majoras');
+  return /\b3ds xl\b/.test(text) && /\bmajoras mask\b/.test(text);
+}
+function floorConsoleIdentityTitle(title, product) {
+  if (!floorConsoleProduct(product) || !floorMajoraConsoleTitle(product['product-name']) || !floorMajoraConsoleTitle(title)) return title;
+  return norm(title).replace(/\bmajora(?: s|s)?\b/g, 'majoras')
+    .replace(/\b(?:new|nintendo|legend of zelda|zelda|limited|edition)\b/g, ' ');
+}
 function floorConsoleListingMismatch(title, product) {
   if (!floorConsoleProduct(product)) return null;
   const text = norm(title);
@@ -5643,7 +5662,7 @@ function floorConsoleListingMismatch(title, product) {
   if (/^(?:compatible (?:with|for)|for)\b/.test(text)) return 'Console compatibility accessory, not the console';
   const parts = /\b(?:screw (?:sets?|kits?)|rubber feet|hole covers?|soft covers?|screen protectors?|protective (?:cases?|covers?)|carrying cases?|replacement (?:shells?|housing|screens?|parts?)|housing shells?|digitizers?|lcd screens?|battery (?:covers?|doors?)|buttons? (?:sets?|kits?)|silicone (?:cases?|covers?))\b/;
   const systemAt = text.search(/\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/);
-  const componentTitle = text.replace(/\b(?:with|includes?) (?:a )?(?:carrying case|protective case|screen protector)\b/g,
+  const componentTitle = text.replace(/\b(?:with|includes?|w|and)\s+(?:a )?(?:carrying case|protective case|screen protector)\b/g,
     (phrase, offset) => systemAt >= 0 && offset > systemAt ? '' : phrase);
   if (!parts.test(name) && parts.test(componentTitle)) return 'Console accessory or replacement part, not the console';
   if (/\b(?:stylus|styli|chargers?|cables?|cases?|covers?|batter(?:y|ies)|screens?|shells?)\b.*\b(?:for|compatible with)\b.*\b(?:3ds|2ds|ds|switch|psp|vita|console|system)\b/.test(text)) return 'Console accessory or replacement part, not the console';
@@ -5652,13 +5671,14 @@ function floorConsoleListingMismatch(title, product) {
   if (modifications.some(re => re.test(text) && !re.test(name))) return 'Modified console, not the selected stock model';
   // Model RED-001 is shared by New 3DS XL colors; it is not proof of red casing.
   if (/\b3ds\b/.test(name)) {
-    const editions = [/\bhappy home designer\b/, /\bmajoras? mask\b/, /\bhyrule\b/, /\bpikachu\b/, /\bpokemon\b/, /\bfire emblem\b/, /\bmonster hunter\b/, /\bsamus\b/, /\bgalaxy\b/, /\bsuper (?:mario|nintendo)\b/, /\bsnes\b/, /\byoshi\b/];
+    const editions = [/\bhappy home designer\b/, /\bmajora(?: s|s)? mask\b/, /\bhyrule\b/, /\bpikachu\b/, /\bpokemon\b/, /\bfire emblem\b/, /\bmonster hunter\b/, /\bsamus\b/, /\bgalaxy\b/, /\bsuper (?:mario|nintendo)\b/, /\bsnes\b/, /\byoshi\b/];
     if (editions.some(re => re.test(text) && !re.test(name))) return 'Different console special edition';
     const color = name.match(/\b(red|blue|black|white|pink|silver|gold)\b/)?.[1];
     const withoutModel = text.replace(/\bred\s*001\b/g, '');
     if (color && !new RegExp(`\\b${color}\\b`).test(withoutModel)) return 'Listing does not confirm the selected console color';
   }
   if (/\b(?:untested|not tested|broken|faulty|not working|non working|for parts|parts only|repair only|powers on only)\b/.test(text)) return 'Faulty or untested console condition';
+  if (/[+&]\s*(?:\.{2,}|…)[\s]*$/.test(title)) return 'Truncated console bundle contents need review';
   const soldItem = text.replace(/\b(?:with|includes?) (?:original |factory )?(?:stickers?|decals?|skins?)\b|\b(?:serial(?: number)?|warranty) stickers?\b|\b(?:original |factory )?stickers? (?:intact|removed|present)\b/g, ' ');
   if (/\b(?:stickers?|decals?|skins?|replacement shell|motherboard|diagnostic (?:cart|cartridge)|test cartridge)\b/.test(soldItem)
     || /\b(?:controller|joystick|keypad|power supply|power adapter|cable|cord)\b.*\b(?:for|compatible with)\b.*\b(?:console|system)\b/.test(text)
@@ -5749,7 +5769,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   const listedEditionWords = floorTitleWords(title);
   if (selectedEdition.some((edition) => floorTitleWords(edition).filter(word => word !== 'edition')
     .some((word) => !listedEditionWords.includes(word)))) return 'Different named edition';
-  if (EDITION_RES.some((re) => re.test(name) && !re.test(title))) return 'Listing does not confirm the selected edition';
+  if (EDITION_RES.some((re) => re.test(name) && !re.test(title)
+    && !(re.test('Limited Edition') && floorConsoleProduct(product) && floorMajoraConsoleTitle(name) && floorMajoraConsoleTitle(title)))) return 'Listing does not confirm the selected edition';
   if (/\b(?:bonus|demo) disc\b/i.test(packInTitle) && !/\b(?:bonus|demo) disc\b/i.test(name)) return 'Bonus/demo disc variant';
   const equipmentTitle = floorConsoleContentsTitle(packInTitle, product);
   if (floorExtraMismatch(equipmentTitle, name)) return 'Bundled extra item';

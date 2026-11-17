@@ -582,6 +582,17 @@ The site's **only server-side code**. Everything else is static.
     imports and packaging still pass the existing exclusions. PSA titles join the
     existing graded-copy exclusions so correcting the name cannot admit slabs.
     Regressions: `test-floor-variants.cjs`, `test-game-evidence.cjs`.
+    Console identity matching recognizes Majora's/Majoras/curly-apostrophe
+    Majora's Mask 3DS XL titles without requiring the redundant Nintendo,
+    Zelda, New or Limited Edition labels. This is a model/edition alias, not
+    a pricing exception. Model + edition evidence remains required; other
+    editions, imports, accessories, modified consoles and extra games still
+    fail their existing checks. Included carrying cases are distinguished
+    from standalone cases. Truncated console `+...` contents require review.
+    Direct-search hardware titles without packaging words retain a matching
+    listing's known CIB category; explicit loose/console-only evidence wins.
+    Regression: `test-console-edition-matching.cjs` audits recovered titles,
+    mismatch controls and separate New/CIB/Loose classification.
     Xbox One-boxed Xbox 360 reissues use a release allowlist for Amazon discovery
     and catalog platform matching. Sold titles must explicitly identify the
     selected Xbox One/360 generation, including own-page PriceCharting sales;
