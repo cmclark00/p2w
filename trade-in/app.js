@@ -5887,7 +5887,8 @@ function floorAmazonLowest(cur, showPartial = false) {
   return Number.isFinite(lowest) && lowest > 0 && lowest <= rhythmDiscSaleCap(cur) ? lowest : null;
 }
 
-// Regular and verified Renewed references use the same three-source maximum.
+// Regular and verified Renewed references share the baseline rules, including
+// the nearby-Amazon preference for ordinary low-price games.
 // Games with sold evidence and a $500+ sale or Amazon offer
 // use sales/GameStop instead of either Amazon baseline. Specific adjustments follow.
 function floorUnverifiedBasis(cur = floorCur) {
@@ -5901,7 +5902,7 @@ function floorUnverifiedBasis(cur = floorCur) {
   const base = floorOwnBasis(baseCur);
   const checks = [...own.checks];
   if (base.basis > 0) checks.push(`Standard-game baseline ${money(base.basis)} (${baseCur.product['product-name']}, ${GAME_CONDITIONS[cur.condition]}). The variant cannot use a lower baseline; specific premiums and deductions still apply`);
-  for (const note of base.checks.filter(n => /unavailable|incomplete|failed|fallback|out of stock/i.test(n))) checks.push(`Standard game: ${note}`);
+  for (const note of base.checks.filter(n => /unavailable|incomplete|failed|fallback|out of stock|within \$2 below/i.test(n))) checks.push(`Standard game: ${note}`);
   const standardReference = { ...base, cur: baseCur };
   if (base.basis > 0 && (own.basis == null || base.basis > own.basis)) {
     return { ...base, from: 'standard', referenceMin: base.basis, checks, standardReference, variantBasis: own.basis };
@@ -6018,6 +6019,17 @@ function floorOwnBasis(cur = floorCur) {
   if (!sale) checks.push('No usable eBay sold evidence for this condition; fallback price — verify before labeling');
   if (renewedReference) checks.push('Renewed reference: compare the lowest verified Amazon Renewed offer with the highest eligible eBay sale and applicable GameStop price; use the highest. Specific premiums, deductions and rounding still apply');
   const options = [[sale?.price, 'sale'], [expensiveGameBasis ? null : amz, 'amazon'], [gs, 'gamestop']].filter(([v]) => v > 0);
+  // For ordinary low-price games, a nearby matching Amazon offer is the more
+  // useful shelf reference. Keep the sale as evidence, not as a floor that
+  // would immediately undo this preference during rounding.
+  if (sale && sale.price <= 8000 && amz > 0 && amz < sale.price && sale.price - amz <= 200
+    && !(gs > amz) && !expensiveGameBasis && !specificRule && cur.pick == null && !cur.manualMissing
+    && !floorIsHardware(cur.product) && !floorToyFamily(cur.product)
+    && autoShitboxReason({ name: cur.product['product-name'], genre: cur.product.genre }) !== 'sports game') {
+    checks.push(`Matching Amazon offer ${money(amz)} is within $2 below the highest eligible sale ${money(sale.price)}; using Amazon and its rounding for this game through $80`);
+    return { basis: amz, from: 'amazon', sale, checks, waiting, referenceMin: amz,
+      renewedReference, renewedReferenceOnly, expensiveGameBasis, nearbyAmazon: true };
+  }
   const referenceMin = options.length ? Math.max(...options.map(([v]) => v)) : null;
   if (!options.length && pc > 0) options.push([pc, 'pricecharting']);
   if (options.length) {

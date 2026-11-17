@@ -631,7 +631,7 @@ test('Amazon-driven prices through $80 round down to $5 unless within $2 of the 
     assert.equal(invoke('floorPrice',raw,{amazonRounding:true}).price,invoke('floorPrice',raw,{}).price,'Higher tiers stay intact');
   }
   const shared={sales:{cib:[{title:'Example Game CIB',price:2799}]},amazon:{found:true,offers:[{price:2700}],lowest:2700}};
-  const ebay=invoke('floorResult',cur(item,shared));assert.equal(ebay.b.from,'sale');assert.equal(ebay.r.price,3000);
+  const ebay=invoke('floorResult',cur(item,shared));assert.equal(ebay.b.from,'amazon');assert.equal(ebay.r.price,2500,'Nearby Amazon takes priority');
   const gs=invoke('floorResult',cur({...item,'gamestop-price':2799},{...shared,sales:{cib:[]}}));assert.equal(gs.b.from,'gamestop');assert.equal(gs.r.price,3000);
   const typed=invoke('floorResult',cur(item,{...shared,typed:2799}));assert.equal(typed.r.price,3000);
   const renewed=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,title:'Example Game (Renewed)',renewedFallback:true,condition:'New',offers:[{price:2799,sub:'new'}],lowest:2799}}));
@@ -2542,6 +2542,40 @@ test('one eligible sale just above a low-price step rounds down without altering
   const standard={...item,id:'200'}, variant={...item,id:'201','product-name':'Example Game [Limited Edition]',standardGame:standard};
   const v=cur(variant,{sales:{cib:[]},standardGame:input([2200,1900],standard)});
   assert.equal(invoke('floorResult',v).r.price,2000,'Standard-edition sale floor uses its own eligible evidence');
+});
+
+test('nearby Amazon offers take priority for ordinary games through $80', () => {
+  const product = {...item, 'product-name':'Wolfenstein: The New Order', 'console-name':'Xbox One', 'cib-price':990, 'gamestop-price':499};
+  const sample = (sale=1705, amazon=1517, p=product) => cur(p, {
+    sales:{cib:[{title:p['product-name']+' '+p['console-name']+' CIB',price:sale}]},
+    amazon:{found:true,offers:[{price:amazon,sub:'very_good'}]}
+  });
+  const result=invoke('floorResult',sample());
+  assert.equal(result.b.from,'amazon'); assert.equal(result.b.basis,1517);
+  assert.equal(result.b.sale.price,1705,'Keep original sold evidence');
+  assert.equal(result.r.price,1500,'Wolfenstein screenshot uses $15, not $20');
+  assert.match(result.b.checks.join(' '),/within \$2 below/);
+  assert.equal(invoke('floorResult',sample(1717)).b.nearbyAmazon,true,'Inclusive $2 gap');
+  assert.equal(invoke('floorResult',sample(1718)).b.from,'sale','Larger gap keeps highest-source rule');
+  assert.equal(invoke('floorResult',sample(1500)).b.from,'amazon','Higher Amazon still wins normally');
+  assert.equal(invoke('floorResult',sample(8000,7800,item)).b.nearbyAmazon,true);
+  assert.equal(invoke('floorResult',sample(8001,7801,item)).b.from,'sale','Higher price tier unaffected');
+  assert.equal(invoke('floorResult',sample(1705,1517,{...product,'gamestop-price':1699})).b.from,'sale','Do not bypass GameStop minimum');
+  for (const extra of [{pick:0},{manualMissing:true}])
+    assert.equal(invoke('floorResult',{...sample(),...extra}).b.from,'sale');
+  assert.equal(invoke('floorResult',{...sample(),typed:2500}).r.price,2500);
+  for(const p of [{...item,'product-name':'Pokemon X','console-name':'Nintendo 3DS'},
+    {...item,'product-name':'Pokemon Yellow','console-name':'GameBoy'},
+    {...item,'product-name':'Madden NFL 17'}, {...item,'product-name':'Atari 5200 System'}])
+    assert.notEqual(invoke('floorResult',sample(1705,1517,p)).b.nearbyAmazon,true,p['product-name']);
+  for(const amazon of [{...sample().amazon,title:'Different Game'}, {...sample().amazon,error:'failed'},
+    {...sample().amazon,incomplete:true}, {...sample().amazon,newReference:true,references:{used:null}},
+    {...sample().amazon,renewedFallback:true,offers:[{price:2100,sub:'new'}]}])
+    assert.notEqual(invoke('floorResult',{...sample(),amazon}).b.nearbyAmazon,true,'Only usable matching offers');
+  const standard={...item,id:'200'}, variant={...item,id:'201','product-name':'Example Game [Limited Edition]',standardGame:standard};
+  const v=cur(variant,{sales:{cib:[]},standardGame:sample(1705,1517,standard),
+    amazon:{found:false,standard:sample(1705,1517,standard).amazon}});
+  assert.equal(invoke('floorResult',v).r.price,1500,'Standard-game Amazon baseline uses the same preference');
 });
 
 test('LEGO DC Super Villains PS4 CIB rounds its winning $14.95 sale to $15', () => {

@@ -1195,6 +1195,15 @@ The site's **only server-side code**. Everything else is static.
     Street, NFL Blitz) retain normal treatment. Typed prices and exact MSRP
     rules are unchanged; premiums apply before rounding and missing-manual
     deductions keep their existing order. CIB/New floors still compare final recommendations.
+    **Nearby Amazon preference:** automatic ordinary games with a highest eligible
+    sale through $80 use the matching, usable Amazon offer when it is lower by
+    at most $2 and GameStop is no higher than that offer. For example, a $17.05
+    sale and $15.17 Amazon offer use $15.17 and round to $15. The sale remains
+    visible evidence but cannot reimpose a higher reference minimum. Specific
+    pricing rules (including 0%), manual deductions, sports, toys, hardware,
+    picked sales and typed prices keep their existing treatment. Failed,
+    incomplete, mismatched and reference-only Amazon offers cannot qualify.
+    Standard-game baselines use the same preference with their own evidence.
     **Amazon-driven exception through $80:** `floorAmazonLowRound()` rounds down
     to $5 unless the amount is within $2 (inclusive) of the higher $5. Thus
     $27/$27.99 -> $25, $28 -> $30, $32.99 -> $30, $33 -> $35. `floorResult()`

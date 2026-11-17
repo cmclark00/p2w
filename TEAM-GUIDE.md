@@ -1205,6 +1205,13 @@ Guide (the Google Sheet tab).
    GameStop reference above that step keeps normal rounding. Specific pricing
    rules, sports, toys, hardware, manual deductions and staff overrides keep
    their existing treatment. This also works for a standard-game sale baseline.
+   **Amazon close to the highest sale:** for ordinary automatic game pricing,
+   when the highest eligible sale is $80 or less and a matching usable Amazon
+   offer is up to $2 lower, use Amazon if GameStop is no higher than that offer.
+   A $17.05 sale and $15.17 Amazon offer therefore give **$15**. Failed,
+   incomplete or reference-only offers do not qualify. Specific pricing rules,
+   sports, toys, hardware, manual deductions and staff overrides stay intact.
+   This also applies to standard-game baselines.
    **Amazon-driven prices through $80 round down to $5 unless within $2 of
    the higher $5:** $27.99 → $25, $28 → $30, $32.99 → $30, $33 → $35. This
    includes Renewed and an Amazon-driven standard-game fallback. Merely showing
