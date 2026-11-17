@@ -23,6 +23,48 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('The Surge uses cheaper New at 12.97 and rounds to 15, with Used visible', async () => {
+    const p = {...product, 'product-name':'The Surge', 'console-name':'Xbox One', 'cib-price':855, 'gamestop-price':499};
+    const match = candidate('B01N2YCMIN','The Surge - Xbox One',['Xbox One']);
+    const e = engine(async (route, params) => route === 'amazon/catalog' ? {candidates:[match]} :
+      {...offer(match,params.cond === 'new' ? 1297 : 1394), condition:params.cond === 'new' ? 'New' : 'Used'});
+    e.ctx.result = await e.fetch(p,'cib');
+    e.ctx.sample = {product:p,condition:'cib',sales:{cib:[{title:'The Surge Xbox One',price:1200}]},amazon:e.ctx.result};
+    assert.equal(e.run('floorResult(sample).b.basis'),1297);
+    assert.equal(e.run('floorResult(sample).r.price'),1500);
+    assert.match(e.run('floorAmazonReferencesHtml(sample,floorResult(sample).b)'),/\$13\.94/);
+  });
+  await test('all known barcodes are searched with bounded concurrency and duplicate offers merged', async () => {
+    const codes = Array.from({length:7}, (_, i) => String(123456789010 + i));
+    const p = {...product, upc:codes[0], catalogBarcodes:[...codes, codes[0]]};
+    const match = candidate('B000000007');
+    const seen = new Set(); let active = 0, peak = 0;
+    const e = engine(async (route, params) => {
+      if (route !== 'amazon/catalog') return offer(match, 2200);
+      active++; peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 1)); active--;
+      if (params.upc) seen.add(params.upc);
+      return {candidates:params.upc === codes[6] ? [match,match] : []};
+    });
+    const result = await e.fetch(p);
+    assert.equal(result.error, undefined);
+    assert.equal(result.incomplete, undefined);
+    assert.deepEqual([...seen].sort(), codes);
+    assert.ok(peak <= 2, 'Existing two-worker catalog limit is preserved');
+    assert.equal(result.asin, match.asin, 'The seventh barcode recovers the correct listing');
+    assert.equal(result.offers.length, 2, 'Duplicate catalog hits do not duplicate offers');
+  });
+  await test('Amazon failure and partial rows explain the actual problem safely', async () => {
+    const e = engine(async () => ({candidates:[]}));
+    for (const state of [{error:'Amazon request timed out <retry>'},
+      {incomplete:true, searchError:'Catalog page unavailable <retry>'}]) {
+      e.ctx.state = state;
+      const html = e.run('floorAmazonReferencesHtml({product,condition:"cib",amazon:state},{})');
+      assert.ok(html.includes('&lt;retry&gt;'));
+      assert.ok(html.includes(state.error ? 'Amazon request timed out' : 'Catalog page unavailable'));
+      assert.doesNotMatch(html, /Check failed|No matching offers|<retry>/);
+    }
+  });
   await test('handheld Amazon search rejects components and modified or named editions before reading offers', async () => {
     const p={'product-name':'New Nintendo 3DS XL Red','console-name':'Nintendo 3DS',genre:'Systems','loose-price':27930};
     const wrong=[
@@ -649,7 +691,7 @@ async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name
       e.ctx.result=result;
       assert.equal(e.run('floorAmazonLowest({product,condition:"new",amazon:result})'),6000);
       const html=e.run('floorAmazonReferencesHtml({product,condition:"new",amazon:result},{from:"amazon"})');
-      if(fail)assert.match(html,/Check failed/);else assert.match(html,/\$10\.00/);
+      if(fail)assert.match(html,/Unavailable: Used unavailable/);else assert.match(html,/\$10\.00/);
     }
   });
   await test('CIB keeps regular New reference-only when eligible Used is absent', async () => {

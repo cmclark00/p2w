@@ -604,14 +604,14 @@ The site's **only server-side code**. Everything else is static.
     This supersedes the p90/second-highest sale selection, older-system
     Amazon midpoint adjustment, scarcity markup, and modern Amazon
     comparison-only rule. Never use Amazon's median or higher offers.
-    An unusually high lowest Amazon offer (>2x eBay/GameStop) is flagged
+    An unusually high lowest Amazon offer (>2x eBay/GameStop plus $2) is flagged
     for review but remains a minimum outside the high-value game exception. Wrong-product rhythm bundles are
     still excluded. PriceCharting's condition market price is a fallback
     only when all three references are missing; retail-sell is reference-only.
     Missing references and failed lookups remain visibly flagged.
   - **High-value games (owner correction, Oct 19 2026):** when a valid
     condition-specific sale exists and either that sale or the lowest verified
-    Amazon offer is at least $500 (`FLOOR_EXPENSIVE_GAME`),
+    Amazon offer is above $502 (`FLOOR_EXPENSIVE_GAME` plus the $2 buffer),
     `floorBasis()` uses `max(sale, GameStop)` and excludes both regular and
     Renewed Amazon from the baseline and `referenceMin`. Amazon stays visible
     as a reference. The threshold uses filtered sold evidence or the lowest verified Amazon offer
@@ -764,8 +764,8 @@ The site's **only server-side code**. Everything else is static.
     edition, bundle, condition, origin, date and sale-verification filters remain.
     The actual percentage is still applied once after choosing the valid baseline;
     `floorPremium()` continues to return null for 0%, so no adjustment is added.
-    For products without a specific rule, `floorSales()` first excludes non-figure sold evidence at or above **3x
-    the selected product/condition's PriceCharting market value** (not retail
+    For products without a specific rule, `floorSales()` first excludes non-figure sold evidence above **3x
+    the selected product/condition's PriceCharting market value plus $2** (not retail
     sell, another condition or the standard edition). This guard applies even
     with one sale and includes known shipping in direct eBay totals. Missing,
     zero or invalid market values disable this guard; no fabricated threshold.
@@ -776,6 +776,11 @@ The site's **only server-side code**. Everything else is static.
     price cap: eligible Amazon/GameStop and specific premiums still apply.
     Toys-to-life keep their specific pricing and looser outlier policies.
     PC-rejected rows do not support recent-sales counts or median/gap checks.
+    General price-only exclusion thresholds allow a $2 grace above their
+    calculated limit (`FLOOR_PRICE_CUTOFF_BUFFER`). The 3× PC guard, isolated
+    gap and median-group tests exclude only above that buffered limit. Toy
+    thresholds, specific premiums, minimums, condition/date/identity checks,
+    sports cutoff, MSRP and rounding tiers keep their explicit policies.
     It then flags an isolated highest sale when
     at least four comparable sales remain and it is at least 50% AND $5
     above the next highest (`FLOOR_SALE_OUTLIER_MIN/RATIO/GAP`). Only that
@@ -1172,26 +1177,17 @@ The site's **only server-side code**. Everything else is static.
     it too. Existing percentage premiums
     still apply before toy rounding; the rare minimum applies afterward.
 
-  - **Price math** (`floorPrice()`): through $80, `floorLowRound()` rounds
-    dollar endings 2/3/4 and 7/8/9 up to the next $5; other endings round down
-    to $5 (exact multiples stay unchanged). Cents do not affect the ending:
-    $11.99 -> $10, $14.95 -> $15, $16.99 -> $15, $17 -> $20, $52 -> $55. The existing $10 minimum ($5 for shitbox games) remains.
-    **Lone sale near a lower step:** `floorSingleSaleRound()` uses the lower $5
-    step for automatic sale-driven games through $80 when the top eligible sale
-    is at most $2 above it and all other eligible sales (at least one) are at or
-    below the step. $22 above $19.17/$17.95 -> $20, not $25. Deduplicate by sale
-    identity; excluded/outlier rows do not count. Standard-edition sale baselines
-    use their own evidence. Any matching specific pricing rule (including 0%),
-    sports, hardware, toys, manual deductions, picked sales and typed prices
-    retain existing treatment. A qualifying Amazon/GameStop reference above the
-    lower step preserves normal rounding. No sale is excluded by this rule;
-    the explanation identifies the rounding adjustment, applied once.
+  - **Price math** (`floorPrice()`): through $80, `floorLowRound()` uses
+    nearest $5 with cents included and halfway ties up, for every source.
+    $14.95 -> $15, $17 -> $15, $22 -> $20, $22.50 -> $25, $27.99 -> $30,
+    $52 -> $50. The $10 minimum ($5 for shitbox games) remains. This replaces
+    both the old dollar-ending rule and the lone-sale rounding exception.
     **Sports below $20:** games classified as `sports game` by the existing
-    guide use normal source-specific rounding, then subtract $5 once:
+    guide use normal nearest-$5 rounding, then subtract $5 once:
     $16 -> $15 -> $10, $19.99 -> $20 -> $15, $10 -> $5. The $5 minimum remains.
     The under-$20 cutoff uses the unrounded price after percentage adjustments
-    and applicable market floors; $20 and above remain unchanged. Amazon keeps
-    its usual rounding before the subtraction. Named sports exceptions (Wii Sports, NFL/NBA
+    and applicable market floors; $20 and above remain unchanged. Amazon uses
+    the same rounding before the subtraction. Named sports exceptions (Wii Sports, NFL/NBA
     Street, NFL Blitz) retain normal treatment. Typed prices and exact MSRP
     rules are unchanged; premiums apply before rounding and missing-manual
     deductions keep their existing order. CIB/New floors still compare final recommendations.
@@ -1204,18 +1200,11 @@ The site's **only server-side code**. Everything else is static.
     picked sales and typed prices keep their existing treatment. Failed,
     incomplete, mismatched and reference-only Amazon offers cannot qualify.
     Standard-game baselines use the same preference with their own evidence.
-    **Amazon-driven exception through $80:** `floorAmazonLowRound()` rounds down
-    to $5 unless the amount is within $2 (inclusive) of the higher $5. Thus
-    $27/$27.99 -> $25, $28 -> $30, $32.99 -> $30, $33 -> $35. `floorResult()`
-    passes `amazonRounding` only when Amazon wins the baseline (including Renewed
-    and an Amazon-driven standard-edition fallback), not merely when an Amazon
-    listing is displayed. Apply after percentage premiums/discounts and use the
-    same rounding on market minimums so they cannot undo it. Existing manual
-    deduction ordering, game minimums and higher-price tiers remain unchanged.
-    Toys retain their specific steps; Nintendo exact MSRP pricing bypasses rounding.
-    Typed, eBay, GameStop and PriceCharting-driven prices retain the general rule.
-    This rounding also applies to GameStop and `referenceMin`, so an
-    unrounded market reference cannot undo the owner's low-price rule.
+    Amazon uses the same nearest-$5 rounding as other sources, including Renewed
+    and standard-game fallbacks. GameStop and `referenceMin` use it too, so an
+    unrounded reference cannot undo rounding. Toys retain their specific steps;
+    Nintendo exact MSRP pricing bypasses rounding. Manual deduction ordering,
+    game minimums and higher-price tiers remain unchanged.
     Above $80, amounts stay unrounded through the baseline and adjustments.
     When a nonzero premium/discount or CIB missing-manual rule applies,
     `floorResult()` omits both `referenceMin` and the GameStop clamp:
@@ -1383,7 +1372,9 @@ The site's **only server-side code**. Everything else is static.
     are stripped as platform text during title checks, without allowing extra
     sequel/edition/headset-bundle words. This fixes Astro Bot Rescue Mission's
     Amazon title being rejected as PS1 and as an extra title extension.
-    Catalog searches automatically follow every pageToken with up to five known UPCs;
+    Catalog searches automatically follow every pageToken with all valid deduplicated known UPCs;
+    there is no five-barcode failure. Failed/partial comparison rows display
+    the actual error reason (escaped), rather than generic "Check failed";
     no manual continuation is needed. Catalog pages overlap offer I/O. The browser
     prefetches independent first catalog pages with at most two concurrent reads
     per identity, but applies matches in the original barcode/title order. All
@@ -1535,7 +1526,7 @@ The site's **only server-side code**. Everything else is static.
     visibly labeled. Renewed uses the normal three-source maximum:
     `max(highest eligible eBay sale, lowest Renewed, applicable GameStop)`, before
     specific premiums/deductions and rounding, except that Renewed strictly above
-    2× the selected-condition PriceCharting value is reference-only. Its price/link
+    2× the selected-condition PriceCharting value plus $2 is reference-only. Its price/link
     remain visible with an explanation; it cannot set a market floor or suppress
     verification of the winning sale. Missing/zero PC values do not invent a cutoff.
     A higher eBay sale remains eligible

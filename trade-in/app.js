@@ -3542,7 +3542,7 @@ function floorSaleLocation(sale) {
   return sale.locationSource === 'ebay-located-in' ? 'outside-north-america' : 'unknown';
 }
 const FLOOR_REVIEW = 10000;        // shelf price this high or more (cents): ask staff to double-check (owner request)
-const FLOOR_EXPENSIVE_GAME = 50000; // sold or lowest verified Amazon at $500+, with a valid sale: Amazon is reference-only for games
+const FLOOR_EXPENSIVE_GAME = 50000; // sold or lowest verified Amazon above $502 (a $2 buffer), with a valid sale: Amazon is reference-only for games
 const FLOOR_MIN = 1000; // only shitbox games go on the shelf at $5
 const FLOOR_MIN_SHITBOX = 500;
 const FLOOR_STEP = 500;
@@ -3669,6 +3669,7 @@ function floorToyPrice(basis, { family, group, premium }) {
 }
 // Flag an unusually high lowest Amazon offer for review, without silently dropping a required minimum.
 const FLOOR_AMAZON_OUTLIER = 2;
+const FLOOR_PRICE_CUTOFF_BUFFER = 200; // $2 grace above general price-only exclusion thresholds
 // A single isolated high sale needs at least three lower comparables before we exclude it automatically.
 const FLOOR_SALE_OUTLIER_MIN = 4;
 const FLOOR_SALE_OUTLIER_RATIO = 1.5;
@@ -3734,17 +3735,9 @@ function floorShelfRound(price) {
   return candidates.sort((a, b) => Math.abs(a - price) - Math.abs(b - price) || b - a)[0];
 }
 
-// Through $80, each $5 interval rounds up at $2 into the interval.
-// Ignore cents for the ending: $11.99 -> $10, $12 -> $15, $14.95 -> $15, $16.99 -> $15, $17 -> $20.
+// Through $80, use nearest $5 for every source; exact half-way ties go up.
 function floorLowRound(price) {
-  return price % FLOOR_STEP >= 200 ? Math.ceil(price / FLOOR_STEP) * FLOOR_STEP : Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
-}
-
-// Amazon-driven prices through $80: down to $5 unless within $2 of the next $5.
-// Preserve cents at the boundary: $27.99 -> $25, $28 -> $30, $32.99 -> $30.
-function floorAmazonLowRound(price) {
-  const lower = Math.floor(price / FLOOR_STEP) * FLOOR_STEP;
-  return price - lower >= FLOOR_STEP - 200 ? lower + FLOOR_STEP : lower;
+  return Math.round(price / FLOOR_STEP) * FLOOR_STEP;
 }
 
 // Basis (cents) -> shelf price: use the low-price rule through $80; above it,
@@ -3753,12 +3746,11 @@ function floorAmazonLowRound(price) {
 // Market references receive the same rounding, so a raw $16 reference cannot force $20. Specific premiums/discounts and manual
 // deductions take priority: floorResult omits the market minimums for those exceptions.
 // Premiums apply to the basis before rounding; typed prices bypass rules and market minimums.
-function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsAdjustment = false, singleSaleRound = null }) {
+function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, referenceMin = null, amazonRounding = false, sportsAdjustment = false }) {
   if (basis == null) return null;
   const min = shitbox ? FLOOR_MIN_SHITBOX : FLOOR_MIN;
   const premiumBasis = premium ? Math.round(basis * (1 + premium.pct / 100)) : basis;
-  const ordinaryRound = amazonRounding ? floorAmazonLowRound : floorLowRound;
-  const lowRound = value => singleSaleRound != null && value === basis ? singleSaleRound : ordinaryRound(value);
+  const lowRound = floorLowRound;
   const full = Math.max(min, premiumBasis <= 8000 ? lowRound(premiumBasis) : premiumBasis);
   const ded = manualMissing ? manualDeduction(full) : 0;
   const roundedReference = (value) => value > 0 ? (value <= 8000 ? lowRound(value) : value) : 0;
@@ -3772,7 +3764,7 @@ function floorPrice(basis, { shitbox, manualMissing, gs = null, premium = null, 
     ? Math.min(FLOOR_STEP, Math.max(0, normalPrice - min)) : 0;
   return { full, ded, price: normalPrice - sportsDiscount, beforeShelfRound, min, gsRaised: gsFloor > full - ded && gsFloor >= marketFloor ? gsFloor : 0,
     marketRaised: marketFloor > Math.max(full - ded, gsFloor) ? marketFloor : 0,
-    premium, premiumBasis, amazonRounding, sportsDiscount, singleSaleRound };
+    premium, premiumBasis, amazonRounding, sportsDiscount };
 }
 
 // GameStop's pre-owned price for the game being priced, or null (PriceCharting uses 0 when GameStop doesn't carry it).
@@ -4333,7 +4325,6 @@ async function fetchFloorAmazonSingle(product, condition, request) {
         return verified.filter(a => !a.displayOnly && floorAmazonLowest({ product, condition, amazon: a }) > 0);
       };
       try {
-        if (upcs.length > 5) throw Error('More than five product barcodes need review; Amazon search is incomplete.');
         const searchPlatforms = [...new Set([product['console-name'], floorMarketSearchPlatform(product)])];
         const queries = [...new Set([product['product-name'], floorToyFamily(product) ? product['product-name'] : floorVariantName(product)]
           .flatMap(name => searchPlatforms.map(platform => `${name.replace(/[\[\]]/g, ' ')} ${platform}`.replace(/\s+/g, ' ').trim())))];
@@ -5100,9 +5091,9 @@ function floorSales(cur = floorCur) {
   const specificPricing = !!floorPricingRule(name, cur.product?.['console-name']);
   // Toys-to-life retain their specific common-average / uncommon-high-sale policy.
   if (!specificPricing && !floorToyFamily(cur.product) && Number.isFinite(pcMarket) && pcMarket > 0) {
-    const pcLimit = pcMarket * FLOOR_SALE_PC_LIMIT_RATIO;
+    const pcLimit = pcMarket * FLOOR_SALE_PC_LIMIT_RATIO + FLOOR_PRICE_CUTOFF_BUFFER;
     for (const sale of sales) {
-      if (!sale.odd && Number.isFinite(sale.price) && sale.price >= pcLimit) {
+      if (!sale.odd && Number.isFinite(sale.price) && sale.price > pcLimit) {
         sale.outlier = { pcMarket, pcLimit };
       }
     }
@@ -5142,7 +5133,8 @@ function floorSales(cur = floorCur) {
     const [top, next] = normal;
     const ratio = relaxedToys ? FLOOR_TOY_OUTLIER_RATIO : FLOOR_SALE_OUTLIER_RATIO;
     const gap = relaxedToys ? FLOOR_TOY_OUTLIER_GAP : FLOOR_SALE_OUTLIER_GAP;
-    const isolatedGap = top.price >= next.price * ratio && top.price - next.price >= gap;
+    const isolatedGap = relaxedToys ? top.price >= next.price * ratio && top.price - next.price >= gap
+      : top.price > Math.max(next.price * ratio, next.price + gap) + FLOOR_PRICE_CUTOFF_BUFFER;
     if (isolatedGap) {
       top.outlier = { nextPrice: next.price, lowerCount: normal.length - 1 };
     }
@@ -5154,7 +5146,8 @@ function floorSales(cur = floorCur) {
     for (let count = Math.min(FLOOR_SALE_CLUSTER_MAX, Math.floor((normal.length - 1) / 2)); count >= 2; count--) {
       if (normal.length - count < 3) continue;
       const lowest = normal[count - 1].price, below = normal[count].price;
-      if (lowest < median * FLOOR_SALE_CLUSTER_MEDIAN_RATIO || lowest < below * ratio || lowest - below < gap) continue;
+      const threshold = Math.max(median * FLOOR_SALE_CLUSTER_MEDIAN_RATIO, below * ratio, below + gap);
+      if (relaxedToys ? lowest < threshold : lowest <= threshold + FLOOR_PRICE_CUTOFF_BUFFER) continue;
       for (const sale of normal.slice(0, count)) {
         sale.outlier = { nextPrice: below, lowerCount: normal.length - count, median, groupCount: count };
       }
@@ -5912,7 +5905,7 @@ function floorUnverifiedBasis(cur = floorCur) {
 function floorRenewedReferenceOnly(cur) {
   const pc = Number(cur.product?.[PC_FIELDS.market[cur.condition]]);
   const price = cur.amazon?.renewedFallback && !cur.amazon.error ? floorAmazonLowest(cur) : null;
-  return pc > 0 && price > pc * 2;
+  return pc > 0 && price > pc * 2 + FLOOR_PRICE_CUTOFF_BUFFER;
 }
 function floorOwnBasis(cur = floorCur) {
   cur = floorConditionCur(cur);
@@ -5953,7 +5946,7 @@ function floorOwnBasis(cur = floorCur) {
   if (amazonMismatch) checks.push(`Amazon excluded from pricing: ${amazonMismatch}. Review the linked listing`);
   for (const s of sales.filter((s) => s.outlier)) {
     const comparison = s.outlier.pcMarket
-      ? `at or above ${FLOOR_SALE_PC_LIMIT_RATIO}× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(s.outlier.pcMarket)} (threshold ${money(s.outlier.pcLimit)})`
+      ? `above ${FLOOR_SALE_PC_LIMIT_RATIO}× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(s.outlier.pcMarket)} (including $2 buffer: ${money(s.outlier.pcLimit)})`
       : s.outlier.groupCount
       ? `group of ${s.outlier.groupCount} high sales; eligible-sales median ${money(s.outlier.median)}, next sale below group ${money(s.outlier.nextPrice)}`
       : `next comparable sale ${money(s.outlier.nextPrice)}`;
@@ -5976,8 +5969,8 @@ function floorOwnBasis(cur = floorCur) {
   const renewedReferenceOnly = floorRenewedReferenceOnly(cur);
   const amz = cur.amazon?.error || renewedReferenceOnly ? null : floorAmazonLowest(cur);
   if (floorAmazonNewOnlyReference(cur)) checks.push('Amazon has only a New offer for this pre-owned item; reference only. Use eligible sales and PriceCharting fallback with applicable GameStop and specific pricing rules.');
-  if (renewedReferenceOnly) checks.push(`Amazon Renewed ${money(floorAmazonLowest(cur))} is more than 2× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(Number(cur.product[PC_FIELDS.market[cur.condition]]))}; reference only. Eligible sales, GameStop and specific premiums still apply`);
-  const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) >= FLOOR_EXPENSIVE_GAME;
+  if (renewedReferenceOnly) checks.push(`Amazon Renewed ${money(floorAmazonLowest(cur))} is above 2× PriceCharting ${GAME_CONDITIONS[cur.condition]} ${money(Number(cur.product[PC_FIELDS.market[cur.condition]]))} plus the $2 buffer; reference only. Eligible sales, GameStop and specific premiums still apply`);
+  const expensiveGameBasis = !floorToyFamily(cur.product) && !floorIsHardware(cur.product) && !!sale && Math.max(sale.price, amz || 0) > FLOOR_EXPENSIVE_GAME + FLOOR_PRICE_CUTOFF_BUFFER;
   const renewedReference = !!(amz && cur.amazon.renewedFallback && !expensiveGameBasis);
   const toyGroup = floorToyGroup(cur);
   // A verified, priced Amazon match switches figures to the usual three-source
@@ -6010,9 +6003,9 @@ function floorOwnBasis(cur = floorCur) {
   const pc = pcRaw && pcRaw <= rhythmCap ? pcRaw : null;
   const reference = Math.max(sale?.price || 0, gs || 0);
   if (expensiveGameBasis) {
-    checks.push('High-value game: eligible sold evidence or the lowest verified Amazon offer is $500 or more. Amazon is reference-only; GameStop minimum, specific adjustments and final rounding still apply');
-  } else if (amz && reference > 0 && amz > reference * FLOOR_AMAZON_OUTLIER) {
-    checks.push(`Amazon's lowest offer (${money(amz)}) is more than ${FLOOR_AMAZON_OUTLIER}× eBay/GameStop; verify the match and asking price`);
+    checks.push('High-value game: eligible sold evidence or the lowest verified Amazon offer is above $502 ($500 plus the $2 buffer). Amazon is reference-only; GameStop minimum, specific adjustments and final rounding still apply');
+  } else if (amz && reference > 0 && amz > reference * FLOOR_AMAZON_OUTLIER + FLOOR_PRICE_CUTOFF_BUFFER) {
+    checks.push(`Amazon's lowest offer (${money(amz)}) is more than ${FLOOR_AMAZON_OUTLIER}× eBay/GameStop plus the $2 buffer; verify the match and asking price`);
   } else if (sale && amz && Math.abs(amz - reference) > FLOOR_STEP) {
     checks.push(`Amazon's lowest offer is ${money(amz)}; compare it with the sold evidence before labeling`);
   }
@@ -6026,7 +6019,7 @@ function floorOwnBasis(cur = floorCur) {
     && !(gs > amz) && !expensiveGameBasis && !specificRule && cur.pick == null && !cur.manualMissing
     && !floorIsHardware(cur.product) && !floorToyFamily(cur.product)
     && autoShitboxReason({ name: cur.product['product-name'], genre: cur.product.genre }) !== 'sports game') {
-    checks.push(`Matching Amazon offer ${money(amz)} is within $2 below the highest eligible sale ${money(sale.price)}; using Amazon and its rounding for this game through $80`);
+    checks.push(`Matching Amazon offer ${money(amz)} is within $2 below the highest eligible sale ${money(sale.price)}; using Amazon for this game through $80`);
     return { basis: amz, from: 'amazon', sale, checks, waiting, referenceMin: amz,
       renewedReference, renewedReferenceOnly, expensiveGameBasis, nearbyAmazon: true };
   }
@@ -6144,26 +6137,6 @@ function floorResult(cur) {
   return { ...result, b, r: { ...result.r, price: cib.r.price, cibFloor: cib.r.price, beforeCibFloor: result.r.price } };
 }
 
-// A lone sale just above a $5 step should not create an unsupported higher
-// shelf step. Count only the shared eligible, deduplicated evidence, including
-// the standard edition when it drives a variant. Never change specific rules.
-function floorSingleSaleRound(cur, b) {
-  const source = b.from === 'standard' ? b.standardReference : b;
-  const evidence = b.from === 'standard' ? b.standardReference?.cur : cur;
-  if (!evidence || source?.from !== 'sale' || cur.typed != null || cur.pick != null || cur.manualMissing
-    || floorIsHardware(cur.product) || floorToyFamily(cur.product)
-    || autoShitboxReason({ name: cur.product['product-name'], genre: cur.product.genre }) === 'sports game'
-    || [cur, evidence].some(c => floorPricingRule(c.product['product-name'], c.product['console-name']))) return null;
-  const basis = b.basis, lower = Math.floor(basis / FLOOR_STEP) * FLOOR_STEP;
-  if (!(basis > lower && basis <= 8000 && basis - lower <= 200) || floorLowRound(basis) <= lower) return null;
-  // Independent market references can still justify the higher step.
-  if (floorGsFor(evidence) > lower || floorAmazonLowest(evidence) > lower || floorGsFor(cur) > lower || floorAmazonLowest(cur) > lower) return null;
-  const eligible = floorSales(evidence).filter(s => !s.odd && !s.outlier && s.price > 0);
-  const sales = [...new Map(eligible.map(s => [floorSaleKey(s), s])).values()];
-  return sales.length >= 2 && sales.filter(s => s.price > lower).length === 1
-    && sales[0].price === basis ? lower : null;
-}
-
 function floorConditionResult(cur) {
   cur = floorConditionCur(cur);
   const p = cur.product;
@@ -6191,7 +6164,6 @@ function floorConditionResult(cur) {
   const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
     gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
     sportsAdjustment: !typed && shitbox === 'sports game',
-    singleSaleRound: floorSingleSaleRound(cur, b),
     amazonRounding: b.from === 'amazon' || b.from === 'standard' && b.standardReference?.from === 'amazon' });
   return { b, r, shitbox, premium, hw, toy, toyGroup };
 }
@@ -6414,7 +6386,7 @@ function renderFloorPricer() {
         <div class="floor-review-summary">
           ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
-          ${b.renewedReferenceOnly ? '<span class="badge info">Renewed above 2× PriceCharting · reference only</span>' : ''}
+          ${b.renewedReferenceOnly ? '<span class="badge info">Renewed above 2× PriceCharting + $2 · reference only</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}
           ${excluded ? `<span class="badge info">${excluded} mismatched listing${excluded === 1 ? '' : 's'} excluded</span>` : ''}
           ${outliers ? `<span class="badge warn">${outliers} possible outlier${outliers === 1 ? '' : 's'} · review notes</span>` : ''}
@@ -6467,13 +6439,13 @@ function renderFloorPricer() {
           ${!toy ? `<ul>
             <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
             <li>Regular baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
-            <li>Games with a valid sale and either sold or lowest Amazon at $500+: use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
+            <li>Games with a valid sale and either sold or lowest Amazon above $502 ($500 + $2 buffer): use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
-            <li>Amazon-driven prices through $80: round down to $5 unless within $2 of the next $5 ($27.99 → $25; $28 → $30). Higher-price rounding stays unchanged.</li>
+            <li>General price exclusions allow a $2 buffer, including Renewed above 2× PriceCharting and sales above 3× PriceCharting. Specific premiums stay intact.</li>
             <li>Renewed fallback: compare its lowest verified offer with eBay and GameStop; use the highest.</li>
             <li>Outside the recent Switch fixed-price rule, specific premiums and deductions take priority. PriceCharting is the last fallback.</li>
             <li>General high-sale outlier filters do not apply when a specific pricing rule matches. Invalid listings remain excluded.</li>
-            <li>General rounding (except Amazon through $80 and exact MSRP pricing): through $80, endings 2–4 and 7–9 go up to the next $5; endings 0–1 and 5–6 go down to $5 (exact multiples stay unchanged). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
+            <li>General rounding (except toy steps and exact MSRP pricing): through $80, nearest $5 ($22 → $20; $22.50 → $25; $27.99 → $30). Over $80 through $500, nearest $10 or $25. Above $500, nearest $50. Round once after adjustments; ties up.</li>
           </ul>` : ''}
         </details>
       </aside>
@@ -6500,10 +6472,11 @@ function floorAmazonReferencesHtml(cur, b, compact = false, standardFallback = f
     const price = ref && !a?.error ? floorAmazonLowest(referenceCur, true) : null;
     const renewedReferenceOnly = kind === 'renewed' && floorRenewedReferenceOnly(cur);
     const selected = price > 0 && floorAmazonLowest(cur) > 0 && kind === selectedKind && !a?.incomplete && !a?.error && !b.waiting && !renewedReferenceOnly;
-    const status = a?.loading ? 'Checking…' : a?.error || a?.referenceErrors?.[kind] ? 'Check failed'
-      : a?.incomplete ? 'Partial' : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
+    const failure = a?.error || a?.referenceErrors?.[kind];
+    const status = a?.loading ? 'Checking…' : failure ? `Unavailable: ${failure}`
+      : a?.incomplete ? `Search incomplete${a.searchError ? ': ' + a.searchError : ''}` : price > 0 ? selected ? b.from === 'amazon' ? 'Sets baseline' : 'Selected Amazon reference' : 'Reference only'
       : !a ? 'Not checked' : 'No matching offers';
-    const statusLabel = renewedReferenceOnly ? 'Reference only · above 2× PriceCharting' : kind === 'new' && price > 0 && !a?.incomplete && floorAmazonNewOnlyReference(cur) ? 'Reference only · no eligible Used offer' : price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
+    const statusLabel = renewedReferenceOnly ? 'Reference only · above 2× PriceCharting + $2' : kind === 'new' && price > 0 && !a?.incomplete && floorAmazonNewOnlyReference(cur) ? 'Reference only · no eligible Used offer' : price > 0 && conditionFallback ? `${status} · ${conditionFallback}` : status;
     const url = ref?.url || floorLinks(cur.product, kind === 'new' ? 'new' : 'cib').amazon;
     const link = `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(statusLabel)} · ${ref?.url ? 'Open matching listing' : 'Search Amazon'}">${compact ? standardFallback ? 'Standard Amazon ' : 'Amazon ' : ''}${label} ${compact ? `<strong class="amazon-market-price">${a?.loading ? 'Checking…' : money(price)}</strong>${selected ? ' · selected' : a?.incomplete ? ' · partial' : a?.error || a?.referenceErrors?.[kind] ? ' · unavailable' : ''}${price > 0 && conditionFallback ? ' · fallback' : ''}` : ''} ↗</a>`;
     return compact ? link : `<tr${selected ? ' class="picked"' : ''}><td>${link}</td><td class="num amazon-market-price">${money(price)}</td><td>${esc(statusLabel)}</td></tr>`;
@@ -6549,7 +6522,7 @@ function floorMath(b, r) {
     if (r.price !== r.beforeShelfRound) parts.push(`rounded to toys-to-life ${r.toy === 'amiibo' || r.beforeShelfRound >= 1500 ? '$5' : '$2 / $15'} step: ${money(r.price)}`);
     return parts.join(' → ');
   }
-  const lowLabel = r.singleSaleRound != null ? 'single sale just above step — rounded down' : r.amazonRounding ? 'Amazon $5 rounding (up within $2)' : 'low-price rounding';
+  const lowLabel = 'nearest $5 rounding';
   if (r.full !== r.premiumBasis) parts.push(r.full === r.min && r.premiumBasis < r.min ? `minimum ${money(r.min)}` : `${lowLabel}: ${money(r.full)}`);
   if (r.ded) parts.push(`manual missing −${money(r.ded)}`);
   if (r.gsRaised) parts.push(`raised to GameStop's ${money(r.gsRaised)}`);

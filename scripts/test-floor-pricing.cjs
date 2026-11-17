@@ -538,13 +538,13 @@ test('audited seller metadata does not masquerade as sequels, publishers, or bun
 
 test('sports below $20 use normal rounding then subtract $5 once, preserving exceptions and higher tiers', () => {
   const product={...item,'product-name':'Madden NFL 17'};
-  for(const [raw,want] of [[499,500],[700,500],[999,500],[1000,500],[1200,1000],[1495,1000],[1500,1000],[1600,1000],[1700,1500],[1999,1500],[2000,2000],[2200,2500],[3495,3500],[14500,15000],[52500,55000]]) {
+  for(const [raw,want] of [[499,500],[700,500],[999,500],[1000,500],[1200,500],[1495,1000],[1500,1000],[1600,1000],[1700,1000],[1999,1500],[2000,2000],[2200,2000],[3495,3500],[14500,15000],[52500,55000]]) {
     for(const source of ['sale','amazon','gamestop','pricecharting']) {
       const c=cur({...product,'cib-price':source==='pricecharting'?raw:null,'gamestop-price':source==='gamestop'?raw:0},
         {sales:{cib:source==='sale'?[{title:'Madden NFL 17 PS4 CIB',price:raw}]:[]},
           amazon:source==='amazon'?{found:true,condition:'Used',offers:[{price:raw,sub:'very_good'}]}:{found:false}});
       const r=invoke('floorResult',c);
-      const expected=source==='amazon'?({1200:500,1700:1000,2200:2000}[raw]??want):want;
+      const expected=want;
       assert.equal(r.r.price,expected,`${source} ${raw}`);
       if(r.r.sportsDiscount)assert.match(invoke('floorMath',r.b,r.r),/sports under \$20/);
     }
@@ -564,7 +564,7 @@ test('sports below $20 use normal rounding then subtract $5 once, preserving exc
   assert.equal(manual.full,ordinary.full);assert.equal(manual.ded,ordinary.ded);
   assert.equal(manual.price,Math.max(500,ordinary.price-500),'existing manual deduction precedes sports subtraction');
   const shown=invoke('floorResult',cur(product,{sales:{cib:[{title:'Madden NFL 17 PS4 CIB',price:1600}]}}));
-  assert.match(invoke('floorMath',shown.b,shown.r),/low-price rounding: \$15.00 → sports under \$20 −\$5.00: \$10.00/);
+  assert.match(invoke('floorMath',shown.b,shown.r),/nearest \$5 rounding: \$15.00 → sports under \$20 −\$5.00: \$10.00/);
   const sealed=invoke('floorResult',cur(product,{condition:'new',sales:{
     new:[{title:'Madden NFL 17 PS4 sealed',price:1600}],cib:[{title:'Madden NFL 17 PS4 CIB',price:1900}]}}));
   assert.equal(sealed.r.price,1500,'New CIB floor compares already-adjusted prices without subtracting again');
@@ -620,12 +620,12 @@ test('New CIB floor uses separate Amazon, standard edition and stock evidence', 
   assert.equal(invoke('floorResult',{...stock,gamestopStock:{state:'in'}}).r.price,6000);
 });
 
-test('Amazon-driven prices through $80 round down to $5 unless within $2 of the next step', () => {
-  for(const [raw,want] of [[1000,1000],[1200,1000],[1299,1000],[1300,1500],[1495,1500],[2500,2500],[2700,2500],[2799,2500],[2800,3000],[2999,3000],[3299,3000],[3300,3500],[7799,7500],[7800,8000],[8000,8000]]) {
+test('Amazon-driven prices through $80 use the same nearest $5 rounding as other sources', () => {
+  for(const [raw,want] of [[1000,1000],[1200,1000],[1299,1500],[1300,1500],[1495,1500],[2500,2500],[2700,2500],[2799,3000],[2800,3000],[2999,3000],[3299,3500],[3300,3500],[7799,8000],[7800,8000],[8000,8000]]) {
     const r=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,offers:[{price:raw}],lowest:raw}}));
     assert.equal(r.b.from,'amazon');assert.equal(r.r.price,want,`${raw} cents`);
     assert.equal(r.r.amazonRounding,true);
-    if(raw!==want && raw>=1000) assert.match(invoke('floorMath',r.b,r.r),/Amazon \$5 rounding/);
+    if(raw!==want && raw>=1000) assert.match(invoke('floorMath',r.b,r.r),/nearest \$5 rounding/);
   }
   for(const raw of [8001,8200,14500,40200,50000,50001,52499,52500]) {
     assert.equal(invoke('floorPrice',raw,{amazonRounding:true}).price,invoke('floorPrice',raw,{}).price,'Higher tiers stay intact');
@@ -635,16 +635,16 @@ test('Amazon-driven prices through $80 round down to $5 unless within $2 of the 
   const gs=invoke('floorResult',cur({...item,'gamestop-price':2799},{...shared,sales:{cib:[]}}));assert.equal(gs.b.from,'gamestop');assert.equal(gs.r.price,3000);
   const typed=invoke('floorResult',cur(item,{...shared,typed:2799}));assert.equal(typed.r.price,3000);
   const renewed=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,title:'Example Game (Renewed)',renewedFallback:true,condition:'New',offers:[{price:2799,sub:'new'}],lowest:2799}}));
-  assert.equal(renewed.b.from,'amazon');assert.equal(renewed.r.price,2500,'Renewed follows the selected Amazon source');
+  assert.equal(renewed.b.from,'amazon');assert.equal(renewed.r.price,3000,'Renewed follows the selected Amazon source');
   const variant=cur({...item,id:'201','product-name':'Example Game [Deluxe Edition]'},{sales:{cib:[]},
     standardGame:{product:{...item,id:'200'},sales:{cib:[]}},
     amazon:{found:false,standard:{found:true,title:'Example Game',condition:'Used',offers:[{price:2799,sub:'very_good'}],lowest:2799}}});
-  const standard=invoke('floorResult',variant);assert.equal(standard.b.from,'standard');assert.equal(standard.b.standardReference.from,'amazon');assert.equal(standard.r.price,2500);
+  const standard=invoke('floorResult',variant);assert.equal(standard.b.from,'standard');assert.equal(standard.b.standardReference.from,'amazon');assert.equal(standard.r.price,3000);
   const sealed=invoke('floorResult',cur(item,{condition:'new',sales:{new:[]},amazon:{found:true,condition:'New',offers:[{price:2799,sub:'new'}],lowest:2799}}));
-  assert.equal(sealed.b.from,'amazon');assert.equal(sealed.r.price,2500);
-  const premium=invoke('floorPrice',2500,{amazonRounding:true,premium:{pct:10}});assert.equal(premium.premiumBasis,2750);assert.equal(premium.price,2500,'Premium applies before source-specific rounding');
-  const manual=invoke('floorPrice',3799,{amazonRounding:true,manualMissing:true});assert.equal(manual.full,3500);assert.equal(manual.ded,500);assert.equal(manual.price,3000);
-  const floors=invoke('floorPrice',2799,{amazonRounding:true,referenceMin:2799,gs:2700});assert.equal(floors.price,2500,'Reference minimum cannot undo Amazon rounding');
+  assert.equal(sealed.b.from,'amazon');assert.equal(sealed.r.price,3000);
+  const premium=invoke('floorPrice',2500,{amazonRounding:true,premium:{pct:10}});assert.equal(premium.premiumBasis,2750);assert.equal(premium.price,3000,'Premium applies before source-specific rounding');
+  const manual=invoke('floorPrice',3799,{amazonRounding:true,manualMissing:true});assert.equal(manual.full,4000);assert.equal(manual.ded,500);assert.equal(manual.price,3500);
+  const floors=invoke('floorPrice',2799,{amazonRounding:true,referenceMin:2799,gs:2700});assert.equal(floors.price,3000,'Reference minimum cannot undo Amazon rounding');
 });
 
 test('recent pre-owned Switch games keep exact MSRP minus $5 through all pricing adjustments', () => {
@@ -1036,7 +1036,7 @@ test('slow sellers retain unavailable old PC sales without claiming verified sal
     }
     const knownUnsold={results:{'200000000001':{state:'ended',confirmedUnsold:true}}};
     assert.ok(invoke('floorSales',{...example,ebayChecks:knownUnsold})[0].odd);
-    const high={...example,sales:{cib:[row(1,7548),row(2,4949)]}};
+    const high={...example,sales:{cib:[row(1,7749),row(2,4949)]}};
     assert.ok(invoke('floorSales',high)[0].outlier,'3x PC guard still applies to historical evidence');
     const recent=[row(4,3000,'2026-09-01'),row(5,2999,'2026-10-01'),row(6,2900,'2026-10-20')];
     assert.ok(invoke('floorSales',{...example,sales:{cib:[...example.sales.cib,...recent]}})[0].odd,'Three recent matches disable historical exception');
@@ -1068,7 +1068,7 @@ test('Overseas sales are excluded while North American shipping and premiums rem
   assert.equal(invoke('floorResult',example).r.price,1500,'Confirmed overseas rows cannot drive the price');
   const oldPremiums=json('settings.floorPremiums');
   try {run('settings.floorPremiums=[{phrase:"Rainbow Six Siege",pct:50}]');
-    assert.equal(invoke('floorResult',example).r.price,2500,'Specific premium applies after evidence filtering');
+    assert.equal(invoke('floorResult',example).r.price,2000,'Specific premium applies before nearest-$5 rounding');
   } finally {context.restorePremiums=oldPremiums;run('settings.floorPremiums=restorePremiums');}
   direct[0].sellerCountry='Canada';
   assert.equal(invoke('floorResult',example).r.price,1500,'Canadian sale is eligible by location but exceeds 3x this game market value');
@@ -1367,9 +1367,9 @@ test('named collections cannot raise the standard game price, including the Valo
     { title: 'Call of Duty WWII PS4 CIB', price: 1200 }] },
     amazon: { found: true, title: titles[0], offers: [{ price: 15000 }] } });
   assert.equal(invoke('floorResult', example).b.basis, 1200);
-  assert.equal(invoke('floorResult', example).r.price, 1500);
+  assert.equal(invoke('floorResult', example).r.price, 1000);
   assert.equal(invoke('floorAmazonLowest', example), null);
-  assert.equal(invoke('floorEstimate', { ...example, salesLoading: true }).price, 1500);
+  assert.equal(invoke('floorEstimate', { ...example, salesLoading: true }).price, 1000);
   for (const title of titles) assert.ok(invoke('floorListingMismatch', title, product), title);
   const valor = { ...product, 'product-name': 'Call of Duty WWII [Valor Collection]' };
   assert.equal(invoke('floorListingMismatch', titles[0], valor), null);
@@ -1752,7 +1752,7 @@ test('normal naming, selected extras and genuine collections remain comparable',
   const title = 'Halo The Master Chief Collection Xbox One 6 Games';
   const result = invoke('floorResult', cur(collection, { sales: { cib: [{ title, price: 5200 }] },
     amazon: { found: true, title, offers: [{ price: 4000 }] } }));
-  assert.equal(result.b.from, 'sale'); assert.equal(result.b.basis, 5200); assert.equal(result.r.price, 5500);
+  assert.equal(result.b.from, 'sale'); assert.equal(result.b.basis, 5200); assert.equal(result.r.price, 5000);
 });
 
 test('Amazon missing-title and renewed/digital matches are excluded and visibly explained', () => {
@@ -1814,11 +1814,11 @@ test('games with sold evidence and a $500+ reference use sales instead of regula
 
 test('Mega Man 7 uses $450 sold when Amazon is $700 and switches at the raw $500 Amazon boundary', () => {
   const product = { ...item, 'product-name': 'Mega Man 7', 'console-name': 'Super Nintendo' };
-  for (const [amazonPrice, expected] of [[49999, 49999], [50000, 45000], [70000, 45000]]) {
+  for (const [amazonPrice, expected] of [[49999, 49999], [50000, 50000], [50200,50200], [50201,45000], [70000, 45000]]) {
     const result = invoke('floorResult', cur(product, { sales: { cib: [{ title: 'Mega Man 7 SNES complete', price: 45000 }] },
       amazon: { found: true, offers: [{ price: amazonPrice }, { price: 170000 }] } }));
     assert.equal(result.b.basis, expected);
-    if (amazonPrice >= 50000) assert.equal(result.r.price, 45000);
+    if (amazonPrice > 50200) assert.equal(result.r.price, 45000);
   }
 });
 
@@ -1877,13 +1877,13 @@ const highSaleCur = (prices, product = item, extra = {}) => cur(product, {
 test('3x PriceCharting excludes every sale at the boundary using only the selected condition market', () => {
   const product={...item,'product-name':'Final Fantasy IX','loose-price':1000,'cib-price':3000,'new-price':10000,'retail-cib-sell':99999};
   for(const [condition,market,title] of [['loose',1000,'Final Fantasy IX disc only'],['cib',3000,'Final Fantasy IX CIB'],['new',10000,'Final Fantasy IX Brand New Sealed']]) {
-    const example=cur(product,{condition,sales:{[condition]:[market*4,market*3,market*3-1].map(price=>({title,price}))}});
+    const example=cur(product,{condition,sales:{[condition]:[market*4,market*3+201,market*3+200].map(price=>({title,price}))}});
     const before=JSON.stringify(example), rows=invoke('floorSales',example);
     assert.equal(rows.filter(s=>s.outlier).length,2,condition);
     assert.equal(rows[0].outlier.pcMarket,market);
-    assert.equal(rows[1].outlier.pcLimit,market*3);
+    assert.equal(rows[1].outlier.pcLimit,market*3+200);
     assert.equal(invoke('floorSaleGroup',rows[0]),'outlier');
-    assert.equal(invoke('floorResult',example).b.basis,market*3-1);
+    assert.equal(invoke('floorResult',example).b.basis,market*3+200);
     assert.ok(invoke('floorResult',example).b.checks.some(s=>s.includes('3× PriceCharting')));
     assert.equal(JSON.stringify(example),before);
   }
@@ -1891,7 +1891,7 @@ test('3x PriceCharting excludes every sale at the boundary using only the select
 
 test('PriceCharting guard works with one sale, preserves fallbacks, premiums and staff overrides', () => {
   const product={...item,'product-name':'Final Fantasy IX','cib-price':3000,'gamestop-price':2000};
-  const example=highSaleCur([12000,10000,9000,6000,5500,5000],product);
+  const example=highSaleCur([12000,10000,9201,6000,5500,5000],product);
   assert.equal(invoke('floorResult',example).b.basis,6000);
   const old=json('settings.floorPremiums');
   try {
@@ -1901,7 +1901,7 @@ test('PriceCharting guard works with one sale, preserves fallbacks, premiums and
     assert.equal(invoke('floorResult',{...example,pick:0}).b.basis,12000);
     assert.equal(invoke('floorResult',{...example,typed:13000}).b.from,'typed');
   } finally {run(`settings.floorPremiums=${JSON.stringify(old)}`);}
-  const sparse=highSaleCur([9000],{...product,'gamestop-price':0});
+  const sparse=highSaleCur([9201],{...product,'gamestop-price':0});
   assert.equal(invoke('floorResult',sparse).b.from,'pricecharting');
   assert.equal(invoke('floorResult',sparse).r.price,3000);
   assert.equal(invoke('floorResult',{...sparse,amazon:{found:true,title:'Final Fantasy IX',offers:[{price:4000,sub:'very_good'}]}}).b.from,'amazon');
@@ -1988,7 +1988,9 @@ test('median groups require a minority, three lower comparables and a clear boun
     [[9000,9000,1000,1000,1000],2],
     [[9000,9000,1000,1000],0],
     [[9000,9000,9000,1000,1000,1000],0],
-    [[3000,3000,1000,1000,1000],2],
+    [[3000,3000,1000,1000,1000],0],
+    [[3200,3200,1000,1000,1000],0],
+    [[3201,3201,1000,1000,1000],2],
     [[2999,2999,1000,1000,1000],0],
     [[9000,8500,6000,5000,2000,2000,2000,2000,2000],0],
     [[8000,6000,4000,3000,2999,2900,2800,2700],0],
@@ -2088,7 +2090,7 @@ test('Kingdom Hearts uses the general gap rule while bundles and failed sold che
 
 test('Killzone uses the supported baseline without a special discount while other premiums stay active', () => {
   const amazon = { found: true, lowest: 1000, offers: [{ price: 1000 }] };
-  const killzone = invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'product-name': 'Killzone: Shadow Fall' }, { amazon }));
+  const killzone = invoke('floorResult', highSaleCur([1800, 1000, 999, 950], { ...item, 'product-name': 'Killzone: Shadow Fall' }, { amazon }));
   assert.equal(killzone.b.basis, 1000); assert.equal(killzone.premium, null); assert.equal(killzone.r.price, 1000);
   const pokemon = invoke('floorResult', highSaleCur([10000, 5000, 4999, 4500], { ...item, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }));
   assert.equal(pokemon.b.basis, 10000); assert.equal(pokemon.premium.pct, 10); assert.equal(pokemon.r.price, 11000);
@@ -2096,15 +2098,15 @@ test('Killzone uses the supported baseline without a special discount while othe
 
 test('outlier thresholds require both a large relative gap and a $5 gap with three lower comparables', () => {
   for (const [prices, expected] of [
-    [[1500, 1000, 999, 950], 1000], [[1499, 1000, 999, 950], 1499],
+    [[1500, 1000, 999, 950], 1500], [[1700, 1000, 999, 950], 1700], [[1701, 1000, 999, 950], 1000], [[1499, 1000, 999, 950], 1499],
     [[1200, 800, 799, 750], 1200], [[1600, 1000, 999], 1600],
     [[1600, 1600, 1000, 999], 1600], [[1600, 1400, 1200, 1000], 1600],
     [[3000, 1600, 1000, 999, 950], 1600],
   ]) assert.equal(invoke('floorResult', highSaleCur(prices)).b.basis, expected);
-  const example = highSaleCur([1600, 1000, 999, 950]);
+  const example = highSaleCur([1800, 1000, 999, 950]);
   example.sales.cib[2].title = 'Example Game Steelbook';
   example.sales.cib[3].title = 'Example Game sealed';
-  assert.equal(invoke('floorResult', example).b.basis, 1600);
+  assert.equal(invoke('floorResult', example).b.basis, 1800);
 });
 
 test('Killzone distribution keeps $16 supported by $13 without a broad cluster exclusion', () => {
@@ -2137,7 +2139,7 @@ test('a cheaper sales cluster cannot exclude a supported high sale for any title
 });
 
 test('outliers are condition-specific, keep original indices, and do not mutate cached sales', () => {
-  const example = highSaleCur([1000, 999, 1600, 950]);
+  const example = highSaleCur([1000, 999, 1800, 950]);
   example.sales.loose = [{ price: 10000, title: 'Example Game disc only' }];
   const before = JSON.stringify(example);
   context.cachedExample = example;
@@ -2149,14 +2151,14 @@ test('outliers are condition-specific, keep original indices, and do not mutate 
 
 test('Amazon and GameStop remain baseline candidates after excluding an eBay outlier', () => {
   const amazon = { found: true, lowest: 1200, offers: [{ price: 1200 }] };
-  assert.equal(invoke('floorResult', highSaleCur([1600, 1000, 999, 950], item, { amazon })).b.basis, 1200);
-  assert.equal(invoke('floorResult', highSaleCur([1600, 1000, 999, 950], { ...item, 'gamestop-price': 1300 }, { amazon })).b.basis, 1300);
+  assert.equal(invoke('floorResult', highSaleCur([1800, 1000, 999, 950], item, { amazon })).b.basis, 1200);
+  assert.equal(invoke('floorResult', highSaleCur([1800, 1000, 999, 950], { ...item, 'gamestop-price': 1300 }, { amazon })).b.basis, 1300);
 });
 
 test('reviewed outliers can be selected explicitly and returning to automatic excludes them again', () => {
-  const example = highSaleCur([1600, 1000, 999, 950], item, { pick: 0 });
+  const example = highSaleCur([1800, 1000, 999, 950], item, { pick: 0 });
   const selected = invoke('floorResult', example);
-  assert.equal(selected.b.basis, 1600);
+  assert.equal(selected.b.basis, 1800);
   assert.ok(selected.b.checks.some((s) => s.includes('Manually included possible high sale outlier')));
   run(`floorCur = ${JSON.stringify(example)}; renderFloorPricer();`);
   assert.ok(element('#floorPricer').innerHTML.includes('Possible high outlier'));
@@ -2169,7 +2171,7 @@ test('reviewed outliers can be selected explicitly and returning to automatic ex
 });
 
 test('review warnings survive list metadata, unchanged rechecks and accepting a new price', () => {
-  const result = invoke('floorResult', highSaleCur([1600, 1000, 999, 950]));
+  const result = invoke('floorResult', highSaleCur([1800, 1000, 999, 950]));
   const info = invoke('floorBasisInfo', result.b);
   assert.ok(info.reviewNotes.some((s) => s.includes('high sale outlier')));
   for (const price of [1000, 2000]) {
@@ -2191,7 +2193,7 @@ test('Halo MCC uses the highest supported sale then low-price rounding across sy
     const r = invoke('floorResult', cur(product, { sales }));
     assert.equal(r.b.from, 'sale'); assert.equal(r.b.basis, 5200); assert.equal(r.r.price, 5000);
     // Clicking a lower sale cannot undercut the highest valid sale; typed prices are explicit overrides.
-    assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5500);
+    assert.equal(invoke('floorResult', cur(product, { sales, pick: 1 })).r.price, 5000);
   }
 });
 
@@ -2206,7 +2208,7 @@ test('highest-sale selection filters odd listings before ranking and handles spa
   ] };
   assert.equal(invoke('floorResult', cur(item, { sales })).b.basis, 5200);
   const one = invoke('floorResult', cur(item, { sales: { cib: [sales.cib[3]] } }));
-  assert.equal(one.r.price, 5500); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
+  assert.equal(one.r.price, 5000); assert.ok(one.b.checks.some((s) => s.includes('Only 1')));
   assert.equal(invoke('floorAutoSale', [{ price: 5200 }, { price: 4999 }]).sale.price, 5200);
   assert.equal(invoke('floorAutoSale', []).sale, null);
 });
@@ -2265,6 +2267,13 @@ test('Kingdom Hearts uses its higher eligible sale over Renewed and retains eBay
 });
 
 test('Renewed above twice the selected PC condition is reference-only without changing premiums', () => {
+  const pandemonium = cur({...item, 'product-name':'Pandemonium 2', 'console-name':'Playstation', 'cib-price':3999}, {
+    sales:{cib:[]}, amazon:{found:true,title:'Pandemonium 2 (Renewed)',renewedFallback:true,offers:[{price:8091}]}
+  });
+  const buffered = invoke('floorResult', pandemonium);
+  assert.equal(buffered.b.renewedReferenceOnly, false);
+  assert.equal(buffered.b.basis, 8091, '$80.91 is within $2 of twice $39.99');
+  assert.equal(buffered.r.price, 8000, 'Above-$80 rounding is unchanged');
   const product = { ...item, 'product-name': 'PaRappa the Rapper', 'console-name': 'Playstation', 'loose-price': 9004, 'cib-price': 14200 };
   const example = cur(product, { condition: 'loose', sales: { loose: [{ title: 'PaRappa the Rapper PS1 Disc Only', price: 10000, url: 'https://www.ebay.com/itm/111111111111' }] },
     amazon: { found: true, title: 'PaRappa the Rapper (Renewed)', renewedFallback: true, offers: [{ price: 22206 }] } });
@@ -2277,9 +2286,9 @@ test('Renewed above twice the selected PC condition is reference-only without ch
   assert.match(html, /Reference only · above 2× PriceCharting/);
   assert.ok(!html.includes('class="picked"'));
   assert.equal(invoke('floorRenewedReferenceOnly', { ...example, condition: 'cib' }), false, 'Use the selected condition, not loose for every condition');
-  for (const price of [18008, 18009]) {
+  for (const price of [18008, 18009, 18208, 18209]) {
     const changed = { ...example, amazon: { ...example.amazon, offers: [{ price, sub: 'good' }] } };
-    assert.equal(invoke('floorRenewedReferenceOnly', changed), price > 18008, 'Strictly above 2×');
+    assert.equal(invoke('floorRenewedReferenceOnly', changed), price > 18208, 'Inclusive $2 buffer above 2×');
   }
   assert.equal(invoke('floorRenewedReferenceOnly', { ...example, product: { ...product, 'loose-price': null } }), false);
   assert.equal(invoke('floorRenewedReferenceOnly', { ...example, amazon: { ...example.amazon, renewedFallback: false, title: product['product-name'] } }), false);
@@ -2490,58 +2499,23 @@ test('longest and system-specific rules win, while zero-percent exemptions retai
   assert.equal(invoke('floorPremium', 'Example Game', 'Xbox 360', overrides).pct, 20);
   const product = { ...item, 'product-name': 'Pokemon Black Version 2', 'console-name': 'Nintendo DS' };
   const r = invoke('floorResult', cur(product, { sales: { cib: [{ price: 5200, title: 'Pokemon Black Version 2 complete' }] } }));
-  assert.equal(r.premium, null); assert.equal(r.r.price, 5500);
+  assert.equal(r.premium, null); assert.equal(r.r.price, 5000);
   assert.equal(invoke('floorResult', cur({ ...product, 'product-name': 'Pokemon Shield', 'console-name': 'Nintendo Switch' }, { typed: 1000 })).r.price, 1000);
 });
-test('low-price rounding respects dollar endings, cents, market references and the $80 boundary', () => {
-  for (const [basis, expected] of [[1000, 1000], [1099, 1000], [1100, 1000], [1199, 1000], [1200, 1500], [1299, 1500], [1300, 1500], [1400, 1500], [1495, 1500], [1499, 1500], [1500, 1500], [1599, 1500], [1600, 1500], [1699, 1500],
-    [1700, 2000], [1800, 2000], [1999, 2000], [2038, 2000], [2250, 2500], [2499, 2500],
-    [2500, 2500], [2699, 2500], [2700, 3000], [5200, 5500], [5250, 5500], [5700, 6000],
-    [7699, 7500], [7700, 8000], [8000, 8000], [8001, 8000]]) {
-    assert.equal(invoke('floorPrice', basis, { referenceMin: basis, gs: basis }).price, expected, `market basis ${basis}`);
-    if (basis <= 8000) assert.equal(invoke('floorPrice', basis, {}).price, expected, `typed basis ${basis}`);
+test('nearest $5 rounding uses cents and half-up ties consistently through $80', () => {
+  for (const [raw,want] of [[1200,1000],[1249,1000],[1250,1500],[1495,1500],[1700,1500],[1749,1500],[1750,2000],[2200,2000],[2249,2000],[2250,2500],[2700,2500],[2750,3000],[2799,3000],[5200,5000],[5250,5500],[7700,7500],[7750,8000],[8000,8000]]) {
+    for (const options of [{},{amazonRounding:true},{gs:raw,referenceMin:raw}])
+      assert.equal(invoke('floorPrice',raw,options).price,want,`${raw} cents`);
   }
-  assert.equal(invoke('floorPrice', 200, {}).price, 1000);
-  assert.equal(invoke('floorPrice', 200, { shitbox: true }).price, 500);
-  assert.equal(invoke('floorPrice', 5200, { gs: 5200 }).price, 5500);
-  assert.equal(invoke('floorPrice', 5200, { manualMissing: true }).price, 4500);
-  const rounded = invoke('floorPrice', 5200, {});
-  assert.ok(invoke('floorMath', { from: 'sale', basis: 5200 }, rounded).includes('low-price rounding: $55.00'));
-  assert.deepEqual([2000, 2500, 5000, 5500, 10000, 10500, 20000, 20500].map((v) => invoke('manualDeduction', v)), [0, 500, 500, 1000, 1000, 2000, 2000, 2000]);
-});
-
-test('one eligible sale just above a low-price step rounds down without altering specific rules', () => {
-  const product = {...item, 'product-name':'The Evil Within', 'console-name':'Xbox One', 'cib-price':809, 'gamestop-price':999};
-  const input = (prices, p = product) => cur(p, {sales:{cib:prices.map((price,i)=>({
-    title:p['product-name']+' '+p['console-name']+' CIB', price, url:`https://www.ebay.com/itm/${100000000000+i}`
-  }))}});
-  const sample=input([2200,1917,1795,1785,1780]);
-  const result=invoke('floorResult',sample);
-  assert.equal(result.b.basis,2200,'Evidence price is preserved');
-  assert.equal(result.r.price,2000,'Screenshot case must not jump to $25');
-  assert.match(invoke('floorMath',result.b,result.r),/single sale just above step.*\$20.00/);
-  for(const [prices,expected] of [[[2200,2100,1900],2500],[[2201,1900],2500],[[2499,1900],2500],[[2200],2500]])
-    assert.equal(invoke('floorResult',input(prices,{...product,'cib-price':1000})).r.price,expected,JSON.stringify(prices));
-  assert.equal(invoke('floorResult',{...sample,typed:2200}).r.price,2500,'Typed override remains deliberate');
-  assert.equal(invoke('floorResult',{...sample,pick:0}).r.price,2500,'Manual sale selection remains deliberate');
-  assert.equal(invoke('floorResult',{...sample,product:{...product,'gamestop-price':2199}}).r.singleSaleRound,null,'Independent market floor remains');
-  const amazon=cur(product,{...sample,amazon:{found:true,offers:[{price:2199,sub:'very_good'}]}});
-  assert.equal(invoke('floorResult',amazon).r.singleSaleRound,null,'Amazon support remains');
-  const excluded=input([2200,2300,1917]); excluded.sales.cib[1].title='The Evil Within 2 CIB';
-  assert.equal(invoke('floorResult',excluded).r.price,2000,'Wrong game cannot count as supporting evidence');
-  const duplicate=input([2200,2200,1917]); duplicate.sales.cib[1].url=duplicate.sales.cib[0].url;
-  assert.equal(invoke('floorResult',duplicate).r.price,2000,'Same sale cannot count twice');
-  for(const p of [{...item,'product-name':'Pokemon X','console-name':'Nintendo 3DS'},
-    {...item,'product-name':'Pokemon Yellow','console-name':'GameBoy'},
-    {...item,'product-name':'Madden NFL 17'}, {...item,'product-name':'Atari 5200 System'}]) {
-    assert.equal(invoke('floorResult',input([2200,1900],p)).r.singleSaleRound,null,p['product-name']);
+  assert.equal(invoke('floorPrice',200,{}).price,1000);
+  assert.equal(invoke('floorPrice',200,{shitbox:true}).price,500);
+  assert.equal(invoke('floorPrice',5200,{manualMissing:true}).price,4500);
+  const p={...item,'product-name':'The Evil Within','console-name':'Xbox One'};
+  for(const prices of [[2200],[2200,2100,1900],[2200,1917,1795]]) {
+    const c=cur(p,{sales:{cib:prices.map(price=>({price,title:'The Evil Within Xbox One CIB'}))}});
+    assert.equal(invoke('floorResult',c).r.price,2000,'No separate single-sale rounding exception');
+    assert.match(invoke('floorMath',invoke('floorResult',c).b,invoke('floorResult',c).r),/nearest \$5 rounding/);
   }
-  assert.equal(invoke('floorResult',{...sample,manualMissing:true}).r.singleSaleRound,null,'Manual rule keeps its ordering');
-  assert.equal(invoke('floorResult',input([8200,7900],{...item})).r.price,8000,'Higher tiers unchanged');
-  assert.equal(invoke('floorResult',input([7700,7400],{...item})).r.price,7500,'Applies across the existing low-price tier');
-  const standard={...item,id:'200'}, variant={...item,id:'201','product-name':'Example Game [Limited Edition]',standardGame:standard};
-  const v=cur(variant,{sales:{cib:[]},standardGame:input([2200,1900],standard)});
-  assert.equal(invoke('floorResult',v).r.price,2000,'Standard-edition sale floor uses its own eligible evidence');
 });
 
 test('nearby Amazon offers take priority for ordinary games through $80', () => {

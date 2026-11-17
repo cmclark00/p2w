@@ -1027,10 +1027,10 @@ Guide (the Google Sheet tab).
      Wrong games, bundles, wrong conditions, foreign variants and invalid sale
      evidence remain excluded.
    - **PriceCharting reference limit:** for items without a specific pricing
-     rule, sales at **3× or more** of the selected
-     game's condition-specific PriceCharting value are excluded from automatic
+     rule, sales **above 3×** the selected
+     game's condition-specific PriceCharting value **plus $2** are excluded from automatic
      pricing, even if only one sale was found. A $30 CIB value excludes sales
-     of $90 or more; the tool uses the next eligible sale and continues eBay
+     above $92; the tool uses the next eligible sale and continues eBay
      pages if needed. Known shipping counts toward the sale total. No valid
      PriceCharting value means no reference limit. Excluded rows remain available
      for review with the reference and threshold in the notes. This is an
@@ -1038,7 +1038,11 @@ Guide (the Google Sheet tab).
      references, rounding and deliberate staff overrides still apply.
      Toys-to-life keep their separate rules.
    - **Possible high outliers:** for items without a specific pricing rule,
-     one isolated high sale is flagged and left
+     General price-only exclusion cutoffs allow a **$2 grace** above the limit,
+     including the 3× PriceCharting check and isolated/group outlier tests.
+     This does not change specific premiums, toy policies, conditions or dates.
+     The $500 expensive-Amazon exception starts above $502.
+     One isolated high sale is flagged and left
      out of the automatic price when at least three lower comparable sales
      support a lower value. The top sale must be at least 50% and $5 above
      the next highest valid sale. A group of **two or three high sales** is
@@ -1049,14 +1053,14 @@ Guide (the Google Sheet tab).
      3×/$25 gap. The median is calculated once from eligible sales for that
      condition, never repeatedly lowered by removing sales. This catches
      $175/$149.95 above a $35–$45 range. For any title, $34.95 beside $26 stays
-     eligible; an isolated $16 beside $10 is still flagged. There is no
+     eligible; an isolated $18 beside $10 is flagged. There is no
      Kingdom Hearts exception. The row stays visible for review. Open its
      link and check that it actually sold and matches the item; click the
      row to include it if warranted. **Back to the automatic price** excludes
      it again. The flag is a pricing warning, not proof a listing was unsold.
      Review notes remain visible on saved lists and price re-checks. Bundle,
      edition, condition and sold-status checks still apply, as do premiums.
-   - **High-value games (sold or lowest verified Amazon at $500+):** when a valid sale exists, use the highest
+   - **High-value games (sold or lowest verified Amazon above $502):** when a valid sale exists, use the highest
      eligible PriceCharting sale, with the GameStop minimum. Amazon and
      Renewed offers remain visible but do not set the price. For example,
      a $1,300 sale and $1,700 Amazon offer give a $1,300 baseline. The cutoff
@@ -1095,7 +1099,7 @@ Guide (the Google Sheet tab).
      highest. For example, $15.48 Renewed with a $24.95 eligible sale points to
      $25 before any specific adjustment. Renewed does not replace a higher sale.
      If Renewed is **more than twice the PriceCharting value for the selected
-     condition**, it stays visible for reference but cannot raise the price.
+     condition plus $2**, it stays visible for reference but cannot raise the price.
      The tool then uses the other eligible sources; specific premiums still apply.
      For Loose games, sales that include posters, maps or other printed inserts
      are excluded. Those original contents remain valid for CIB. Loose sales
@@ -1192,19 +1196,10 @@ Guide (the Google Sheet tab).
    the current pricing rules and only reads market data. History stays in
    the browser. Download results before closing; the download can also be
    loaded as a checkpoint to resume unfinished comparisons.
-5. **Through $80**, whole-dollar endings **2–4 and 7–9 round up to the next $5**.
-   Endings **0–1 and 5–6 round down to $5**; exact multiples stay unchanged.
-   Cents do not change the ending: $11.99 → $10, $14.95 → $15, $16.99 → $15,
-   $17 → $20, and $52 → $55. This applies to the
-   winning baseline after any premium or discount, except when Amazon sets it.
-   **One sale just above a step:** for automatic game prices through $80, if
-   only one eligible sale is above the lower $5 step, by no more than $2, and
-   at least one other eligible sale is at or below that step, use the lower
-   step. For example, $22 above $19.17/$17.95 gives **$20**, not $25.
-   Duplicate/excluded listings do not provide support. A matching Amazon or
-   GameStop reference above that step keeps normal rounding. Specific pricing
-   rules, sports, toys, hardware, manual deductions and staff overrides keep
-   their existing treatment. This also works for a standard-game sale baseline.
+5. **Through $80, round to the nearest $5**, including cents; halfway ties
+   round up. $14.95 → $15, $17 → $15, $22 → $20, $22.50 → $25,
+   $27.99 → $30, and $52 → $50. This applies to all ordinary sources after
+   premiums/discounts. Toy steps and exact Nintendo MSRP pricing stay intact.
    **Amazon close to the highest sale:** for ordinary automatic game pricing,
    when the highest eligible sale is $80 or less and a matching usable Amazon
    offer is up to $2 lower, use Amazon if GameStop is no higher than that offer.
@@ -1212,11 +1207,9 @@ Guide (the Google Sheet tab).
    incomplete or reference-only offers do not qualify. Specific pricing rules,
    sports, toys, hardware, manual deductions and staff overrides stay intact.
    This also applies to standard-game baselines.
-   **Amazon-driven prices through $80 round down to $5 unless within $2 of
-   the higher $5:** $27.99 → $25, $28 → $30, $32.99 → $30, $33 → $35. This
-   includes Renewed and an Amazon-driven standard-game fallback. Merely showing
-   an Amazon listing does not change rounding if eBay or GameStop sets the price. The $10 minimum ($5 for shitbox games) still applies
-   before missing-manual deductions. Specific adjustments take priority.
+   Amazon uses that same nearest-$5 rounding, including Renewed and standard-game
+   fallbacks. The $10 minimum ($5 for shitbox games) still applies before
+   missing-manual deductions. Specific adjustments take priority.
    Prices **over $80 through $500 round once to the nearest multiple of $10 or $25**:
    $402.17 → $400, $145 → $150, $165 → $170, while $125 and $175 stay as
    they are. **Above $500, round once to the nearest $50**: $524.99 → $500,

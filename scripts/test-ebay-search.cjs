@@ -86,7 +86,7 @@ const delivered={...base(),product:wwe,sales:{cib:[]},directEbay:{result:ready([
   {...sold,id:'123456789012',url:'https://www.ebay.com/itm/123456789012',title:'WWE 2K20 PS4 CIB',conditionText:'Pre-Owned',price:1650,shipping:0}
 ])}};
 assert.equal(rows(delivered)[0].price,2243,'Highest delivered total outranks a higher item-only price');
-assert.equal(result(delivered).r.price,2500,'WWE example follows the existing low-price rounding');
+assert.equal(result(delivered).r.price,2000,'$22.43 delivered follows nearest-$5 rounding');
 delivered.directEbay.result.sales[0].shipping=null;
 assert.equal(rows(delivered).find(s=>s.id===sold.id).shipping,null,'Unknown shipping stays unknown');
 assert.equal(rows(delivered).find(s=>s.id===sold.id).price,1070,'Never invent shipping');
@@ -195,11 +195,11 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.ok(legacyWarning.detail.includes('did not report a specific cause'),'Do not invent a reason for older results');
   const marketLimited={...searchCur(),product:wwe}, marketPages=[];
   await invoke(ctx,'runFloorEbaySearch',marketLimited,()=>{},()=>false,{search:async(q,page)=>{
-    marketPages.push(page);return {...ready([{...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),price:page===1?2500:1500,shipping:page===1?500:0}]),page,more:true};
+    marketPages.push(page);return {...ready([{...comp(page,'Pre-Owned','WWE 2K20 PS4 CIB'),price:page===1?2701:1500,shipping:page===1?500:0}]),page,more:true};
   }});
-  assert.deepEqual(marketPages,[1,2],'A sold price plus shipping at 3x market cannot stop pagination');
+  assert.deepEqual(marketPages,[1,2],'A sold price plus shipping above 3x market plus $2 cannot stop pagination');
   assert.equal(result(marketLimited).b.basis,1500);
-  assert.equal(rows(marketLimited)[0].outlier.pcLimit,3000);
+  assert.equal(rows(marketLimited)[0].outlier.pcLimit,3200);
   const savedPricingRules=vm.runInContext('settings.floorPremiums',ctx);
   try {
     vm.runInContext('settings.floorPremiums=[{phrase:"WWE 2K20",pct:0}]',ctx);
