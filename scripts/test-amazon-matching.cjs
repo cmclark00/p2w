@@ -23,6 +23,17 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('Generic game cartridges cannot become original-game Amazon references', async () => {
+    const p = {...product,'product-name':'Crusader of Centy','console-name':'Sega Genesis'};
+    const generic = {...candidate('B0C3J23LK1','Crusader Of Centy NTSC-USA 16 Bit MD Game Card For Sega Mega Drive For Genesis (Black)',['Sega Genesis']),publishers:['Generic']};
+    const original = {...candidate('B000000002','Crusader of Centy Sega Genesis',['Sega Genesis']),publishers:['Atlus']};
+    const e = engine(async route => route === 'amazon/catalog' ? {candidates:[generic,original]} : offer(original,50000));
+    assert.equal((await e.fetch(p)).asin,original.asin);
+    const changed = engine(async route => route === 'amazon/catalog' ? {candidates:[original]} : offer({...original,publishers:['Unbranded']},500));
+    assert.equal((await changed.fetch(p)).found,false,'Offer revalidation also rejects unbranded cartridges');
+    e.ctx.hardware={product:{'product-name':'Example Controller','console-name':'Xbox One'},amazon:{found:true,title:'Example Controller Xbox One',publishers:['Generic']},condition:'loose'};
+    assert.notEqual(e.run('floorAmazonMismatch(hardware)'),'Unverified original game manufacturer');
+  });
   await test('The Surge uses cheaper New at 12.97 and rounds to 15, with Used visible', async () => {
     const p = {...product, 'product-name':'The Surge', 'console-name':'Xbox One', 'cib-price':855, 'gamestop-price':499};
     const match = candidate('B01N2YCMIN','The Surge - Xbox One',['Xbox One']);

@@ -3797,9 +3797,12 @@ function floorLooseConditionMismatch(title, condition, product) {
   const name = norm(product['product-name']);
   if (name) text = text.replace(` ${name} `, ' ');
   if (/\bnot loose\b/.test(text)) return 'Loose condition unconfirmed — review';
-  // Sellers also use "game only" for a game in its original case/artwork.
-  // Black label identifies a print, not packaging; neither phrase proves Loose.
+  // Disc sellers also use "game only" for a game in its original case/artwork.
+  // On cartridge systems, explicit game-only wording is usable after the
+  // packaging rejection above. Unknown platforms still need explicit evidence.
+  const cartridgePlatform = /^(?:pal |jp )?(?:sega genesis|sega mega drive|nes|super nintendo|nintendo 64|gameboy(?: color| advance)?|nintendo (?:ds|3ds|switch(?: 2)?)|atari (?:2600|5200|7800)|neo geo)$/i.test(norm(product['console-name']));
   const loose = /\b(?:loose|(?:disc|discs|disk|disks|cart|cartridge|umd) only|only (?:the )?(?:disc|disk|cart|cartridge|umd))\b/.test(text)
+    || cartridgePlatform && /\bgame only\b/.test(text)
     || /\b(?:no|without|missing) (?:the )?(?:original |retail |jewel |game )?(?:box|case|packaging)\b/.test(text)
     || /\b(?:box|case|packaging)(?: and manual)? (?:is |are )?(?:not included|missing|absent)\b/.test(text);
   return loose ? null : 'Loose condition unconfirmed — review';
@@ -5562,6 +5565,11 @@ function floorListingMetadataTitle(title, product) {
   if (!/^110 Industries\b/i.test(name)) title = String(title).replace(/^\s*110 Industries\b\s*[-:–]?\s*/i, '');
   if (!/\bWarner Bros\b/i.test(name)) title = String(title).replace(/\bWarner\s+Bros\.?(?:\s+Interactive\s+Entertainment)?\b/gi, '');
   if (!/\bWHV Games\b/i.test(name)) title = String(title).replace(/\bWHV\s+Games\b/gi, '');
+  if (!/\bAtlus\b/i.test(name)) title = String(title).replace(/\bAtlus\b/gi, '');
+  // Whole sales/rating phrases, never arbitrary extra title words.
+  for (const re of [/\bultra\s+rare\b/gi, /\bofficial\s+authentic\b/gi, /\brated\s+KA\s+kids\s+to\s+adults\b/gi]) {
+    if (!new RegExp(re.source, 'i').test(name)) title = String(title).replace(re, ' ');
+  }
   title = String(title).replace(/^\s*B2G1\s+Free\b/i, '');
   // A repeated acronym immediately after the full selected title is redundant,
   // e.g. "Mortal Kombat X MKX". An acronym alone never establishes a match.
@@ -5786,6 +5794,11 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
 
 function floorAmazonMismatch(cur) {
   if (!cur.amazon?.found) return null;
+  // A Generic/unbranded game cartridge is not evidence of an original release.
+  // Do not apply this to legitimate third-party hardware or toys.
+  if (!floorIsHardware(cur.product) && !floorToyFamily(cur.product)
+    && cur.amazon.publishers?.some(name => /^(?:generic|unbranded)$/i.test(String(name).trim())))
+    return 'Unverified original game manufacturer';
   if (floorNetworkAdapterProduct(cur.product) && cur.amazon.publishers?.length
     && !cur.amazon.publishers.some(name => /\b(?:microsoft|xbox)\b/i.test(name))) return 'Different adapter manufacturer';
   // An exact catalog GTIN can supply a missing region label, never override

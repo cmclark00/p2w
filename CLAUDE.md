@@ -978,6 +978,14 @@ The site's **only server-side code**. Everything else is static.
     whole Smart Delivery, library-discard, dispatch and genre/rating phrases,
     Xbox compatibility punctuation, and recognized publisher/distributor credits
     cannot become phantom sequels.
+    The Crusader of Centy audit also recognizes Atlus publisher credits and
+    whole Ultra Rare / Official Authentic / Rated KA Kids to Adults phrases.
+    Explicit Game Only is loose evidence on known cartridge systems, after
+    box/manual exclusions; disc games and unknown platforms retain stricter
+    evidence requirements. Generic/unbranded Amazon game manufacturers cannot
+    establish an original-game match (catalog and offer revalidation); hardware
+    and toys retain their separate manufacturer checks. Pricing/premiums and
+    the existing historical-sale policy are unchanged.
     The sealed PAL Alien Isolation audit also covers Survival Horror / Shoot 'Em
     Up genre phrases, Save £s seller wording, and explicitly labelled language
     lists; language evidence is retained without treating slash separators as games.

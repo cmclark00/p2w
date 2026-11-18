@@ -499,6 +499,31 @@ test('Xbox model letters cannot satisfy a game Roman numeral or admit another nu
     'Warner Bros Mortal Kombat X Xbox One + Cyberpunk 2077']) assert.ok(invoke('floorListingMismatch',title,p),title);
 });
 
+test('Crusader cartridge audit accepts publisher credits without accepting boxes, imports or other games', () => {
+  const p = {...item,'product-name':'Crusader of Centy','console-name':'Sega Genesis'};
+  for (const title of [
+    'SEGA GENESIS - CRUSADER OF CENTY - ATLUS - ULTRA RARE GAME CART ONLY',
+    'Crusader of Centy Sega Genesis Atlus Official Authentic Cartridge Tested Works',
+    'ATLUS Crusader of Centy Sega Genesis 1994',
+    'Crusader of Centy (Sega Genesis, 1994) Authentic Game only Tested Working',
+  ]) assert.equal(invoke('floorListingMismatch',title,p),null,title);
+  assert.equal(invoke('floorLooseConditionMismatch','Crusader of Centy (Sega Genesis, 1994) Authentic Game only Tested Working','loose',p),null);
+  for (const title of [
+    'Crusader of Centy game only with original box',
+    'Crusader of Centy cartridge and manual',
+    'Crusader of Centy authentic cartridge tested',
+  ]) assert.ok(invoke('floorLooseConditionMismatch',title,'loose',p),title);
+  const boxed = 'Atlus Crusader of Centy w/ Box for Sega Genesis, Rated KA Kids to Adults';
+  assert.equal(invoke('floorListingMismatch',boxed,p),null);
+  assert.ok(invoke('floorLooseConditionMismatch',boxed,'loose',p));
+  for (const title of ['Atlus Crusader of Centy and Light Crusader Sega Genesis',
+    'Atlus Crusader of Centy Japanese Version Sega Genesis',
+    'Atlus Crusader of Centy Reproduction Sega Genesis'])
+    assert.ok(invoke('floorListingMismatch',title,p) || invoke('floorOdd',{title},'loose',null,p),title);
+  const disc = {...item,'product-name':'PaRappa the Rapper','console-name':'Playstation'};
+  assert.ok(invoke('floorLooseConditionMismatch','PaRappa the Rapper PS1 Game Only NTSC-U/C Tested Black Label','loose',disc));
+});
+
 test('audited seller metadata does not masquerade as sequels, publishers, or bundles', () => {
   const farm={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
   const wanted={...item,'product-name':'Wanted: Dead'};
