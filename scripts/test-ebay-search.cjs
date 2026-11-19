@@ -148,6 +148,7 @@ const flush = () => new Promise(r => setImmediate(r));
   const ranked = [], recentPages = [], writes = [];
   const requestCache = async (route, options) => {
     assert.equal(route, 'ebay/sales-cache');
+    if (options.params.query === '[unreadable cards] WWE 2K20 PS4' && options.method !== 'POST') return { now, entry: null, fresh: false };
     assert.equal(options.params.query, 'WWE 2K20 PS4');
     if (options.method !== 'POST') return { now, entry, fresh: now - (entry?.checkedAt || 0) < 300 };
     writes.push(options.body);
@@ -218,8 +219,60 @@ const flush = () => new Promise(r => setImmediate(r));
   assert.deepEqual(ranked, [1, 1, 1, 1, 1], 'Rejected cached coverage starts a ranked search at page one');
   assert.equal(rejectedCache.directEbay.result.sharedCache, undefined);
 
-  await cachedScan(searchCur(), cacheHelper, async () => { throw Error('cache offline'); });
+  const offlineCache = searchCur();
+  await cachedScan(offlineCache, cacheHelper, async () => { throw Error('cache offline'); });
   assert.deepEqual(ranked, [1, 1, 1, 1, 1, 1], 'A cache outage falls back to the ordinary helper');
+  assert.match(invoke(ctx, 'floorDirectSearchHtml', offlineCache), /Shared cache lookup unavailable/);
+
+  // The register reported 832 readable cards over seven pages and a skipped
+  // card on loose Elden Ring. Even after the page retry, retain that warning.
+  const elden = () => ({ ...searchCur(), condition: 'loose', sales: { loose: [] },
+    product: { id: '3219371', 'product-name': 'Elden Ring', 'console-name': 'Playstation 5', 'loose-price': 2566 } });
+  const disc = { ...anchor, id: '398351749982', url: 'https://www.ebay.com/itm/398351749982',
+    title: 'Elden Ring (Sony PlayStation 5 PS5, 2022) Disc Only', price: 2499, shipping: 650 };
+  const snapshots = new Map(), eldenPages = [], eldenRecent = [];
+  const eldenCache = async (route, { params, method, body }) => {
+    assert.equal(params.id, '3219371');
+    assert.equal(params.condition, 'loose');
+    const entry = snapshots.get(params.query);
+    if (method !== 'POST') return { now, entry, fresh: entry && now - entry.checkedAt < 300 };
+    assert.equal(body.revision, entry?.revision ?? null);
+    await flush(); // An immediate second scan must see the completed write.
+    snapshots.set(params.query, { ...body, revision: String(now), checkedAt: body.startedAt });
+  };
+  const eldenHelper = {
+    search: async (q, page) => {
+      assert.equal(q, 'Elden Ring PS5');
+      eldenPages.push(page);
+      const sales = Array.from({ length: page === 7 ? 112 : 120 }, (_, i) => {
+        const id = String(100000001000 + (page - 1) * 120 + i);
+        return { ...disc, id, url: 'https://www.ebay.com/itm/' + id, title: 'Elden Ring PS5 Complete CIB' };
+      });
+      if (page === 7) sales[0] = disc;
+      return { ...ready(sales), page, more: true, partial: page === 2, skipped: page === 2 ? 1 : 0 };
+    },
+    searchRecent: async (q, page) => {
+      eldenRecent.push(page);
+      return { ...ready([{ ...disc, id: newSale.id, url: newSale.url, date: day(0) }, disc]),
+        order: 'recent', more: true, partial: true, skipped: 1 };
+    }
+  };
+  const coldElden = elden();
+  await cachedScan(coldElden, eldenHelper, eldenCache);
+  assert.equal(coldElden.directEbay.result.sales.length, 832);
+  assert.deepEqual(eldenPages, [1, 2, 2, 3, 4, 5, 6, 7]);
+  assert.equal(snapshots.has('Elden Ring PS5'), false, 'Legacy clients must never see this snapshot as clean');
+  for (const status of ['fresh', 'refreshed']) {
+    const repeat = elden();
+    await cachedScan(repeat, eldenHelper, eldenCache);
+    assert.equal(repeat.directEbay.result.sharedCache, status);
+    assert.equal(repeat.directEbay.result.partial, true);
+    assert.match(invoke(ctx, 'floorDirectSearchHtml', repeat), /Some results unreadable/);
+    assert.equal(eldenPages.length, 8, 'Repeat scans never reopen the seven ranked pages');
+    assert.deepEqual(eldenRecent, status === 'fresh' ? [] : [1]);
+    if (status === 'refreshed') assert.ok(repeat.directEbay.result.sales.some(s => s.id === newSale.id));
+    now += 320;
+  }
   const tony={...searchCur(),product:{id:'12916','product-name':'Tony Hawk','console-name':'Playstation','cib-price':1649}}, tonyPages=[];
   await invoke(ctx,'runFloorEbaySearch',tony,()=>{},()=>false,{search:async(q,page)=>{
     tonyPages.push(page);

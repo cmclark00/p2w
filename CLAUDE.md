@@ -1088,12 +1088,17 @@ The site's **only server-side code**. Everything else is static.
     unreachable configuration falls back to the existing ranked search.
     The cache service stores normalized cards under its own private data
     directory in ebay-sales-v1/, keyed by product ID, query and condition.
-    Clean price-ranked searches seed a five-minute shared cache. A warm scan
-    still runs the existing pricing filters and targeted original-item checks.
+    Price-ranked searches seed a five-minute shared cache. When skipped cards
+    are the only issue, the readable rows use a separate cache query prefixed
+    with `[unreadable cards] ` (never sent to eBay). Repeat scans use the newest
+    snapshot and retain Needs review. Older clients only read clean results.
+    A newest-first refresh can retain this warning when it also skips cards.
+    A warm scan still runs the pricing filters and targeted original-item checks.
     A stale scan can read up to five newest-first pages through a two-day
     overlap, then replace that date range by item ID. Wrong order, duplicate
-    pages, partial reads, missing or weakened ranked coverage, and entries
-    whose last ranked search was 24 hours ago fall back to the ranked search.
+    pages, partial reads of a previously clean search, missing or weakened ranked
+    coverage, and entries whose last ranked search was 24 hours ago fall back
+    to the ranked search.
     Run full search bypasses the shared cache on demand. The PHP server stores
     only listing fields, caps entries and rows, and checks revisions under a
     lock so concurrent registers cannot overwrite newer results. The helper
