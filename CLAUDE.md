@@ -1448,6 +1448,10 @@ The site's **only server-side code**. Everything else is static.
     Title/edition mismatch results use a bounded 2,000-entry cache keyed by title,
     product name, platform, genre and current hardware classification. It caches
     only identity checks, never prices, conditions or eBay verification results.
+    Publisher/feature metadata such as "Konami M 4K UHD HDR Multiplayer Online"
+    does not make Contra Rogue Corps a different game. Both online-multiplayer
+    word orders are normalized; publisher words in a selected title remain
+    required. Named editions, other games/platforms and pricing rules stay separate.
     Scattered title words separated by other game names do not establish a
     match (e.g. Pokemon followed by a list ending in X/Y). Model/condition
     words may still intervene. Reverse quantities such as "Games 17 x" are

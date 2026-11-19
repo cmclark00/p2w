@@ -5547,7 +5547,7 @@ function floorListingMetadataTitle(title, product) {
     /\b(?:free\s+)?same\s+day\s+dispatch(?:\s+T48)?\b/gi,
     /\blightly\s+used\b/gi, /\bexpertly\s+refurbished\s+product\b/gi,
     /\b(?:shooter|action|simulation|strategy|rpg)\s*,\s*(?:E10\+|E|T|M)(?=\s*[,(-]|$)/gi,
-    /\b(?:online\s+)?multi[ -]?player\b/gi];
+    /\b(?:online\s+)?multi[ -]?player(?:\s+online)?\b/gi];
   phrases.push(/\bfighting\s+game\b/gi, /\bfighting(?=\s+(?:19|20)\d{2}\b)/gi,
     /\bunreal\s+engine\b/gi, /\bonline\s+play(?:\s+[ETM]\b)?/gi,
     /\bsurvival\s+horror\b/gi, /\bshoot\s*['’]?em\s+up\b/gi,
@@ -5566,6 +5566,9 @@ function floorListingMetadataTitle(title, product) {
   if (!/\bWarner Bros\b/i.test(name)) title = String(title).replace(/\bWarner\s+Bros\.?(?:\s+Interactive\s+Entertainment)?\b/gi, '');
   if (!/\bWHV Games\b/i.test(name)) title = String(title).replace(/\bWHV\s+Games\b/gi, '');
   if (!/\bAtlus\b/i.test(name)) title = String(title).replace(/\bAtlus\b/gi, '');
+  // Publisher followed by an ESRB/feature string is catalog metadata. Keep
+  // publisher words when they belong to the selected title (Konami Classics).
+  if (!/\bKonami\b/i.test(name)) title = String(title).replace(/\bKonami\b(?:\s+[ETM](?=\s+(?:4k|8k|uhd|hdr|multi[ -]?player|online)\b|\s*$))?/gi, ' ');
   // Whole sales/rating phrases, never arbitrary extra title words.
   for (const re of [/\bultra\s+rare\b/gi, /\bofficial\s+authentic\b/gi, /\brated\s+KA\s+kids\s+to\s+adults\b/gi]) {
     if (!new RegExp(re.source, 'i').test(name)) title = String(title).replace(re, ' ');

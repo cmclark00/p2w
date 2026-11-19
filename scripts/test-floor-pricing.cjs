@@ -561,6 +561,29 @@ test('audited seller metadata does not masquerade as sequels, publishers, or bun
   assert.equal(invoke('floorSales',cur(farm,{condition:'new',sales:{new:[{title:'Farming Simulator 22 Xbox Series X Lightly Used',price:2000}]}}))[0].odd,true,'metadata cannot erase condition checks');
 });
 
+test('publisher and multiplayer metadata retain Contra sales without admitting other editions or games', () => {
+  const product={...item,'product-name':'Contra Rogue Corps','console-name':'Xbox One'};
+  const title='Contra: Rogue Corps Xbox One Konami M 4K UHD HDR Multiplayer Online';
+  for(const value of [title,'Konami Contra Rogue Corps Xbox One Online Multiplayer','Contra Rogue Corps Xbox One Multiplayer Online']) {
+    assert.equal(invoke('floorListingMismatch',value,product),null,value);
+    assert.equal(invoke('floorSaleListingMismatch',{title:value},product),null,value);
+    assert.equal(invoke('floorAmazonMismatch',{title:value,platforms:['Xbox One']},product),null,value);
+  }
+  for(const value of [
+    'Contra Rogue Corps Xbox One Locked and Loaded Edition',
+    'Contra Rogue Corps Xbox One Lock & Loaded Edition',
+    'Contra Operation Galuga Xbox One Konami M 4K UHD HDR Multiplayer Online',
+    'Contra Rogue Corps PlayStation 4 Konami M 4K UHD HDR Multiplayer Online',
+    'Contra Rogue Corps Xbox One + Halo Infinite Multiplayer Online',
+  ]) assert.ok(invoke('floorListingMismatch',value,product),value);
+  const online={...product,'product-name':'Phantasy Star Online'};
+  assert.ok(invoke('floorListingMismatch','Phantasy Star Xbox One Multiplayer Online',online),'Online remains part of the selected identity');
+  const classics={...product,'product-name':'Konami Classics Volume 1','console-name':'Xbox 360'};
+  assert.ok(invoke('floorListingMismatch','Classics Volume 1 Xbox 360',classics),'Publisher in a selected title is required');
+  const sales=invoke('floorSales',cur(product,{sales:{cib:[{title,price:700,date:new Date().toISOString().slice(0,10)}]}}));
+  assert.equal(sales[0].odd,false,'Correctly matched sale remains eligible');
+});
+
 test('sports below $20 use normal rounding then subtract $5 once, preserving exceptions and higher tiers', () => {
   const product={...item,'product-name':'Madden NFL 17'};
   for(const [raw,want] of [[499,500],[700,500],[999,500],[1000,500],[1200,500],[1495,1000],[1500,1000],[1600,1000],[1700,1000],[1999,1500],[2000,2000],[2200,2000],[3495,3500],[14500,15000],[52500,55000]]) {
