@@ -937,13 +937,15 @@ Guide (the Google Sheet tab).
    - **Barcode editions:** scanning prices the matching edition and also checks
      related PriceCharting entries for misplaced matching sales. It checks the
      listing title, platform, region and condition; duplicates count once.
-     A variant also uses the standard game's same-condition price as a minimum:
+     Most variants also use the standard game's same-condition price as a minimum:
      if the variant is $20 and the standard game is $25, its baseline is $25.
      Specific premiums and deductions still apply, followed by one rounding
      step. Other special editions do not raise the standard game's price.
      This includes named collections such as **WWII Valor Collection**; choose
      that version only when pricing the collection itself. Ordinary compilation
      games and seller wording such as “from my personal collection” still qualify.
+     **Nintendo Selects** copies use their own edition's market evidence and
+     can price below the standard release.
      For **Link to the Past on GBA**, **Four Swords** is part of the same cartridge
      and is accepted in listing titles. Other Zelda games and seller-added bundles
      still need to be excluded.

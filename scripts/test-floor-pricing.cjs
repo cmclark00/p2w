@@ -668,6 +668,31 @@ test('New CIB floor uses separate Amazon, standard edition and stock evidence', 
   assert.equal(invoke('floorResult',{...stock,gamestopStock:{state:'in'}}).r.price,6000);
 });
 
+test('Nintendo Selects uses its own market evidence even with an $80.33 regular-edition sale', () => {
+  const name = 'Zelda Ocarina of Time 3D';
+  const date = new Date().toISOString().slice(0, 10);
+  const regular = { ...item, id: '901', 'product-name': name, 'console-name': 'Nintendo 3DS', 'cib-price': 3300 };
+  const selects = { ...regular, id: '902', 'product-name': name + ' [Nintendo Selects]', 'cib-price': 2975, 'gamestop-price': 3499 };
+  const ordinarySale = { title: name + ' Nintendo 3DS CIB', price: 8033, date };
+  const editionSale = { id: '100000000902', url: 'https://www.ebay.com/itm/100000000902', title: name + ' Nintendo Selects Nintendo 3DS CIB',
+    price: 3999, shipping: 667, date, conditionText: 'Pre-Owned', sellerCountry: 'United States', state: 'sold' };
+  const input = cur(selects, {
+    sales: { cib: [ordinarySale] },
+    standardGame: { product: regular, sales: { cib: [ordinarySale] } },
+    directEbay: { result: { state: 'ready', sales: [editionSale] } },
+    gamestopStock: { state: 'in' },
+    amazon: { found: true, offers: [{ price: 4744, sub: 'very_good' }] },
+  });
+  const priced = invoke('floorResult', input);
+  assert.equal(invoke('floorOwnBasis', cur(regular, { sales: { cib: [ordinarySale] } })).basis, 8033);
+  assert.equal(invoke('floorStandardGame', selects), null);
+  assert.equal(invoke('floorStandardGame', { ...selects, 'product-name': name + ' (Nintendo Selects)' }), null);
+  assert.equal(priced.b.from, 'amazon');
+  assert.equal(priced.b.basis, 4744);
+  assert.equal(priced.r.price, 4500);
+  assert.equal(priced.b.standardReference, undefined);
+});
+
 test('Amazon-driven prices through $80 use the same nearest $5 rounding as other sources', () => {
   for(const [raw,want] of [[1000,1000],[1200,1000],[1299,1500],[1300,1500],[1495,1500],[2500,2500],[2700,2500],[2799,3000],[2800,3000],[2999,3000],[3299,3500],[3300,3500],[7799,8000],[7800,8000],[8000,8000]]) {
     const r=invoke('floorResult',cur(item,{sales:{cib:[]},amazon:{found:true,offers:[{price:raw}],lowest:raw}}));

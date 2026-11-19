@@ -564,6 +564,8 @@ The site's **only server-side code**. Everything else is static.
     become that floor. Specific premiums/deductions and rounding apply once
     afterward; typed overrides still work. Standard evidence appears in its
     own expandable section. Toys-to-life/hardware keep their existing rules.
+    Nintendo Selects copies use their own edition's market evidence. The
+    pricer skips the separate standard-release lookups for these copies.
     Named game releases labeled Collection (e.g. WWII Valor Collection) are
     variant evidence, not standard-game comps. The shared listing matcher
     rejects them in selected-page sales, sibling recovery and Amazon; selected

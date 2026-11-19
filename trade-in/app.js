@@ -3966,6 +3966,7 @@ async function floorScanUpc(upc) {
 // UPCs can point at a sparse edition entry. Discover sibling entries while
 // preserving title/condition checks and a separate standard-game baseline.
 const floorVariantName = (product) => String(product?.['product-name'] || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+const NINTENDO_SELECTS_EDITION = /\bnintendo selects\b/i;
 const floorGamePlatform = (product) => norm(product?.['console-name']).replace(/^(?:pal|jp|asian english|asian|korean) /, '');
 // Physical Xbox 360 discs reissued in Xbox One / Xbox 360 packaging. This is
 // deliberately NOT the full backwards-compatibility list. See the sourced
@@ -4027,6 +4028,7 @@ const floorMarketSearchPlatform = product => floorXbox360Reissue(product)
   : product['console-name'];
 function floorStandardGame(product) {
   if (floorToyFamily(product) || floorIsHardware(product) || rhythmKind(product['product-name']) === 'bundle') return null;
+  if (NINTENDO_SELECTS_EDITION.test(norm(product['product-name']))) return null;
   const name = floorVariantName(product);
   if (!name || name === product['product-name']) return null;
   return { id: `standard:${product.id}`, 'product-name': name, 'console-name': product['console-name'], upc: product.upc || '' };
@@ -5268,7 +5270,7 @@ function floorSales(cur = floorCur) {
 const EDITION_RES = [/\bsteel[ -]?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|game of the year)\b/i, /\bcollector'?s\b/i, /\blimited edition\b/i,
   /\bdeluxe\b/i, /\bpremium( online)? edition\b/i, /\bspecial edition\b/i, /\blaunch edition\b/i, /\bday one\b/i, /\bgold edition\b/i,
   /\bultimate edition\b/i, /\blegendary edition\b/i, /\banniversary edition\b/i, /\bsignature edition\b/i, /\bcomplete edition\b/i,
-  /\bdefinitive edition\b/i, /\b(?:greatest|playstation) hits\b/i, /\bplayer'?s choice\b/i, /\bnintendo selects\b/i,
+  /\bdefinitive edition\b/i, /\b(?:greatest|playstation) hits\b/i, /\bplayer'?s choice\b/i, NINTENDO_SELECTS_EDITION,
   /\bplatinum hits\b/i, /\bbonus content\b/i, /\bnot for resale\b/i,
   /\b(?:collector'?s|limited|special|deluxe|gold|ultimate) (?:edition|version)\b/i];
 const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || '') && !re.test(name));
@@ -6636,7 +6638,10 @@ function floorAmazonHtml(cur, b) {
   if (a.loading) return `<div class="eyebrow floor-amz-head">${label}</div><p class="muted"><span class="spinner"></span>${a.retrying ? 'Retrying unfinished Amazon checks once…' : 'Checking Amazon…'}</p>`;
   if (a.error) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">${a.retryAttempted ? 'Still unavailable after one automatic retry. ' : ''}${esc(a.error)}</p><button type="button" class="link" data-floor-act="amazon">Retry Amazon</button>`;
   const matchNote = (a.matchNotes || []).length ? `<details class="floor-details floor-amazon-details"><summary>Amazon match details</summary><p class="muted small-print">${esc(a.matchNotes.join('. '))}.</p></details>` : '';
-  if (!a.found) return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match${floorStandardGame(cur.product) ? ' for this edition' : ''}. Check the title, platform and edition before using another listing.</p>${matchNote}`;
+  if (!a.found) {
+    const edition = floorStandardGame(cur.product) || NINTENDO_SELECTS_EDITION.test(norm(cur.product['product-name']));
+    return `<div class="eyebrow floor-amz-head">${label}</div>${floorAmazonReferencesHtml(cur, b)}<p class="muted">No verified Amazon match${edition ? ' for this edition' : ''}. Check the title, platform and edition before using another listing.</p>${matchNote}`;
+  }
   const offers = a.offers || [];
   const eligible = floorAmazonEligibleOffers(cur);
   const lowestAt = offers.findIndex((o) => eligible.includes(o) && Number(o.price) === floorAmazonLowest(cur, true));
