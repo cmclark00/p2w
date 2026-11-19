@@ -100,39 +100,46 @@ function ebay_sales_cache_write(string $file, array $input, int $now): void {
   $dir = dirname($file);
   if (!is_dir($dir) && !@mkdir($dir, 0700) && !is_dir($dir)) fail(503, 'Shared eBay cache unavailable.');
   $lock = @fopen($dir . '/write.lock', 'c');
-  if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) fail(503, 'Shared eBay cache busy.');
-  // Compare against the version read before searching. Slow scans cannot overwrite newer evidence.
-  $previous = ebay_sales_cache_read($file, $now);
-  if (($previous['revision'] ?? null) !== $revision || $startedAt < ($previous['checkedAt'] ?? 0)
-    || ($mode === 'recent' && (!$previous || $more !== $previous['more'] || $coverageId !== $previous['coverageId']))) {
-    fail(409, 'Shared eBay cache changed during the search.');
+  if (!$lock) fail(503, 'Shared eBay cache busy.');
+  if (!flock($lock, LOCK_EX | LOCK_NB)) {
+    fclose($lock);
+    fail(503, 'Shared eBay cache busy.');
   }
-  $entry = [
-    'revision' => bin2hex(random_bytes(12)),
-    'checkedAt' => $startedAt,
-    'fullAt' => $mode === 'full' ? $startedAt : $previous['fullAt'],
-    'coverageId' => $coverageId, 'more' => $more, 'sales' => array_values($sales),
-  ];
-  $json = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-  if ($json === false || strlen($json) > EBAY_SALES_MAX_BYTES) fail(413, 'Shared eBay cache entry is too large.');
-  $temp = $file . '.tmp';
-  if (@file_put_contents($temp, $json) !== strlen($json) || !@rename($temp, $file)) {
-    @unlink($temp);
-    fail(503, 'Could not write shared eBay cache.');
-  }
-
-  $files = glob($dir . '/*.json') ?: [];
-  if (count($files) > EBAY_SALES_MAX_ENTRIES || mt_rand(1, 50) === 1) {
-    $times = [];
-    foreach ($files as $path) {
-      if ($path === $file) continue;
-      $mtime = (int)@filemtime($path);
-      if ($mtime < $now - EBAY_SALES_FULL_SECONDS) @unlink($path);
-      else $times[$path] = $mtime;
+  try {
+    // Compare against the version read before searching. Slow scans cannot overwrite newer evidence.
+    $previous = ebay_sales_cache_read($file, $now);
+    if (($previous['revision'] ?? null) !== $revision || $startedAt < ($previous['checkedAt'] ?? 0)
+      || ($mode === 'recent' && (!$previous || $more !== $previous['more'] || $coverageId !== $previous['coverageId']))) {
+      fail(409, 'Shared eBay cache changed during the search.');
     }
-    asort($times);
-    foreach (array_slice(array_keys($times), 0, max(0, count($times) + 1 - EBAY_SALES_MAX_ENTRIES)) as $path) @unlink($path);
+    $entry = [
+      'revision' => bin2hex(random_bytes(12)),
+      'checkedAt' => $startedAt,
+      'fullAt' => $mode === 'full' ? $startedAt : $previous['fullAt'],
+      'coverageId' => $coverageId, 'more' => $more, 'sales' => array_values($sales),
+    ];
+    $json = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($json === false || strlen($json) > EBAY_SALES_MAX_BYTES) fail(413, 'Shared eBay cache entry is too large.');
+    $temp = $file . '.tmp';
+    if (@file_put_contents($temp, $json) !== strlen($json) || !@rename($temp, $file)) {
+      @unlink($temp);
+      fail(503, 'Could not write shared eBay cache.');
+    }
+
+    $files = glob($dir . '/*.json') ?: [];
+    if (count($files) > EBAY_SALES_MAX_ENTRIES || mt_rand(1, 50) === 1) {
+      $times = [];
+      foreach ($files as $path) {
+        if ($path === $file) continue;
+        $mtime = (int)@filemtime($path);
+        if ($mtime < $now - EBAY_SALES_FULL_SECONDS) @unlink($path);
+        else $times[$path] = $mtime;
+      }
+      asort($times);
+      foreach (array_slice(array_keys($times), 0, max(0, count($times) + 1 - EBAY_SALES_MAX_ENTRIES)) as $path) @unlink($path);
+    }
+  } finally {
+    fclose($lock);
   }
-  fclose($lock);
   respond(200, ['ok' => true]);
 }

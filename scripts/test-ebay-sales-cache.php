@@ -2,15 +2,15 @@
 require __DIR__ . '/../trade-in/ebay-sales-cache.php';
 
 class CacheResponse extends RuntimeException {
-  public function __construct(public int $status) { parent::__construct('HTTP ' . $status); }
+  public function __construct(public int $status, string $details = '') { parent::__construct("HTTP $status $details"); }
 }
 function respond(int $status, array $body): void { throw new CacheResponse($status); }
-function fail(int $status, string $message): void { throw new CacheResponse($status); }
+function fail(int $status, string $message): void { throw new CacheResponse($status, $message); }
 function data_path(string $name): string { return $GLOBALS['directory'] . '/' . $name; }
 function check(bool $passed, string $reason): void { if (!$passed) throw new RuntimeException($reason); }
 function expect_status(int $status, callable $request): void {
   try { $request(); } catch (CacheResponse $response) {
-    check($response->status === $status, "Expected HTTP $status, got {$response->status}");
+    check($response->status === $status, "Expected HTTP $status, got {$response->getMessage()}");
     return;
   }
   throw new RuntimeException("No response, expected HTTP $status");
