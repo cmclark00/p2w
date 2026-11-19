@@ -393,7 +393,7 @@ if (trade.split && !trade.split.by) trade.split = { by: 'cash', amount: trade.sp
 /* ================================================================== server + PriceCharting */
 
 // Both servers answer at api.php?route=... (the local PowerShell server maps it too).
-async function api(route, { method = 'GET', body, params } = {}) {
+async function api(route, { method = 'GET', body, params, signal } = {}) {
   const query = new URLSearchParams({ route, ...params });
   let res;
   try {
@@ -402,6 +402,7 @@ async function api(route, { method = 'GET', body, params } = {}) {
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     });
   } catch {
     throw new Error(auth.enabled
@@ -3872,7 +3873,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.11';
+const FLOOR_HELPER_RECOMMENDED = '1.1.12';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -3883,7 +3884,7 @@ function floorHelperStatusInfo(helper) {
     comparison = (parts[i] || 0) - (required[i] || 0);
     if (comparison) break;
   }
-  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1 && helper.location === 1 && helper.searchRetry === 1;
+  const ready = version && comparison >= 0 && helper.protocol === 2 && helper.targeted === 1 && helper.search === 1 && helper.pagination === 1 && helper.location === 1 && helper.searchRetry === 1 && helper.recentSearch === 1;
   return { state: ready ? 'connected' : 'update',
     text: `Connected · ${version ? `v${version}` : 'version unknown'}${ready ? '' : ' · Update needed'}`,
     hint: ready ? 'Helper is responding and supports automatic sale checks. Individual listings can still be unavailable.'
@@ -4684,32 +4685,121 @@ function floorMergedSales(cur, pool) {
   }
   return [...merged.values()];
 }
+
+const FLOOR_EBAY_CACHE_ROUTE = 'ebay/sales-cache';
+const FLOOR_EBAY_CACHE_MAX_ROWS = 1000;
+function floorEbayPageReady(value, page) {
+  return value?.state === 'ready' && Array.isArray(value.sales) && value.page === page && value.sorted === true;
+}
+function floorEbayPageSales(value) {
+  return value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
+    && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
+    && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+}
+function floorEbaySearchMatches(sale) {
+  return !sale.odd && !sale.outlier && ['search', 'sold', 'pending'].includes(sale.verification?.state);
+}
+async function floorEbayRecentSales(helper, query, since, stopped) {
+  // Sold cards have day precision. Overlap two days and read through the entire cutoff day.
+  const cutoff = new Date((since - 2 * 86400) * 1000).toISOString().slice(0, 10);
+  const sales = new Map();
+  let lastDate = null;
+  const seen = new Set();
+  for (let page = 1; page <= 5 && !stopped(); page++) {
+    let value;
+    try { value = await helper.searchRecent(query, page); } catch (_) { return null; }
+    if (stopped() || !floorEbayPageReady(value, page) || value.order !== 'recent'
+      || value.partial || value.skipped || typeof value.more !== 'boolean') return null;
+    const rows = floorEbayPageSales(value);
+    if (rows.length !== value.sales.length || (!rows.length && value.more)) return null;
+    for (const sale of rows) {
+      const date = new Date(sale.date);
+      if (!Number.isFinite(+date) || date.toISOString().slice(0, 10) !== sale.date
+        || (lastDate && sale.date > lastDate) || seen.has(sale.id)) return null;
+      lastDate = sale.date;
+      seen.add(sale.id);
+      if (sale.date >= cutoff) sales.set(sale.id, sale);
+    }
+    if (!value.more || lastDate < cutoff) return { cutoff, sales };
+  }
+  return null;
+}
+
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
-  helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
+  helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null, cacheRequest = auth.enabled ? api : null) {
   if (floorSwitchMsrpBasis(cur)) return; // A fixed MSRP price does not need sold-search tabs.
   const previous = cur.directEbay;
-  const resume = (result, evidence) => result?.state === 'ready' && result.more && result.stoppedAtMatch
+  const resume = (result, evidence) => result?.state === 'ready' && result.stoppedAtMatch && (result.more || result.sharedCache)
     && !floorSales({ ...evidence, condition: cur.condition, directEbay: { result } })
-      .some(s => s.directEbay && !s.odd && !s.outlier && ['search', 'sold', 'pending'].includes(s.verification?.state));
+      .some(s => s.directEbay && floorEbaySearchMatches(s) && (!result.sharedCache || s.id === result.coverageId));
   const same = previous?.condition === cur.condition;
   const resumeOwn = same && !previous.loading && resume(previous.result, cur);
   const resumeStandard = same && !previous.loading && cur.standardGame && resume(previous.standard?.result, cur.standardGame);
   if (same && !resumeOwn && !resumeStandard || cancelled() || cur.typed != null || !/^\d+$/.test(String(cur.product.id))) return;
   if (!helper?.search) { cur.directEbay = { condition: cur.condition, loading: false, result: { state: 'unavailable', sales: [], reason: 'Direct sold search needs Chrome helper 1.1.8.' } }; return; }
   const condition = cur.condition;
+  const forceRankedSearch = cur.forceRankedEbaySearch === true;
+  delete cur.forceRankedEbaySearch;
   const state = cur.directEbay = { ...(same ? previous : {}), condition, loading: true };
   const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
   progress();
   const read = async (product, evidence = {}, seed = null) => {
     const query = floorEbaySearchQuery(product);
+    const params = { id: String(product.id), query, condition };
+    let cache = null;
+    if (cacheRequest && /^\d{1,10}$/.test(params.id) && query.length >= 3) {
+      try {
+        const value = await cacheRequest(FLOOR_EBAY_CACHE_ROUTE, { params, signal: AbortSignal.timeout(2000) });
+        if (Number.isSafeInteger(value?.now) && value.now > 0) cache = value;
+      } catch (_) { /* A cache miss or outage never blocks the ranked search. */ }
+    }
+    const startAt = seed?.searchStartedAt ?? cache?.now;
+    const save = (sales, coverageId, more, mode) => {
+      if (!cache || stopped() || sales.length > FLOOR_EBAY_CACHE_MAX_ROWS || startAt == null) return;
+      void cacheRequest(FLOOR_EBAY_CACHE_ROUTE, { method: 'POST', params, signal: AbortSignal.timeout(5000),
+        body: { revision: cache.entry?.revision ?? null, startedAt: startAt, mode, sales, coverageId, more } }).catch(() => {});
+    };
+    const entry = cache?.entry;
+    const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120';
+    if (!stopped() && !seed && !forceRankedSearch && Array.isArray(entry?.sales)
+      && Number.isSafeInteger(entry.checkedAt) && entry.checkedAt > 0 && entry.checkedAt <= cache.now) {
+      let sales = entry.sales;
+      let refreshed = false;
+      if (!cache.fresh && helper.searchRecent) {
+        const update = await floorEbayRecentSales(helper, query, entry.checkedAt, stopped);
+        if (update) {
+          // Rows missing from the covered date range may have disappeared or changed.
+          sales = sales.filter(sale => sale.date < update.cutoff && !update.sales.has(sale.id)).concat([...update.sales.values()]);
+          refreshed = true;
+        }
+      }
+      if (!stopped() && (cache.fresh || refreshed) && sales.length <= FLOOR_EBAY_CACHE_MAX_ROWS) {
+        const oldest = new Date((cache.now - 90 * 86400) * 1000).toISOString().slice(0, 10);
+        sales = sales.filter(sale => sale.date >= oldest);
+        const cached = { state: 'ready', sales, more: entry.more, partial: false, url, coverageId: entry.coverageId,
+          checkedAt: entry.checkedAt, sharedCache: refreshed ? 'refreshed' : 'fresh', stoppedAtMatch: entry.coverageId !== null };
+        const candidates = floorSales({ ...evidence, product, condition, directEbay: { result: cached } });
+        const priorAnchor = entry.sales.find(s => s.id === entry.coverageId);
+        // A lower delivered price shrinks the ranked range proved by the original search.
+        const covered = entry.coverageId === null ? !entry.more
+          : candidates.some(s => s.directEbay && s.id === entry.coverageId && floorEbaySearchMatches(s)
+            && s.shipping != null && floorSaleLocation(s) !== 'unknown'
+            && (!entry.more || s.price >= (priorAnchor?.price ?? Infinity) + (priorAnchor?.shipping ?? 0)));
+        const driver = candidates.find(s => s.directEbay && floorEbaySearchMatches(s));
+        const pending = candidates.some(s => s.ageInfo?.pending || s.historicalInfo?.pending);
+        if (covered && !pending && (!driver || (driver.shipping != null && floorSaleLocation(driver) !== 'unknown'))) {
+          if (refreshed) save(sales, entry.coverageId, entry.more, 'recent');
+          return cached;
+        }
+      }
+    }
+    if (seed?.sharedCache) seed = null; // A cached result has no resumable price-ranked page offset.
     const rows = new Map((seed?.sales || []).map(s => [s.id, s])); let partial = !!seed?.partial;
-    const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url: 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query) + '&LH_Sold=1&LH_Complete=1&_sop=16&_ipg=120',
-      ...seed, issues: [...(seed?.issues || [])], retriedPages: [...(seed?.retriedPages || [])] };
+    const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url,
+      ...seed, searchStartedAt: startAt, issues: [...(seed?.issues || [])], retriedPages: [...(seed?.retriedPages || [])] };
     delete result.stoppedAtMatch;
-    const validPage = (value, page) => value?.state === 'ready' && Array.isArray(value.sales) && value.page === page && value.sorted === true;
-    const validSales = value => value.sales.slice(0, 240).filter(s => s && /^\d{9,15}$/.test(s.id) && floorSaleKey(s) === s.id
-      && /^https:\/\/(?:www\.)?ebay\.com\/itm\//.test(s.url) && typeof s.title === 'string' && s.title.length < 500
-      && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+    const validPage = (value, page) => floorEbayPageReady(value, page) && (value.order ?? 'price') === 'price';
+    const validSales = floorEbayPageSales;
     const unreadable = value => !!value.partial || value.skipped > 0 || validSales(value).length !== value.sales.length;
     for (let page = (seed?.pages || 0) + 1; page <= 50 && !stopped(); page++) {
       let value, recoveredSales;
@@ -4765,11 +4855,15 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       if (matched && !olderPending) {
         if (matched.shipping == null) result.issues.push({ code: 'shipping' });
         if (floorSaleLocation(matched) === 'unknown') result.issues.push({ code: 'location' });
+        if (!result.issues.length && matched.directEbay) save(result.sales, matched.id, result.more, 'full');
         return { ...result, stoppedAtMatch: true,
         partial: partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown',
         reason: `Stopped on page ${page} at the highest eligible ${GAME_CONDITIONS[condition]} sale found.${partial || matched.shipping == null || floorSaleLocation(matched) === 'unknown' ? ' Some evidence, shipping or seller location needs review.' : ''}` };
       }
-      if (!value.more) return { ...result, reason: `Checked ${page} page${page === 1 ? '' : 's'}; no eligible ${GAME_CONDITIONS[condition]} sale found.` };
+      if (!value.more) {
+        if (!partial && !result.issues.length && !olderPending) save(result.sales, null, false, 'full');
+        return { ...result, reason: `Checked ${page} page${page === 1 ? '' : 's'}; no eligible ${GAME_CONDITIONS[condition]} sale found.` };
+      }
       if (rows.size === before) {
         result.issues.push({ code: 'no-progress', page });
         return { ...result, partial: true, reason: 'eBay repeated a page or returned unreadable results. Review the remaining pages manually.' };
@@ -4831,10 +4925,12 @@ function floorDirectSearchHtml(cur) {
   if (!s) return '';
   const r = s.result;
   const warnings = s.loading ? [] : floorSearchReviewWarnings(cur);
+  const source = r?.sharedCache === 'fresh' ? 'Shared eBay cache' : r?.sharedCache === 'refreshed' ? 'Shared eBay cache · recent sales checked' : 'Direct eBay';
   const note = s.loading ? s.retryPage ? `Retrying eBay page ${s.retryPage} once…` : `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
-    ? `Direct eBay · ${r.sales.length} sold results read${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
+    ? `${source} · ${r.sales.length} sold results${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
     : r?.reason || 'Direct eBay search unavailable';
-  return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${!s.loading && r?.state !== 'unavailable' && (r?.state !== 'ready' || warnings.length) ? ' · <button type="button" class="link" data-floor-act="ebay-search">Retry search</button>' : ''}</p>`;
+  const retry = !s.loading && r?.state !== 'unavailable' && (r?.sharedCache || r?.state !== 'ready' || warnings.length);
+  return `<p class="small-print muted">${esc(note)}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${retry ? ` · <button type="button" class="link" data-floor-act="ebay-search">${r?.sharedCache ? 'Run full search' : 'Retry search'}</button>` : ''}</p>`;
 }
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
@@ -6646,7 +6742,14 @@ function onFloorPricerClick(e) {
     }
     return;
   }
-  if (act === 'ebay-search') { if (!floorCur.directEbay?.loading) { floorCur.directEbay = null; renderFloorPricer(); } return; }
+  if (act === 'ebay-search') {
+    if (!floorCur.directEbay?.loading) {
+      floorCur.forceRankedEbaySearch = true;
+      floorCur.directEbay = null;
+      renderFloorPricer();
+    }
+    return;
+  }
   if (act === 'ebay') { if (!floorCur.ebayChecks?.loading && !floorCur.targetedEbay?.running) loadFloorEbayCheck(floorCur, Number(e.target.closest('[data-ebay-sale]')?.dataset.ebaySale)); return; }
   if (act === 'type') {
     floorCur.typed = floorBasis().basis;

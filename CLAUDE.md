@@ -1078,6 +1078,37 @@ The site's **only server-side code**. Everything else is static.
     failures remain unknown, never zero sales. Scripts ebay-search-reader/background.js
     are included in the manual ZIP. Tests: test-ebay-search.cjs; parser fields verified
     against live s-card markup and The Order 1886 $40 sale on Oct. 26, 2026.
+  - **Shared direct eBay sales cache (helper 1.1.12):** the staff-only
+    GET/POST ebay/sales-cache route authenticates staff and forwards their requests
+    over HTTPS to the separate cache service. It reads the endpoint and token from
+    the GoDaddy private file `ebay-cache-upstream.json` (`url` points to the tunnel's
+    `/cache` endpoint, `token` is the service's private bearer token). Missing or
+    unreachable configuration falls back to the existing ranked search.
+    The cache service stores normalized cards under its own private data
+    directory in ebay-sales-v1/, keyed by product ID, query and condition.
+    Clean price-ranked searches seed a five-minute shared cache. A warm scan
+    still runs the existing pricing filters and targeted original-item checks.
+    A stale scan can read up to five newest-first pages through a two-day
+    overlap, then replace that date range by item ID. Wrong order, duplicate
+    pages, partial reads, missing or weakened ranked coverage, and entries
+    whose last ranked search was 24 hours ago fall back to the ranked search.
+    Run full search bypasses the shared cache on demand. The PHP server stores
+    only listing fields, caps entries and rows, and checks revisions under a
+    lock so concurrent registers cannot overwrite newer results. The helper
+    supplies the listing data from the staff browser. Older helpers can use
+    fresh shared results and fall back to ranked search when they go stale.
+    Offline mode does not use the shared cache. The Ubuntu service files are
+    in scripts/ebay-cache-server/ and use the shared trade-in/ebay-sales-cache.php
+    engine. FrankenPHP listens on 127.0.0.1:8787 under the server account. The
+    service home is ~/.local/share/p2w-ebay-cache, where current points at the
+    active release and private/token holds the service credential. The user
+    crontab starts it at boot and retries each minute if it exits. Use an
+    authenticated HTTPS tunnel to its loopback endpoint for GoDaddy.
+    The ngrok scripts in the same folder run it as the server user. They
+    use a dedicated private config file and disable local request inspection.
+    On the server, authorize-ngrok prompts for the agent authtoken without echoing
+    it. The GoDaddy connector uses the separate cache token, never the agent token.
+    Tests: test-ebay-search.cjs and test-ebay-sales-cache.php.
 
   - **Targeted original eBay verification:** Market Helper 1.1.5 advertises
     protocol 2 plus targeted capability 1. Old helpers never receive automatic

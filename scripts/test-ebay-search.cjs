@@ -35,6 +35,8 @@ assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].sellerC
 for (const url of [href.replace('LH_Sold=1', 'LH_Sold=0'), 'https://signin.ebay.com/', href.replace('_nkw=', '_wrong=')])
   assert.equal(invoke(reader, 'readEbaySearch', doc, url, query).state, 'unknown');
 assert.equal(invoke(reader,'readEbaySearch',doc,href.replace('_sop=16','_sop=13'),query).state,'unknown','Only highest-first pages can justify stopping early');
+assert.equal(invoke(reader, 'readEbaySearch', doc, href.replace('_sop=16', '_sop=13'), query, 1, 'recent').order, 'recent');
+assert.equal(invoke(reader, 'readEbaySearch', doc, href, query, 1, 'recent').state, 'unknown', 'A price-ranked page is never accepted as newest-first');
 assert.equal(invoke(reader,'readEbaySearch',doc,href,query,2).state,'unknown','Wrong page cannot be counted twice');
 const noCards = { ...doc, querySelectorAll: () => [] };
 assert.equal(invoke(reader, 'readEbaySearch', noCards, href, query).state, 'unknown', 'A layout failure is not zero sales');
@@ -43,7 +45,7 @@ assert.equal(invoke(reader, 'readEbaySearch', { ...doc, querySelector: s => s.in
 price.matches = () => true;
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].state, 'offer'); price.matches = () => false;
 
-const ctx = vm.createContext({ console, URL, Date, setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
+const ctx = vm.createContext({ console, URL, Date, AbortSignal, setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
   document: { querySelector: () => ({ value: '', innerHTML: '', addEventListener() {} }), addEventListener() {} } });
 vm.runInContext(fs.readFileSync('trade-in/dead-games.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('trade-in/app.js', 'utf8').replace(/\binit\(\);\s*$/, ''), ctx);
@@ -136,6 +138,88 @@ const flush = () => new Promise(r => setImmediate(r));
 
   const searchCur=()=>({...base(),product:{...wwe,'cib-price':3000},sales:{cib:[]},directEbay:undefined});
   const comp=(n,grade,title)=>({...sold,id:String(100000000000+n),url:`https://www.ebay.com/itm/${100000000000+n}`,title,conditionText:grade,price:5000-n*100,shipping:0});
+  const day = offset => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const anchor = { ...comp(10, 'Pre-Owned', 'WWE 2K20 PS4 CIB'), date: day(-8) };
+  const older = { ...comp(12, 'Pre-Owned', 'WWE 2K20 PS4 CIB'), date: day(-9) };
+  const removedSale = { ...comp(11, 'Pre-Owned', 'WWE 2K20 PS4 CIB'), date: day(-1) };
+  const newSale = { ...comp(7, 'Pre-Owned', 'WWE 2K20 PS4 CIB'), date: day(0) };
+  const sameDaySale = { ...comp(13, 'Pre-Owned', 'WWE 2K20 PS4 CIB'), date: day(-2) };
+  let now = Math.floor(Date.now() / 1000), entry = null;
+  const ranked = [], recentPages = [], writes = [];
+  const requestCache = async (route, options) => {
+    assert.equal(route, 'ebay/sales-cache');
+    assert.equal(options.params.query, 'WWE 2K20 PS4');
+    if (options.method !== 'POST') return { now, entry, fresh: now - (entry?.checkedAt || 0) < 300 };
+    writes.push(options.body);
+    entry = { ...options.body, checkedAt: options.body.startedAt, revision: String(writes.length) };
+  };
+  const cacheHelper = {
+    search: async (q, page) => {
+      ranked.push(page);
+      return { ...ready([anchor, removedSale, { ...sameDaySale, price: sameDaySale.price - 100 }]), page, more: true };
+    },
+    searchRecent: async (q, page) => {
+      recentPages.push(page);
+      return { ...ready(page === 1 ? [newSale, sameDaySale] : [older]), page, more: true, order: 'recent' };
+    },
+  };
+  const cachedScan = (cur, helper = cacheHelper, request = requestCache) =>
+    invoke(ctx, 'runFloorEbaySearch', cur, () => {}, () => false, helper, request);
+  await cachedScan(searchCur());
+  assert.deepEqual(ranked, [1]);
+  assert.equal(writes[0]?.coverageId, anchor.id, 'Clean ranked evidence seeds the shared cache');
+  const warm = searchCur();
+  await cachedScan(warm);
+  assert.equal(warm.directEbay.result.sharedCache, 'fresh');
+  assert.deepEqual(ranked, [1], 'Fresh shared evidence skips ranked page tabs on another scan');
+  assert.deepEqual(recentPages, []);
+  assert.ok(invoke(ctx, 'floorEbayCandidates', warm, 2).some(candidate => candidate.key === anchor.id), 'Cached drivers still receive original-item verification');
+  now += 320;
+  const updated = searchCur();
+  await cachedScan(updated);
+  assert.deepEqual(recentPages, [1, 2], 'The cutoff day is fully read before stopping');
+  assert.deepEqual(ranked, [1], 'A successful incremental refresh skips ranked search');
+  assert.equal(updated.directEbay.result.sharedCache, 'refreshed');
+  assert.deepEqual(Array.from(updated.directEbay.result.sales, s => s.id), [anchor.id, newSale.id, sameDaySale.id]);
+  assert.equal(updated.directEbay.result.sales.find(s => s.id === sameDaySale.id).price, sameDaySale.price, 'New evidence replaces the old copy by item ID');
+  assert.equal(writes.at(-1)?.mode, 'recent');
+  assert.equal(writes.at(-1)?.revision, '1');
+  assert.match(invoke(ctx, 'floorDirectSearchHtml', updated), /Run full search/);
+
+  now += 320;
+  await cachedScan(searchCur(), {
+    ...cacheHelper, searchRecent: async () => ({ ...ready([older, newSale]), order: 'recent', more: false }),
+  });
+  assert.deepEqual(ranked, [1, 1], 'Out-of-order refresh falls back to ranked search');
+  assert.equal(writes.at(-1)?.mode, 'full');
+  now += 320;
+  const weakerCoverage = searchCur();
+  await cachedScan(weakerCoverage, {
+    ...cacheHelper, searchRecent: async () => ({
+      ...ready([{ ...anchor, price: anchor.price - 100, date: day(0) }]), order: 'recent', more: false
+    }),
+  });
+  assert.deepEqual(ranked, [1, 1, 1], 'A lower anchor price invalidates the ranked coverage');
+  assert.equal(weakerCoverage.directEbay.result.sharedCache, undefined);
+  const manual = searchCur();
+  manual.forceRankedEbaySearch = true;
+  await cachedScan(manual);
+  assert.deepEqual(ranked, [1, 1, 1, 1], 'Manual full search bypasses fresh shared data');
+
+  const rejectedCache = searchCur();
+  await cachedScan(rejectedCache);
+  rejectedCache.ebayChecks = { results: { [anchor.id]: { state: 'ended', confirmedUnsold: true } } };
+  await cachedScan(rejectedCache, {
+    ...cacheHelper, search: async (q, page) => {
+      ranked.push(page);
+      return { ...ready([newSale]), page, more: false };
+    },
+  });
+  assert.deepEqual(ranked, [1, 1, 1, 1, 1], 'Rejected cached coverage starts a ranked search at page one');
+  assert.equal(rejectedCache.directEbay.result.sharedCache, undefined);
+
+  await cachedScan(searchCur(), cacheHelper, async () => { throw Error('cache offline'); });
+  assert.deepEqual(ranked, [1, 1, 1, 1, 1, 1], 'A cache outage falls back to the ordinary helper');
   const tony={...searchCur(),product:{id:'12916','product-name':'Tony Hawk','console-name':'Playstation','cib-price':1649}}, tonyPages=[];
   await invoke(ctx,'runFloorEbaySearch',tony,()=>{},()=>false,{search:async(q,page)=>{
     tonyPages.push(page);
@@ -393,10 +477,20 @@ const flush = () => new Promise(r => setImmediate(r));
   requests.at(-1).resolve({...ready([sold]),page:2});await fresh;await sharedFresh;
   const afterFresh=created.length;await pageWindow.P2WEbayHelper.search(query,2);
   assert.equal(created.length,afterFresh,'Successful retry refreshes cache for normal requests');
+  const recentRequest = pageWindow.P2WEbayHelper.searchRecent(query, 2);
+  await flush();
+  assert.equal(new URL(created.at(-1).url).searchParams.get('_sop'), '13', 'Newest-first mode crosses the client and worker boundary');
+  assert.equal(requests.at(-1).m.order, 'recent');
+  requests.at(-1).resolve({ ...ready([sold]), page: 2, order: 'recent' });
+  assert.equal((await recentRequest).order, 'recent');
+  assert.equal((await pageWindow.P2WEbayHelper.search(query, 2)).order, 'price', 'The worker separates ranked and recent results');
   legacySearch=true;messages.length=0;
   assert.equal((await pageWindow.P2WEbayHelper.search(query,2,true)).retryUnsupported,true);
   assert.equal(messages.length,1,'Helper without fresh-read capability receives only a ping');
   assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2,'Existing helper still supports normal cached searches');
+  messages.length = 0;
+  assert.equal((await pageWindow.P2WEbayHelper.searchRecent(query)).state, 'unavailable');
+  assert.equal(messages.length, 1, 'Legacy helpers receive only a capability ping for incremental searches');
   legacySearch=false;
   oldHelper = true; messages.length = 0;
   assert.equal((await pageWindow.P2WEbayHelper.search(query)).state, 'unavailable');

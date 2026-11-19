@@ -1,0 +1,38 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+	log {
+		output file {$P2W_EBAY_CACHE_HOME}/private/service.log {
+			roll_size 4MiB
+			roll_keep 3
+		}
+	}
+	servers {
+		timeouts {
+			read_header 5s
+			read_body 10s
+			write 15s
+			idle 30s
+		}
+	}
+	frankenphp {
+		num_threads 2
+		max_threads 4
+		php_ini display_errors 0
+		php_ini expose_php 0
+	}
+}
+
+http://:8787 {
+	bind 127.0.0.1
+	handle /cache {
+		request_body {
+			max_size 1250000
+		}
+		root * {$P2W_EBAY_CACHE_RELEASE}/public
+		rewrite * /index.php
+		php_server
+	}
+	respond 404
+}

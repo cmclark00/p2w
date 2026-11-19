@@ -24,6 +24,7 @@
  *   PUT  trades                  manager: correct a logged trade (kept: who/when/why + what it was before)
  *   GET  history (of=settings|hardware)  manager: saved versions, newest first
  *   GET  pc/sales (id)           recent sold listings from a game's PriceCharting page (floor pricing)
+ *   GET/POST ebay/sales-cache    shared sold-search data by product, query and condition (floor pricing)
  *   GET  floor-sessions (id)     saved floor-pricing sessions: list, or one session with its items
  *   PUT  floor-sessions          save (create or update) a named session; 409 if someone saved it since baseUpdated
  *   DELETE floor-sessions (id)   delete a saved session
@@ -1107,6 +1108,13 @@ switch ("$method $route") {
   case 'GET pc/sales':
     require_role('staff');
     pc_sales((string)($_GET['id'] ?? ''));
+
+  case 'GET ebay/sales-cache':
+  case 'POST ebay/sales-cache':
+    require_role('staff');
+    require_once __DIR__ . '/ebay-sales-cache.php';
+    require_once __DIR__ . '/ebay-cache-upstream.php';
+    ebay_sales_cache_upstream($method, $_GET);
 
   case 'GET gamestop/stock':
     require_role('staff');

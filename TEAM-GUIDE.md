@@ -896,6 +896,10 @@ Guide (the Google Sheet tab).
      refresh pricing. Allow the added eBay search-page access if Chrome asks.
      Changing condition searches for that condition using cached pages where possible.
      Verified sold cards avoid extra item tabs. Failed or repeated pages still need review.
+     **Shared eBay cache** means Floor Pricing reused results from a recent scan
+     on any register. With helper **1.1.12+**, older cached results can be refreshed
+     by checking recent sales. The tool still verifies sales that can set the
+     price. Choose **Run full search** to search eBay again from the start.
    - **Targeted eBay checks:** with Chrome Market Helper **1.1.5+**, the tool
      checks GameStop and the first potential price-driving eBay sale together,
      then checks further eBay sales **in pairs**. There is **no three-sale cap**:

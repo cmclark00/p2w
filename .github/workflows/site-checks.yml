@@ -62,6 +62,8 @@ jobs:
         run: php scripts/test-gamestop-links.php
       - name: Check GameStop stock signals (offline)
         run: php scripts/test-gamestop-stock.php
+      - name: Test shared eBay sales cache
+        run: php scripts/test-ebay-sales-cache.php
       - name: Check checkout recovery and inventory mappings (offline)
         run: php scripts/test-shop-checkout.php
       - name: Check preview routes and staff access (offline)

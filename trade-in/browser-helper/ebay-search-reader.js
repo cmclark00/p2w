@@ -18,19 +18,21 @@ function parseEbaySearchCard(card) {
     state: offer ? 'offer' : 'sold', shipping, sellerCountry,
     locationSource: sellerCountry ? 'ebay-located-in' : null, source: 'ebay-search' };
 }
-function readEbaySearch(doc, href, query, page = 1) {
+function readEbaySearch(doc, href, query, page = 1, order = 'price') {
   const unknown = { state: 'unknown', reason: 'Search unavailable. Sign in to eBay or review the search manually.', sales: [] };
   let u;
   try { u = new URL(href); } catch (_) { return unknown; }
   if (u.protocol !== 'https:' || !['www.ebay.com', 'ebay.com'].includes(u.hostname) || u.pathname !== '/sch/i.html'
     || u.searchParams.get('LH_Sold') !== '1' || u.searchParams.get('LH_Complete') !== '1'
-    || u.searchParams.get('_nkw') !== query || u.searchParams.get('_sop') !== '16' || Number(u.searchParams.get('_pgn') || 1) !== page) return unknown;
+    || !['price', 'recent'].includes(order) || u.searchParams.get('_nkw') !== query
+    || u.searchParams.get('_sop') !== (order === 'recent' ? '13' : '16') || Number(u.searchParams.get('_pgn') || 1) !== page) return unknown;
   const visible = el => !!el && el.getClientRects().length > 0 && !el.closest('[aria-hidden="true"], .s-clipped');
   const text = el => visible(el) ? el.textContent.replace(/\s+/g, ' ').trim() : '';
   const heading = text(doc.querySelector('#srp-results-heading'));
   if (!/^\d[\d,]*\+? results? for\b/i.test(heading)) return unknown;
-  const cards = [...doc.querySelectorAll('#srp-river-results li.s-card')].filter(visible).slice(0, 240);
-  let skipped = 0;
+  const visibleCards = [...doc.querySelectorAll('#srp-river-results li.s-card')].filter(visible);
+  const cards = visibleCards.slice(0, 240);
+  let skipped = order === 'recent' ? visibleCards.length - cards.length : 0;
   const sales = [];
   for (const card of cards) {
     const titleEl = card.querySelector('.s-card__title .su-styled-text');
@@ -51,7 +53,7 @@ function readEbaySearch(doc, href, query, page = 1) {
   // Zero is valid only with an explicit zero-result heading. Layout changes are failures.
   if (!sales.length && !/^0 results? for\b/i.test(heading)) return { ...unknown, reason: 'Sold results could not be read reliably. Review eBay manually.' };
   const more = visible(doc.querySelector('a.pagination__next[href]'));
-  return { state: 'ready', sales, page, sorted: true, more, skipped, partial: skipped > 0,
+  return { state: 'ready', sales, page, order, sorted: true, more, skipped, partial: skipped > 0,
     reason: more ? 'More sold results are available on eBay.' : skipped ? 'Some result cards could not be read.' : '' };
 }
 if (typeof chrome !== 'undefined') {
@@ -60,7 +62,7 @@ if (typeof chrome !== 'undefined') {
     let last = '', stable = 0, elapsed = 0;
     const timer = setInterval(() => {
       elapsed += 500;
-      const value = readEbaySearch(document, location.href, message.query, message.page ?? 1), signature = JSON.stringify(value);
+      const value = readEbaySearch(document, location.href, message.query, message.page ?? 1, message.order ?? 'price'), signature = JSON.stringify(value);
       stable = signature === last ? stable + 500 : 0; last = signature;
       if (elapsed >= 12000 || value.state === 'ready' && document.readyState === 'complete' && elapsed >= 2000 && stable >= 1000) {
         clearInterval(timer); respond(value);
