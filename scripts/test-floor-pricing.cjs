@@ -2434,6 +2434,36 @@ test('original Elite pricing excludes Series 2 and compatibility cables without 
   assert.equal(invoke('floorResult',c).r.price,invoke('floorResult',clean).r.price);
   assert.equal(invoke('floorResult',c).r.price,6000);
 });
+test('stock controllers exclude multiple units and TMR/Hall upgrades across pricing sources', () => {
+  const p = {'product-name':'DualSense Wireless Controller [Chroma Teal]','console-name':'Playstation 5',genre:'Accessories','loose-price':4595};
+  const rejected = [
+    'Two Sony DualSense Wireless Controller for PlayStation 5 - White Chroma Teal',
+    'TMR Analogs Custom Glow Chroma Teal Ps5 Sony DualSense Wireless Controller',
+    'Sony DualSense Wireless Controller Chroma Teal PS5 upgraded Hall-effect sticks',
+    'Sony DualSense Wireless Controller Chroma Teal PS5 HallEffect upgrade',
+    'Sony DualSense Wireless Controller Chroma Teal PS5 with Hall Effect joysticks',
+    '2x Sony DualSense Wireless Controllers Chroma Teal PS5',
+    'Pair of Sony DualSense Wireless Controllers Chroma Teal PS5',
+    'Sony DualSense Wireless Controller Chroma Teal PS5 qty 2',
+    'Lot of 2 Sony DualSense Wireless Controllers Chroma Teal PS5'
+  ];
+  for (const title of rejected) {
+    assert.ok(invoke('floorListingMismatch',title,p),title);
+    assert.ok(invoke('floorSaleListingMismatch',{title,source:'direct-ebay'},p),title);
+    assert.ok(invoke('floorAmazonMismatch',cur(p,{amazon:{found:true,title,offers:[{price:7750,sub:'good'}]}})),title);
+  }
+  const valid = 'Sony DualSense Wireless Controller Chroma Teal PS5 with USB cable';
+  assert.equal(invoke('floorListingMismatch',valid,p),null);
+  assert.equal(invoke('floorListingMismatch','Sony DualSense Wireless Controller Chroma Teal PS5 with carrying case',p),null);
+  for (const title of ['Xbox Elite Series 2 Wireless Controller', 'Sony PlayStation 2 Wireless Controller', 'Wireless Controller 2.4GHz'])
+    assert.equal(invoke('floorControllerMismatch',title,p),null,title);
+  assert.equal(invoke('floorControllerMismatch','Hall Effect Wireless Controller',{'product-name':'Hall Effect Wireless Controller',genre:'Accessories'}),null,'Selected factory Hall-effect hardware is not a stock-controller upgrade');
+  const date = new Date().toISOString().slice(0,10);
+  const c = cur(p,{condition:'loose',sales:{loose:[...rejected.map(title=>({title,price:8317,date})),{title:valid,price:4999,date}]}});
+  assert.equal(invoke('floorSales',c).filter(s=>!s.odd && !s.outlier).length,1);
+  assert.equal(invoke('floorResult',c).b.basis,4999,'The valid single controller sets the baseline');
+});
+
 test('Wireless N adapter aliases preserve model and accessory identity across sales sources', () => {
   const p = {'product-name':'Xbox 360 Wireless Network Adapter ABG & N','console-name':'Xbox 360','loose-price':2297};
   const valid = ['Authentic OEM Xbox 360 Wireless N Network Adapter Dual Antenna Wifi Nice Shape!',

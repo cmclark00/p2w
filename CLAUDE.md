@@ -1460,6 +1460,10 @@ The site's **only server-side code**. Everything else is static.
     1797) and Core packages are checked across Amazon, PriceCharting and direct
     eBay. The original Xbox One Elite catalog name implies Series 1. These checks
     filter evidence only; hardware pricing and specific premiums are unchanged.
+    Single stock controllers also reject multi-controller quantities (including
+    "Two Sony ... Controller") and TMR/Hall-effect stick upgrades across sources.
+    Selected products explicitly naming those factory features remain distinct;
+    ordinary included cables/cases and generation numbers are not bundle counts.
     Xbox 360 Wireless Network Adapter ABG & N uses model-aware aliases across
     all sources: A/B/G & N, Wireless N, model 1398 and dual-antenna wording.
     Network/networking and adapter/adaptor spellings are equivalent for this

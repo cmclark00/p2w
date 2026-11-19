@@ -5621,6 +5621,16 @@ function floorControllerMismatch(title, product) {
   // A selected replacement component remains a legitimate product of its own.
   if (parts.test(name)) return null;
   const text = norm(String(title || '').replace(/\bw\s*\//gi, 'with '));
+  // A stock controller must not inherit the price of a pair or an upgraded
+  // controller. Quantity can precede a brand/model and a singular "Controller".
+  const multipleControllers = value => {
+    const counts = /\b(?:two|three|four|five|six|[2-9]|[1-9]\d+)\s*(?:x\s+|\s+)(?:(?:sony|microsoft|nintendo|official|oem|original|genuine|ps[1-5]|xbox|one|dualsense|dualshock|wireless|wired|elite|pro|black|white|red|blue)\s+){0,8}controllers?\b/g;
+    return Array.from(value.matchAll(counts)).some(m => !/\b(?:series|gen|generation|model|playstation|xbox)\s*$/.test(value.slice(0, m.index)))
+      || /\b(?:pair of (?:\w+ ){0,5}controllers?|controllers? (?:pair|duo)|controllers? x\s*[2-9]|(?:qty|quantity)\s*[2-9]|[2-9] (?:pack|pcs) (?:of )?controllers?)\b/.test(value);
+  };
+  if (multipleControllers(text) && !multipleControllers(name)) return 'Multiple-controller bundle';
+  const stickUpgrades = [/\btmr\b/, /\bhall\s*effect\b/];
+  if (stickUpgrades.some(re => re.test(text) && !re.test(name))) return 'Upgraded TMR or Hall-effect controller, not the selected stock model';
   if (/\b(?:controller (?:is )?not included|no controller included|without (?:the )?controller)\b/.test(text)) return 'Controller not included';
   // Controllers can include their ordinary charging cable/case. Only strip
   // included contents after an actual controller noun, never a cable's "for".
