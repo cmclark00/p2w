@@ -54,7 +54,9 @@ try {
   expect_status(400, fn() => ebay_sales_cache_write($progressFile, array_replace($prefix, ['retriedPages' => [6]]), $now, true));
   expect_status(200, fn() => ebay_sales_cache_write($progressFile, $prefix, $now, true));
   $progress = ebay_sales_cache_read($progressFile, $now);
-  check($progress['pages'] === 5 && $progress['issues'] === $prefix['issues'], 'Progress retains the page offset and warnings');
+  check($progress['pages'] === 5 && count($progress['issues']) === 1
+    && $progress['issues'][0]['page'] === 2 && $progress['issues'][0]['code'] === 'unreadable',
+    'Progress retains the page offset and warnings');
   expect_status(409, fn() => ebay_sales_cache_write($progressFile, $prefix, $now, true));
   check(ebay_sales_cache_read($progressFile, $now + 300) === null, 'Incomplete pagination expires after five minutes');
   echo "Shared eBay sales cache validation, isolation, revisions and expiry passed.\n";
