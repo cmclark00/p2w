@@ -47,9 +47,21 @@ try {
   check($updated['fullAt'] === $now && $updated['checkedAt'] === $later, 'Recent checks preserve the ranked search expiry');
   check(count($updated['sales']) === 2, 'New evidence is available to the next register');
   check(ebay_sales_cache_read($file, $now + EBAY_SALES_FULL_SECONDS) === null, 'Periodic ranked refresh becomes due');
+  $progressFile = ebay_sales_cache_file($key, true);
+  $prefix = array_replace($full, ['coverageId' => null, 'pages' => 5,
+    'issues' => [['code' => 'unreadable', 'page' => 2]], 'retriedPages' => [2]]);
+  expect_status(400, fn() => ebay_sales_cache_write($file, $prefix, $now));
+  expect_status(400, fn() => ebay_sales_cache_write($progressFile, array_replace($prefix, ['retriedPages' => [6]]), $now, true));
+  expect_status(200, fn() => ebay_sales_cache_write($progressFile, $prefix, $now, true));
+  $progress = ebay_sales_cache_read($progressFile, $now);
+  check($progress['pages'] === 5 && $progress['issues'] === $prefix['issues'], 'Progress retains the page offset and warnings');
+  expect_status(409, fn() => ebay_sales_cache_write($progressFile, $prefix, $now, true));
+  check(ebay_sales_cache_read($progressFile, $now + 300) === null, 'Incomplete pagination expires after five minutes');
   echo "Shared eBay sales cache validation, isolation, revisions and expiry passed.\n";
 } finally {
-  foreach (glob(data_path('ebay-sales-v1') . '/*') ?: [] as $path) unlink($path);
-  if (is_dir(data_path('ebay-sales-v1'))) rmdir(data_path('ebay-sales-v1'));
+  foreach (['ebay-sales-v1', 'ebay-search-progress-v1'] as $name) {
+    foreach (glob(data_path($name) . '/*') ?: [] as $path) unlink($path);
+    if (is_dir(data_path($name))) rmdir(data_path($name));
+  }
   rmdir($directory);
 }

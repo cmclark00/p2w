@@ -1116,6 +1116,12 @@ switch ("$method $route") {
     require_once __DIR__ . '/ebay-cache-upstream.php';
     ebay_sales_cache_upstream($method, $_GET);
 
+  case 'GET ebay/search-progress':
+  case 'POST ebay/search-progress':
+    require_role('staff');
+    require_once __DIR__ . '/ebay-sales-cache.php';
+    ebay_sales_cache_request($method, $_GET, true);
+
   case 'GET gamestop/stock':
     require_role('staff');
     require_once __DIR__ . '/gamestop-stock.php';

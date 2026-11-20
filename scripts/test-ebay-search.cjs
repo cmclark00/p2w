@@ -234,11 +234,12 @@ const flush = () => new Promise(r => setImmediate(r));
   const eldenCache = async (route, { params, method, body }) => {
     assert.equal(params.id, '3219371');
     assert.equal(params.condition, 'loose');
-    const entry = snapshots.get(params.query);
+    const key = route === 'ebay/search-progress' ? 'progress' : params.query;
+    const entry = snapshots.get(key);
     if (method !== 'POST') return { now, entry, fresh: entry && now - entry.checkedAt < 300 };
     assert.equal(body.revision, entry?.revision ?? null);
     await flush(); // An immediate second scan must see the completed write.
-    snapshots.set(params.query, { ...body, revision: String(now), checkedAt: body.startedAt });
+    snapshots.set(key, { ...body, revision: String(now), checkedAt: body.startedAt, fullAt: body.startedAt });
   };
   const eldenHelper = {
     search: async (q, page) => {
@@ -273,6 +274,41 @@ const flush = () => new Promise(r => setImmediate(r));
     if (status === 'refreshed') assert.ok(repeat.directEbay.result.sales.some(s => s.id === newSale.id));
     now += 320;
   }
+  snapshots.clear(); eldenPages.length = 0;
+  let helperDown = true;
+  const interruptedHelper = { ...eldenHelper, search: async (q, page) => {
+    if (page === 6 && helperDown) {
+      eldenPages.push(page);
+      return { state: 'unavailable', sales: [] };
+    }
+    const value = await eldenHelper.search(q, page);
+    if (page === 2) value.sales = value.sales.slice(4);
+    return value;
+  } };
+  const interrupted = elden();
+  await cachedScan(interrupted, interruptedHelper, eldenCache);
+  assert.equal(interrupted.directEbay.result.sales.length, 596);
+  assert.match(invoke(ctx, 'floorDirectSearchHtml', interrupted), /saved progress through page 5/);
+  assert.equal(snapshots.size, 1, 'Interrupted pagination only writes search progress');
+  assert.deepEqual(Array.from(snapshots.get('progress').issues, issue => issue.code), ['unreadable']);
+  const interruptedStart = now;
+  now += 10;
+  helperDown = false; eldenPages.length = 0;
+  const resumed = elden();
+  await cachedScan(resumed, interruptedHelper, eldenCache);
+  assert.deepEqual(eldenPages, [6, 7], 'A new lookup continues with the failed page');
+  assert.equal(resumed.directEbay.result.sales.length, 828);
+  assert.equal(snapshots.get('[unreadable cards] Elden Ring PS5').startedAt, interruptedStart);
+  assert.match(invoke(ctx, 'floorDirectSearchHtml', resumed), /resumed on page 6/);
+  assert.doesNotMatch(invoke(ctx, 'floorDirectSearchHtml', resumed), /Helper not connected/);
+  const afterRecovery = elden();
+  await cachedScan(afterRecovery, interruptedHelper, eldenCache);
+  assert.equal(afterRecovery.directEbay.result.sharedCache, 'fresh');
+  assert.deepEqual(eldenPages, [6, 7], 'The next lookup uses the completed shared result');
+  snapshots.delete('[unreadable cards] Elden Ring PS5');
+  now += 300; eldenPages.length = 0;
+  await cachedScan(elden(), interruptedHelper, eldenCache);
+  assert.equal(eldenPages[0], 1, 'Expired ranked pagination cannot skip pages');
   const tony={...searchCur(),product:{id:'12916','product-name':'Tony Hawk','console-name':'Playstation','cib-price':1649}}, tonyPages=[];
   await invoke(ctx,'runFloorEbaySearch',tony,()=>{},()=>false,{search:async(q,page)=>{
     tonyPages.push(page);
@@ -508,9 +544,11 @@ const flush = () => new Promise(r => setImmediate(r));
   const pageWindow = { addEventListener: (t, f) => pageListeners.add(f), removeEventListener: (t, f) => pageListeners.delete(f),
     postMessage: data => queueMicrotask(() => { for (const f of [...pageListeners]) f({ data, source: pageWindow, origin: 'https://play2wingames.com' }); }) };
   let oldHelper = false, legacySearch = false;
+  let missNextPing = false;
   const bridge = vm.createContext({ window: pageWindow, location: { origin: 'https://play2wingames.com' }, crypto: require('node:crypto').webcrypto, setTimeout, clearTimeout,
     chrome: { runtime: { sendMessage: m => {
       messages.push(m);
+      if (missNextPing && m.type === 'P2W_EBAY_CAPABILITY') { missNextPing = false; return Promise.resolve(null); }
       if (oldHelper) return Promise.resolve({ available: true, protocol: 2, targeted: 1 });
       if (legacySearch && m.type==='P2W_EBAY_CAPABILITY') return Promise.resolve({available:true,version:'1.1.8',protocol:2,targeted:1,search:1,pagination:1,location:1});
       return new Promise(resolve => { for (const h of listeners) if (h(m, sender, resolve)) return; resolve(null); });
@@ -524,6 +562,9 @@ const flush = () => new Promise(r => setImmediate(r));
   requests.at(-1).resolve({...ready([sold]),page:2});assert.equal((await pageTwo).page,2);
   assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).sales[0].sellerCountry,'United States','Worker preserves observed country');
   const beforeCachedPage=created.length;assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page,2);assert.equal(created.length,beforeCachedPage,'Cache separates pages');
+  missNextPing = true;
+  assert.equal((await pageWindow.P2WEbayHelper.search(query,2)).page, 2, 'One missed capability reply does not interrupt pagination');
+  assert.deepEqual(messages.slice(-3).map(m => m.type), ['P2W_EBAY_CAPABILITY', 'P2W_EBAY_CAPABILITY', 'P2W_EBAY_SEARCH']);
   const fresh=pageWindow.P2WEbayHelper.search(query,2,true), sharedFresh=pageWindow.P2WEbayHelper.search(query,2,true);
   await flush();assert.equal(created.length,beforeCachedPage+1,'Fresh retry bypasses cache but coalesces concurrent requests');
   assert.equal(messages.filter(m=>m.type==='P2W_EBAY_SEARCH').at(-1).refresh,true,'Fresh flag crosses the bridge');

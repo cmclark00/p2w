@@ -4689,6 +4689,7 @@ function floorMergedSales(cur, pool) {
 }
 
 const FLOOR_EBAY_CACHE_ROUTE = 'ebay/sales-cache';
+const FLOOR_EBAY_PROGRESS_ROUTE = 'ebay/search-progress';
 const FLOOR_EBAY_CACHE_MAX_ROWS = 1000;
 function floorEbayPageReady(value, page) {
   return value?.state === 'ready' && Array.isArray(value.sales) && value.page === page && value.sorted === true;
@@ -4747,14 +4748,15 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
   const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
   progress();
   const read = async (product, evidence = {}, seed = null) => {
+    delete state.resumedPages;
     const query = floorEbaySearchQuery(product);
     const params = { id: String(product.id), query, condition };
     // Brackets are stripped from real search queries. Keep readable rows from a
     // scan with skipped cards isolated from complete evidence, including for older clients.
     const reviewParams = { ...params, query: '[unreadable cards] ' + query };
-    const lookup = async key => {
+    const lookup = async (key, route = FLOOR_EBAY_CACHE_ROUTE) => {
       try {
-        const value = await cacheRequest(FLOOR_EBAY_CACHE_ROUTE, { params: key, signal: AbortSignal.timeout(5000) });
+        const value = await cacheRequest(route, { params: key, signal: AbortSignal.timeout(5000) });
         if (Number.isSafeInteger(value?.now) && value.now > 0) return value;
       } catch (_) { /* A cache miss or outage never blocks the ranked search. */ }
       return null;
@@ -4765,7 +4767,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
     if (useCache && (!cleanCache || !reviewCache)) state.cacheNote = 'Shared cache lookup unavailable';
     const needsReview = !!reviewCache?.entry && (!cleanCache?.entry || reviewCache.entry.checkedAt >= cleanCache.entry.checkedAt);
     const cache = needsReview ? reviewCache : cleanCache;
-    const startAt = seed?.searchStartedAt ?? cache?.now ?? reviewCache?.now;
+    let startAt = seed?.searchStartedAt ?? cache?.now ?? reviewCache?.now;
     const save = async (sales, coverageId, more, mode, unreadable = false) => {
       const destination = unreadable ? reviewCache : cleanCache;
       if (!destination || stopped() || sales.length > FLOOR_EBAY_CACHE_MAX_ROWS || startAt == null) return;
@@ -4812,12 +4814,32 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
         }
       }
     }
-    if (seed?.sharedCache) seed = null; // A cached result has no resumable price-ranked page offset.
+    // An interrupted ranked scan has a page offset. A finished shared search
+    // can establish coverage, but cannot supply a ranked pagination cursor.
+    const checkpoint = useCache ? await lookup(params, FLOOR_EBAY_PROGRESS_ROUTE) : null;
+    if (stopped()) return;
+    const saved = checkpoint?.entry;
+    let progressStartedAt = seed?.progressStartedAt ?? checkpoint?.now;
+    if (!seed && !forceRankedSearch && checkpoint?.fresh && saved?.pages >= 1 && saved.pages < 50
+      && Array.isArray(saved.sales) && saved.more === true) {
+      const age = checkpoint.now - saved.fullAt;
+      // Both hosts supply their own clocks. Keep the original scan age when
+      // writing completed evidence to the upstream server.
+      if (age >= 0 && age < 300 && (!entry || entry.checkedAt <= startAt - age)) {
+        seed = { pages: saved.pages, sales: saved.sales, issues: saved.issues, retriedPages: saved.retriedPages,
+          partial: saved.issues.length > 0, more: true };
+        progressStartedAt = saved.fullAt;
+        if (startAt != null) startAt -= age;
+        state.resumedPages = saved.pages;
+      }
+    }
+    if (seed?.sharedCache) seed = null;
     state.phase = 'ranked'; state.page = (seed?.pages || 0) + 1;
     if (useCache && !stopped()) progress();
     const rows = new Map((seed?.sales || []).map(s => [s.id, s])); let partial = !!seed?.partial;
     const result = { state: 'ready', sales: [], pages: 0, issues: [], retriedPages: [], url,
-      ...seed, searchStartedAt: startAt, issues: [...(seed?.issues || [])], retriedPages: [...(seed?.retriedPages || [])] };
+      ...seed, searchStartedAt: startAt, progressStartedAt, issues: [...(seed?.issues || [])], retriedPages: [...(seed?.retriedPages || [])] };
+    if (state.resumedPages) result.resumedPages = state.resumedPages;
     delete result.stoppedAtMatch;
     const validPage = (value, page) => floorEbayPageReady(value, page) && (value.order ?? 'price') === 'price';
     const validSales = floorEbayPageSales;
@@ -4834,7 +4856,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
         delete state.retryPage;
         if (stopped()) return result;
         if (value?.retryUnsupported) {
-          result.issues.push({ code: 'helper' }); value = first;
+          result.issues.push({ code: 'helper', page }); value = first;
         } else {
           result.retriedPages.push(page);
           if (!validPage(value, page) && validPage(first, page)) {
@@ -4854,8 +4876,21 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
         }
       }
       if (!validPage(value, page)) {
+        if (checkpoint && result.pages > 0 && result.more && rows.size > 0 && rows.size <= FLOOR_EBAY_CACHE_MAX_ROWS) {
+          // Save only pages actually read. A failed page and its warning belong
+          // to this attempt, so the next search retries that page.
+          try {
+            await cacheRequest(FLOOR_EBAY_PROGRESS_ROUTE, { method: 'POST', params, signal: AbortSignal.timeout(5000),
+              body: { mode: 'full', startedAt: progressStartedAt, revision: saved?.revision ?? null, more: true,
+                pages: result.pages, sales: result.sales, issues: result.issues.filter(issue => issue.page <= result.pages),
+                retriedPages: [...new Set(result.retriedPages.filter(p => p <= result.pages))] } });
+            result.savedPages = result.pages;
+          } catch (error) {
+            if (error?.status !== 409) state.cacheNote = 'Could not save interrupted search progress';
+          }
+        }
         result.issues.push({ code: value?.state === 'unavailable' ? 'helper' : value?.state === 'ready' ? 'page-unverified' : 'page-failed', page });
-        return { ...result, state: rows.size ? 'ready' : value?.state || 'unknown', partial: true,
+        return { ...result, interruptedAt: page, state: rows.size ? 'ready' : value?.state || 'unknown', partial: true,
           reason: value?.reason || 'The next sold-results page could not be verified. Review or retry the search.' };
       }
       const sales = recoveredSales || validSales(value);
@@ -4951,14 +4986,18 @@ function floorDirectSearchHtml(cur) {
   const r = s.result;
   const warnings = s.loading ? [] : floorSearchReviewWarnings(cur);
   const source = r?.sharedCache === 'fresh' ? 'Shared eBay cache' : r?.sharedCache === 'refreshed' ? 'Shared eBay cache · recent sales checked' : 'Direct eBay';
+  const pageNote = r?.savedPages ? ` · saved progress through page ${r.savedPages}`
+    : r?.resumedPages ? ` · resumed on page ${r.resumedPages + 1}` : '';
   const note = s.loading ? s.retryPage ? `Retrying eBay page ${s.retryPage} once…`
     : s.phase === 'recent' ? 'Checking recently ended eBay listings…'
     : !s.phase && auth.enabled ? 'Checking the shared eBay cache…'
+    : s.resumedPages ? `Reused ${s.resumedPages} ranked pages · searching eBay page ${s.page}…`
     : `Searching eBay sold listings${s.page ? ` · page ${s.page}` : ''}…` : r?.state === 'ready'
-    ? `${source} · ${r.sales.length} sold results${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
+    ? `${source} · ${r.sales.length} sold results${r.pages ? ` · ${r.pages} page${r.pages === 1 ? '' : 's'}` : ''}${pageNote}${r.stoppedAtMatch ? ' · matching sale found' : ''} · includes known shipping${warnings.length ? ' · ' + warnings.map(w => w.label).join(' · ') : ''}`
     : r?.reason || 'Direct eBay search unavailable';
   const retry = !s.loading && r?.state !== 'unavailable' && (r?.sharedCache || r?.state !== 'ready' || warnings.length);
-  return `<p class="small-print muted">${esc(note)}${s.cacheNote ? ' · ' + esc(s.cacheNote) : ''}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${retry ? ` · <button type="button" class="link" data-floor-act="ebay-search">${r?.sharedCache ? 'Run full search' : 'Retry search'}</button>` : ''}</p>`;
+  const interrupted = r?.interruptedAt || s.standard?.result?.interruptedAt;
+  return `<p class="small-print muted">${esc(note)}${s.cacheNote ? ' · ' + esc(s.cacheNote) : ''}${r?.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open search ↗</a>` : ''}${retry ? ` · <button type="button" class="link" data-floor-act="ebay-search">${r?.sharedCache && !interrupted ? 'Run full search' : 'Retry search'}</button>` : ''}</p>`;
 }
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
@@ -6775,7 +6814,8 @@ function onFloorPricerClick(e) {
   }
   if (act === 'ebay-search') {
     if (!floorCur.directEbay?.loading) {
-      floorCur.forceRankedEbaySearch = true;
+      const search = floorCur.directEbay;
+      floorCur.forceRankedEbaySearch = ![search?.result, search?.standard?.result].some(r => r?.interruptedAt);
       floorCur.directEbay = null;
       renderFloorPricer();
     }

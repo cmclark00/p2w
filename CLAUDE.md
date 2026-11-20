@@ -1092,6 +1092,11 @@ The site's **only server-side code**. Everything else is static.
     are the only issue, the readable rows use a separate cache query prefixed
     with `[unreadable cards] ` (never sent to eBay). Repeat scans use the newest
     snapshot and retain Needs review. Older clients only read clean results.
+    If a later ranked page fails, the staff API on GoDaddy keeps the readable
+    prefix in its private ebay-search-progress-v1/ directory for five minutes
+    from scan start. A repeat lookup or Retry search can continue at the failed
+    page, with earlier unreadable-card warnings intact. A completed shared
+    snapshot takes priority. Run full search bypasses the saved page offset.
     A newest-first refresh can retain this warning when it also skips cards.
     A warm scan still runs the pricing filters and targeted original-item checks.
     A stale scan can read up to five newest-first pages through a two-day

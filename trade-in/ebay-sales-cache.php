@@ -19,8 +19,8 @@ function ebay_sales_cache_key(array $params): string {
   return hash('sha256', $id . '|' . $condition . '|' . $query);
 }
 
-function ebay_sales_cache_file(array $params): string {
-  return data_path('ebay-sales-v1') . '/' . ebay_sales_cache_key($params) . '.json';
+function ebay_sales_cache_file(array $params, bool $progress = false): string {
+  return data_path($progress ? 'ebay-search-progress-v1' : 'ebay-sales-v1') . '/' . ebay_sales_cache_key($params) . '.json';
 }
 
 function ebay_sales_cache_body(): string {
@@ -29,8 +29,8 @@ function ebay_sales_cache_body(): string {
   return $raw;
 }
 
-function ebay_sales_cache_request(string $method, array $params): void {
-  $file = ebay_sales_cache_file($params);
+function ebay_sales_cache_request(string $method, array $params, bool $progress = false): void {
+  $file = ebay_sales_cache_file($params, $progress);
   $now = time();
   if ($method === 'GET') {
     $entry = ebay_sales_cache_read($file, $now);
@@ -38,14 +38,15 @@ function ebay_sales_cache_request(string $method, array $params): void {
   }
   $input = json_decode(ebay_sales_cache_body(), true);
   if (!is_array($input)) fail(400, 'Expected a JSON object.');
-  ebay_sales_cache_write($file, $input, $now);
+  ebay_sales_cache_write($file, $input, $now, $progress);
 }
 
 function ebay_sales_cache_read(string $file, int $now): ?array {
   $json = @file_get_contents($file, false, null, 0, EBAY_SALES_MAX_BYTES + 1);
   if ($json === false || strlen($json) > EBAY_SALES_MAX_BYTES) return null;
   $entry = json_decode($json, true);
-  return is_array($entry) && ($entry['fullAt'] ?? 0) > $now - EBAY_SALES_FULL_SECONDS ? $entry : null;
+  $ttl = isset($entry['pages']) ? EBAY_SALES_FRESH_SECONDS : EBAY_SALES_FULL_SECONDS;
+  return is_array($entry) && ($entry['fullAt'] ?? 0) > $now - $ttl ? $entry : null;
 }
 
 function ebay_sales_cache_rows(array $rows): array {
@@ -81,7 +82,27 @@ function ebay_sales_cache_rows(array $rows): array {
   return $sales;
 }
 
-function ebay_sales_cache_write(string $file, array $input, int $now): void {
+function ebay_search_progress_fields(array $input): array {
+  $pages = $input['pages'] ?? null;
+  $issues = $input['issues'] ?? null;
+  $retried = $input['retriedPages'] ?? null;
+  if (!is_int($pages) || $pages < 1 || $pages >= 50 || !is_array($issues) || count($issues) > 150
+    || !is_array($retried) || count($retried) > $pages || empty($input['sales'])) fail(400, 'Invalid ranked search progress.');
+  $warnings = [];
+  foreach ($issues as $issue) {
+    $page = $issue['page'] ?? null;
+    $code = $issue['code'] ?? null;
+    if (!in_array($code, ['unreadable', 'unspecified', 'page-failed', 'page-unverified', 'helper'], true)
+      || !is_int($page) || $page < 1 || $page > $pages) fail(400, 'Invalid ranked page warning.');
+    $warnings[] = ['page' => $page, 'code' => $code];
+  }
+  foreach ($retried as $page) {
+    if (!is_int($page) || $page < 1 || $page > $pages) fail(400, 'Invalid ranked page retry.');
+  }
+  return ['pages' => $pages, 'issues' => $warnings, 'retriedPages' => array_values($retried)];
+}
+
+function ebay_sales_cache_write(string $file, array $input, int $now, bool $progress = false): void {
   $startedAt = $input['startedAt'] ?? null;
   $mode = $input['mode'] ?? '';
   $revision = $input['revision'] ?? null;
@@ -91,10 +112,12 @@ function ebay_sales_cache_write(string $file, array $input, int $now): void {
     || !in_array($mode, ['full', 'recent'], true) || !is_array($input['sales'] ?? null)
     || ($revision !== null && (!is_string($revision) || !preg_match('/^[a-f0-9]{24}$/D', $revision)))
     || ($coverageId !== null && (!is_string($coverageId) || !preg_match('/^\d{9,15}$/D', $coverageId)))
-    || !is_bool($more) || ($more && $coverageId === null)) {
+    || !is_bool($more) || ($progress ? ($mode !== 'full' || !$more || $coverageId !== null
+      || $startedAt <= $now - EBAY_SALES_FRESH_SECONDS) : ($more && $coverageId === null))) {
     fail(400, 'Invalid eBay sales cache update.');
   }
   $sales = ebay_sales_cache_rows($input['sales']);
+  $progressFields = $progress ? ebay_search_progress_fields($input) : [];
   if ($coverageId !== null && ($sales[$coverageId]['state'] ?? null) !== 'sold') fail(400, 'Missing eBay sale used for search coverage.');
 
   $dir = dirname($file);
@@ -117,7 +140,7 @@ function ebay_sales_cache_write(string $file, array $input, int $now): void {
       'checkedAt' => $startedAt,
       'fullAt' => $mode === 'full' ? $startedAt : $previous['fullAt'],
       'coverageId' => $coverageId, 'more' => $more, 'sales' => array_values($sales),
-    ];
+    ] + $progressFields;
     $json = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($json === false || strlen($json) > EBAY_SALES_MAX_BYTES) fail(413, 'Shared eBay cache entry is too large.');
     $temp = $file . '.tmp';
@@ -132,7 +155,7 @@ function ebay_sales_cache_write(string $file, array $input, int $now): void {
       foreach ($files as $path) {
         if ($path === $file) continue;
         $mtime = (int)@filemtime($path);
-        if ($mtime < $now - EBAY_SALES_FULL_SECONDS) @unlink($path);
+        if ($mtime < $now - ($progress ? EBAY_SALES_FRESH_SECONDS : EBAY_SALES_FULL_SECONDS)) @unlink($path);
         else $times[$path] = $mtime;
       }
       asort($times);

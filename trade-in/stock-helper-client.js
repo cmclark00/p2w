@@ -35,15 +35,21 @@ function ebayHelperRequest(type, url, mode = 'manual', query, page = 1, refresh 
     window.postMessage({ type, nonce, url, query, page, refresh, order, protocol: 2, mode }, location.origin);
   });
 }
+async function ebaySearchCapabilities() {
+  const first = await ebayHelperRequest('P2W_EBAY_PING');
+  // A missed connection check in the middle of pagination is recoverable.
+  // A responding older helper still receives its normal version check.
+  return first?.available ? first : ebayHelperRequest('P2W_EBAY_PING');
+}
 window.P2WEbayHelper = {
   async search(query, page = 1, refresh = false) {
-    const h = await ebayHelperRequest('P2W_EBAY_PING');
+    const h = await ebaySearchCapabilities();
     if (!h?.available || h.protocol !== 2 || h.search !== 1 || h.pagination !== 1 || h.location !== 1) return { state: 'unavailable', sales: [], reason: 'Direct sold search needs helper 1.1.8. Download the update above.' };
     if (refresh && h.searchRetry !== 1) return { state: 'unavailable', retryUnsupported: true, sales: [], reason: 'Fresh search retries need helper 1.1.9. Download the update above.' };
     return ebayHelperRequest('P2W_EBAY_SEARCH_REQUEST', undefined, 'search', query, page, refresh);
   },
   async searchRecent(query, page = 1) {
-    const h = await ebayHelperRequest('P2W_EBAY_PING');
+    const h = await ebaySearchCapabilities();
     if (!h?.available || h.protocol !== 2 || h.recentSearch !== 1) return { state: 'unavailable' };
     return ebayHelperRequest('P2W_EBAY_SEARCH_REQUEST', undefined, 'search', query, page, true, 'recent');
   },
