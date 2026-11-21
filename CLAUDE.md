@@ -553,12 +553,13 @@ The site's **only server-side code**. Everything else is static.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
   - Interactive ordinary games with a positive selected-condition PriceCharting
-    market value **below $15** use quick pricing from the **highest eligible
+    market average **below $15** use quick pricing from the **highest listed
     selected-condition PriceCharting sale**, with existing rounding/deductions.
-    One selected-page `pc/sales` request supplies all conditions; title, packaging,
-    region, age and outlier filters still apply. No sibling-page discovery,
+    One selected-page `pc/sales` request supplies all conditions. Quick mode trusts
+    PriceCharting's condition lists: no title, packaging, region, age or outlier
+    filtering and no individual sale verification. No sibling-page discovery,
     Amazon, direct eBay/helper research or GameStop floor runs in quick mode.
-    Until sales load, Add is disabled. With no eligible sale (or a failed lookup),
+    Until sales load, Add is disabled. With no sale price (or a failed lookup),
     the condition average is an explicitly labeled fallback. `quickSales` is
     separate from full-research state so late responses cannot overwrite it.
     Exactly $15, missing values, hardware, toys-to-life, rhythm titles, standard
