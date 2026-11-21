@@ -1835,6 +1835,39 @@ test('preorders, multi-game lots and unknown named editions are held for review'
   assert.equal(invoke('floorListingMismatch', 'Example Game Zelda 40th Edition PS4', product), null);
 });
 
+test('named content packs cannot price standard copies across quick, full and Amazon sources', () => {
+  const product = { ...item, 'product-name': 'The Evil Within', 'console-name': 'Xbox One', 'cib-price': 809 };
+  const packTitle = 'The Evil Within (Xbox One, 2014) with Fighting Chance Pack Lenticular Slipcover';
+  for (const title of [packTitle, 'The Evil Within Xbox One Fighting Chance Pack',
+    'The Evil Within Xbox One with Survival Pack', 'The Evil Within Xbox One includes Bonus Pack',
+    'The Evil Within Xbox One with Last Chance Content Pack']) {
+    assert.equal(invoke('floorListingMismatch', title, product), 'Different named content pack', title);
+    assert.equal(invoke('floorAmazonMismatch', cur(product, { amazon: { found: true, title } })), 'Different named content pack', title);
+  }
+  const selected = { ...product, 'product-name': 'The Evil Within [The Fighting Chance Pack]' };
+  assert.equal(invoke('floorListingMismatch', packTitle, selected), null);
+  assert.ok(invoke('floorListingMismatch', 'The Evil Within Xbox One CIB', selected));
+  assert.ok(invoke('floorListingMismatch', 'The Evil Within Xbox One with Survival Pack', selected));
+  for (const title of ['The Evil Within Xbox One Complete with Manual and Original Pack-in Inserts',
+    'The Evil Within Xbox One CIB with Lenticular Slipcover', 'The Evil Within Xbox One with original poster']) {
+    assert.equal(invoke('floorListingMismatch', title, product), null, title);
+  }
+  const party = { ...item, 'product-name': 'The Jackbox Party Pack', 'console-name': 'Xbox One' };
+  assert.equal(invoke('floorListingMismatch', 'The Jackbox Party Pack Xbox One CIB', party), null);
+  for (const [name, title] of [['Example Game', 'Example Game PS4 with Survival Pack'],
+    ['Another Game', 'Another Game (PS4, 2014) Ripper Pack'],
+    ['Third Game', 'Third Game PS4 includes Last Chance Content Pack']]) {
+    assert.equal(invoke('floorListingMismatch', title, { ...item, 'product-name': name }), 'Different named content pack');
+  }
+  assert.equal(invoke('floorSaleGroup', { mismatch: 'Different named content pack' }), 'variant');
+  const sales = { cib: [{ title: packTitle, price: 1529, date: '2026-11-01' },
+    { title: 'The Evil Within Xbox One CIB', price: 1299, date: '2026-11-02' }] };
+  const quick = invoke('floorQuickBasis', cur(product, { quickSales: { sales } }));
+  assert.equal(quick.basis, 1299);
+  const full = invoke('floorResult', cur(product, { sales }));
+  assert.equal(full.b.basis, 1299);
+});
+
 test('normal naming, selected extras and genuine collections remain comparable', () => {
   for (const [name, system, title] of [
     ['Example Game', 'Playstation 4', 'Example Game Standard Edition PS4'],

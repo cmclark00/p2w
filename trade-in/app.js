@@ -5421,6 +5421,21 @@ const EDITION_RES = [/\bsteel[ -]?book\b/i, /(?<!\bnot )\b(goty|g\.o\.t\.y\.?|ga
   /\bplatinum hits\b/i, /\bbonus content\b/i, /\bnot for resale\b/i,
   /\b(?:collector'?s|limited|special|deluxe|gold|ultimate) (?:edition|version)\b/i];
 const otherEdition = (title, name) => EDITION_RES.some((re) => re.test(title || '') && !re.test(name));
+// Named content packs are edition evidence even after platform/year/"with"
+// wording. Do not treat ordinary pack-in paper or packaging as an edition.
+function floorNamedContentPackMismatch(title, product) {
+  if (floorToyFamily(product) || floorIsHardware(product)) return null;
+  const name = product?.['product-name'] || '';
+  const selectedWords = new Set(norm(floorIdentityPlatformTitle(name)).split(' '));
+  const text = norm(floorIdentityPlatformTitle(title));
+  for (const match of text.matchAll(/\b((?:[a-z0-9]+ ){1,6})packs?\b(?! in\b| of\b)/g)) {
+    const qualifiers = match[1].trim().split(' ').filter(word => !selectedWords.has(word)
+      && !FLOOR_TITLE_DETAILS.test(word)
+      && !/^(?:the|a|an|and|plus|comes|include|included|its|it|one|360|series|s|x|slipcover|packaging|retail|paper|safety)$/.test(word));
+    if (qualifiers.length) return 'Different named content pack';
+  }
+  return null;
+}
 // A barcode or PriceCharting category is not enough: inspect the actual listing title too.
 // Language words need variant context so "French Revolution" is not mistaken for French packaging.
 const FLOOR_LANGUAGES = [
@@ -6020,6 +6035,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (floorTitleIdentityMismatch(title, product) === 'Listing does not confirm the selected game or product') return 'Listing does not confirm the selected game or product';
   const regionMismatch = floorRegionMismatch(title, product, sourceConsole);
   if (regionMismatch) return regionMismatch;
+  const contentPackMismatch = floorNamedContentPackMismatch(title, product);
+  if (contentPackMismatch) return contentPackMismatch;
   // Marketing "limited edition" on an already verified special figure is not
   // a separate game edition. Other edition names still require confirmation.
   const packInTitle = floorEditionContentsTitle(title, product);
@@ -6040,7 +6057,7 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
     .replace(/\b(?:from|out of) (?:my|our) collection\b|\b(?:add|addition) to (?:your|any|a) collection\b/g, '');
   if (!floorToyFamily(product) && !floorIsHardware(product)
     && /\bcollection\b/.test(collectionTitle) && !/\bcollection\b/i.test(name)) return 'Different collection or collector release';
-  const selectedEdition = name.match(/\[[^\]]*\b(?:edition|collection)\b[^\]]*\]|\([^)]*\b(?:edition|collection)\b[^)]*\)/gi) || [];
+  const selectedEdition = name.match(/\[[^\]]*\b(?:edition|collection|pack)\b[^\]]*\]|\([^)]*\b(?:edition|collection|pack)\b[^)]*\)/gi) || [];
   // "Edition" is a catalog label, not distinguishing evidence. A seller's
   // "Steelbook" confirms [Steelbook Edition]; retain every actual qualifier.
   const listedEditionWords = floorTitleWords(title);
@@ -6518,7 +6535,7 @@ function floorSaleGroup(s) {
   if (/language|region|import/i.test(reason)) return 'foreign';
   if (/platform/i.test(reason)) return 'platform';
   if (/bundle|multiple-game|extra item/i.test(reason)) return 'bundle';
-  if (/edition|reprint|variant|character/i.test(reason)) return 'variant';
+  if (/edition|reprint|variant|character|content pack/i.test(reason)) return 'variant';
   if (/game|sequel|title extension|product/i.test(reason)) return 'game';
   if (/condition|packaging|box|case|manual/i.test(reason)) return 'condition';
   if (floorEbayExcluded(s.verification)) return 'verification';

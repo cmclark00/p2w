@@ -727,6 +727,10 @@ The site's **only server-side code**. Everything else is static.
     Standard/platform editions and selected extras remain eligible; named
     collections can advertise their included games. These filters run before
     source selection and do not modify premium settings or rounding rules.
+    Named content packs (e.g. Fighting Chance Pack) are different editions even
+    after platform/year or "with" wording. They cannot price the standard copy
+    in quick mode, full research or Amazon comparisons. Selected pack editions
+    require their named qualifiers; ordinary pack-in inserts and packaging remain.
     Numbered sequel pairs anchored to the selected game series (such as
     "Kingdom Hearts 1 & 2" or "God of War I + II") are multi-game bundles
     for both eBay and Amazon. Platform compatibility, disc numbers and a
