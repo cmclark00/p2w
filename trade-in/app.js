@@ -5563,6 +5563,17 @@ function floorNamedGameBundle(title, product) {
   if (at < 0) return false;
   const contents = /^(?:soundtracks?|music|cds?|slipcovers?|stickers?|art|books?|steelbook|postcards?|patches|pins?|inlays?|inlay|artwork|cover|covers)$/;
   const titleWord = word => !!word && !FLOOR_TITLE_DETAILS.test(word) && !contents.test(word) && !/^\d+$/.test(word);
+  // Sellers often omit the franchise on the second game: "Dragon Ball
+  // Xenoverse and Xenoverse 2". Match a repeated series suffix followed by a
+  // different sequel number, not quantities attached to manuals or discs.
+  const seriesWords = core.slice();
+  const selectedNumber = /^\d+$/.test(seriesWords.at(-1)) ? seriesWords.pop() : '1';
+  if (parts.some((words, index) => index !== at && seriesWords.some((_, start) => {
+    const suffix = seriesWords.slice(start);
+    return suffix.some(titleWord) && suffix.every((word, i) => words[i] === word)
+      && /^[1-9]\d?$/.test(words[suffix.length] || '')
+      && words[suffix.length] !== selectedNumber;
+  }))) return true;
   // A separate franchise/base title can be a second game even though all its
   // words occur in the selected sequel: "Doom & Doom Eternal", in either order.
   // Require a delimited title segment, not a shared word in ordinary metadata.

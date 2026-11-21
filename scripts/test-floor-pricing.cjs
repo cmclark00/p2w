@@ -1696,6 +1696,39 @@ test('game sets and a separate base game cannot price a single subtitled sequel'
   assert.equal(invoke('floorResult',input).r.price,3000,'normal rounding and premiums stay intact');
 });
 
+test('abbreviated sequel bundles cannot price an unnumbered first game', () => {
+  const product = {...item, 'product-name':'Dragon Ball Xenoverse', 'console-name':'Xbox One', 'cib-price':888};
+  const titles = [
+    'Dragon Ball Xenoverse And Xenoverse 2 Microsoft Xbox One 2013 Bandai Namco Games',
+    'Dragon Ball Xenoverse & Xenoverse II Xbox One CIB',
+    'Xenoverse 2 and Dragon Ball Xenoverse Xbox One CIB',
+    'Dragon Ball Xenoverse + Dragon Ball Xenoverse 2 Xbox One',
+  ];
+  for (const title of titles) {
+    assert.match(invoke('floorListingMismatch',title,product),/^Multiple-game/,title);
+    assert.match(invoke('floorAmazonMismatch',{product,condition:'cib',amazon:{found:true,title}}),/^Multiple-game/,title);
+  }
+  const single = 'Dragon Ball XenoVerse (Microsoft Xbox One, 2015) FREE SHIPPING';
+  for (const title of [single, 'Dragon Ball Xenoverse Xbox One Complete Disc + Case + Manual',
+    'Dragon Ball Xenoverse Xbox One CIB with 2 inserts']) {
+    assert.equal(invoke('floorListingMismatch',title,product),null,title);
+  }
+  assert.equal(invoke('floorNamedGameBundle','Dragon Ball Xenoverse 2 & Xenoverse II Xbox One',
+    {...product,'product-name':'Dragon Ball Xenoverse 2'}),false,'same sequel number is not a bundle');
+  assert.equal(invoke('floorNamedGameBundle','Dragon Ball Xenoverse and Xenoverse 2 Collection Xbox One',
+    {...product,'product-name':'Dragon Ball Xenoverse Collection'}),false,'selected collections retain their games');
+  assert.equal(invoke('floorNamedGameBundle','Star Wars Battlefront and Battlefront II Xbox One',
+    {...product,'product-name':'Star Wars Battlefront'}),true,'general abbreviated-series rule');
+  const input=cur(product,{sales:{cib:[{title:titles[0],price:1879},{title:single,price:1424}]}});
+  assert.equal(invoke('floorAutoSale',invoke('floorSales',input)).sale.price,1424,'PriceCharting skips the bundle');
+  input.sales.cib=[];
+  input.directEbay={result:{state:'ready',sales:[titles[0],single].map((title,i)=>({
+    id:String(123456789080+i),title,price:i ? 1424 : 999,shipping:i ? 0 : 880,state:'sold',
+    conditionText:'Pre-Owned',sellerCountry:'United States',locationSource:'ebay-located-in',
+  }))}};
+  assert.equal(invoke('floorAutoSale',invoke('floorSales',input)).sale.price,1424,'verified bundle cannot win or stop search');
+});
+
 test('two-digit and repeated-series bundles are excluded before selecting a price', () => {
   const p={...item,'product-name':'Farming Simulator 22','console-name':'Xbox Series X'};
   for(const title of ['Farming Simulator 19 And 22 Xbox Series X W/ Case & Game',
