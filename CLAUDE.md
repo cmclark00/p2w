@@ -1079,6 +1079,10 @@ The site's **only server-side code**. Everything else is static.
     in search; the original-item check takes precedence over search evidence,
     including ended, offer, price, identity and unreadable results. Conditions need
     title/grade evidence (New Other is not sealed; opened figures remain loose).
+    eBay refurbished grades (Certified, Excellent, Very Good, Good, Seller and
+    Manufacturer refurbished) are used evidence in both search merging and
+    original-item verification. They never qualify as sealed/New or bypass
+    packaging, identity, bundle, outlier or sold-price verification checks.
     Owner clarification Oct. 27: matching used games, including explicit loose/disc-only
     or unspecified packaging, may support a higher CIB price. The reverse remains
     disallowed; sealed, broken, empty-case, bundle and identity exclusions remain.

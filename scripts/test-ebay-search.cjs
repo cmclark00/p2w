@@ -32,6 +32,10 @@ const doc = { querySelector: selector => selector === '#srp-results-heading' ? e
   querySelectorAll: selector => selector === '#srp-river-results li.s-card' ? [row] : [], defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) } };
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].price, 4000);
 assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].sellerCountry,'United States');
+card.condition = 'Very Good - Refurbished';
+assert.equal(invoke(reader, 'readEbaySearch', doc, href, query).sales[0].conditionText, card.condition,
+  'Existing helper preserves the refurbished grade observed on Urban Chaos');
+card.condition = 'New (Other)';
 for (const url of [href.replace('LH_Sold=1', 'LH_Sold=0'), 'https://signin.ebay.com/', href.replace('_nkw=', '_wrong=')])
   assert.equal(invoke(reader, 'readEbaySearch', doc, url, query).state, 'unknown');
 assert.equal(invoke(reader,'readEbaySearch',doc,href.replace('_sop=16','_sop=13'),query).state,'unknown','Only highest-first pages can justify stopping early');
@@ -54,6 +58,35 @@ const sold = parse(), ready = rows => ({ state: 'ready', sales: rows, checkedAt:
 const base = () => ({ product, condition: 'cib', sales: { cib: [{ ...sold, price: 2500, source: undefined, state: undefined }] }, typed: null, pick: null, amazon: { found: false }, directEbay: { result: ready([sold]) } });
 const result = c => invoke(ctx, 'floorResult', c);
 const rows = c => invoke(ctx, 'floorSales', c);
+// Urban Chaos: a matching $99.88 CIB sale was lost because eBay labels it refurbished.
+const urbanProduct = { id: 'urban-chaos', 'product-name': 'Urban Chaos Riot Response', 'console-name': 'Playstation 2', 'cib-price': 4400, 'loose-price': 3000 };
+const refurbishedSale = parse({ title: 'Urban Chaos Riot Response PS2 Complete CIB', price: '$99.88',
+  condition: 'Very Good - Refurbished', shipping: 'Free delivery', sold: 'Sold Oct 6, 2026', details: 'Buy It Now' });
+const urban = () => ({ ...base(), product: urbanProduct, sales: { cib: [], loose: [], new: [] }, directEbay: { result: ready([refurbishedSale]) } });
+for (const grade of ['Very Good - Refurbished', 'Excellent - Refurbished', 'Good - Refurbished', 'Certified Refurbished',
+  'Certified - Refurbished', 'Seller refurbished', 'Manufacturer refurbished', 'Refurbished', 'Very Good – Refurbished']) {
+  const c = urban(); c.directEbay.result.sales = [{ ...refurbishedSale, conditionText: grade }];
+  const sale = rows(c)[0];
+  assert.equal(sale.odd, false, grade + ': complete refurbished copy remains eligible for CIB');
+  assert.equal(sale.conditionUnknown, false, grade);
+  assert.equal(sale.verification.state, 'search', 'Search card is not original-item verification');
+  assert.equal(invoke(ctx, 'floorEbayCandidates', c, 2)[0].key, refurbishedSale.id, grade + ': still requires original-item check');
+  const checked = invoke(ctx, 'floorEbayResult', sale, urbanProduct,
+    { id: sale.id, title: sale.title, state: 'sold', price: 9988, conditionText: grade }, 'cib');
+  assert.equal(checked.state, 'sold', grade + ': original-item verifier agrees with search condition handling');
+  c.ebayChecks = { results: { [sale.id]: checked } };
+  assert.equal(result(c).r.price, 10000, 'Verified $99.88 CIB sale rounds to $100 using existing rules');
+  c.condition = 'loose'; assert.equal(rows(c).length, 0, 'Refurbished CIB cannot contaminate Loose');
+  c.condition = 'new'; assert.equal(rows(c).length, 0, 'Refurbished cannot contaminate sealed/New');
+  assert.equal(invoke(ctx, 'floorEbayResult', sale, urbanProduct,
+    { id: sale.id, title: sale.title, state: 'sold', price: 9988, conditionText: grade }, 'new').state, 'mismatch');
+}
+for (const grade of ['For parts or not working', 'For parts - Refurbished', 'Unknown', 'Not refurbished'])
+  assert.equal(invoke(ctx, 'floorEbayUsedCondition', grade), false, grade);
+for (const state of ['ended', 'offer']) {
+  const c = urban(); c.ebayChecks = { results: { [refurbishedSale.id]: { state, confirmedUnsold: true } } };
+  assert.equal(rows(c)[0].odd, true, 'Refurbished does not override an original-item ' + state + ' result');
+}
 assert.equal(rows(base()).length, 1, 'Same item dedupes across PriceCharting and eBay');
 assert.equal(result(base()).b.basis, 4612, 'Recovered sale includes known shipping exactly once');
 assert.equal(result(base()).r.price, 4500, 'Total follows unchanged rounding');

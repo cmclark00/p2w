@@ -4672,10 +4672,16 @@ function floorEbaySearchQuery(product) {
   return `${product['product-name'] || ''} ${system}`.replace(/[\[\]():]/g, ' ')
     .replace(/\bedition\b/gi, '').replace(/\s+/g, ' ').trim().slice(0, 180);
 }
+function floorEbayUsedCondition(value) {
+  // Refurbished grades describe used merchandise, not factory-sealed stock.
+  // Packaging still comes from the listing title and existing condition checks.
+  const grade = String(value || '').trim().replace(/[\u2010-\u2015]/g, '-').replace(/\s+/g, ' ');
+  return /^(?:Pre-Owned|Used|New \(Other\)|Open box|Refurbished|(?:Certified|Excellent|Very Good|Good|Seller|Manufacturer)(?:\s*-\s*|\s+)Refurbished)$/i.test(grade);
+}
 function floorDirectCondition(sale, product) {
   const grade = sale.conditionText || '', title = sale.title || '';
   if (/^(?:Brand New|New)$/i.test(grade)) return 'new';
-  if (!/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(grade)) return null;
+  if (!floorEbayUsedCondition(grade)) return null;
   if (floorToyFamily(product)) return floorFigureSaleCondition(sale, 'loose');
   if (floorIsHardware(product) ? /\b(?:loose|(?:disc|disk|cart|cartridge) only|no (?:case|box|manual))\b/i.test(title)
     : !floorLooseConditionMismatch(title, 'loose', product)) return 'loose';
@@ -4699,10 +4705,10 @@ function floorMergedSales(cur, pool) {
     // CIB can use a higher-priced used copy even when loose or packaging is
     // unspecified. This never admits sealed, broken, accessory-only or wrong-game evidence.
     const cibUsedEvidence = cur.condition === 'cib' && !floorToyFamily(cur.product) && !floorIsHardware(cur.product)
-      && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText || '') && condition !== 'new';
+      && floorEbayUsedCondition(s.conditionText) && condition !== 'new';
     // CIB retains its higher-used-sale policy. A PC Loose category cannot
     // establish missing packaging when the actual listing title is ambiguous.
-    if (!condition && previous && cur.condition === 'cib' && /^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(s.conditionText)
+    if (!condition && previous && cur.condition === 'cib' && floorEbayUsedCondition(s.conditionText)
       && !floorSaleListingMismatch(previous, cur.product) && !floorOdd(previous, cur.condition, rhythmKind(cur.product['product-name']), cur.product)) condition = cur.condition;
     merged.delete(s.id); // The same eBay listing must not count twice or in the wrong condition.
     if (condition && condition !== cur.condition && !cibUsedEvidence) continue;
@@ -5031,7 +5037,7 @@ function floorEbayResult(sale, product, result, condition) {
   if (!floorAllowsOverseasSellers(product) && floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
   if (result.conditionText) {
     const brandNew = /^(Brand New|New)$/i.test(result.conditionText);
-    if (condition === 'new' ? !brandNew : brandNew || !/^(?:Pre-Owned|Used|New \(Other\)|Open box)$/i.test(result.conditionText)) return { state: 'mismatch' };
+    if (condition === 'new' ? !brandNew : brandNew || !floorEbayUsedCondition(result.conditionText)) return { state: 'mismatch' };
   } else if (condition === 'new' && !SEALED_RE.test(result.title)) return { state: 'unknown' };
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
