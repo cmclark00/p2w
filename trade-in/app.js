@@ -4112,7 +4112,17 @@ function floorQuickPricing(cur) {
 
 function startFloorResearch() {
   const cur = floorCur;
-  if (!cur || floorQuickPricing(cur)) return;
+  if (!cur) return;
+  if (floorQuickPricing(cur)) {
+    if (!cur.quickSales) {
+      cur.quickSales = { loading: true };
+      void fetchFloorQuickSales(cur.product).then(data => {
+        cur.quickSales = data;
+        if (floorCur === cur) renderFloorPricer();
+      });
+    }
+    return;
+  }
   const product = cur.product;
   if (!cur.salesRequested) { cur.salesRequested = true; void loadFloorSales(product); }
   if (cur.gamestopUrl && !cur.gamestopStock) void loadFloorGameStopStock(cur);
@@ -5097,12 +5107,41 @@ function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
   const gap = amz > 0 && b.sale.price - amz >= 1000 && b.sale.price >= amz * 1.3;
   return { target, holder: standard ? cur.standardGame : cur, sale: b.sale, risky: stale || gap };
 }
+// Quick mode reads only the selected PriceCharting page, not sibling catalogs,
+// Amazon or helper tabs. Keep its snapshot separate from any full research so
+// switching conditions or a late response cannot contaminate either lookup.
+async function fetchFloorQuickSales(product) {
+  try {
+    if (!/^\d+$/.test(String(product.id))) throw new Error('Demo mode: PriceCharting sales unavailable.');
+    const data = await pcReadRequest('pc/sales', { id: String(product.id) });
+    if (!data?.sales || !['loose', 'cib', 'new'].every(c => Array.isArray(data.sales[c]))) {
+      throw new Error('PriceCharting sales response incomplete.');
+    }
+    return { sales: Object.fromEntries(Object.entries(data.sales).map(([condition, rows]) => [condition,
+      rows.map(s => ({ ...s, sourceCondition: condition, sourcePcId: String(product.id),
+        sourcePcName: product['product-name'], sourcePcConsole: product['console-name'] }))])) };
+  } catch (err) { return { error: err.message }; }
+}
+function floorQuickSales(cur) {
+  return floorSales({ ...cur, sales: cur.quickSales?.sales, salesLoading: false,
+    salesError: cur.quickSales?.error, directEbay: null, ebayChecks: null });
+}
+function floorQuickBasis(cur) {
+  const checks = ['Quick pricing: highest eligible sale on the selected PriceCharting page. Amazon, direct eBay searches and individual sale verification are skipped. Use Research this item for full checks.'];
+  if (cur.typed != null) return { basis: cur.typed, from: 'typed', quick: true, checks };
+  if (!cur.quickSales || cur.quickSales.loading) return { basis: null, quick: true, waiting: true, checks };
+  const sales = floorQuickSales(cur);
+  const sale = sales.find(s => !s.odd && !s.outlier && Number.isFinite(s.price) && s.price > 0);
+  const excluded = sales.filter(s => s.odd || s.outlier).length;
+  if (excluded) checks.push(`${excluded} PriceCharting listings excluded by matching, condition, age or outlier checks.`);
+  if (sale) return { basis: sale.price, from: 'pcsale', sale, quick: true, checks };
+  checks.push(cur.quickSales.error ? `PriceCharting sales check failed: ${cur.quickSales.error}. Using the condition average as fallback; research before labeling.`
+    : 'No eligible PriceCharting sale found for this condition. Using the condition average as fallback.');
+  return { basis: Number(cur.product[PC_FIELDS.market[cur.condition]]), from: 'pricecharting', quick: true,
+    quickFallback: true, checks };
+}
 function floorBasis(cur = floorCur) {
-  if (floorQuickPricing(cur)) return {
-    basis: cur.typed != null ? cur.typed : Number(cur.product[PC_FIELDS.market[cur.condition]]),
-    from: cur.typed != null ? 'typed' : 'pricecharting', quick: true,
-    checks: ['Quick pricing: selected-condition PriceCharting value is below $15. Marketplace listings and GameStop stock have not been researched. Use Research this item for full checks.'],
-  };
+  if (floorQuickPricing(cur)) return floorQuickBasis(cur);
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   if (b.from === 'msrp') return b;
   const state = cur.targetedEbay;
@@ -6588,7 +6627,7 @@ function renderFloorPricer() {
   const tier = floorTier(p['console-name']);
   const links = floorLinks(p, cur.condition);
   const { b, r: result, shitbox, premium, hw, toy, toyGroup } = floorResult(cur);
-  const estimate = b.waiting ? floorEstimate(cur) : null;
+  const estimate = b.waiting && !quick ? floorEstimate(cur) : null;
   const rhythm = rhythmKind(p['product-name']);
   const belowGs = !quick && !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const conditions = Object.entries(GAME_CONDITIONS).filter(([c]) => !toy || c !== 'cib');
@@ -6624,7 +6663,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${quick ? 'PriceCharting estimate' : b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${quick ? b.waiting ? 'Checking PriceCharting' : b.quickFallback ? 'PriceCharting fallback' : 'Quick price' : b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -6680,7 +6719,7 @@ function renderFloorPricer() {
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
-        ${quick ? '<p class="muted">Quick price from PriceCharting. Use <strong>Research this item</strong> above to check sold listings, Amazon and GameStop.</p>' : `
+        ${quick ? `<p class="muted">${b.quickFallback ? 'PriceCharting average fallback — no eligible sale available.' : b.sale ? `Highest eligible PriceCharting sale: ${money(b.sale.price)}${b.sale.url ? ` · <a href="${esc(b.sale.url)}" target="_blank" rel="noopener noreferrer">${esc(b.sale.title)}</a>` : ''}.` : b.waiting ? 'Loading PriceCharting sales…' : 'Quick pricing.'} Use <strong>Research this item</strong> above for full marketplace checks.</p>` : `
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
         ${floorDirectSearchHtml(cur)}
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : cur.targetedEbay?.unavailable ? `${checkSelected}Individual sale verification unavailable. <button type="button" class="link" data-floor-act="ebay-resume">Retry sale checks</button> · Check the helper connection; search results alone are not verified sales.` : `${checkSelected}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
@@ -6708,7 +6747,7 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
-            <li>Ordinary games below $15 in the selected PriceCharting condition use quick pricing. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
+            <li>Ordinary games with a PriceCharting average below $15 use the highest eligible sale on that condition's PriceCharting page for quick pricing, with the average only as fallback when no eligible sale is available. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
             <li>Researched baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon above $502 ($500 + $2 buffer): use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
@@ -6810,7 +6849,7 @@ const floorBasisInfo = (b) => ({
   basis: b.basis, from: b.from,
   ...(b.quick ? { quickPricing: true } : {}),
   ...(b.cibReference ? { cibReference: b.cibReference } : {}),
-  saleDate: b.from === 'sale' ? b.sale?.date || '' : '',
+  saleDate: ['sale', 'pcsale'].includes(b.from) ? b.sale?.date || '' : '',
   reviewNotes: b.checks || [],
   ...(b.from === 'msrp' ? { msrp: b.msrp, msrpUrl: b.msrpUrl } : {}),
 });
@@ -6924,7 +6963,7 @@ function onFloorPricerChange(e) {
 
 /* ---------------------------------------------------------------- the list */
 
-const FROM_LABELS = { msrp: 'MSRP minus $5', standard: 'Standard-game baseline', sale: 'eBay sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
+const FROM_LABELS = { msrp: 'MSRP minus $5', standard: 'Standard-game baseline', sale: 'eBay sale', pcsale: 'PriceCharting sale', toyaverage: 'PriceCharting market average', pricecharting: 'PriceCharting', retailsell: 'PriceCharting retail sell', gamestop: 'GameStop', amazon: 'Amazon', amazonMid: 'Toward Amazon', ebay: 'eBay', typed: 'Typed' };
 
 // A re-check's suggestion that differs from the list price (it.recheck = { price, basis, from, saleDate, at } or { error }).
 const recheckChanged = (it) => !!globalThis.P2WDeadGames && !deadGameHeld(it.name, it.platform)
@@ -6988,7 +7027,9 @@ async function recheckFloorPrices() {
       const condition = floorCondition(product, it.condition);
       const cur = { product, condition, quickPricingEnabled: !!it.quickPricing,
         manualMissing: it.manualMissing, toyGroup: it.toyGroup, pick: null, typed: null };
-      if (!floorQuickPricing(cur)) {
+      if (floorQuickPricing(cur)) {
+        cur.quickSales = await fetchFloorQuickSales(product);
+      } else {
         Object.assign(cur, await fetchFloorProductSales(product));
         if (amazonSet) cur.amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
         cur.gamestopStock = await fetchFloorGameStopStock(product, cur.gamestopUrl);

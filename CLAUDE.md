@@ -553,15 +553,23 @@ The site's **only server-side code**. Everything else is static.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
   - Interactive ordinary games with a positive selected-condition PriceCharting
-    market value **below $15** use quick pricing from that value, with existing
-    rounding/deductions and no automatic marketplace research or GameStop floor.
+    market value **below $15** use quick pricing from the **highest eligible
+    selected-condition PriceCharting sale**, with existing rounding/deductions.
+    One selected-page `pc/sales` request supplies all conditions; title, packaging,
+    region, age and outlier filters still apply. No sibling-page discovery,
+    Amazon, direct eBay/helper research or GameStop floor runs in quick mode.
+    Until sales load, Add is disabled. With no eligible sale (or a failed lookup),
+    the condition average is an explicitly labeled fallback. `quickSales` is
+    separate from full-research state so late responses cannot overwrite it.
     Exactly $15, missing values, hardware, toys-to-life, rhythm titles, standard
     edition floors and specific premium/MSRP rules retain full research.
     **Research this item** in the pinned price bar starts the normal research
     once and keeps it enabled for that item across condition changes. Quick New
     pricing requires a quick CIB comparison and retains the CIB price floor.
     Saved quick results carry `quickPricing` and an explanatory review note;
-    rechecks retain quick mode only while the updated PC value still qualifies.
+    rechecks reload the selected page's sales and retain quick mode only while
+    the updated PC average still qualifies. The sale can exceed the $15 cutoff;
+    the cutoff uses the average, not the resulting shelf price.
     Historical audits and previously researched saved items remain full checks.
   - UPC scans price the matched entry automatically. `fetchFloorGameSales()`
     also searches the base title/platform and reads up to 16 sibling entries

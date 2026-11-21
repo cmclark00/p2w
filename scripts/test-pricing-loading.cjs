@@ -17,22 +17,50 @@ function engine(request) {
   return { ctx, element, run: js => vm.runInContext(js, ctx) };
 }
 (async () => {
-  const quick = engine(() => { throw new Error('Quick mode must not request marketplace data'); });
+  const quickPending = deferred(), quickCalls = [];
+  const quickData = { sales: {
+    loose: [{ ...sale, title: 'Example Game PS4 Disc Only', price: 1499 }],
+    cib: [{ ...sale, price: 5000 },
+      { ...sale, title: 'Example Game PS4 CIB Bundle Lot of 3 Games', price: 3900 },
+      { ...sale, title: 'Example Game Xbox One CIB', price: 3800 },
+      { ...sale, title: 'Example Game PS4 PAL Italian CIB', price: 3700 },
+      { ...sale, date: new Date().toISOString().slice(0,10) }],
+    new: [{ ...sale, title: 'Example Game PS4 New Sealed', price: 1800 }],
+  } };
+  const quick = engine((route, params) => {
+    quickCalls.push({ route, params });
+    assert.equal(route,'pc/sales','Quick mode only reads the selected PriceCharting sales page');
+    assert.equal(params.id,'1');
+    return quickPending.promise;
+  });
   quick.run(`tokenSet=true; amazonSet=true; closeFloorResults=()=>{};
     lowProduct={...product,'loose-price':999,'cib-price':1499,'new-price':1200,'gamestop-price':5999};
     pickFloorGame(lowProduct);`);
   assert.equal(quick.run('floorQuickPricing(floorCur)'),true);
-  assert.equal(quick.run('floorResult(floorCur).r.price'),1500,'Quick price uses PC, not the higher unchecked GameStop');
+  assert.equal(quick.run('floorResult(floorCur).b.waiting'),true);
+  assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="add" disabled/);
+  quick.run('startFloorResearch();renderFloorPricer();');
+  quickPending.resolve(quickData);
+  await tick();
+  assert.equal(quickCalls.length,1,'Repaints do not repeat the selected-page lookup');
+  assert.equal(quick.run('floorResult(floorCur).r.price'),2500,'Highest eligible PC sale wins over average, without unchecked GameStop');
+  assert.equal(quick.run('floorBasis().from'),'pcsale');
+  assert.equal(quick.run('floorQuickSales(floorCur).filter(s=>s.odd||s.outlier).length'),4,'Bundle, platform, region and outlier filters remain active');
   assert.equal(quick.run('floorCur.salesRequested'),undefined);
   assert.equal(quick.run('floorCur.fullRequested'),undefined,'Missing UPC alone does not trigger research');
   assert.equal(quick.run('floorCur.directEbay'),undefined);
   assert.equal(quick.run('floorCur.amazon'),undefined);
-  assert.match(quick.element('#floorPricer').innerHTML,/PriceCharting estimate/);
+  assert.match(quick.element('#floorPricer').innerHTML,/Highest eligible PriceCharting sale: \$25.00/);
   assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="research"/);
   assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="add">/);
   assert.doesNotMatch(quick.element('#floorPricer').innerHTML,/No matching offers|Reading recent sales/);
   assert.equal(quick.run('floorBasisInfo(floorBasis()).quickPricing'),true,'Saved result records skipped research');
-  assert.equal(quick.run(`floorResult({...floorCur,condition:'new'}).r.price`),1500,'Quick sealed price retains CIB floor');
+  assert.equal(quick.run(`floorResult({...floorCur,condition:'new'}).r.price`),2500,'Quick sealed price retains CIB sale floor');
+  assert.equal(quick.run('floorBasisInfo(floorBasis()).saleDate'),new Date().toISOString().slice(0,10));
+  assert.equal(quick.run(`floorBasis({...floorCur,quickSales:{sales:{loose:[],cib:[],new:[]}}}).quickFallback`),true);
+  assert.equal(quick.run(`floorResult({...floorCur,quickSales:{error:'offline'}}).r.price`),1500,'Failed lookup visibly falls back to condition average');
+  assert.match(quick.run(`floorBasis({...floorCur,quickSales:{error:'offline'}}).checks.join(' ')`),/check failed.*offline/);
+  assert.equal(quick.run(`floorBasis({...floorCur,typed:1800}).basis`),1800,'Typed price remains an explicit override');
   for (const price of [0, null, undefined, 1500, 1501]) {
     quick.ctx.testPrice=price;
     assert.equal(quick.run(`floorQuickPricing({...floorCur,product:{...lowProduct,'cib-price':testPrice}})`),false,`Full research at missing/$15+ value ${price}`);
@@ -48,7 +76,8 @@ function engine(request) {
     assert.equal(quick.run('floorQuickPricing({...floorCur,product:specialProduct})'),false,`${name} keeps its evidence-dependent rules`);
   }
   quick.run(`onFloorPricerClick({target:{closest:s=>s==='[data-floor-cond]'?{dataset:{floorCond:'loose'}}:null}});`);
-  assert.equal(quick.run('floorResult(floorCur).r.price'),1000,'Condition-specific PC value selects quick price');
+  assert.equal(quick.run('floorResult(floorCur).r.price'),1500,'Condition-specific PC sales select quick price');
+  assert.equal(quickCalls.length,1,'All conditions reuse one PriceCharting response');
   quick.run(`salesStarts=0; amazonStarts=0; fullStarts=0;
     loadFloorSales=()=>{salesStarts++;floorCur.salesLoading=true;};
     loadFloorAmazon=()=>{amazonStarts++;floorCur.amazon={loading:true};};
@@ -71,9 +100,9 @@ function engine(request) {
   quick.run(`onFloorPricerClick({target:{closest:s=>s==='[data-floor-cond]'?{dataset:{floorCond:'loose'}}:null}});`);
   assert.equal(quick.run('floorQuickPricing(floorCur)'),true);
   assert.equal(quick.run('floorResult(floorCur).b.waiting'),undefined,'Old full-mode work cannot keep quick mode waiting');
-  assert.equal(quick.run('floorResult(floorCur).r.price'),1000);
+  assert.equal(quick.run('floorResult(floorCur).r.price'),1500);
   console.log('PASS $15 quick cutoff, manual research, condition changes, CIB floor and premium exceptions');
-  const quickRecheck = engine();
+  const quickRecheck = engine((route) => { assert.equal(route,'pc/sales'); return quickData; });
   quickRecheck.run(`amazonSet=true; savedCalls=0; stockCalls=0; amzCalls=0;
     renderFloorList=()=>{};toast=()=>{};
     PC.byId=async id=>({...product,id,'gamestop-price':0,'cib-price':id==='2'?1500:999});
@@ -84,15 +113,35 @@ function engine(request) {
       {pcId:'2',condition:'cib',price:500,quickPricing:true},
       {pcId:'3',condition:'cib',price:500}];`);
   await quickRecheck.run('recheckFloorPrices()');
-  assert.equal(quickRecheck.run('savedCalls'),2,'Only still-cheap quick items skip sales on recheck');
+  assert.equal(quickRecheck.run('savedCalls'),2,'Only still-cheap quick items skip related-page research on recheck');
   assert.equal(quickRecheck.run('amzCalls'),2);
   assert.equal(quickRecheck.run('stockCalls'),2);
   assert.equal(quickRecheck.run('floor.items[0].recheck.quickPricing'),true);
+  assert.equal(quickRecheck.run('floor.items[0].recheck.price'),2500,'Saved quick rechecks use highest eligible sale');
   assert.equal(quickRecheck.run('floor.items[1].recheck.quickPricing'),undefined);
   quickRecheck.run('useRecheck(floor.items[0]);useRecheck(floor.items[1]);');
   assert.equal(quickRecheck.run('floor.items[0].quickPricing'),true);
   assert.equal(quickRecheck.run('floor.items[1].quickPricing'),false);
   console.log('PASS quick saved-list rechecks retain provenance and promote $15+ items to research');
+  const latePage = deferred();
+  const quickRace = engine(() => latePage.promise);
+  quickRace.run(`tokenSet=true; closeFloorResults=()=>{};
+    pickFloorGame({...product,'cib-price':999});
+    loadFloorSales=()=>{floorCur.sales={cib:[{...sale,price:2200}]};};
+    PC.byId=async()=>({...product,upc:'123456789012'});
+    runFloorEbaySearch=()=>{};runFloorTargetedEbay=()=>{};
+    onFloorPricerClick({target:{closest:s=>s==='[data-floor-act]'?{dataset:{floorAct:'research'}}:null}});`);
+  latePage.resolve(quickData);
+  await tick();
+  assert.equal(quickRace.run('floorQuickPricing(floorCur)'),false);
+  assert.equal(quickRace.run('floorCur.sales.cib[0].price'),2200,'Late quick response cannot overwrite full research');
+  const quickFailure = engine(() => { throw new Error('offline'); });
+  quickFailure.run(`tokenSet=true;closeFloorResults=()=>{};pickFloorGame({...product,'cib-price':999});`);
+  await tick();
+  assert.match(quickFailure.element('#floorPricer').innerHTML,/PriceCharting fallback/);
+  assert.equal(quickFailure.run('floorBasis().quickFallback'),true);
+  assert.equal(quickFailure.run('floorBasis().waiting'),undefined,'Failed quick lookup cannot get stuck loading');
+  console.log('PASS quick lookup failures and late responses preserve fallback and full research');
   const sealed = engine();
   sealed.run(`amazonSet=false; pendingComparisons=[];
     runFloorEbaySearch=(cur,progress,cancelled)=>{
