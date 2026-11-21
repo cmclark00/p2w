@@ -17,6 +17,82 @@ function engine(request) {
   return { ctx, element, run: js => vm.runInContext(js, ctx) };
 }
 (async () => {
+  const quick = engine(() => { throw new Error('Quick mode must not request marketplace data'); });
+  quick.run(`tokenSet=true; amazonSet=true; closeFloorResults=()=>{};
+    lowProduct={...product,'loose-price':999,'cib-price':1499,'new-price':1200,'gamestop-price':5999};
+    pickFloorGame(lowProduct);`);
+  assert.equal(quick.run('floorQuickPricing(floorCur)'),true);
+  assert.equal(quick.run('floorResult(floorCur).r.price'),1500,'Quick price uses PC, not the higher unchecked GameStop');
+  assert.equal(quick.run('floorCur.salesRequested'),undefined);
+  assert.equal(quick.run('floorCur.fullRequested'),undefined,'Missing UPC alone does not trigger research');
+  assert.equal(quick.run('floorCur.directEbay'),undefined);
+  assert.equal(quick.run('floorCur.amazon'),undefined);
+  assert.match(quick.element('#floorPricer').innerHTML,/PriceCharting estimate/);
+  assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="research"/);
+  assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="add">/);
+  assert.doesNotMatch(quick.element('#floorPricer').innerHTML,/No matching offers|Reading recent sales/);
+  assert.equal(quick.run('floorBasisInfo(floorBasis()).quickPricing'),true,'Saved result records skipped research');
+  assert.equal(quick.run(`floorResult({...floorCur,condition:'new'}).r.price`),1500,'Quick sealed price retains CIB floor');
+  for (const price of [0, null, undefined, 1500, 1501]) {
+    quick.ctx.testPrice=price;
+    assert.equal(quick.run(`floorQuickPricing({...floorCur,product:{...lowProduct,'cib-price':testPrice}})`),false,`Full research at missing/$15+ value ${price}`);
+  }
+  quick.run(`settings.floorPremiums.push({phrase:'Example Game',pct:25});`);
+  assert.equal(quick.run('floorQuickPricing(floorCur)'),false,'Specific premiums keep researched pricing');
+  quick.run(`settings.floorPremiums.pop();`);
+  for (const [name, platform] of [
+    ['Xbox One Elite Wireless Controller','Xbox One'], ['Spyro','Skylanders'],
+    ['Example Game [Deluxe Edition]','Playstation 4'], ['Example Game','Nintendo Switch'],
+  ]) {
+    quick.ctx.specialProduct={...product,'product-name':name,'console-name':platform,'cib-price':999};
+    assert.equal(quick.run('floorQuickPricing({...floorCur,product:specialProduct})'),false,`${name} keeps its evidence-dependent rules`);
+  }
+  quick.run(`onFloorPricerClick({target:{closest:s=>s==='[data-floor-cond]'?{dataset:{floorCond:'loose'}}:null}});`);
+  assert.equal(quick.run('floorResult(floorCur).r.price'),1000,'Condition-specific PC value selects quick price');
+  quick.run(`salesStarts=0; amazonStarts=0; fullStarts=0;
+    loadFloorSales=()=>{salesStarts++;floorCur.salesLoading=true;};
+    loadFloorAmazon=()=>{amazonStarts++;floorCur.amazon={loading:true};};
+    PC.byId=async()=>{fullStarts++;return {...lowProduct,upc:'123456789012'};};
+    onFloorPricerClick({target:{closest:s=>s==='[data-floor-act]'?{dataset:{floorAct:'research'}}:null}});`);
+  await tick();
+  assert.equal(quick.run('floorQuickPricing(floorCur)'),false);
+  assert.equal(quick.run('salesStarts'),1);
+  assert.equal(quick.run('amazonStarts'),1);
+  assert.equal(quick.run('fullStarts'),1);
+  assert.doesNotMatch(quick.element('#floorPricer').innerHTML,/data-floor-act="research"/);
+  quick.run('startFloorResearch();renderFloorPricer();');
+  assert.equal(quick.run('salesStarts'),1,'Repainting/re-entry does not duplicate research');
+  assert.equal(quick.run('amazonStarts'),1);
+  assert.equal(quick.run('fullStarts'),1);
+  quick.run(`floorCur.researchRequested=false;
+    floorCur.product['cib-price']=1500;
+    onFloorPricerClick({target:{closest:s=>s==='[data-floor-cond]'?{dataset:{floorCond:'cib'}}:null}});`);
+  assert.equal(quick.run('floorQuickPricing(floorCur)'),false,'Switching to $15 condition starts full mode');
+  quick.run(`onFloorPricerClick({target:{closest:s=>s==='[data-floor-cond]'?{dataset:{floorCond:'loose'}}:null}});`);
+  assert.equal(quick.run('floorQuickPricing(floorCur)'),true);
+  assert.equal(quick.run('floorResult(floorCur).b.waiting'),undefined,'Old full-mode work cannot keep quick mode waiting');
+  assert.equal(quick.run('floorResult(floorCur).r.price'),1000);
+  console.log('PASS $15 quick cutoff, manual research, condition changes, CIB floor and premium exceptions');
+  const quickRecheck = engine();
+  quickRecheck.run(`amazonSet=true; savedCalls=0; stockCalls=0; amzCalls=0;
+    renderFloorList=()=>{};toast=()=>{};
+    PC.byId=async id=>({...product,id,'gamestop-price':0,'cib-price':id==='2'?1500:999});
+    fetchFloorProductSales=async()=>{savedCalls++;return {sales:{cib:[]}};};
+    fetchFloorAmazon=async()=>{amzCalls++;return {found:false};};
+    fetchFloorGameStopStock=async()=>{stockCalls++;return {state:'unknown'};};
+    floor.items=[{pcId:'1',condition:'cib',price:500,quickPricing:true},
+      {pcId:'2',condition:'cib',price:500,quickPricing:true},
+      {pcId:'3',condition:'cib',price:500}];`);
+  await quickRecheck.run('recheckFloorPrices()');
+  assert.equal(quickRecheck.run('savedCalls'),2,'Only still-cheap quick items skip sales on recheck');
+  assert.equal(quickRecheck.run('amzCalls'),2);
+  assert.equal(quickRecheck.run('stockCalls'),2);
+  assert.equal(quickRecheck.run('floor.items[0].recheck.quickPricing'),true);
+  assert.equal(quickRecheck.run('floor.items[1].recheck.quickPricing'),undefined);
+  quickRecheck.run('useRecheck(floor.items[0]);useRecheck(floor.items[1]);');
+  assert.equal(quickRecheck.run('floor.items[0].quickPricing'),true);
+  assert.equal(quickRecheck.run('floor.items[1].quickPricing'),false);
+  console.log('PASS quick saved-list rechecks retain provenance and promote $15+ items to research');
   const sealed = engine();
   sealed.run(`amazonSet=false; pendingComparisons=[];
     runFloorEbaySearch=(cur,progress,cancelled)=>{

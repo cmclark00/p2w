@@ -802,6 +802,16 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
+   Ordinary games with a **PriceCharting value below $15 in that condition**
+   show a quick **PriceCharting estimate**, with normal rounding and deductions.
+   These skip marketplace research and do not use GameStop as a minimum.
+   Click **Research this item** beside the price whenever a closer check is
+   needed; it runs the normal sold-listing, Amazon and GameStop checks.
+   At $15 or above, or with a missing value, full research runs automatically.
+   Hardware, toys-to-life, special edition baselines and specific pricing rules
+   keep their full checks. Changing conditions re-evaluates the cutoff; once
+   you request research, it stays enabled for that item. Quick prices are marked
+   in saved review notes, and their rechecks use the updated PriceCharting value.
    The game name, system, **Loose / CIB / New** buttons, **Shelf price**, and
    **Add to list** share a pinned bar (compact stacked rows on phones).
    **Manual missing** stays pinned with the condition buttons for CIB games.

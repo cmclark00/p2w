@@ -4090,17 +4090,42 @@ function renderFloorResults() {
 function pickFloorGame(product) {
   $('#floorScan').value = '';
   closeFloorResults();
-  floorCur = { product, condition: floorToyFamily(product) ? 'loose' : 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
+  floorCur = { product, quickPricingEnabled: true, condition: floorToyFamily(product) ? 'loose' : 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
+  startFloorResearch();
   renderFloorPricer();
-  loadFloorSales(product);
+}
+
+// Only ordinary low-value games use the fast path. Evidence-dependent specific
+// rules, edition floors and hardware still get their normal research.
+function floorQuickPricing(cur) {
+  if (!cur?.quickPricingEnabled || cur.researchRequested) return false;
+  const p = cur.product;
+  if (floorIsHardware(p) || floorToyFamily(p) || floorStandardGame(p)
+    || floorPricingRule(p['product-name'], p['console-name']) || rhythmKind(p['product-name'])
+    || floorRecentSwitch({ ...cur, typed: null })) return false;
+  const value = Number(p[PC_FIELDS.market[cur.condition]]);
+  if (!(value > 0 && value < 1500)) return false;
+  // Sealed inventory retains its CIB floor, even if CIB needs full research.
+  if (cur.condition === 'new') return floorQuickPricing({ ...cur, condition: 'cib' });
+  return true;
+}
+
+function startFloorResearch() {
+  const cur = floorCur;
+  if (!cur || floorQuickPricing(cur)) return;
+  const product = cur.product;
+  if (!cur.salesRequested) { cur.salesRequested = true; void loadFloorSales(product); }
+  if (cur.gamestopUrl && !cur.gamestopStock) void loadFloorGameStopStock(cur);
   const sellKeys = Object.values(PC_FIELDS['retail-sell']);
   const needsFull = !('gamestop-price' in product) || (amazonSet && !product.upc)
     || (/^nintendo switch(?: 2)?$/i.test(product['console-name'] || '') && !product['release-date']);
-  if (needsFull && tokenSet) {
-    floorCur.fullLoading = true;
+  if (cur.fullLoading) return;
+  if (needsFull && tokenSet && !cur.fullRequested) {
+    cur.fullRequested = true;
+    cur.fullLoading = true;
     renderFloorPricer();
     PC.byId(product.id).then((full) => {
-      if (floorCur?.product !== product) return;
+      if (floorCur !== cur) return;
       if (!full?.id) throw new Error('PriceCharting returned no full product.');
       product['gamestop-price'] = full['gamestop-price'];
       for (const k of [...sellKeys, ...Object.values(PC_FIELDS.market)]) if (k in full) product[k] = full[k];
@@ -4109,9 +4134,9 @@ function pickFloorGame(product) {
       floorCur.fullLoading = false;
       renderFloorPricer();
       loadFloorAmazon();
-    }).catch(() => { if (floorCur?.product === product) { floorCur.fullLoading = false; floorCur.fullError = true; renderFloorPricer(); loadFloorAmazon(); } });
-  } else {
-    loadFloorAmazon();
+    }).catch(() => { if (floorCur === cur) { cur.fullLoading = false; cur.fullError = true; renderFloorPricer(); loadFloorAmazon(); } });
+  } else if (!cur.amazon) {
+    void loadFloorAmazon();
   }
 }
 
@@ -4120,11 +4145,11 @@ const AMAZON_RENEWED_RE = /\b(?:renewed|refurbished)\b/i;
 // Amazon's offers, loaded for every product. Only the lowest matching offer is a price reference.
 async function loadFloorAmazon() {
   const cur = floorCur;
-  if (!cur || !amazonSet) return;
+  if (!cur || !amazonSet || floorQuickPricing(cur)) return;
   const condition = cur.condition, loadId = (cur.amazonLoadId || 0) + 1;
   cur.amazonLoadId = loadId;
   cur.amazon = { loading: true }; renderFloorPricer();
-  const cancelled = () => floorCur !== cur || cur.condition !== condition || cur.amazonLoadId !== loadId;
+  const cancelled = () => floorCur !== cur || cur.condition !== condition || cur.amazonLoadId !== loadId || floorQuickPricing(cur);
   try {
     const d = await fetchFloorAmazonRetry(cur.product, condition, { cancelled, onRetry: () => {
       if (!cancelled()) { cur.amazon = { loading: true, retrying: true }; renderFloorPricer(); }
@@ -4731,7 +4756,7 @@ async function floorEbayRecentSales(helper, query, since, stopped, allowUnreadab
 
 async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null, cacheRequest = auth.enabled ? api : null) {
-  if (floorSwitchMsrpBasis(cur)) return; // A fixed MSRP price does not need sold-search tabs.
+  if (floorQuickPricing(cur) || floorSwitchMsrpBasis(cur)) return; // Quick/fixed prices do not need sold-search tabs.
   const previous = cur.directEbay;
   const resume = (result, evidence) => result?.state === 'ready' && result.stoppedAtMatch && (result.more || result.sharedCache)
     && !floorSales({ ...evidence, condition: cur.condition, directEbay: { result } })
@@ -4745,7 +4770,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
   const forceRankedSearch = cur.forceRankedEbaySearch === true;
   delete cur.forceRankedEbaySearch;
   const state = cur.directEbay = { ...(same ? previous : {}), condition, loading: true };
-  const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null;
+  const stopped = () => cancelled() || cur.directEbay !== state || cur.condition !== condition || cur.typed != null || floorQuickPricing(cur);
   progress();
   const read = async (product, evidence = {}, seed = null) => {
     delete state.resumedPages;
@@ -5064,6 +5089,11 @@ function floorEbayDriver(cur, basis = floorUnverifiedBasis(cur)) {
   return { target, holder: standard ? cur.standardGame : cur, sale: b.sale, risky: stale || gap };
 }
 function floorBasis(cur = floorCur) {
+  if (floorQuickPricing(cur)) return {
+    basis: cur.typed != null ? cur.typed : Number(cur.product[PC_FIELDS.market[cur.condition]]),
+    from: cur.typed != null ? 'typed' : 'pricecharting', quick: true,
+    checks: ['Quick pricing: selected-condition PriceCharting value is below $15. Marketplace listings and GameStop stock have not been researched. Use Research this item for full checks.'],
+  };
   const b = floorUnverifiedBasis(cur), driver = floorEbayDriver(cur, b);
   if (b.from === 'msrp') return b;
   const state = cur.targetedEbay;
@@ -5117,6 +5147,7 @@ function floorEbayCandidates(cur, limit, early = false) {
 }
 async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => false,
   helper = typeof window !== 'undefined' ? window.P2WEbayHelper : null) {
+  if (floorQuickPricing(cur)) return;
   if (cur.targetedEbay?.running || cur.ebayChecks?.loading || cancelled() || cur.typed != null) return;
   const previous = cur.targetedEbay;
   // A search that returned actual rows proves the bridge can respond. Recover
@@ -5134,7 +5165,7 @@ async function runFloorTargetedEbay(cur, progress = () => {}, cancelled = () => 
   const state = cur.targetedEbay = previous || { attempts: 0, checked: new Map() };
   state.running = true;
   if (recover) { state.recoveryAttempted = true; state.unavailable = false; }
-  const stopped = () => cancelled() || cur.targetedEbay !== state;
+  const stopped = () => cancelled() || cur.targetedEbay !== state || floorQuickPricing(cur);
   progress();
   try {
     if (recover) { await delay(250); if (stopped()) return; }
@@ -5200,6 +5231,7 @@ async function fetchFloorGameStopStock(product, url, request = (route, params) =
 }
 
 async function loadFloorGameStopStock(cur) {
+  if (floorQuickPricing(cur)) return;
   if (!cur.gamestopUrl) return;
   cur.gamestopStock = { state: 'loading' };
   cur.gamestopStock = await fetchFloorGameStopStock(cur.product, cur.gamestopUrl);
@@ -6348,7 +6380,7 @@ function floorResult(cur) {
   if (cib.b.waiting || cib.b.ebayChecking) {
     return { ...result, b: { ...b, waiting: true, cibWaiting: true }, r: null };
   }
-  const review = !!(cib.b.need || cib.b.ebayReview || [cibCur.amazon, cibCur.amazon?.standard].some(a => a?.error || a?.incomplete));
+  const review = !!(cib.b.need || cib.b.ebayReview || !cib.b.quick && [cibCur.amazon, cibCur.amazon?.standard].some(a => a?.error || a?.incomplete));
   if (review) {
     b.cibReview = true;
     b.checks.push('CIB comparison needs review.', ...cib.b.checks.filter(Boolean).map(note => `CIB: ${note}`));
@@ -6383,7 +6415,7 @@ function floorConditionResult(cur) {
   // including discounts below it. A 0% premium only exempts a title from a broader premium.
   const specific = !!(premium?.pct || manualMissing);
   const r = toy ? floorToyPrice(b.basis, { family: toy, group: toyGroup, premium }) : floorPrice(b.basis, { shitbox: !!shitbox, manualMissing,
-    gs: typed || specific ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
+    gs: typed || specific || b.quick ? null : floorGsFor(cur), premium, referenceMin: typed || specific ? null : b.referenceMin,
     sportsAdjustment: !typed && shitbox === 'sports game',
     amazonRounding: b.from === 'amazon' || b.from === 'standard' && b.standardReference?.from === 'amazon' });
   return { b, r, shitbox, premium, hw, toy, toyGroup };
@@ -6520,8 +6552,9 @@ function renderFloorPricer() {
   if (!floorCur) { el.innerHTML = ''; return; }
   const cur = floorCur = floorConditionCur(floorCur);
   const condition = cur.condition;
+  const quick = floorQuickPricing(cur);
   if (cur.condition === 'new' && cur.typed != null) cur.cibComparison = null;
-  if (floorNeedsCibFloor(cur)) {
+  if (!quick && floorNeedsCibFloor(cur)) {
     const comparison = floorCibCur(cur);
     const cib = cur.cibComparison ||= {};
     if (cib.standardGame && comparison.standardGame) {
@@ -6534,8 +6567,8 @@ function renderFloorPricer() {
     void runFloorEbaySearch(cib, progress, stopped);
     void runFloorTargetedEbay(cib, progress, stopped);
   }
-  void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
-  void runFloorTargetedEbay(cur, () => {
+  if (!quick) void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
+  if (!quick) void runFloorTargetedEbay(cur, () => {
     if (floorCur === cur && cur.condition === condition) queueFloorPricerRender(cur, condition);
   }, () => floorCur !== cur || cur.condition !== condition || cur.typed != null);
   const p = cur.product;
@@ -6544,14 +6577,14 @@ function renderFloorPricer() {
   const { b, r: result, shitbox, premium, hw, toy, toyGroup } = floorResult(cur);
   const estimate = b.waiting ? floorEstimate(cur) : null;
   const rhythm = rhythmKind(p['product-name']);
-  const belowGs = !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
+  const belowGs = !quick && !toy && b.from === 'typed' && result && floorGsFor(cur) && result.price < floorGsFor(cur);
   const conditions = Object.entries(GAME_CONDITIONS).filter(([c]) => !toy || c !== 'cib');
   const pcPrices = conditions.map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS.market[c]]) || null)}`).join(' · ')
     + (tier.id === 'modern' ? ` · Retail sell reference ${Object.entries(GAME_CONDITIONS).map(([c, label]) => `${label} ${money(Number(p[PC_FIELDS['retail-sell'][c]]) || null)}`).join(' · ')}` : '');
   const gs = Number(p['gamestop-price']) > 0 ? ` · ${esc(`GameStop pre-owned ${money(Number(p['gamestop-price']))}`)}` : '';
 
   const condBtns = conditions.map(([c, label]) => `<button type="button" class="seg${c === cur.condition ? ' on' : ''}" data-floor-cond="${c}">${label}</button>`).join('');
-  const sales = floorSales(cur);
+  const sales = quick ? [] : floorSales(cur);
   let salesHtml;
   const saleToCheck = sales.find(s => s.i === cur.pick && !s.odd) || (b.from === 'standard' ? floorAutoSale(sales).sale : b.sale);
   const checkSelected = saleToCheck?.url ? `<button type="button" class="link" data-floor-act="ebay" data-ebay-sale="${saleToCheck.i}">Check selected sale</button> · ` : '';
@@ -6562,9 +6595,9 @@ function renderFloorPricer() {
 
   const showTyped = !!b.need || cur.typed != null;
   const reviewNotes = [...new Set(b.checks)];
-  const excluded = sales.filter((s) => s.mismatch && !s.unrelatedSuggestion).length + (cur.amazon?.rejected?.length || 0);
+  const excluded = quick ? 0 : sales.filter((s) => s.mismatch && !s.unrelatedSuggestion).length + (cur.amazon?.rejected?.length || 0);
   const outliers = sales.filter((s) => s.outlier).length;
-  const incomplete = !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.incomplete || cur.amazon?.standard?.error || cur.amazon?.standard?.incomplete);
+  const incomplete = !quick && !!(cur.fullError || cur.salesError || cur.amazon?.error || cur.amazon?.incomplete || cur.amazon?.standard?.error || cur.amazon?.standard?.incomplete);
   el.innerHTML = `
     <div class="floor-pinned-header">
     <div class="floor-price-actions" role="group" aria-label="Game, condition, and price">
@@ -6578,13 +6611,14 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${quick ? 'PriceCharting estimate' : b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
           </label>
           ${!showTyped ? '<button type="button" class="link" data-floor-act="type">Type a different price</button>' : '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>'}
           ${!showTyped && cur.pick != null ? '<button type="button" class="link" data-floor-act="auto">Use automatic price</button>' : ''}
+          ${quick ? '<button type="button" class="link" data-floor-act="research">Research this item</button>' : ''}
         </div>
       </div>
       <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && !b.ebayChecking && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
@@ -6593,7 +6627,7 @@ function renderFloorPricer() {
     <div class="floor-market-quick" aria-label="Market references">
       <a href="${esc(cur.gamestopUrl || links.gamestop)}" target="_blank" rel="noopener noreferrer" title="${cur.gamestopUrl ? 'Open the GameStop listing linked by PriceCharting' : 'Product link unavailable — search this game on GameStop'} (new tab)">GameStop pre-owned <strong class="gamestop-market-price">${Number(p['gamestop-price']) > 0 ? money(Number(p['gamestop-price'])) : cur.fullLoading ? 'Checking…' : '—'}</strong> ${floorGameStopStock(cur)} ↗</a>
       ${links.pc ? `<a href="${esc(links.pc)}" target="_blank" rel="noopener noreferrer" title="Open this product on PriceCharting (new tab)">` : '<span>'}PriceCharting ${esc(GAME_CONDITIONS[cur.condition])} <strong class="pricecharting-market-price">${money(Number(p[PC_FIELDS.market[cur.condition]]) || null)}</strong>${links.pc ? ' ↗</a>' : '</span>'}
-      ${floorAmazonReferencesHtml(cur, b, true)}
+      ${quick ? '<span class="muted">Marketplace research skipped · under $15</span>' : floorAmazonReferencesHtml(cur, b, true)}
       ${b.msrp ? `<a href="${esc(b.msrpUrl)}" target="_blank" rel="noopener noreferrer">MSRP <strong>${money(b.msrp)}</strong> · minus $5 ↗</a>` : ''}
       <a href="${esc(links.ebay)}" target="_blank" rel="noopener noreferrer" title="Search eBay sold listings for this game and condition (new tab)">eBay sold ↗</a>
     </div>
@@ -6633,6 +6667,7 @@ function renderFloorPricer() {
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
+        ${quick ? '<p class="muted">Quick price from PriceCharting. Use <strong>Research this item</strong> above to check sold listings, Amazon and GameStop.</p>' : `
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
         ${floorDirectSearchHtml(cur)}
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : cur.targetedEbay?.unavailable ? `${checkSelected}Individual sale verification unavailable. <button type="button" class="link" data-floor-act="ebay-resume">Retry sale checks</button> · Check the helper connection; search results alone are not verified sales.` : `${checkSelected}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
@@ -6652,6 +6687,7 @@ function renderFloorPricer() {
           <p class="muted small-print">These are our pricing categories; check seller notes for exact contents. Prices include shipping. Specific pricing rules and premiums still apply.</p>
         </details>` : ''}
         ${floorAmazonHtml(cur, b)}
+        `}
       </div>
       <aside class="floor-result" aria-label="Pricing details">
         ${reviewNotes.length ? `<details class="floor-details"><summary>Review notes (${reviewNotes.length})</summary><ul>${reviewNotes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '<p class="muted small-print">No review notes.</p>'}
@@ -6659,7 +6695,8 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
-            <li>Regular baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
+            <li>Ordinary games below $15 in the selected PriceCharting condition use quick pricing. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
+            <li>Researched baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon above $502 ($500 + $2 buffer): use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
             <li>General price exclusions allow a $2 buffer, including Renewed above 2× PriceCharting and sales above 3× PriceCharting. Specific premiums stay intact.</li>
@@ -6758,6 +6795,7 @@ function floorMath(b, r) {
 // Where a list item's price came from (kept on the item; shown in the "Based on" column).
 const floorBasisInfo = (b) => ({
   basis: b.basis, from: b.from,
+  ...(b.quick ? { quickPricing: true } : {}),
   ...(b.cibReference ? { cibReference: b.cibReference } : {}),
   saleDate: b.from === 'sale' ? b.sale?.date || '' : '',
   reviewNotes: b.checks || [],
@@ -6802,13 +6840,20 @@ function onFloorPricerClick(e) {
     }
     Object.assign(floorCur, { condition: cond, pick: null, typed: null, showAll: false, openSaleGroups: {} });
     if (cond !== 'cib') floorCur.manualMissing = false;
-    if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; loadFloorAmazon(); }
+    if (amazonChanged && floorCur.amazon) { floorCur.amazon = null; if (!floorCur.quickPricingEnabled) loadFloorAmazon(); }
     floorCur.ebayChecks = null; floorCur.ebayRun = null; floorCur.targetedEbay = null;
     if (floorCur.standardGame) floorCur.standardGame.ebayChecks = null;
+    if (floorCur.quickPricingEnabled) startFloorResearch();
     renderFloorPricer();
     return;
   }
   const act = e.target.closest('[data-floor-act]')?.dataset.floorAct;
+  if (act === 'research') {
+    floorCur.researchRequested = true;
+    startFloorResearch();
+    renderFloorPricer();
+    return;
+  }
   if (act === 'variants') { runFloorVariants(floorCur.product); $('#floorScan').focus(); $('#floorScan').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
@@ -6928,11 +6973,13 @@ async function recheckFloorPrices() {
     try {
       const product = await PC.byId(it.pcId);
       const condition = floorCondition(product, it.condition);
-      const sold = await fetchFloorProductSales(product);
-      let amazon = null;
-      if (amazonSet) amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
-      const gamestopStock = await fetchFloorGameStopStock(product, sold.gamestopUrl);
-      const cur = { product, condition, manualMissing: it.manualMissing, toyGroup: it.toyGroup, ...sold, gamestopStock, pick: null, typed: null, amazon };
+      const cur = { product, condition, quickPricingEnabled: !!it.quickPricing,
+        manualMissing: it.manualMissing, toyGroup: it.toyGroup, pick: null, typed: null };
+      if (!floorQuickPricing(cur)) {
+        Object.assign(cur, await fetchFloorProductSales(product));
+        if (amazonSet) cur.amazon = await fetchFloorAmazon(product, it.condition).catch((err) => ({ error: err.message }));
+        cur.gamestopStock = await fetchFloorGameStopStock(product, cur.gamestopUrl);
+      }
       const { b, r } = floorResult(cur);
       it.recheck = r ? { price: r.price, condition, ...floorBasisInfo(b), at: new Date().toISOString() } : { error: b.need || 'no sales to go by' };
     } catch (err) {
@@ -6958,7 +7005,7 @@ function useRecheck(it) {
     it.condition = it.recheck.condition;
     if (it.condition !== 'cib') it.manualMissing = false;
   }
-  Object.assign(it, { price, basis, from, saleDate, reviewNotes, edited: false });
+  Object.assign(it, { price, basis, from, saleDate, reviewNotes, quickPricing: !!it.recheck.quickPricing, edited: false });
   delete it.recheck;
   return true;
 }

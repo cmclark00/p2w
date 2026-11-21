@@ -552,6 +552,17 @@ The site's **only server-side code**. Everything else is static.
     on the dev machine; to add routes, get a copy from the shop PC.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
+  - Interactive ordinary games with a positive selected-condition PriceCharting
+    market value **below $15** use quick pricing from that value, with existing
+    rounding/deductions and no automatic marketplace research or GameStop floor.
+    Exactly $15, missing values, hardware, toys-to-life, rhythm titles, standard
+    edition floors and specific premium/MSRP rules retain full research.
+    **Research this item** in the pinned price bar starts the normal research
+    once and keeps it enabled for that item across condition changes. Quick New
+    pricing requires a quick CIB comparison and retains the CIB price floor.
+    Saved quick results carry `quickPricing` and an explanatory review note;
+    rechecks retain quick mode only while the updated PC value still qualifies.
+    Historical audits and previously researched saved items remain full checks.
   - UPC scans price the matched entry automatically. `fetchFloorGameSales()`
     also searches the base title/platform and reads up to 16 sibling entries
     with three concurrent sales requests. Recovered sales must match title,
