@@ -5123,20 +5123,20 @@ async function fetchFloorQuickSales(product) {
   } catch (err) { return { error: err.message }; }
 }
 function floorQuickSales(cur) {
-  // Quick mode intentionally trusts PriceCharting's selected-condition list.
-  // Listing validation belongs to the optional full research path only.
-  return (cur.quickSales?.sales?.[cur.condition] || [])
-    .filter(s => Number.isFinite(s.price) && s.price > 0).slice().sort((a, b) => b.price - a.price);
+  return floorSales({ ...cur, sales: cur.quickSales?.sales, salesLoading: false,
+    salesError: cur.quickSales?.error, directEbay: null, ebayChecks: null });
 }
 function floorQuickBasis(cur) {
-  const checks = ['Quick pricing: the selected-condition PriceCharting average determines the under-$15 cutoff, then the highest listed PriceCharting sale sets the price before rounding. Listing filters, outlier checks and individual sale verification are skipped. Use Research this item for full marketplace checks.'];
+  const checks = ['Quick pricing: highest eligible sale on the selected PriceCharting page. Amazon, direct eBay searches and individual sale verification are skipped. Use Research this item for full checks.'];
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', quick: true, checks };
   if (!cur.quickSales || cur.quickSales.loading) return { basis: null, quick: true, waiting: true, checks };
   const sales = floorQuickSales(cur);
-  const sale = sales[0];
+  const sale = sales.find(s => !s.odd && !s.outlier && Number.isFinite(s.price) && s.price > 0);
+  const excluded = sales.filter(s => s.odd || s.outlier).length;
+  if (excluded) checks.push(`${excluded} PriceCharting listings excluded by matching, condition, age or outlier checks.`);
   if (sale) return { basis: sale.price, from: 'pcsale', sale, quick: true, checks };
   checks.push(cur.quickSales.error ? `PriceCharting sales check failed: ${cur.quickSales.error}. Using the condition average as fallback; research before labeling.`
-    : 'No priced PriceCharting sale found for this condition. Using the condition average as fallback.');
+    : 'No eligible PriceCharting sale found for this condition. Using the condition average as fallback.');
   return { basis: Number(cur.product[PC_FIELDS.market[cur.condition]]), from: 'pricecharting', quick: true,
     quickFallback: true, checks };
 }
@@ -6719,7 +6719,7 @@ function renderFloorPricer() {
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
-        ${quick ? `<p class="muted">${b.quickFallback ? 'PriceCharting average fallback — no sale price available.' : b.sale ? `Highest listed PriceCharting sale: ${money(b.sale.price)}${b.sale.url ? ` · <a href="${esc(b.sale.url)}" target="_blank" rel="noopener noreferrer">${esc(b.sale.title)}</a>` : ''} · unchecked.` : b.waiting ? 'Loading PriceCharting sales…' : 'Quick pricing.'} Use <strong>Research this item</strong> above for full marketplace checks.</p>` : `
+        ${quick ? `<p class="muted">${b.quickFallback ? 'PriceCharting average fallback — no eligible sale available.' : b.sale ? `Highest eligible PriceCharting sale: ${money(b.sale.price)}${b.sale.url ? ` · <a href="${esc(b.sale.url)}" target="_blank" rel="noopener noreferrer">${esc(b.sale.title)}</a>` : ''}.` : b.waiting ? 'Loading PriceCharting sales…' : 'Quick pricing.'} Use <strong>Research this item</strong> above for full marketplace checks.</p>` : `
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
         ${floorDirectSearchHtml(cur)}
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : cur.targetedEbay?.unavailable ? `${checkSelected}Individual sale verification unavailable. <button type="button" class="link" data-floor-act="ebay-resume">Retry sale checks</button> · Check the helper connection; search results alone are not verified sales.` : `${checkSelected}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
@@ -6747,7 +6747,7 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
-            <li>Ordinary games with a PriceCharting average below $15 use the highest listed sale in that condition for quick pricing, without listing filters or sale checks. The average is only a fallback when no sale price is available. Research this item runs full checks. Missing averages, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
+            <li>Ordinary games with a PriceCharting average below $15 use the highest eligible sale on that condition's PriceCharting page for quick pricing, with the average only as fallback when no eligible sale is available. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
             <li>Researched baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon above $502 ($500 + $2 buffer): use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>

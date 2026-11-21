@@ -802,11 +802,11 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
-   Ordinary games with a **PriceCharting average below $15 in that condition**
-   show a **Quick price** from the **highest listed PriceCharting sale** for
+   Ordinary games with a **PriceCharting value below $15 in that condition**
+   show a **Quick price** from the **highest eligible PriceCharting sale** for
    that condition, with normal rounding and deductions. The tool reads one
-   PriceCharting page, without filtering or verifying the listings. The sale is
-   marked **unchecked**. If no sale price is available, the average is a labeled fallback.
+   PriceCharting page and still filters mismatched listings and outliers.
+   If no eligible sale is available, it clearly labels the average as a fallback.
    These skip Amazon and direct eBay research and do not use GameStop as a minimum.
    Click **Research this item** beside the price whenever a closer check is
    needed; it runs the normal sold-listing, Amazon and GameStop checks.
