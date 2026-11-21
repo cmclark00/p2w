@@ -1152,6 +1152,13 @@ The site's **only server-side code**. Everything else is static.
     recovered from related pages. No checks for typed prices or other driving sources.
     There is no per-lookup count cap: stop when the highest eligible driver is
     verified, another source sets the baseline, or eligible evidence is exhausted.
+    Helper 1.1.13 also permits reviewable multi-quantity evidence: a Sold search
+    card plus the same original item showing a visible positive units-sold count
+    in its quantity panel and the exact matching USD item price. State multi-sold
+    is eligible, stops targeted checks at that driver, and always flags review;
+    it is never labeled a verified individual transaction price. Search-only,
+    PC-only, hidden/ambiguous counts, accepted offers and mismatched prices do
+    not qualify. Normal listing filters, outliers and specific premiums remain.
     Recent ended/offer/mismatch/price discrepancies exclude that sale. Unreadable
     checked listings retain state unknown, with skipped:true excluding them from
     the automatic baseline and a Needs review flag. Missing links behave the same.

@@ -1,17 +1,22 @@
-Play2Win Market Helper 1.1.12
+Play2Win Market Helper 1.1.13
 
 Update each staff computer/profile manually:
 1. Download the helper ZIP from Floor Pricing and extract it over the helper's
    permanent folder (the folder containing manifest.json).
 2. Open chrome://extensions and click Reload on Play2Win Market Helper.
    Allow eBay search-page access if Chrome asks. Keep only one helper enabled.
-3. Refresh the pricing tool. The header should say Connected - v1.1.12.
+3. Refresh the pricing tool. The header should say Connected - v1.1.13.
 For first installation, enable Developer mode and choose Load unpacked instead.
 Manual guide: https://play2wingames.com/trade-in/helper-setup.html
 Connection checks: https://play2wingames.com/trade-in/helper.html
 Privacy: https://play2wingames.com/trade-in/helper-privacy.html
 
-New in 1.1.12: Floor Pricing can refresh the shared cache from recently ended eBay sales.
+New in 1.1.13: A Sold search result plus visible units sold on the same original
+item at the matching displayed price can support pricing with a review flag.
+This is not a confirmed individual transaction price. Ended listings, accepted
+offers and price mismatches remain excluded. No new permissions.
+
+In 1.1.12: Floor Pricing can refresh the shared cache from recently ended eBay sales.
 In 1.1.11, original-item checks began preserving explicit seller-ended evidence.
 The pricing tool checks the highest eligible sale even when search says Sold,
 then moves downward only as needed. Search cards no longer override an ended,

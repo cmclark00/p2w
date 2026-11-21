@@ -10,14 +10,15 @@ vm.runInContext(fs.readFileSync(root + 'ebay-reader.js', 'utf8'), reader);
 // Minimal DOM fixture follows original eBay item markup, not the collapsed SOLD card.
 const el = (text = '', visible = true, strike = false) => ({ textContent: text,
   getClientRects: () => visible ? [1] : [], matches: () => strike, querySelector: () => null, querySelectorAll: () => [] });
-function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false, condition = '', location = '',
+function fixture({ status = 'This listing sold on Mon, Oct 19 at 10:00 AM.', price = 'US $18.00', offer = false, condition = '', location = '', quantity = '', hiddenQuantity = false,
   strike = false, hiddenStrike = false, hiddenSold = false, summary = false, conflict = false, hiddenPrice = false, duplicatePrice = false } = {}) {
   const primary = el(), section = el(), main = el();
   primary.querySelectorAll = s => s === '.x-price-primary__price' ? [el(price, !hiddenPrice), ...(duplicatePrice ? [el(price)] : [])]
     : [el(price, true, strike), el('$99.99', !hiddenStrike && strike, strike)];
   section.querySelector = () => primary;
   section.querySelectorAll = () => offer ? [el('Best offer accepted')] : [];
-  main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : s === '.x-item-condition-text' ? el(condition) : section;
+  const qty = el(quantity, !hiddenQuantity); qty.querySelectorAll = () => [el(quantity, !hiddenQuantity)];
+  main.querySelector = s => s === 'h1.x-item-title__mainTitle' ? el('Skylanders Giants Glow In The Dark Sonic Boom') : s === '.x-item-condition-text' ? el(condition) : s === '.x-price-section' ? section : s === '.x-quantity' ? qty : null;
   main.querySelectorAll = () => location ? [el(location)] : [];
   return { readyState: 'complete', defaultView: { getComputedStyle: () => ({ textDecorationLine: '' }) },
     querySelector: selector => selector === '#mainContent' && !summary ? main : null,
@@ -31,6 +32,18 @@ assert.equal(parse().state, 'sold'); assert.equal(parse().price, 1800);
 assert.equal(parse({condition:'Brand New: unopened'}).conditionText,'Brand New');
 assert.equal(parse({condition:'New (Other): opened box'}).conditionText,'New (Other)');
 assert.equal(parse({condition:'Used: tested'}).conditionText,'Used');
+assert.equal(parse({condition:'Very Good - Refurbished: tested'}).conditionText,'Very Good - Refurbished');
+const multi = { status: 'This item is out of stock.', quantity: 'Out of Stock · 3 sold', price: 'US $99.88' };
+assert.equal(parse({ ...multi, quantity: 'Out of Stock3 sold' }).unitsSold, 3, 'Adjacent live availability spans have no textContent separator');
+assert.equal(parse(multi).state, 'multi-sold');
+assert.equal(parse(multi).unitsSold, 3);
+assert.equal(parse(multi).price, 9988);
+for (const change of [{ quantity: 'Out of Stock' }, { quantity: '0 sold' }, { hiddenQuantity: true },
+  { quantity: '3 sold 4 sold' }, { hiddenPrice: true }, { price: 'US $99.88 to $120.00' }])
+  assert.equal(parse({ ...multi, ...change }).state, 'unknown');
+assert.equal(parse({ ...multi, offer: true }).state, 'offer');
+assert.equal(parse({ ...multi, strike: true }).state, 'offer');
+assert.equal(parse({ ...multi, status: 'This listing has ended.' }).state, 'ended');
 assert.equal(parse({location:'Located in: Toronto, Canada'}).sellerCountry,'Toronto, Canada');
 assert.equal(parse({location:'Located in: Rome, Italy'}).locationSource,'ebay-located-in');
 assert.equal(parse({location:'Delivery to Italy'}).sellerCountry,undefined);
@@ -129,6 +142,14 @@ const result = (job, extra = {}) => ({ id: job.message.id, title: 'Example Game 
   const abandoned = check('404870222603'); await flush(); removedHandler(1); await flush();
   assert.ok(removed.includes(16), 'Closing requesting page cancels its temporary tabs');
   void abandoned;
+  const multiCheck = check('404870222604'); await flush();
+  pending.at(-1).resolve(result(pending.at(-1), { state: 'multi-sold', unitsSold: 3, price: 9988 }));
+  const multiValue = await multiCheck;
+  assert.equal(multiValue.state, 'multi-sold'); assert.equal(multiValue.unitsSold, 3); assert.equal(multiValue.price, 9988);
+  await flush();
+  const badMulti = check('404870222605'); await flush();
+  pending.at(-1).resolve(result(pending.at(-1), { state: 'multi-sold', unitsSold: 0 }));
+  assert.equal((await badMulti).state, 'unknown'); await flush();
   const listeners = new Set();
   const pageWindow = { addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn),
     postMessage: data => queueMicrotask(() => { for (const fn of [...listeners]) fn({ source: pageWindow, origin: 'https://play2wingames.com', data }); }) };

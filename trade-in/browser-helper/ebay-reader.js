@@ -36,16 +36,24 @@ function readEbaySale(doc, id, href) {
       || /line-through/.test(doc.defaultView?.getComputedStyle(e).textDecorationLine || '')));
   if (offer || strike) return { state: 'offer', id, title };
   // The collapsed SOLD summary can show an asking price. Full item markup is required above.
-  if (!sold) return unknown;
+  // A quantity counter is weaker evidence: the pricing page must also match a
+  // Sold search card and its item price before using it, always with review.
+  // Scope to the original item's quantity panel, never recommendations/prose.
+  const quantity = main.querySelector('.x-quantity');
+  const counts = visible(quantity) ? [...quantity.querySelectorAll('.x-quantity__availability')]
+    .filter(visible).flatMap(e => [...e.textContent.matchAll(/(?:^|[^\d,])([\d,]+)\s+sold\b/gi)].map(m => Number(m[1].replace(/,/g, '')))) : [];
+  const unitsSold = counts.length === 1 && Number.isSafeInteger(counts[0]) && counts[0] > 0 ? counts[0] : null;
+  if (!sold && !unitsSold) return unknown;
   const prices = [...primary.querySelectorAll('.x-price-primary__price')].filter(visible).map(e => e.textContent.trim());
   if (prices.length !== 1 || !/^US\s*\$\s*[\d,]+(?:\.\d{2})?$/.test(prices[0])) return unknown;
   const price = Math.round(Number(prices[0].replace(/[^\d.]/g, '')) * 100);
   const conditionNode = main.querySelector('.x-item-condition-text');
-  const conditionText = visible(conditionNode) ? conditionNode.textContent.trim().match(/^(Brand New|New \(Other\)|New|Pre-Owned|Used|Open box|For parts or not working)(?=\s|:|$)/i)?.[1] : null;
+  const conditionText = visible(conditionNode) ? conditionNode.textContent.trim().match(/^(Brand New|New \(Other\)|New|Pre-Owned|Used|Open box|(?:(?:Certified|Excellent|Very Good|Good|Acceptable)\s*-\s*)?Refurbished|Seller refurbished|Manufacturer refurbished|For parts or not working)(?=\s|:|$)/i)?.[1] : null;
   const locations = [...main.querySelectorAll('.ux-labels-values--shipping .ux-textspans, .ux-labels-values--location .ux-textspans')]
     .filter(visible).map(el => el.textContent.trim().match(/^Located in\s*:\s*(.{2,120})$/i)?.[1]).filter(Boolean);
   const sellerCountry = locations.length === 1 ? locations[0] : null;
-  return Number.isSafeInteger(price) && price > 0 ? { state: 'sold', id, title, price,
+  return Number.isSafeInteger(price) && price > 0 ? { state: sold ? 'sold' : 'multi-sold', id, title, price,
+    ...(!sold ? { unitsSold } : {}),
     ...(conditionText ? { conditionText } : {}), ...(sellerCountry ? { sellerCountry, locationSource: 'ebay-located-in' } : {}) } : unknown;
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {

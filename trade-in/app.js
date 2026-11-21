@@ -3873,7 +3873,7 @@ const floorAmazonProgress = new Map(); // successful request results retained on
 const amazonCond = (condition) => (condition === 'new' ? 'new' : 'used');
 const AMZ_SUB = { new: 'New', mint: 'Mint', like_new: 'Like new', very_good: 'Very good', good: 'Good', acceptable: 'Acceptable', poor: 'Poor', club: 'Club', oem: 'OEM', warranty: 'Warranty', refurbished_warranty: 'Refurbished', refurbished: 'Refurbished', open_box: 'Open box', other: 'Other' };
 
-const FLOOR_HELPER_RECOMMENDED = '1.1.12';
+const FLOOR_HELPER_RECOMMENDED = '1.1.13';
 function floorHelperStatusInfo(helper) {
   if (!helper?.available) return { state: 'missing', text: 'Not connected', hint: 'Enable the helper in this Chrome profile, then refresh the page. No response does not prove it is uninstalled.' };
   const version = typeof helper.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(helper.version) ? helper.version : null;
@@ -4652,7 +4652,7 @@ async function loadFloorSales(product) {
   if (floorCur === cur) renderFloorPricer();
 }
 
-const FLOOR_EBAY_LABELS = { search: 'Sold shown in search — item not checked', sold: 'Sold price verified', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
+const FLOOR_EBAY_LABELS = { search: 'Sold shown in search — item not checked', sold: 'Sold price verified', 'multi-sold': 'Sold search + units sold — review price', ended: 'Ended — not a confirmed sale', offer: 'Accepted offer — price hidden',
   price: 'Sale price differs — review', mismatch: 'eBay item does not match', location: 'Seller outside North America', unknown: 'Unverified — review manually', pending: 'Checking sale…', historical: 'Historical evidence — not verified' };
 function floorOutsideEbayWindow(sale, now = Date.now()) {
   const date = sale?.date;
@@ -4731,7 +4731,7 @@ function floorEbayPageSales(value) {
     && Number.isSafeInteger(s.price) && s.price > 0 && s.price < 100000000 && ['sold', 'offer'].includes(s.state) && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
 }
 function floorEbaySearchMatches(sale) {
-  return !sale.odd && !sale.outlier && ['search', 'sold', 'pending'].includes(sale.verification?.state);
+  return !sale.odd && !sale.outlier && ['search', 'sold', 'multi-sold', 'pending'].includes(sale.verification?.state);
 }
 async function floorEbayRecentSales(helper, query, since, stopped, allowUnreadable) {
   // Sold cards have day precision. Overlap two days and read through the entire cutoff day.
@@ -4935,7 +4935,7 @@ async function runFloorEbaySearch(cur, progress = () => {}, cancelled = () => fa
       // Use the same identity, condition, offer and outlier rules as pricing.
       // Do not stop for a mismatched bundle, hidden offer, or unreadable condition.
       const candidates = floorSales({ ...evidence, product, condition, directEbay: { result } });
-      const matched = candidates.find(s => !s.odd && !s.outlier && ['search', 'sold'].includes(s.verification?.state));
+      const matched = candidates.find(s => !s.odd && !s.outlier && ['search', 'sold', 'multi-sold'].includes(s.verification?.state));
       // Do not infer a slow seller just because its first, highest-price page
       // has old listings. Continue until recent evidence or pagination resolves it.
       const olderPending = candidates.some(s => s.ageInfo?.pending || s.historicalInfo?.pending);
@@ -5032,7 +5032,9 @@ function floorDirectSearchHtml(cur) {
 }
 function floorEbayResult(sale, product, result, condition) {
   const id = floorSaleKey(sale);
-  if (!result || result.id !== id || !['sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
+  if (!result || result.id !== id || !['sold', 'multi-sold', 'ended', 'offer'].includes(result.state)) return { state: 'unknown' };
+  if (result.state === 'multi-sold' && (!sale.directEbay || sale.searchVerification?.state !== 'search'
+    || !Number.isSafeInteger(result.unitsSold) || result.unitsSold < 1)) return { state: 'unknown' };
   if (!result.title || floorSaleListingMismatch(sale, product, result.title)) return { state: 'mismatch' };
   if (!floorAllowsOverseasSellers(product) && floorSaleLocation(result) === 'outside-north-america') return { state: 'location', sellerCountry: result.sellerCountry, locationSource: result.locationSource };
   if (result.conditionText) {
@@ -5042,8 +5044,9 @@ function floorEbayResult(sale, product, result, condition) {
   if (condition && (floorOdd({ ...sale, title: result.title }, condition, rhythmKind(product['product-name']), product)
     || floorToyFamily(product) && floorFigureSaleCondition({ title: result.title }, condition) !== condition)) return { state: 'mismatch' };
   if (floorLooseConditionMismatch(result.title, condition, product)) return { state: 'unknown' };
-  if (result.state === 'sold' && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
+  if (['sold', 'multi-sold'].includes(result.state) && (!Number.isSafeInteger(result.price) || result.price !== (sale.itemPrice ?? sale.price))) return { state: 'price' };
   return { state: result.state, price: result.price, checkedAt: result.checkedAt,
+    ...(result.state === 'multi-sold' ? { unitsSold: result.unitsSold } : {}),
     ...(result.state === 'ended' && result.confirmedUnsold === true ? { confirmedUnsold: true } : {}),
     ...(result.sellerCountry ? { sellerCountry: result.sellerCountry, locationSource: result.locationSource } : {}) };
 }
@@ -5104,18 +5107,20 @@ function floorBasis(cur = floorCur) {
   if (b.from === 'msrp') return b;
   const state = cur.targetedEbay;
   const historical = !!(driver?.sale.historicalInfo?.retained);
-  const checking = !!(driver && state?.running && driver.sale.verification?.state !== 'sold');
+  const multiSold = driver?.sale.verification?.state === 'multi-sold';
+  const checking = !!(driver && state?.running && !['sold', 'multi-sold'].includes(driver.sale.verification?.state));
   const skipped = [cur, b.standardReference?.cur].filter(Boolean).some(c => floorSales(c).some(s => s.verification?.skipped && (!b.basis || s.price >= b.basis)));
   const exhausted = state?.attempts > 0 && !driver && (b.from === 'pricecharting' || b.need);
   if (cur.typed != null) return b;
   const searchReview = cur.directEbay && !cur.directEbay.loading && [cur.directEbay.result, cur.directEbay.standard?.result].filter(Boolean).some(r => r.state !== 'ready' || r.partial);
-  const review = historical || searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
+  const review = multiSold || historical || searchReview || skipped || exhausted || !!(driver && driver.sale.verification?.state !== 'sold' && (driver.risky || state));
   if (!review && !checking) return b;
   const message = checking ? `Checking eBay sales (${state.attempts} checked or in progress); historical references do not stop checks of the next eligible sales.`
+    : multiSold ? 'Review multi-quantity eBay evidence: Sold appears in search and the original item shows units sold at the same displayed price. Individual transaction prices are not confirmed.'
     : searchReview ? floorSearchReviewWarnings(cur).map(w => w.detail).join(' ')
     : historical ? 'Historical PriceCharting sale retained. Its date is highlighted; current eBay sold status is unavailable. Review the evidence or Product Research before labeling.'
     : 'Price needs review: some eBay evidence could not be verified. Recent unreadable checked listings are skipped, not treated as sold. Review the marked listings or Product Research before labeling.';
-  return { ...b, ebayReview: review, searchReview, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
+  return { ...b, ebayReview: review, multiSoldReview: multiSold, searchReview, ebayChecking: checking, checks: [...b.checks, message, ...(state?.unavailable ? ['Automatic eBay check needs Chrome Market Helper 1.1.4 or later. Reload the updated helper and refresh the pricing tool; review the sale manually until connected.'] : [])] };
 }
 // Predict only the next possible driver if the current one is rejected. All
 // hypothetical exclusions stay in a copy, never in the actual pricing evidence.
@@ -5137,7 +5142,7 @@ function floorEbayCandidates(cur, limit, early = false) {
   const candidates = [], keys = new Set();
   while (candidates.length < limit) {
     const driver = floorEbayDriver(shadow);
-    if (!driver || ['sold', 'pending'].includes(driver.sale.verification?.state)) break;
+    if (!driver || ['sold', 'multi-sold', 'pending'].includes(driver.sale.verification?.state)) break;
     const key = floorSaleKey(driver.sale);
     if (keys.has(key)) break;
     keys.add(key);
@@ -6193,6 +6198,7 @@ function floorOwnBasis(cur = floorCur) {
   checks.push(...(cur.salesNotes || []));
   checks.push(...(cur.amazon?.matchNotes || []));
   if (cur.ebayChecks?.unavailable) checks.push('Optional eBay check unavailable. Reload Chrome Market Helper 1.1.2 or later and refresh the tool, or review the listing manually; normal pricing continues');
+  if (sales.some(s => s.verification?.state === 'multi-sold')) checks.push('Multi-quantity eBay evidence included for review: Sold search price matches the original item price and visible units-sold count. Individual transaction prices are not confirmed.');
   if (sales.some(s => s.verification?.skipped)) checks.push('Unreadable eBay listings were skipped from automatic pricing and need manual review; they are not confirmed sold or ended');
   if (sales.some(s => s.verification?.state === 'unknown' && !s.verification.skipped)) checks.push('An eBay listing could not be verified. It remains PriceCharting evidence, not a verified sale; review manually');
   for (const state of ['ended', 'offer', 'price', 'mismatch', 'location']) {
@@ -6445,8 +6451,9 @@ function floorStandardHtml(b) {
   const sales = floorSales(cur);
   const rows = sales.filter(s => !s.odd && !s.outlier).slice(0, 8);
   const rejected = sales.filter(s => floorEbayExcluded(s.verification));
-  const unverified = ref.from === 'sale' && ref.sale?.verification?.state !== 'sold';
-  const status = unverified ? ref.sale?.verification?.state === 'pending' ? 'candidate · checking sale' : 'candidate · unverified' : 'baseline';
+  const multiSold = ref.from === 'sale' && ref.sale?.verification?.state === 'multi-sold';
+  const unverified = ref.from === 'sale' && !['sold', 'multi-sold'].includes(ref.sale?.verification?.state);
+  const status = multiSold ? 'baseline · multi-quantity review' : unverified ? ref.sale?.verification?.state === 'pending' ? 'candidate · checking sale' : 'candidate · unverified' : 'baseline';
   return `<details class="floor-details"><summary>Standard game · ${money(ref.basis)} ${status}${b.from === 'standard' && !unverified ? ' · used' : ''}</summary>
     <p class="muted small-print">${pcLink(p.id, p['product-name'])} · ${esc(GAME_CONDITIONS[cur.condition])} · ${esc(FROM_LABELS[ref.from] || ref.from)}.
     Specific premiums and deductions apply afterward.</p>
@@ -6494,7 +6501,7 @@ function floorSaleDateHtml(s) {
 function floorSaleTable(rows, b, selectable = true) {
   return `<table class="floor-sales"><tbody>${rows.map(s => `<tr${selectable ? ` data-sale="${s.i}"` : ''} class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
     <td class="num">${money(s.price)}</td>
-    <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || FLOOR_EBAY_LABELS[s.verification?.state] || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
+    <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || (s.verification?.state === 'multi-sold' ? `${s.verification.unitsSold} sold · matching search price · review` : FLOOR_EBAY_LABELS[s.verification?.state]) || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
     <td class="muted">${floorSaleDateHtml(s)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 function floorSalesHtml(cur, sales, b) {
@@ -6645,7 +6652,7 @@ function renderFloorPricer() {
         ${b.need ? `<p class="floor-need">${esc(b.need)}</p>` : ''}
         ${b.cibReview ? '<p class="muted small-print">CIB comparison needs review · see review notes.</p>' : ''}
         <div class="floor-review-summary">
-          ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
+          ${b.ebayReview ? `<span class="badge warn">Price needs review · ${b.multiSoldReview ? 'eBay multi-quantity price' : b.searchReview ? esc(floorSearchReviewWarnings(cur).map(w => w.label).join(' · ')) : 'eBay sale unverified'}</span>` : ''}
           ${b.renewedReference ? '<span class="badge info">Renewed reference</span>' : ''}
           ${b.renewedReferenceOnly ? '<span class="badge info">Renewed above 2× PriceCharting + $2 · reference only</span>' : ''}
           ${b.expensiveGameBasis ? '<span class="badge info">$500+ game · Amazon reference only</span>' : ''}

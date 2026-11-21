@@ -81,6 +81,28 @@ for (const grade of ['Very Good - Refurbished', 'Excellent - Refurbished', 'Good
   assert.equal(invoke(ctx, 'floorEbayResult', sale, urbanProduct,
     { id: sale.id, title: sale.title, state: 'sold', price: 9988, conditionText: grade }, 'new').state, 'mismatch');
 }
+// Multi-quantity evidence is usable only with a same-ID Sold search and exact item price.
+{
+  const c = urban(), sale = rows(c)[0];
+  const evidence = { id: sale.id, title: sale.title, state: 'multi-sold', unitsSold: 3, price: 9988, conditionText: 'Very Good - Refurbished' };
+  const check = (s = sale, e = evidence) => invoke(ctx, 'floorEbayResult', s, urbanProduct, e, 'cib');
+  const checked = check(); assert.equal(checked.state, 'multi-sold'); assert.equal(checked.unitsSold, 3);
+  c.ebayChecks = { results: { [sale.id]: checked } };
+  assert.equal(result(c).r.price, 10000, 'Reviewable $99.88 uses existing rounding');
+  assert.equal(result(c).b.ebayReview, true); assert.equal(result(c).b.multiSoldReview, true);
+  assert.equal(invoke(ctx, 'floorEbayCandidates', c, 2).length, 0, 'Checked reviewable driver stops repeated tab checks');
+  c.targetedEbay = { running: true, attempts: 1 };
+  assert.equal(result(c).b.ebayChecking, false, 'A slower backup cannot keep this driver waiting');
+  const html = invoke(ctx, 'floorSaleTable', rows(c), result(c).b);
+  assert.match(html, /3 sold.*matching search price.*review/); assert.doesNotMatch(html, /Sold price verified/);
+  assert.equal(check(sale, { ...evidence, price: 9999 }).state, 'price');
+  assert.equal(check(sale, { ...evidence, id: '999999999999' }).state, 'unknown');
+  assert.equal(check(sale, { ...evidence, unitsSold: 0 }).state, 'unknown');
+  assert.equal(check({ ...sale, directEbay: false }).state, 'unknown', 'PC-only evidence is insufficient');
+  assert.equal(check({ ...sale, searchVerification: { state: 'offer' } }).state, 'unknown');
+  assert.equal(check(sale, { ...evidence, state: 'offer' }).state, 'offer');
+  assert.equal(check(sale, { ...evidence, state: 'ended' }).state, 'ended');
+}
 for (const grade of ['For parts or not working', 'For parts - Refurbished', 'Unknown', 'Not refurbished'])
   assert.equal(invoke(ctx, 'floorEbayUsedCondition', grade), false, grade);
 for (const state of ['ended', 'offer']) {

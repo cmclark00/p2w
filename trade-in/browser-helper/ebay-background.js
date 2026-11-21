@@ -15,14 +15,16 @@ async function finishEbay(job, result) {
   if (job.done) return;
   job.done = true; clearTimeout(job.timer); ebayJobs.delete(job.target.id);
   if (job.running) ebayRunning--;
-  const valid = result?.id === job.target.id && ['sold', 'ended', 'offer'].includes(result.state)
+  const valid = result?.id === job.target.id && ['sold', 'multi-sold', 'ended', 'offer'].includes(result.state)
     && typeof result.title === 'string' && result.title.length > 0 && result.title.length < 500
-    && (result.state !== 'sold' || Number.isSafeInteger(result.price) && result.price > 0 && result.price < 100000000);
+    && (!['sold', 'multi-sold'].includes(result.state) || Number.isSafeInteger(result.price) && result.price > 0 && result.price < 100000000)
+    && (result.state !== 'multi-sold' || Number.isSafeInteger(result.unitsSold) && result.unitsSold > 0);
   const value = valid ? { state: result.state, id: job.target.id, title: result.title,
     ...(result.state === 'ended' && result.confirmedUnsold === true ? { confirmedUnsold: true } : {}),
     ...(result.conditionText ? { conditionText: String(result.conditionText).slice(0, 100) } : {}),
     ...(result.sellerCountry && result.locationSource === 'ebay-located-in' ? { sellerCountry: String(result.sellerCountry).slice(0, 120), locationSource: 'ebay-located-in' } : {}),
-    price: result.state === 'sold' ? result.price : null, source: 'browser-helper', checkedAt: Math.floor(Date.now() / 1000) } : ebayUnknown();
+    ...(result.state === 'multi-sold' ? { unitsSold: result.unitsSold } : {}),
+    price: ['sold', 'multi-sold'].includes(result.state) ? result.price : null, source: 'browser-helper', checkedAt: Math.floor(Date.now() / 1000) } : ebayUnknown();
   ebayCache.set(job.target.id, value);
   if (ebayCache.size > 500) ebayCache.delete(ebayCache.keys().next().value);
   for (const { respond } of job.waiters) respond(value);
