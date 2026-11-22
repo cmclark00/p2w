@@ -590,6 +590,9 @@ The site's **only server-side code**. Everything else is static.
     own expandable section. Toys-to-life/hardware keep their existing rules.
     Nintendo Selects copies use their own edition's market evidence. The
     pricer skips the separate standard-release lookups for these copies.
+    PS1 and PS2 editions (including PAL/import entries) also use only their
+    own edition's evidence, with no standard-game floor or standard Amazon
+    fallback. Sibling-page recovery still requires the selected edition.
     Named game releases labeled Collection (e.g. WWII Valor Collection) are
     variant evidence, not standard-game comps. The shared listing matcher
     rejects them in selected-page sales, sibling recovery and Amazon; selected

@@ -14,6 +14,27 @@ function engine(request) {
   return { ctx, run: js => vm.runInContext(js, ctx), fetch: () => vm.runInContext('fetchFloorProductSales(variant, request)', ctx) };
 }
 (async () => {
+  for (const system of ['Playstation','Playstation 1','Playstation 2','PS1','PS2','PSX','PAL Playstation','JP Playstation 2']) {
+    const independent = engine(async () => { throw Error('unexpected request'); });
+    independent.ctx.copy = {...variant,'console-name':system};
+    assert.equal(independent.run('floorStandardGame(copy)'),null,system);
+    independent.run('current={product:copy,condition:"cib",sales:{cib:[{title:"Example Game Special Edition",price:2000}]},standardGame:{product:{...copy,"product-name":"Example Game"},sales:{cib:[{title:"Example Game",price:9000}]}},amazon:{found:false,standard:{found:true,title:"Example Game",lowest:9000}}}');
+    assert.equal(independent.run('floorResult(current).r.price'),2000,'cached standard evidence cannot raise '+system);
+    independent.run('settings.floorPremiums=[{phrase:"Example Game",pct:20}]');
+    assert.equal(independent.run('floorResult(current).r.price'),2500,'premium still applies on '+system);
+  }
+  const psReprint = {...variant,'console-name':'Playstation 2','product-name':'Example Game [Greatest Hits]'};
+  const psOriginal = {...base,'console-name':'Playstation 2'};
+  const independent = engine(async (route,params) => {
+    if (route==='pc/products') return {products:[psReprint,psOriginal]};
+    if (route==='pc/product') throw Error('must not fetch a standard price floor');
+    return {sales:{cib:params.id==='1'?[]:[sale('123456789050','Example Game Greatest Hits PS2 CIB',2000),sale('123456789051','Example Game PS2 CIB',9000)]}};
+  });
+  independent.ctx.psReprint=psReprint;
+  const isolated=await independent.run('fetchFloorProductSales(psReprint,request)');
+  assert.equal(isolated.standardGame,null);
+  assert.equal(isolated.sales.cib.length,1,'still recovers matching edition sales');
+  assert.equal(isolated.sales.cib[0].price,2000,'standard black-label sale stays separate');
   const recovered = sale('123456789012', 'Example Game Special Edition PS4 CIB', 2200);
   const standard = sale('123456789013', 'Example Game PS4 CIB', 2500);
   const calls = [];

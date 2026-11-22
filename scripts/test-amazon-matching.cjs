@@ -23,6 +23,17 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('PS1 and PS2 variants do not search Amazon for a standard-edition fallback', async () => {
+    for (const system of ['Playstation','Playstation 2','PAL Playstation 2']) {
+      const calls=[];
+      const e=engine(async (route,params) => { calls.push([route,params]); return {candidates:[]}; });
+      const p={...product,'product-name':'Example Game [Greatest Hits]','console-name':system,upc:''};
+      const result=await e.fetch(p,'cib');
+      assert.equal(result.standard,undefined,system);
+      assert.ok(calls.length>0);
+      assert.ok(calls.every(([,params])=>!params.title || /Greatest Hits/.test(params.title)),JSON.stringify(calls));
+    }
+  });
   await test('verified Amazon reprint identity overrides an edition-less title and exact barcode', async () => {
     const p = {...product,'product-name':'Final Fantasy IX','console-name':'Playstation',upc:'662248900100'};
     const reprint = {...candidate('B01823MODW','Final Fantasy IX [並行輸入品]',['Playstation']),barcodes:['0662248900100']};

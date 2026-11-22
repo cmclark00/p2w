@@ -4030,6 +4030,9 @@ const floorMarketSearchPlatform = product => floorXbox360Reissue(product)
   : product['console-name'];
 function floorStandardGame(product) {
   if (floorToyFamily(product) || floorIsHardware(product) || rhythmKind(product['product-name']) === 'bundle') return null;
+  // PS1/PS2 black-label and reprint editions have independent markets. Do not
+  // borrow a standard edition's sales, Amazon fallback or minimum price.
+  if (/^(?:playstation(?: [12])?|ps[12]|psx)$/.test(floorGamePlatform(product))) return null;
   if (NINTENDO_SELECTS_EDITION.test(norm(product['product-name']))) return null;
   const name = floorVariantName(product);
   if (!name || name === product['product-name']) return null;

@@ -977,6 +977,8 @@ Guide (the Google Sheet tab).
      games and seller wording such as “from my personal collection” still qualify.
      **Nintendo Selects** copies use their own edition's market evidence and
      can price below the standard release.
+     **PS1 and PS2 editions** also price independently: black-label and reprint
+     copies do not borrow a standard-game minimum or standard Amazon fallback.
      For **Link to the Past on GBA**, **Four Swords** is part of the same cartridge
      and is accepted in listing titles. Other Zelda games and seller-added bundles
      still need to be excluded.
