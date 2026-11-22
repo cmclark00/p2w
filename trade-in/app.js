@@ -5503,11 +5503,11 @@ function floorRegionMismatch(title, product, sourceConsole = '') {
   return null;
 }
 const FLOOR_EXTRA_ITEMS = ['figurines?|figures?|statues?', 'soundtracks?|music cds?', 'art ?books?', 'steel ?books?',
-  'bonus discs?', 'demo discs?', 'amiibo', 'controllers?', 'memory cards?', '(?:light )?guns?|guncons?', 'sensors?', 'another game|extra games?'];
+  'bonus discs?', 'demo discs?', 'strategy guides?|walkthrough guides?', 'amiibo', 'controllers?', 'memory cards?', '(?:light )?guns?|guncons?', 'sensors?', 'another game|extra games?'];
 // Ordinary box contents are not a seller-added bundle. Remove only the connector
 // and the named paper/packaging item when testing bundle wording; leave every
 // other extra, edition, region, condition and price-outlier check in place.
-const FLOOR_PACK_IN = String.raw`(?:(?:original|included|pack[ -]?in|factory|fold[ -]?out)\s+)*(?:(?:registration|reg\.?|warranty)\s+cards?|registration|instructions?(?:\s+(?:manuals?|booklets?))?|manuals?|(?:instruction|warranty)\s+booklets?|(?:paper|advertising|safety|warranty)\s+inserts?|inserts?|posters?|maps?|foam(?:\s+(?:inserts?|blocks?))?)\b`;
+const FLOOR_PACK_IN = String.raw`(?:(?:original|included|pack[ -]?in|factory|fold[ -]?out)\s+)*(?:(?:registration|reg\.?|warranty)\s+cards?|registration|reg|instructions?(?:\s+(?:manuals?|booklets?))?|manuals?|(?:instruction|warranty)\s+booklets?|(?:paper|advertising|safety|warranty)\s+inserts?|inserts?|posters?|maps?|foam(?:\s+(?:inserts?|blocks?))?)\b`;
 const FLOOR_GAME_CONTENTS = String.raw`(?:(?:original|included|factory)\s+)*(?:(?:jewel\s+|game\s+)?cases?|box(?:es)?|packaging|(?:game\s+)?(?:discs?|disks?|cartridges?|carts?))\b`;
 function floorBundleTitle(title, gameContents = false) {
   const contents = gameContents ? `${FLOOR_PACK_IN}|${FLOOR_GAME_CONTENTS}` : FLOOR_PACK_IN;
@@ -5531,7 +5531,7 @@ function floorEditionContentsTitle(title, product) {
 }
 function floorExtraMismatch(title, name) {
   return FLOOR_EXTRA_ITEMS.some((item) => {
-    const bundled = new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\bincludes?\\b|\\band\\b|&)\\s*(?:(?:a|an|the|bonus|extra|exclusive|collectible|limited|art|mini)\\s+)*(?:${item})\\b`, 'i');
+    const bundled = new RegExp(`(?:\\bwith\\b|\\bw/|\\+|\\bplus\\b|\\bincludes?\\b|\\band\\b|&)\\s*(?:(?:a|an|the|official|original|bonus|extra|exclusive|collectible|limited|art|mini)\\s+)*(?:${item})\\b`, 'i');
     const selected = new RegExp(`\\b(?:${item})\\b`, 'i').test(name);
     return bundled.test(title) && !selected && !(item === 'controllers?' && rhythmKind(name) === 'bundle');
   });
@@ -5587,6 +5587,14 @@ function floorNumberedGameBundle(title, product) {
 // same cartridge. Normalize only this known title/platform combination, keeping
 // other games, extras, condition words and edition qualifiers for the filters.
 function floorKnownGameTitle(title, product) {
+  // Publisher credits and a repeated FF-number abbreviation do not change the
+  // game's identity. Retain other FF numbers so a sequel/bundle still fails.
+  const finalFantasy = floorTitleWords(floorVariantName(product)).join(' ').match(/^final fantasy (\d+)$/);
+  if (finalFantasy && /\bfinal\s+fantasy\b/i.test(title || '')) {
+    title = String(title).replace(/\bsquare\s*(?:soft|enix)\b/gi, ' ')
+      .replace(new RegExp(`\\bFF\\s*${finalFantasy[1]}\\b`, 'gi'), ' ')
+      .replace(/\bRPG\b/gi, ' ');
+  }
   // PS4's first-season disc includes 400 Days. PriceCharting labels that
   // release GOTY; retail packaging calls it The Complete First Season.
   // Normalize only this release, retaining other seasons, regions and extras.
@@ -6091,6 +6099,10 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   return floorTitleIdentityMismatch(packInTitle, product);
 }
 
+// Catalog titles sometimes omit the edition printed on the cover. These are
+// verified product identities, not price overrides. B01823MODW's live cover and
+// EAN 0662248900100 identify the US Greatest Hits reprint (checked 2026-11-21).
+const FLOOR_AMAZON_VERIFIED_EDITIONS = { B01823MODW: 'Greatest Hits' };
 function floorAmazonMismatch(cur) {
   if (!cur.amazon?.found) return null;
   // A Generic/unbranded game cartridge is not evidence of an original release.
@@ -6106,7 +6118,9 @@ function floorAmazonMismatch(cur) {
   const selectedCodes = floorCatalogBarcodes(cur.product).map(barcode);
   const sameBarcode = (cur.amazon.barcodes || []).some(code => selectedCodes.includes(barcode(code)));
   const regionEvidence = sameBarcode && floorAmazonPlatformConfirmed(cur.amazon, cur.product) ? cur.product['console-name'] : '';
-  const mismatch = floorListingMismatch(cur.amazon.title, cur.product, regionEvidence);
+  const edition = FLOOR_AMAZON_VERIFIED_EDITIONS[cur.amazon.asin];
+  const matchingTitle = edition ? `${cur.amazon.title} [${edition}]` : cur.amazon.title;
+  const mismatch = floorListingMismatch(matchingTitle, cur.product, regionEvidence);
   if (mismatch) return mismatch;
   if (cur.amazon.platforms?.length && !floorAmazonPlatformConfirmed({ title: '', platforms: cur.amazon.platforms }, cur.product)) return 'Different or unconfirmed Amazon catalog platform';
   const rhythm = rhythmKind(cur.product?.['product-name']);

@@ -24,6 +24,27 @@ const json = (js) => JSON.parse(JSON.stringify(run(js)));
 const invoke = (name, ...args) => run(`${name}(...${JSON.stringify(args)})`);
 let checks = 0;
 function test(name, fn) { fn(); checks++; console.log(`PASS ${name}`); }
+test('FFIX audit retains publisher and registration wording but excludes guide bundles and other releases', () => {
+  const p = {'product-name':'Final Fantasy IX','console-name':'Playstation','cib-price':3495};
+  for (const title of [
+    'Squaresoft Final Fantasy IX (PS1, 2000) - Complete',
+    'SquareSoft Final Fantasy IX (Sony PlayStation 1 PS1) Complete CIB 4-Disc Manual',
+    'Final Fantasy IX RPG FF9 for PS1 Playstation 1',
+    'Final Fantasy IX (PlayStation, PS1) Complete w/Manual + Reg Free Shipping',
+    'Final Fantasy IX (Sony PlayStation 1, 2000) Complete CIB + Reg Tested Working',
+  ]) assert.equal(invoke('floorListingMismatch',title,p),null,title);
+  for (const title of [
+    'Final Fantasy IX Black Label for PS1 With Official Strategy Guide - CLEAN!',
+    'Final Fantasy IX PS1 + Original Strategy Guide',
+    'Final Fantasy IX PS1 + Reg + Final Fantasy VIII',
+    'Final Fantasy VIII PS1 RPG FF8',
+    'Final Fantasy IX PS1 Greatest Hits CIB',
+    'Final Fantasy IX PS1 PAL CIB',
+  ]) assert.ok(invoke('floorListingMismatch',title,p),title);
+  const special = {...p,'product-name':'Final Fantasy IX [Special Edition]'};
+  assert.ok(invoke('floorListingMismatch','Final Fantasy IX Special Edition PS1 with Official Strategy Guide',special));
+  assert.equal(invoke('floorOdd',{title:'Squaresoft Final Fantasy IX PS1 factory sealed'},'cib',null,p),true);
+});
 test('PS4 Walking Dead GOTY accepts its first-season retail name, not other seasons or bundles', () => {
   const p = {'product-name':'The Walking Dead [Game of the Year]','console-name':'Playstation 4'};
   for (const title of [

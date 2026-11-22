@@ -23,6 +23,20 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('verified Amazon reprint identity overrides an edition-less title and exact barcode', async () => {
+    const p = {...product,'product-name':'Final Fantasy IX','console-name':'Playstation',upc:'662248900100'};
+    const reprint = {...candidate('B01823MODW','Final Fantasy IX [並行輸入品]',['Playstation']),barcodes:['0662248900100']};
+    const e = engine(async route => route === 'amazon/catalog' ? {candidates:[reprint]} : offer(reprint,2893));
+    e.ctx.reprint = reprint; e.ctx.original = p;
+    assert.match(e.run('floorAmazonCandidateMismatch(reprint,original,"cib",false)'),/edition|reprint/i);
+    assert.match(e.run('floorAmazonMismatch({product:original,condition:"cib",amazon:{...reprint,found:true}})'),/edition|reprint/i);
+    assert.equal((await e.fetch(p,'cib')).found,false);
+    e.ctx.greatest = {...p,'product-name':'Final Fantasy IX [Greatest Hits]'};
+    assert.equal(e.run('floorAmazonCandidateMismatch(reprint,greatest,"cib",false)'),null);
+    // The visual finding belongs to this ASIN; don't infer Japanese region from the Japanese import wording.
+    e.ctx.unknown = {...reprint,asin:'B000000001'};
+    assert.equal(e.run('floorAmazonCandidateMismatch(unknown,original,"cib",false)'),null);
+  });
   await test('PS4 Walking Dead GOTY accepts the Complete First Season Amazon listing', async () => {
     const p = {...product,'product-name':'The Walking Dead [Game of the Year]','console-name':'Playstation 4'};
     const match = candidate('B00K2O54V4','The Walking Dead: The Complete First Season - PlayStation 4',['Playstation 4']);
