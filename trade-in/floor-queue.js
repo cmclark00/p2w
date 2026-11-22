@@ -226,8 +226,11 @@ async function researchFloorQueueItem(cur, progress, stopped) {
 function renderFloorQueue() {
   const host = document.querySelector('#floorQueue');
   if (!host) return;
+  const count = document.querySelector('#floorQueueCount');
+  const ready = floorQueue.filter(j => j.state === 'ready').length;
+  if (count) count.textContent = `· ${floorQueue.length}${ready ? ` · ${ready} ready` : ''}`;
   const names = { queued: 'Queued', researching: 'Researching', ready: 'Ready', review: 'Needs review' };
-  host.innerHTML = `<div class="queue-heading"><strong>Scan queue · ${floorQueue.length}</strong><span class="muted">Keep scanning. Open a finished item to review and add it.</span></div>
+  host.innerHTML = `<p class="muted small-print">Open an item to review and add it.</p>
     <div class="queue-items">${floorQueue.map(j => {
       const cur = j.cur, done = cur?.queueDone;
       const price = done ? floorResult(cur).r?.price : null;

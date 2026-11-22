@@ -802,7 +802,9 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
-   The **Scan queue** lets you keep scanning while research finishes. Open any
+   The **Scan queue** tab at the bottom-right lets you keep scanning while research
+   finishes. It starts collapsed and shows the item count and ready count; click
+   it to open or tuck away the side panel, including shared recent results. Open any
    queued item to choose its condition; switching cards does not cancel another
    item's research. Items show **Queued**, **Researching**, **Ready**, or
    **Needs review**. Review a finished item and click **Add to list** to remove
