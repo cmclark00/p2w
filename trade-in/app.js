@@ -6949,7 +6949,7 @@ function onFloorPricerClick(e) {
     return;
   }
   if (act === 'variants') { runFloorVariants(floorCur.product); $('#floorScan').focus(); $('#floorScan').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-  if (act === 'close') { floorCur = null; renderFloorPricer(); $('#floorScan').focus(); return; }
+  if (act === 'close') { floorCur = null; if (typeof floorQueueSelectedId !== 'undefined') floorQueueSelectedId = null; renderFloorPricer(); $('#floorScan').focus(); return; }
   if (act === 'add') { addFloorItem(); return; }
   if (act === 'all') { floorCur.showAll = !floorCur.showAll; renderFloorPricer(); return; }
   if (act === 'auto') { floorCur.typed = null; floorCur.pick = null; renderFloorPricer(); return; }

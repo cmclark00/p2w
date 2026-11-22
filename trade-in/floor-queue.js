@@ -5,6 +5,7 @@
 let floorQueueEnabled = false;
 const floorQueue = [];
 let floorQueueRunning = false;
+let floorQueueSelectedId = null;
 let floorRecentResults = [];
 const FLOOR_RECENT_VERSION = '20261121-queue-skyrim-1';
 const FLOOR_RECENT_TTL = 30 * 60 * 1000;
@@ -27,13 +28,37 @@ function saveFloorQueue() {
     condition: j.cur?.condition || j.condition, manualMissing: !!j.cur?.manualMissing,
     researchRequested: !!j.cur?.researchRequested, toyGroup: j.cur?.toyGroup })));
 }
-function enqueueFloorScan({ product, upc, condition = 'cib', ...extra }, select = false) {
+function selectFloorQueueItem(job) {
+  floorQueueSelectedId = job.id;
+  floorCur = job.cur;
+  renderFloorQueue(); renderFloorPricer();
+}
+function resolveFloorQueueBarcode(job) {
+  if (job.cur) return Promise.resolve();
+  if (!job.lookup) job.lookup = PC.byUpc(job.upc).then(product => {
+    if (!floorQueue.includes(job)) return;
+    job.cur = floorQueueContext(product, job.condition);
+    if (floorQueueSelectedId === job.id) floorCur = job.cur;
+    saveFloorQueue(); renderFloorQueue(); renderFloorPricer();
+  }).catch(error => {
+    job.lookupError = error;
+    if (floorQueue.includes(job)) {
+      job.state = 'review'; job.error = error.message;
+      if (floorQueueSelectedId === job.id) toast(error.message, 'error');
+      renderFloorQueue();
+    }
+  });
+  return job.lookup;
+}
+function enqueueFloorScan({ product, upc, condition = 'cib', ...extra }, select = true) {
   if (floorQueue.length >= 100) { toast('The scan queue has 100 items. Remove finished items before scanning more.', 'error'); return; }
   const existing = floorQueue.find(j => upc ? j.upc === upc : j.cur?.product.id === product?.id && j.cur?.condition === floorCondition(product, condition));
-  if (existing) { if (existing.cur) floorCur = existing.cur; renderFloorQueue(); renderFloorPricer(); toast('Already in the scan queue.'); return; }
+  if (existing) { selectFloorQueueItem(existing); toast('Already in the scan queue.'); return; }
   const job = { id: uid(), upc, condition, state: 'queued', cur: product ? floorQueueContext(product, condition, extra) : null };
   floorQueue.push(job);
-  if (job.cur && (select || !floorCur)) floorCur = job.cur;
+  if (select || !floorCur) selectFloorQueueItem(job);
+  // Resolve the scanned identity immediately, even while an older game's research runs.
+  if (!job.cur) void resolveFloorQueueBarcode(job);
   saveFloorQueue(); renderFloorQueue(); renderFloorPricer();
   void pumpFloorQueue();
 }
@@ -51,6 +76,7 @@ function floorQueueRefresh(job, extra = {}) {
 }
 function finishFloorQueueItem(cur) {
   const index = floorQueue.findIndex(j => j.cur === cur);
+  if (index >= 0 && floorQueueSelectedId === floorQueue[index].id) floorQueueSelectedId = null;
   if (index >= 0) floorQueue.splice(index, 1);
   cur.queueCancelled = true;
   saveFloorQueue(); renderFloorQueue();
@@ -108,12 +134,12 @@ async function pumpFloorQueue() {
       let cur;
       try {
         if (!job.cur) {
-          const product = await PC.byUpc(job.upc);
+          await resolveFloorQueueBarcode(job);
           if (!floorQueue.includes(job)) continue;
-          job.cur = floorQueueContext(product, job.condition);
+          if (job.lookupError) throw job.lookupError;
         }
         cur = job.cur;
-        if (!floorCur) floorCur = cur;
+        if (!floorCur && !floorQueueSelectedId) floorCur = cur;
         const stopped = () => !floorQueue.includes(job) || job.cur !== cur || cur.queueCancelled;
         const progress = () => { if (!stopped()) { renderFloorQueue(); if (floorCur === cur) queueFloorPricerRender(cur, cur.condition); } };
         progress(); saveFloorQueue();
@@ -261,13 +287,14 @@ function initFloorQueue() {
       return;
     }
     const job = floorQueue.find(j => j.id === (d.queueOpen || d.queueRemove || d.queueRefresh)); if (!job) return;
-    if (d.queueOpen && job.cur) { floorCur = job.cur; renderFloorPricer(); }
+    if (d.queueOpen) selectFloorQueueItem(job);
     if (d.queueRefresh) {
-      if (job.cur) floorQueueRefresh(job); else { job.state = 'queued'; job.error = null; void pumpFloorQueue(); }
+      if (job.cur) floorQueueRefresh(job); else { job.lookup = null; job.lookupError = null; job.state = 'queued'; job.error = null; void pumpFloorQueue(); }
     }
     if (d.queueRemove) {
       if (job.cur) job.cur.queueCancelled = true;
       floorQueue.splice(floorQueue.indexOf(job), 1);
+      if (floorQueueSelectedId === job.id) floorQueueSelectedId = null;
       if (floorCur === job.cur) { floorCur = null; renderFloorPricer(); }
       saveFloorQueue();
     }

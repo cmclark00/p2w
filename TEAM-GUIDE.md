@@ -803,7 +803,9 @@ Guide (the Google Sheet tab).
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
    The **Scan queue** tab at the bottom-right lets you keep scanning while research
-   finishes. It starts collapsed and shows the item count and ready count; click
+   finishes. Each new scan or selected search result opens that game immediately;
+   older research finishing will not switch the card back. It starts collapsed
+   and shows the item count and ready count; click
    it to open or tuck away the side panel, including shared recent results. Open any
    queued item to choose its condition; switching cards does not cancel another
    item's research. Items show **Queued**, **Researching**, **Ready**, or
