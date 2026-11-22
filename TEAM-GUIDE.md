@@ -813,10 +813,12 @@ Guide (the Google Sheet tab).
    checks are not shared. **Refresh** requests research again (individual
    source caches still apply). A helper is still needed for fresh eBay checks.
    Ordinary games with a **PriceCharting value below $15 in that condition**
-   show a **Quick price** from the **highest eligible PriceCharting sale** for
+   show a **Quick price** from the **highest PriceCharting sale** for
    that condition, with normal rounding and deductions. The tool reads one
-   PriceCharting page and still filters mismatched listings and outliers.
-   If no eligible sale is available, it clearly labels the average as a fallback.
+   PriceCharting page without filtering its listings or verifying the sales.
+   The sales list stays visible, with the highest sale highlighted; click a title
+   to inspect it or **Show all** to see more than the first eight rows.
+   If no usable sale price is available, it clearly labels the average as a fallback.
    These skip Amazon and direct eBay research and do not use GameStop as a minimum.
    Click **Research this item** beside the price whenever a closer check is
    needed; it runs the normal sold-listing, Amazon and GameStop checks.

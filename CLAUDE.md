@@ -553,12 +553,17 @@ The site's **only server-side code**. Everything else is static.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
   - Interactive ordinary games with a positive selected-condition PriceCharting
-    market value **below $15** use quick pricing from the **highest eligible
+    market value **below $15** use quick pricing from the **highest
     selected-condition PriceCharting sale**, with existing rounding/deductions.
-    One selected-page `pc/sales` request supplies all conditions; title, packaging,
-    region, age and outlier filters still apply. No sibling-page discovery,
+    One selected-page `pc/sales` request supplies all conditions. Quick mode trusts
+    the selected condition bucket without title, packaging, region, age, bundle,
+    outlier or verification exclusions; only unusable/nonpositive prices are skipped.
+    The linked sales list shows eight rows initially, with a show-all toggle and
+    the driving sale highlighted. It is labeled unfiltered/not verified; selecting
+    a row does not start helper research or override the highest-sale basis.
+    No sibling-page discovery,
     Amazon, direct eBay/helper research or GameStop floor runs in quick mode.
-    Until sales load, Add is disabled. With no eligible sale (or a failed lookup),
+    Until sales load, Add is disabled. With no usable sale price (or a failed lookup),
     the condition average is an explicitly labeled fallback. `quickSales` is
     separate from full-research state so late responses cannot overwrite it.
     Exactly $15, missing values, hardware, toys-to-life, rhythm titles, standard
@@ -729,7 +734,8 @@ The site's **only server-side code**. Everything else is static.
     source selection and do not modify premium settings or rounding rules.
     Named content packs (e.g. Fighting Chance Pack) are different editions even
     after platform/year or "with" wording. They cannot price the standard copy
-    in quick mode, full research or Amazon comparisons. Selected pack editions
+    in full research or Amazon comparisons. Quick mode deliberately trusts the
+    selected PriceCharting condition list without these exclusions. Selected pack editions
     require their named qualifiers; ordinary pack-in inserts and packaging remain.
     Numbered sequel pairs anchored to the selected game series (such as
     "Kingdom Hearts 1 & 2" or "God of War I + II") are multi-game bundles

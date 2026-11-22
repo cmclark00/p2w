@@ -20,7 +20,7 @@ function engine(request) {
   const quickPending = deferred(), quickCalls = [];
   const quickData = { sales: {
     loose: [{ ...sale, title: 'Example Game PS4 Disc Only', price: 1499 }],
-    cib: [{ ...sale, price: 5000 },
+    cib: [{ ...sale, price: 5000, date: new Date().toISOString().slice(0,10) },
       { ...sale, title: 'Example Game PS4 CIB Bundle Lot of 3 Games', price: 3900 },
       { ...sale, title: 'Example Game Xbox One CIB', price: 3800 },
       { ...sale, title: 'Example Game PS4 PAL Italian CIB', price: 3700 },
@@ -43,19 +43,24 @@ function engine(request) {
   quickPending.resolve(quickData);
   await tick();
   assert.equal(quickCalls.length,1,'Repaints do not repeat the selected-page lookup');
-  assert.equal(quick.run('floorResult(floorCur).r.price'),2500,'Highest eligible PC sale wins over average, without unchecked GameStop');
+  assert.equal(quick.run('floorResult(floorCur).r.price'),5000,'Highest PC sale wins without exclusions or unchecked GameStop');
   assert.equal(quick.run('floorBasis().from'),'pcsale');
-  assert.equal(quick.run('floorQuickSales(floorCur).filter(s=>s.odd||s.outlier).length'),4,'Bundle, platform, region and outlier filters remain active');
+  assert.equal(quick.run('floorQuickSales(floorCur).length'),5,'Quick mode keeps bundles, platform/region mismatches and high outliers');
   assert.equal(quick.run('floorCur.salesRequested'),undefined);
   assert.equal(quick.run('floorCur.fullRequested'),undefined,'Missing UPC alone does not trigger research');
   assert.equal(quick.run('floorCur.directEbay'),undefined);
   assert.equal(quick.run('floorCur.amazon'),undefined);
-  assert.match(quick.element('#floorPricer').innerHTML,/Highest eligible PriceCharting sale: \$25.00/);
+  assert.match(quick.element('#floorPricer').innerHTML,/Highest PriceCharting sale: \$50.00/);
+  assert.match(quick.element('#floorPricer').innerHTML,/Unfiltered · not verified/);
+  assert.match(quick.element('#floorPricer').innerHTML,/class="floor-sales"/);
+  assert.match(quick.element('#floorPricer').innerHTML,/class="picked"/);
+  assert.match(quick.element('#floorPricer').innerHTML,/Bundle Lot of 3 Games/);
+  assert.doesNotMatch(quick.element('#floorPricer').innerHTML,/data-sale="|Sold price verified/,'Quick rows are links for review, not full-research selections');
   assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="research"/);
   assert.match(quick.element('#floorPricer').innerHTML,/data-floor-act="add">/);
   assert.doesNotMatch(quick.element('#floorPricer').innerHTML,/No matching offers|Reading recent sales/);
   assert.equal(quick.run('floorBasisInfo(floorBasis()).quickPricing'),true,'Saved result records skipped research');
-  assert.equal(quick.run(`floorResult({...floorCur,condition:'new'}).r.price`),2500,'Quick sealed price retains CIB sale floor');
+  assert.equal(quick.run(`floorResult({...floorCur,condition:'new'}).r.price`),5000,'Quick sealed price retains CIB sale floor');
   assert.equal(quick.run('floorBasisInfo(floorBasis()).saleDate'),new Date().toISOString().slice(0,10));
   assert.equal(quick.run(`floorBasis({...floorCur,quickSales:{sales:{loose:[],cib:[],new:[]}}}).quickFallback`),true);
   assert.equal(quick.run(`floorResult({...floorCur,quickSales:{error:'offline'}}).r.price`),1500,'Failed lookup visibly falls back to condition average');
@@ -117,7 +122,7 @@ function engine(request) {
   assert.equal(quickRecheck.run('amzCalls'),2);
   assert.equal(quickRecheck.run('stockCalls'),2);
   assert.equal(quickRecheck.run('floor.items[0].recheck.quickPricing'),true);
-  assert.equal(quickRecheck.run('floor.items[0].recheck.price'),2500,'Saved quick rechecks use highest eligible sale');
+  assert.equal(quickRecheck.run('floor.items[0].recheck.price'),5000,'Saved quick rechecks use highest unfiltered sale');
   assert.equal(quickRecheck.run('floor.items[1].recheck.quickPricing'),undefined);
   quickRecheck.run('useRecheck(floor.items[0]);useRecheck(floor.items[1]);');
   assert.equal(quickRecheck.run('floor.items[0].quickPricing'),true);

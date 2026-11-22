@@ -1863,7 +1863,7 @@ test('preorders, multi-game lots and unknown named editions are held for review'
   assert.equal(invoke('floorListingMismatch', 'Example Game Zelda 40th Edition PS4', product), null);
 });
 
-test('named content packs cannot price standard copies across quick, full and Amazon sources', () => {
+test('named content packs stay filtered in research and Amazon, but quick mode trusts PriceCharting', () => {
   const product = { ...item, 'product-name': 'The Evil Within', 'console-name': 'Xbox One', 'cib-price': 809 };
   const packTitle = 'The Evil Within (Xbox One, 2014) with Fighting Chance Pack Lenticular Slipcover';
   for (const title of [packTitle, 'The Evil Within Xbox One Fighting Chance Pack',
@@ -1891,9 +1891,35 @@ test('named content packs cannot price standard copies across quick, full and Am
   const sales = { cib: [{ title: packTitle, price: 1529, date: '2026-11-01' },
     { title: 'The Evil Within Xbox One CIB', price: 1299, date: '2026-11-02' }] };
   const quick = invoke('floorQuickBasis', cur(product, { quickSales: { sales } }));
-  assert.equal(quick.basis, 1299);
+  assert.equal(quick.basis, 1529);
   const full = invoke('floorResult', cur(product, { sales }));
   assert.equal(full.b.basis, 1299);
+});
+
+test('quick sales use only the selected condition, bypass all exclusions and remain inspectable', () => {
+  const product = { ...item, 'product-name': 'Metal Gear Solid 2', 'console-name': 'Playstation 2', 'cib-price': 999 };
+  const rows = [
+    { title: 'Metal Gear Solid 2 Sons of Libery PS2 CIB', price: 6000, date: '2020-01-01', odd: true, outlier: {}, verification: { state: 'ended' } },
+    { title: 'Metal Gear Solid 2 PS2 bundle', price: 5000 },
+    { title: 'Metal Gear Solid 2 PS2 Disc Only', price: 4000 },
+    { title: 'Metal Gear Solid 2 PS2 PAL', price: 3000 },
+    ...Array.from({ length: 6 }, (_, i) => ({ title: `PriceCharting row ${i}`, price: 2000 - i })),
+    { title: 'Invalid price', price: 'bad' }, { title: 'Zero price', price: 0 },
+  ];
+  const c = cur(product, { quickSales: { sales: { cib: rows, new: [{ title: 'Sealed', price: 20000 }] } },
+    sales: { cib: [{ title: 'Stale research', price: 30000 }] }, directEbay: { sales: [{ price: 40000 }] } });
+  const basis = invoke('floorQuickBasis', c);
+  assert.equal(basis.basis, 6000);
+  const sales = invoke('floorQuickSales', c);
+  assert.equal(sales.length, 10);
+  assert.equal(sales.some(s => s.odd || s.outlier || s.verification), false);
+  const html = invoke('floorQuickSalesHtml', c, basis);
+  assert.match(html, /Sons of Libery/);
+  assert.match(html, /2020-01-01/);
+  assert.match(html, /Show all 10 PriceCharting sales/);
+  assert.doesNotMatch(html, /PriceCharting row 5|data-sale="/);
+  assert.match(invoke('floorQuickSalesHtml', { ...c, showAll: true }, basis), /PriceCharting row 5/);
+  assert.match(invoke('floorQuickSalesHtml', { ...c, quickSales: { error: '<offline>' } }, {}), /&lt;offline&gt;/);
 });
 
 test('normal naming, selected extras and genuine collections remain comparable', () => {

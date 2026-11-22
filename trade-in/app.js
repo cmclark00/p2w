@@ -5126,20 +5126,21 @@ async function fetchFloorQuickSales(product) {
   } catch (err) { return { error: err.message }; }
 }
 function floorQuickSales(cur) {
-  return floorSales({ ...cur, sales: cur.quickSales?.sales, salesLoading: false,
-    salesError: cur.quickSales?.error, directEbay: null, ebayChecks: null });
+  // Trust the selected PriceCharting condition bucket in quick mode. Do not
+  // inherit full-research exclusions or verification from another snapshot.
+  return (cur.quickSales?.sales?.[cur.condition] || []).map((s, i) => ({
+    title: s.title, url: s.url, date: s.date, price: Number(s.price), i,
+  })).filter(s => Number.isFinite(s.price) && s.price > 0).sort((a, b) => b.price - a.price);
 }
 function floorQuickBasis(cur) {
-  const checks = ['Quick pricing: highest eligible sale on the selected PriceCharting page. Amazon, direct eBay searches and individual sale verification are skipped. Use Research this item for full checks.'];
+  const checks = ['Quick pricing: highest sale in the selected PriceCharting condition, without exclusion filters or sale verification. Amazon and direct eBay searches are skipped. Use Research this item for full checks.'];
   if (cur.typed != null) return { basis: cur.typed, from: 'typed', quick: true, checks };
   if (!cur.quickSales || cur.quickSales.loading) return { basis: null, quick: true, waiting: true, checks };
   const sales = floorQuickSales(cur);
-  const sale = sales.find(s => !s.odd && !s.outlier && Number.isFinite(s.price) && s.price > 0);
-  const excluded = sales.filter(s => s.odd || s.outlier).length;
-  if (excluded) checks.push(`${excluded} PriceCharting listings excluded by matching, condition, age or outlier checks.`);
+  const sale = sales[0];
   if (sale) return { basis: sale.price, from: 'pcsale', sale, quick: true, checks };
   checks.push(cur.quickSales.error ? `PriceCharting sales check failed: ${cur.quickSales.error}. Using the condition average as fallback; research before labeling.`
-    : 'No eligible PriceCharting sale found for this condition. Using the condition average as fallback.');
+    : 'No PriceCharting sale with a usable price found for this condition. Using the condition average as fallback.');
   return { basis: Number(cur.product[PC_FIELDS.market[cur.condition]]), from: 'pricecharting', quick: true,
     quickFallback: true, checks };
 }
@@ -6567,7 +6568,7 @@ function floorSaleDateHtml(s) {
   return label ? `<span class="floor-sale-date-old">${esc(s.date)} · ${label}</span>` : esc(s.date || '');
 }
 function floorSaleTable(rows, b, selectable = true) {
-  return `<table class="floor-sales"><tbody>${rows.map(s => `<tr${selectable ? ` data-sale="${s.i}"` : ''} class="${b.from === 'sale' && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
+  return `<table class="floor-sales"><tbody>${rows.map(s => `<tr${selectable ? ` data-sale="${s.i}"` : ''} class="${['sale', 'pcsale'].includes(b.from) && b.sale?.i === s.i ? 'picked' : ''}${s.odd || s.outlier ? ' odd' : ''}">
     <td class="num">${money(s.price)}</td>
     <td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Sale')}</a>` : esc(s.title || 'Sale')}${s.odd || s.verification ? ` <span class="badge info">${esc(s.exclusion || s.mismatch || (s.verification?.state === 'multi-sold' ? `${s.verification.unitsSold} sold · matching search price · review` : FLOOR_EBAY_LABELS[s.verification?.state]) || 'odd listing')}</span>` : ''}${s.ageInfo?.retained ? ' <span class="badge info">Older sale · slow-selling evidence</span>' : ''}${s.outlier ? ' <span class="badge warn">Possible high outlier · review</span>' : ''}</td>
     <td class="muted">${floorSaleDateHtml(s)}${s.directEbay ? `<br>Direct eBay · ${esc(s.conditionText)}${s.shipping != null ? `<br>${money(s.itemPrice)} + ${money(s.shipping)} shipping included` : '<br>Shipping unknown · item price only'}` : ''}${s.sellerCountry ? `<br>Located in ${esc(s.sellerCountry)}` : s.directEbay ? '<br>Seller location not returned' : ''}${s.recovered ? `<br><a href="${esc(pcUrl(s.sourcePcId))}" target="_blank" rel="noopener noreferrer">Filed under ${esc(s.sourcePcName)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
@@ -6586,6 +6587,13 @@ function floorSalesHtml(cur, sales, b) {
       ${Object.entries(FLOOR_SALE_GROUPS).filter(([key]) => groups[key]?.length).map(([key, label]) => `<details class="floor-details floor-sale-group" ${attrs(key)}><summary>${label} (${groups[key].length})</summary><div data-sale-group-body>${open.excluded && open[key] ? floorSaleTable(groups[key], b) : ''}</div></details>`).join('')}
     </details>` : ''}
     ${referenceGroup('suggestions', 'Unrelated eBay results', 'Titles missing the selected game name. These often come from eBay’s broader suggestions and cannot set the automatic price.')}`;
+}
+function floorQuickSalesHtml(cur, b) {
+  if (!cur.quickSales || cur.quickSales.loading) return '<p class="muted">Loading PriceCharting sales…</p>';
+  const sales = floorQuickSales(cur);
+  if (!sales.length) return `<p class="muted">${cur.quickSales.error ? esc(cur.quickSales.error) : 'No PriceCharting sales with usable prices for this condition.'}</p>`;
+  return `${floorSaleTable(cur.showAll ? sales : sales.slice(0, 8), b, false)}
+    ${sales.length > 8 ? `<button type="button" class="link" data-floor-act="all">${cur.showAll ? 'Show fewer PriceCharting sales' : `Show all ${sales.length} PriceCharting sales`}</button>` : ''}`;
 }
 function floorLimitedHistoryHtml(cur, sales, b) {
   if (!cur.sales || cur.salesLoading) return '';
@@ -6748,7 +6756,9 @@ function renderFloorPricer() {
     </div>
     <div class="floor-body">
       <div class="floor-sales-wrap">
-        ${quick ? `<p class="muted">${b.quickFallback ? 'PriceCharting average fallback — no eligible sale available.' : b.sale ? `Highest eligible PriceCharting sale: ${money(b.sale.price)}${b.sale.url ? ` · <a href="${esc(b.sale.url)}" target="_blank" rel="noopener noreferrer">${esc(b.sale.title)}</a>` : ''}.` : b.waiting ? 'Loading PriceCharting sales…' : 'Quick pricing.'} Use <strong>Research this item</strong> above for full marketplace checks.</p>` : `
+        ${quick ? `<div class="eyebrow">${esc(GAME_CONDITIONS[cur.condition])} PriceCharting sales · quick pricing</div>
+        <p class="muted small-print">${b.quickFallback ? 'PriceCharting average fallback. ' : b.sale ? `Highest PriceCharting sale: ${money(b.sale.price)}. ` : ''}Unfiltered · not verified. Use <strong>Research this item</strong> for full checks.</p>
+        ${floorQuickSalesHtml(cur, b)}` : `
         <div class="eyebrow">Recent ${esc(GAME_CONDITIONS[cur.condition])} eBay sales · PriceCharting + direct search</div>
         ${floorDirectSearchHtml(cur)}
         <p class="small-print muted">${cur.targetedEbay?.running ? 'Checking up to two sales at once…' : cur.ebayChecks?.loading ? 'Checking one sale…' : cur.targetedEbay?.unavailable ? `${checkSelected}Individual sale verification unavailable. <button type="button" class="link" data-floor-act="ebay-resume">Retry sale checks</button> · Check the helper connection; search results alone are not verified sales.` : `${checkSelected}Checks: first sale with GameStop, then pairs until verified. Select a sale for a manual check.`}${cur.ebayChecks?.unavailable ? ' Check unavailable: reload helper 1.1.2+ and refresh, or review the sale link manually.' : ''}</p>
@@ -6776,7 +6786,7 @@ function renderFloorPricer() {
         <details class="floor-details"><summary>Pricing rules</summary><p class="muted small-print">${b.expensiveGameBasis ? "High-value game: highest eligible PriceCharting sale, with the GameStop minimum. Amazon is reference-only. Specific adjustments and final rounding still apply" : toy ? 'Toys to life: with a verified Amazon offer, use the highest of the highest eligible eBay sale, lowest matching Amazon offer, and GameStop. Without one, Skylanders/Infinity below $15 on PriceCharting use its market average; $15 and up use the highest eligible sale. Recognized special Skylanders keep a $20 minimum regardless of the average. Review unrecognized variants using the pricing group. Amiibo: $5 steps. Other figures: $2 steps below $15, then $5 steps. Nearest step, ties up.' : esc(tier.rule)}</p>
           ${!toy ? `<ul>
             <li>Nintendo-published pre-owned Switch / Switch 2 games released within 3 years: exactly MSRP minus $5, with no further premiums, deductions or rounding. Missing or conflicting publisher/MSRP details need review.</li>
-            <li>Ordinary games with a PriceCharting average below $15 use the highest eligible sale on that condition's PriceCharting page for quick pricing, with the average only as fallback when no eligible sale is available. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
+            <li>Ordinary games with a PriceCharting average below $15 use the highest sale in that condition's PriceCharting list without exclusions or verification. The average is a fallback when no usable price is available. Research this item runs full checks. Missing values, $15 and above, hardware, toys-to-life, edition baselines and specific pricing rules retain full research.</li>
             <li>Researched baseline for other games: highest eligible eBay sale, lowest Amazon offer, or GameStop.</li>
             <li>Games with a valid sale and either sold or lowest Amazon above $502 ($500 + $2 buffer): use sold evidence and the GameStop minimum; Amazon is reference-only.</li>
             <li>Amazon: use the lowest eligible offer for the selected condition, including shipping.</li>
