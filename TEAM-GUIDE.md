@@ -802,20 +802,10 @@ Guide (the Google Sheet tab).
 1. Type a **session name** (like "PS2 wall, Oct 1") and your name.
 2. Scan or search a game and click it. Pick **Loose / CIB / New**, and
    tick **Manual missing** for a CIB game without its manual.
-   The **Scan queue** tab at the bottom-right lets you keep scanning while research
-   finishes. Each new scan or selected search result opens that game immediately;
-   older research finishing will not switch the card back. It starts collapsed
-   and shows the item count and ready count; click
-   it to open or tuck away the side panel, including shared recent results. Open any
-   queued item to choose its condition; switching cards does not cancel another
-   item's research. Items show **Queued**, **Researching**, **Ready**, or
-   **Needs review**. Review a finished item and click **Add to list** to remove
-   it from the queue. Reloading preserves queued identities and rechecks them.
-   **Shared recent results** reuses completed checks from other registers for
-   30 minutes, only for the same edition, condition and pricing settings.
-   Prices are recalculated using the current rules; typed prices and incomplete
-   checks are not shared. **Refresh** requests research again (individual
-   source caches still apply). A helper is still needed for fresh eBay checks.
+   Each scan or selected search result opens that game and starts its checks
+   immediately. Research follows the current game; there is no scan queue or
+   automatic replay of earlier scans after reloading. A helper is still needed
+   for fresh eBay checks. Use **Save session** to keep items you added to the list.
    Ordinary games with a **PriceCharting value below $15 in that condition**
    show a **Quick price** from the **highest PriceCharting sale** for
    that condition, with normal rounding and deductions. The tool reads one

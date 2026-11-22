@@ -552,6 +552,11 @@ The site's **only server-side code**. Everything else is static.
     on the dev machine; to add routes, get a copy from the shop PC.
 - **Floor Pricing tab** (`#view-floor`, both roles): shelf prices for
   games, per the sheet's **Game Pricing Guide** tab.
+  - Research follows the currently selected game. The scan queue was removed:
+    new scans/search selections start immediately, old responses cannot replace
+    the current card, and saved queue identities are no longer replayed on reload.
+    Named floor sessions still save items added to the list. Regression coverage:
+    `node scripts/test-floor-direct.cjs`.
   - Interactive ordinary games with a positive selected-condition PriceCharting
     market value **below $15** use quick pricing from the **highest
     selected-condition PriceCharting sale**, with existing rounding/deductions.

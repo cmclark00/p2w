@@ -35,7 +35,7 @@ jobs:
         run: |
           node scripts/test-floor-pricing.cjs
           node scripts/test-pricing-loading.cjs
-          node scripts/test-floor-queue.cjs
+          node scripts/test-floor-direct.cjs
           node scripts/test-floor-variants.cjs
           node scripts/test-game-evidence.cjs
           node scripts/test-console-edition-matching.cjs

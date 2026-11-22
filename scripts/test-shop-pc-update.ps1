@@ -5,7 +5,7 @@ $updater = Join-Path $PSScriptRoot 'shop-pc/Update-TradeInCalculator.ps1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('p2w-updater-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 $ctx = @{ Block = ''; Corrupt = ''; FailInstall = ''; Folder = '' }
-$names = @('index.html', 'app.js', 'floor-queue.js', 'styles.css', 'assets/bulk-rates.json')
+$names = @('index.html', 'app.js', 'styles.css', 'assets/bulk-rates.json')
 $checks = 0
 function Invoke-WebRequest {
   param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [int]$TimeoutSec)
@@ -58,7 +58,7 @@ function Expect-Failure {
 try {
   $folder = New-Fixture 'success'
   & $updater -Folder $folder -Site 'https://fixture.invalid'
-  foreach ($n in @('index.html', 'app.js', 'dead-games.js', 'floor-queue.js', 'styles.css', 'assets/bulk-rates.json')) {
+  foreach ($n in @('index.html', 'app.js', 'dead-games.js', 'styles.css', 'assets/bulk-rates.json')) {
     $source = if ($n.StartsWith('assets/')) { Join-Path $repoRoot $n } else { Join-Path (Join-Path $repoRoot 'trade-in') $n }
     if ((Get-FileHash -LiteralPath (Join-Path $folder $n)).Hash -ne (Get-FileHash -LiteralPath $source).Hash) { throw "Wrong installed file: $n" }
   }
