@@ -24,6 +24,34 @@ const json = (js) => JSON.parse(JSON.stringify(run(js)));
 const invoke = (name, ...args) => run(`${name}(...${JSON.stringify(args)})`);
 let checks = 0;
 function test(name, fn) { fn(); checks++; console.log(`PASS ${name}`); }
+test('PS4 Walking Dead GOTY accepts its first-season retail name, not other seasons or bundles', () => {
+  const p = {'product-name':'The Walking Dead [Game of the Year]','console-name':'Playstation 4'};
+  for (const title of [
+    'The Walking Dead: The Complete First Season Plus 400 Days (PS4)',
+    'The Walking Dead: Season 1 Plus 400 Days (Sony PlayStation 4, 2013) PS4 Game',
+    'The Walking Dead The Complete First Season - Sony Playstation 4 PS4 Complete CIB',
+    'The Walking Dead: The Complete First Season Plus 400 Days (PS4) 1 Year Warranty',
+    'The Walking Dead Game of the Year PS4 CIB',
+  ]) assert.equal(invoke('floorListingMismatch',title,p),null,title);
+  for (const title of [
+    'The Walking Dead The Complete Second Season PS4',
+    'The Walking Dead The Complete First Season Plus 400 Days PS4 and Season 2',
+    'The Walking Dead The Complete First Season Plus 400 Days Xbox One',
+    'The Walking Dead The Complete First Season Plus 400 Days PS4 PAL Italian',
+    'The Walking Dead Definitive Series PS4',
+    'The Walking Dead Collection PS4',
+  ]) assert.ok(invoke('floorListingMismatch',title,p),title);
+  assert.ok(invoke('floorListingMismatch','The Walking Dead Complete First Season PS3',{...p,'console-name':'Playstation 3'}));
+});
+test('Skyrim Special Edition does not imply a steelbook', () => {
+  const p = {'product-name':'Elder Scrolls V: Skyrim [Special Edition]','console-name':'Playstation 4'};
+  for (const title of ["Elder Scrolls V: Skyrim -- Special Edition Steelbook (Sony PlayStation 4, 2016)",
+    'The Elder Scrolls V Skyrim Special Edition PS4 Steelbook CIB Complete Manual RPG'])
+    assert.equal(invoke('floorListingMismatch',title,p),'Different steelbook edition');
+  assert.equal(invoke('floorListingMismatch','The Elder Scrolls V Skyrim Special Edition PS4 CIB',p),null);
+  assert.equal(invoke('floorListingMismatch','The Elder Scrolls V Skyrim Special Edition Steelbook PS4 CIB',
+    {...p,'product-name':'Elder Scrolls V Skyrim [Special Edition Steelbook]'}),null);
+});
 const stockHeader = 'stock_code,item_name,category,item_type,condition,sub_condition,quantity,sell_price,pc_retail_loose_sell,pc_retail_cib_sell,pc_retail_new_sell';
 const lineHeader = 'transaction_number,date_local,transaction_type,line_mode,item_name,category,item_type,condition,sub_condition,quantity,line_subtotal';
 const txHeader = 'transaction_number,date_local,transaction_type,purchases_total,line_count';

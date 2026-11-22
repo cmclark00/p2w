@@ -7,7 +7,7 @@
   <title>Trade-In Calculator · Play2Win</title>
   <!-- ../ paths resolve to the site's /assets online and to /assets on the shop PC's local server -->
   <link rel="icon" href="../favicon-32.png">
-  <link rel="stylesheet" href="styles.css?v=20261104-trade-sort">
+  <link rel="stylesheet" href="styles.css?v=20261121-scan-queue">
 </head>
 <body>
   <header class="topbar">
@@ -229,6 +229,7 @@
         <div id="floorResults" class="results" hidden></div>
       </div>
 
+      <section id="floorQueue" class="panel floor-queue" aria-label="Scan queue"></section>
       <div id="floorPricer" class="panel floor-pricer" hidden></div>
 
       <details class="panel fulcrum-panel">
@@ -622,6 +623,7 @@
 
   <script src="stock-helper-client.js?v=20261120-ebay-resume"></script>
   <script src="dead-games.js?v=20261019-normal-play-2"></script>
-  <script src="app.js?v=20261121-named-content-packs"></script>
+  <script src="floor-queue.js?v=20261121-scan-queue"></script>
+  <script src="app.js?v=20261121-scan-queue"></script>
 </body>
 </html>

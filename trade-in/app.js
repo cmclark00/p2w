@@ -3911,6 +3911,7 @@ async function refreshFloorHelperStatus() {
 }
 
 function showFloor() {
+  if (typeof initFloorQueue === 'function') initFloorQueue();
   refreshFloorHelperStatus();
   $('#floorName').value = floor.name;
   $('#floorStaff').value = floor.staff;
@@ -3946,6 +3947,7 @@ async function runFloorSearch(q) {
 }
 
 async function floorScanUpc(upc) {
+  if (typeof floorQueueEnabled !== 'undefined' && floorQueueEnabled) { enqueueFloorScan({ upc }); return; }
   closeFloorResults();
   const seq = floorSearch.seq;
   floorCur = null;
@@ -4088,6 +4090,7 @@ function renderFloorResults() {
 /* ---------------------------------------------------------------- pricing one game */
 
 function pickFloorGame(product) {
+  if (typeof floorQueueEnabled !== 'undefined' && floorQueueEnabled) { enqueueFloorScan({ product }); closeFloorResults(); $('#floorScan').value = ''; return; }
   $('#floorScan').value = '';
   closeFloorResults();
   floorCur = { product, quickPricingEnabled: true, condition: floorToyFamily(product) ? 'loose' : 'cib', manualMissing: false, sales: null, salesError: null, pick: null, typed: null, showAll: false };
@@ -5583,6 +5586,13 @@ function floorNumberedGameBundle(title, product) {
 // same cartridge. Normalize only this known title/platform combination, keeping
 // other games, extras, condition words and edition qualifiers for the filters.
 function floorKnownGameTitle(title, product) {
+  // PS4's first-season disc includes 400 Days. PriceCharting labels that
+  // release GOTY; retail packaging calls it The Complete First Season.
+  // Normalize only this release, retaining other seasons, regions and extras.
+  if (/^(?:playstation 4|ps4)$/.test(floorGamePlatform(product))
+    && /^(?:the )?walking dead\s*(?:\[game of the year\]|game of the year|:?\s*(?:the )?complete first season(?: plus 400 days)?)$/i.test(String(product?.['product-name'] || '').trim())) {
+    title = String(title || '').replace(/\bwalking dead\s*[:\-]?\s*(?:the )?(?:(?:complete )?first season|season (?:1|one))(?:\s*(?:plus|\+|and|with|includes?)\s*400\s*days)?\b/gi, 'Walking Dead Game of the Year');
+  }
   if (floorXbox360Reissue(product)
     && floorXboxReissueKey(product['product-name']) === floorXboxReissueKey('Call of Duty Black Ops')) {
     title = String(title || '').replace(/\bBlack Ops (?:1|I)\b/gi, 'Black Ops');
@@ -6018,6 +6028,8 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
   const controllerMismatch = floorControllerMismatch(title, product);
+  // Skyrim's "Special Edition" is the game release, not proof of steelbook packaging.
+  if (/\bskyrim\b/i.test(name) && !/\bsteel[ -]?book\b/i.test(name) && /\bsteel[ -]?book\b/i.test(title)) return 'Different steelbook edition';
   if (controllerMismatch) return controllerMismatch;
   const consoleMismatch = floorConsoleListingMismatch(title, product);
   if (consoleMismatch) return consoleMismatch;
@@ -6623,7 +6635,7 @@ function renderFloorPricer() {
   const condition = cur.condition;
   const quick = floorQuickPricing(cur);
   if (cur.condition === 'new' && cur.typed != null) cur.cibComparison = null;
-  if (!quick && floorNeedsCibFloor(cur)) {
+  if (!cur.queueManaged && !quick && floorNeedsCibFloor(cur)) {
     const comparison = floorCibCur(cur);
     const cib = cur.cibComparison ||= {};
     if (cib.standardGame && comparison.standardGame) {
@@ -6636,8 +6648,8 @@ function renderFloorPricer() {
     void runFloorEbaySearch(cib, progress, stopped);
     void runFloorTargetedEbay(cib, progress, stopped);
   }
-  if (!quick) void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
-  if (!quick) void runFloorTargetedEbay(cur, () => {
+  if (!cur.queueManaged && !quick) void runFloorEbaySearch(cur, () => queueFloorPricerRender(cur, cur.condition), () => floorCur !== cur);
+  if (!cur.queueManaged && !quick) void runFloorTargetedEbay(cur, () => {
     if (floorCur === cur && cur.condition === condition) queueFloorPricerRender(cur, condition);
   }, () => floorCur !== cur || cur.condition !== condition || cur.typed != null);
   const p = cur.product;
@@ -6680,7 +6692,7 @@ function renderFloorPricer() {
         ${cur.condition === 'cib' && !hw ? `<label class="check floor-pinned-manual"><input type="checkbox" data-floor-field="manual"${cur.manualMissing ? ' checked' : ''}> Manual missing</label>` : ''}
       </div>
       <div class="floor-price${showTyped ? ' is-editing' : ''}">
-        <div class="floor-price-value"><span class="eyebrow">${quick ? b.waiting ? 'Checking PriceCharting' : b.quickFallback ? 'PriceCharting fallback' : 'Quick price' : b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
+        <div class="floor-price-value"><span class="eyebrow">${cur.queueManaged && !cur.queueDone ? 'Queued / checking' : quick ? b.waiting ? 'Checking PriceCharting' : b.quickFallback ? 'PriceCharting fallback' : 'Quick price' : b.ebayChecking ? 'Checking sales' : estimate ? 'Estimate' : b.ebayReview || b.cibReview ? 'Needs review' : 'Shelf price'}</span><strong>${result || estimate ? money((result || estimate).price) : '—'}</strong></div>
         <div class="floor-price-edit">
           <label class="floor-typed"${showTyped ? '' : ' hidden'}><span>Your price</span>
             <span class="money-input"><span>$</span><input type="text" inputmode="decimal" autocomplete="off" data-floor-field="typed" value="${esc(plain(cur.typed))}" placeholder="0.00"></span>
@@ -6690,7 +6702,7 @@ function renderFloorPricer() {
           ${quick ? '<button type="button" class="link" data-floor-act="research">Research this item</button>' : ''}
         </div>
       </div>
-      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && !b.ebayChecking && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
+      <button type="button" class="btn primary" data-floor-act="add"${result && !b.waiting && !b.ebayChecking && (!cur.queueManaged || cur.queueDone) && globalThis.P2WDeadGames ? '' : ' disabled'}>Add to list</button>
       <button type="button" class="icon-btn" data-floor-act="close" title="Close" aria-label="Close">×</button>
     </div>
     <div class="floor-market-quick" aria-label="Market references">
@@ -6874,6 +6886,7 @@ const floorBasisInfo = (b) => ({
 function addFloorItem() {
   if (!deadShelfReady([])) return;
   const cur = floorCur;
+  if (cur?.queueManaged && !cur.queueDone) return;
   const p = cur.product;
   const { b, r, hw } = floorResult(cur);
   if (!r || b.waiting || b.ebayChecking) return;
@@ -6886,6 +6899,7 @@ function addFloorItem() {
   });
   floor.dirty = true;
   saveFloorLocal();
+  if (cur.queueManaged) finishFloorQueueItem(cur);
   floorCur = null;
   renderFloorPricer();
   renderFloorList();
@@ -6894,6 +6908,7 @@ function addFloorItem() {
 
 function onFloorPricerClick(e) {
   if (!floorCur) return;
+  if (floorCur.queueManaged && onFloorQueuePricerClick(e)) return;
   const cond = e.target.closest('[data-floor-cond]')?.dataset.floorCond;
   if (cond) {
     const amazonChanged = cond !== floorCur.condition;
@@ -6968,6 +6983,11 @@ function onFloorPricerClick(e) {
 function onFloorPricerChange(e) {
   if (!floorCur) return;
   const field = e.target.dataset.floorField;
+  if (floorCur.queueManaged && ['manual', 'toyGroup'].includes(field)) {
+    floorQueueRefresh(floorQueue.find(j => j.cur === floorCur), field === 'manual'
+      ? { manualMissing: e.target.checked } : { toyGroup: e.target.value });
+    return;
+  }
   if (field === 'manual') floorCur.manualMissing = e.target.checked;
   if (field === 'toyGroup') { floorCur.toyGroup = e.target.value; floorCur.pick = null; floorCur.typed = null; }
   if (field === 'typed') {

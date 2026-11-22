@@ -35,6 +35,7 @@ jobs:
         run: |
           node scripts/test-floor-pricing.cjs
           node scripts/test-pricing-loading.cjs
+          node scripts/test-floor-queue.cjs
           node scripts/test-floor-variants.cjs
           node scripts/test-game-evidence.cjs
           node scripts/test-console-edition-matching.cjs
@@ -64,6 +65,8 @@ jobs:
         run: php scripts/test-gamestop-stock.php
       - name: Test shared eBay sales cache
         run: php scripts/test-ebay-sales-cache.php
+      - name: Test shared recent research
+        run: php scripts/test-floor-recent.php
       - name: Check checkout recovery and inventory mappings (offline)
         run: php scripts/test-shop-checkout.php
       - name: Check preview routes and staff access (offline)

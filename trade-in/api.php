@@ -1127,6 +1127,16 @@ switch ("$method $route") {
     require_once __DIR__ . '/gamestop-stock.php';
     gamestop_stock((string)($_GET['url'] ?? ''));
 
+  case 'POST floor-recent':
+    require_role('staff');
+    $raw = (string)file_get_contents('php://input');
+    if (strlen($raw) > 262144) fail(413, 'Research evidence too large to share.');
+    $input = json_decode($raw, true);
+    if (!is_array($input)) fail(400, 'Invalid recent research.');
+    require_once __DIR__ . '/floor-recent.php';
+    floor_recent_request($input);
+    break;
+
   case 'GET floor-sessions':
     require_role('staff');
     $id = (string)($_GET['id'] ?? '');

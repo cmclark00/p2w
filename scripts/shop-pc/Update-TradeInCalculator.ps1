@@ -35,6 +35,7 @@ $files = @(
   @{ Name = 'index.html';      Url = "$Site/trade-in/index.html";    Must = @('data-view="trade"', 'data-view="dead"', 'src="dead-games.js'); Dir = 'front' },
   @{ Name = 'app.js';          Url = "$Site/trade-in/app.js";        Must = @('DEFAULT_SETTINGS', 'function wireDeadGames'); Dir = 'front' },
   @{ Name = 'dead-games.js';   Url = "$Site/trade-in/dead-games.js"; Must = 'P2WDeadGames';     Dir = 'front' },
+  @{ Name = 'floor-queue.js';  Url = "$Site/trade-in/floor-queue.js"; Must = 'function initFloorQueue'; Dir = 'front' },
   @{ Name = 'styles.css';      Url = "$Site/trade-in/styles.css";    Must = '#printArea';       Dir = 'front' },
   @{ Name = 'bulk-rates.json'; Url = "$Site/assets/bulk-rates.json"; Must = '"groups"';         Dir = 'assets' }
 )

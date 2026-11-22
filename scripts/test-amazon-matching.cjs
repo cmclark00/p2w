@@ -23,6 +23,13 @@ function engine(request) {
 let checks = 0;
 async function test(name, fn) { await fn(); checks++; console.log('PASS ' + name); }
 (async () => {
+  await test('PS4 Walking Dead GOTY accepts the Complete First Season Amazon listing', async () => {
+    const p = {...product,'product-name':'The Walking Dead [Game of the Year]','console-name':'Playstation 4'};
+    const match = candidate('B00K2O54V4','The Walking Dead: The Complete First Season - PlayStation 4',['Playstation 4']);
+    const e = engine(async route => route === 'amazon/catalog' ? {candidates:[match]} : offer(match,1616));
+    const result = await e.fetch(p,'cib');
+    assert.equal(result.found,true);assert.equal(result.asin,match.asin);
+  });
   await test('Generic game cartridges cannot become original-game Amazon references', async () => {
     const p = {...product,'product-name':'Crusader of Centy','console-name':'Sega Genesis'};
     const generic = {...candidate('B0C3J23LK1','Crusader Of Centy NTSC-USA 16 Bit MD Game Card For Sega Mega Drive For Genesis (Black)',['Sega Genesis']),publishers:['Generic']};
