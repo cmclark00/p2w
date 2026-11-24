@@ -6037,8 +6037,10 @@ function floorComputeListingMismatch(title, product, sourceConsole = '') {
   if (toyMismatch) return toyMismatch;
   const name = product?.['product-name'] || '';
   const controllerMismatch = floorControllerMismatch(title, product);
-  // Skyrim's "Special Edition" is the game release, not proof of steelbook packaging.
-  if (/\bskyrim\b/i.test(name) && !/\bsteel[ -]?book\b/i.test(name) && /\bsteel[ -]?book\b/i.test(title)) return 'Different steelbook edition';
+  // These release names also appear on standard-case copies.
+  if (/\bsteel[ -]?book\b/i.test(title) && !/\bsteel[ -]?book\b/i.test(name)
+    && (/\bskyrim\b/i.test(name) || (norm(name) === 'mass effect legendary edition'
+      && /^(?:playstation 4|ps4)$/.test(floorGamePlatform(product))))) return 'Different steelbook edition';
   if (controllerMismatch) return controllerMismatch;
   const consoleMismatch = floorConsoleListingMismatch(title, product);
   if (consoleMismatch) return consoleMismatch;

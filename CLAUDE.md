@@ -42,6 +42,9 @@ in Knoxville, TN. No build step, no framework, no bundler — edit files directl
 
 ## Hosting & deploy
 
+- After each completed site change, test it, commit the task's changes, and
+  push to `main` to deploy. Verify the change on the live site before reporting
+  completion, unless the user asks to hold deployment.
 - **LIVE on GoDaddy at `https://play2wingames.com` (hosting cutover done
   2026-06-06).** `.github/workflows/deploy.yml` is an `lftp mirror` FTP
   deploy: push to `main` (or the nightly events-sync `workflow_run`, or

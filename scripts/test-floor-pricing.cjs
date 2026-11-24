@@ -64,6 +64,18 @@ test('PS4 Walking Dead GOTY accepts its first-season retail name, not other seas
   ]) assert.ok(invoke('floorListingMismatch',title,p),title);
   assert.ok(invoke('floorListingMismatch','The Walking Dead Complete First Season PS3',{...p,'console-name':'Playstation 3'}));
 });
+test('PS4 Mass Effect Legendary Edition excludes optional SteelBook sales', () => {
+  const product = { 'product-name': 'Mass Effect Legendary Edition', 'console-name': 'Playstation 4' };
+  for (const title of [
+    'Mass Effect Legendary Edition PS4 with Steelbook',
+    'Mass Effect Legendary Edition Steelbook & Game (PlayStation 4 PS4) COMPLETE CIB',
+    'Mass Effect Legendary Edition PlayStation 4, 2021, Complete in Box Steel Book',
+    'Mass Effect Legendary Edition PS4 Steel-Book CIB',
+  ]) assert.equal(invoke('floorListingMismatch', title, product), 'Different steelbook edition', title);
+  assert.equal(invoke('floorListingMismatch', 'Mass Effect Legendary Edition PS4 PlayStation 4 CIB Complete In Box!', product), null);
+  assert.equal(invoke('floorListingMismatch', 'Mass Effect Legendary Edition PS4 Steelbook CIB',
+    { ...product, 'product-name': 'Mass Effect Legendary Edition [Steelbook Edition]' }), null);
+});
 test('Skyrim Special Edition does not imply a steelbook', () => {
   const p = {'product-name':'Elder Scrolls V: Skyrim [Special Edition]','console-name':'Playstation 4'};
   for (const title of ["Elder Scrolls V: Skyrim -- Special Edition Steelbook (Sony PlayStation 4, 2016)",
