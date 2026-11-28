@@ -884,6 +884,14 @@ if ($method !== 'GET') {
 }
 
 switch ("$method $route") {
+  case 'POST inspections/save':
+  case 'POST inspections/search':
+  case 'POST inspections/open':
+    require_role('staff');
+    require_once __DIR__ . '/inspections.php';
+    inspection_request($route);
+    break;
+
   case 'GET status':
     $role = current_role();
     respond(200, [

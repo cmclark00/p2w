@@ -126,8 +126,28 @@ with tempfile.TemporaryDirectory(prefix="p2w-http-test-") as directory:
             check(request("/trade-in/api.php?route=login", json_body={"password": "fixture-staff-only"})[0] == 200, "staff password accepted")
             status, body, headers, _ = request(intake)
             check(status == 200 and 'id="pages"' in body and "no-store" in headers["Cache-Control"], "private inspection available")
+            inspections = "/trade-in/api.php?route=inspections/"
+            fields = {"intake": "00017", "serial": "SN-a0", "model": "Fixture", "p0": "Fail",
+                      "p0note": "Cracked case", "employeeSign": "Test employee"}
+            entry = {"id": "1" * 32, "fields": fields}
+            def inspection(action, payload):
+                status, body, headers, _ = request(inspections + action, json_body=payload)
+                return status, json.loads(body)
+            check(inspection("save", {"id": "0"*32, "fields": {"serial": " "}})[0] == 422, "lookup identifier required")
+            check(inspection("save", entry)[0] == 201, "save inspection")
+            check(inspection("save", entry)[0] == 200, "same save can be retried")
+            check(inspection("save", {**entry, "fields": {**fields, "p0": "Pass"}})[0] == 409, "saved inspection is immutable")
+            check(inspection("search", {"number":"17"})[1]["matches"] == [], "keep leading zeros")
+            for number in ["00017", "  sn-A0 "]:
+                rows = inspection("search", {"number":number})[1]["matches"]
+                check(len(rows) == 1 and rows[0]["id"] == entry["id"], "lookup by either identifier")
+            check(inspection("open", {"id": entry["id"]})[1]["fields"] == fields, "reopen all recorded fields and notes")
+            check(inspection("save", {"id":"2"*32, "fields":{"serial":"SN-a0"}})[0] == 201, "repeat console visit")
+            check(len(inspection("search", {"number":"sn-a0"})[1]["matches"]) == 2, "find both inspections")
             request("/trade-in/api.php?route=logout", json_body={})
             check(request(intake)[0] == 401, "inspection locked after logout")
+            for action, payload in [("save", entry), ("search", {"number":"00017"}), ("open", {"id":entry["id"]})]:
+                check(inspection(action, payload)[0] == 401, "saved records require staff login")
             s,b,h,u=request("/shop")
             check(s==401 and "/shop/login" in u,"preview password required")
             check("noindex" in h.get("X-Robots-Tag",""),"preview search indexing disabled")

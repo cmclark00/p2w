@@ -55,13 +55,22 @@ document.getElementById('login').addEventListener('submit', async event => {
 @media print{@page{margin:14mm}body{background:white;color:black;font:10pt/1.35 sans-serif}header,main,dialog{display:none!important}#report{display:block}.review{display:grid;grid-template-columns:40% 60%}.review dt,.review dd{padding:3px 5px;border-bottom:1px solid #ddd}#report h2{font-size:14pt;border-bottom:1px solid #555;margin-top:16px;break-after:avoid}#report h1{font-size:20pt}#report .entry{break-inside:avoid}}
 </style></head>
 <body>
-<header><div class="bar"><div class="brand"><img src="../assets/logo.jpg" width="44" height="44" alt="" style="border-radius:8px;object-fit:contain"> Play2Win Games</div><button type="button" id="guideOpen">Procedure guide</button></div></header>
+<header><div class="bar" style="flex-wrap:wrap;padding-block:8px"><div class="brand"><img src="../assets/logo.jpg" width="44" height="44" alt="" style="border-radius:8px;object-fit:contain"> Play2Win Games</div><div class="choices"><button type="button" id="findOpen">Find an inspection</button><button type="button" id="guideOpen">Procedure guide</button></div></div></header>
 <main><div class="hero"><div><h1>Trade-in inspection</h1><p>Console intake and employee evaluation</p></div><div class="meter"><span id="count">0 of 22 checks recorded</span><progress id="progress" max="22" value="0" aria-label="Checks recorded"></progress></div></div>
 <div class="layout"><nav id="nav" aria-label="Form sections"></nav><div class="panel"><form id="form" autocomplete="off"><div id="pages"></div><div class="actions"><button type="button" id="back">Back</button><button type="button" class="primary" id="next">Continue</button></div></form></div></div>
-<footer><button type="button" id="logout">Sign out</button><p id="logoutError" role="alert"></p>Entries stay in this tab until you print or save a PDF. Closing or reloading clears the form.</footer></main>
+<footer><button type="button" id="logout">Sign out</button><p id="logoutError" role="alert"></p>Save the completed inspection in Review. Unsaved entries clear when you close or reload this tab.</footer></main>
+<dialog id="archive" aria-labelledby="archiveTitle">
+<h2 id="archiveTitle">Find an inspection</h2>
+<form id="lookup"><label class="field" for="lookupNumber">Full serial number or intake number</label>
+<input id="lookupNumber" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+<div class="actions"><button type="button" id="closeArchive">Close</button><button class="primary">Search</button></div></form>
+<p id="searchStatus" role="status"></p><div id="matches"></div>
+<div id="savedPanel" hidden><h3 id="savedTitle" tabindex="-1">Saved inspection</h3><p id="savedTime"></p>
+<button type="button" id="printSaved">Print / save PDF</button>
+<div id="savedDetail"></div></div></dialog>
 <dialog id="guide"><h2>Employee procedure</h2><ol>
 <li>Confirm store authorization and create an intake record.</li><li>Identify the exact model and record its serial number according to store policy.</li><li>Record received items and arrival condition before testing.</li><li>Inspect before connecting power. Stop for liquid damage, exposed wiring, burning, swelling, or other safety hazards.</li><li>Use known-good, store-approved test equipment.</li><li>Record each applicable result and describe defects or tests you could not complete.</li><li>Protect customer privacy. Never request passwords or record account information.</li><li>Refer locks, suspected tampering, safety concerns, uncertain results, and exceptions to a manager.</li><li>Complete the condition summary. Only authorized personnel may determine or approve an offer.</li><li>Retain the completed record according to store policy.</li></ol><button type="button" id="guideClose">Close guide</button></dialog>
-<dialog id="newDialog"><h2>Start another intake?</h2><p>This clears all entries for this console. Keep a printed copy or save a PDF first if you need this record.</p><div class="actions"><button type="button" id="cancelNew">Keep working</button><button type="button" id="clearForm" class="primary">Clear and start new</button></div></dialog>
+<dialog id="newDialog"><h2>Start another intake?</h2><p>Starting a new intake clears this form. Saved inspections remain available under Find an inspection.</p><div class="actions"><button type="button" id="cancelNew">Keep working</button><button type="button" id="clearForm" class="primary">Clear and start new</button></div></dialog>
 <article id="report"></article>
 <script>
 'use strict';
@@ -85,13 +94,13 @@ function field(parent,name,label,type='text',wide=false,initial=''){
  const node=add(wrap,type==='area'?'textarea':'input',{name,id:name});
  if(type!=='area')node.type=type;
  if(initial)node.value=initial;
- records.push({section:buildSection,label,read:()=>node.value.trim()});return node;
+ records.push({name,section:buildSection,label,read:()=>node.value.trim()});return node;
 }
 function options(parent,name,label,values,multi=false){
  const fs=add(parent,'fieldset',{class:'wide'});add(fs,'legend',{},label);const row=add(fs,'div',{class:'choices'});
  for(const val of values){const wrap=add(row,'label',{class:'choice'});add(wrap,'input',{type:multi?'checkbox':'radio',name,value:val});wrap.append(document.createTextNode(val))}
  const read=()=>Array.from(fs.querySelectorAll('input:checked'),n=>n.value).join(', ');
- records.push({section:buildSection,label,read});return fs;
+ records.push({name,section:buildSection,label,read});return fs;
 }
 function localDate(time=false){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,time?16:10)}
 hint('Identify the console and record what arrived with it.');
@@ -126,16 +135,25 @@ const certification='I completed the applicable inspection and tests, recorded o
 grid=block('Customer acknowledgment (if required)');add(grid,'p',{class:'wide'},acknowledgment);field(grid,'customerSign','Customer signature');field(grid,'customerDate','Customer signature date','date');
 grid=block('Employee certification');add(grid,'p',{class:'wide'},certification);field(grid,'employeeSign','Employee signature');field(grid,'employeeDate','Employee signature date','date');
 grid=block('Manager review');field(grid,'managerSign','Manager / reviewer signature');field(grid,'managerDate','Manager review date','date');
-buildSection=6;hint('Check the record, then use your tablet’s print dialog to print or save a PDF for store retention.');const statusLine=add(sections[6],'p',{class:'note'});const preview=add(sections[6],'div',{});
+buildSection=6;hint('Review the results and save the completed inspection for staff lookup. You can also print a copy.');
+const statusLine=add(sections[6],'p',{class:'note'});
+const saveButton=add(sections[6],'button',{type:'button',class:'primary'},'Save completed inspection');
+const saveStatus=add(sections[6],'p',{role:'status'});
+const preview=add(sections[6],'div',{});
 function updateCount(){const count=tests.filter(t=>t.read()).length;$('count').textContent=count+' of 22 checks recorded';$('progress').value=count;return count}
-function renderReport(root,printing){
+function renderReport(root,printing,snapshot=null){
  root.replaceChildren();
- if(printing){add(root,'h1',{},'Play2Win Games · Trade-in inspection');add(root,'p',{},$('count').textContent)}
+ if(printing){
+  add(root,'h1',{},'Play2Win Games · Trade-in inspection');
+  const count=snapshot?tests.filter(r=>snapshot.fields[r.name]).length:updateCount();
+  add(root,'p',{},count+' of 22 checks recorded');
+  if(snapshot)add(root,'p',{},'Saved '+formatSaved(snapshot.saved));
+ }
  for(let i=0;i<6;i++){
   const group=add(root,printing?'section':'details',{class:'reportGroup'});if(!printing){group.classList.add('test');if(i===0)group.open=true}
   add(group,printing?'h2':'summary',{},titles[i]);
   for(const r of records.filter(item=>item.section===i)){
-   const value=r.read();if(!value&&r.label.startsWith('Notes for '))continue;
+   const value=snapshot?(snapshot.fields[r.name]||''):r.read();if(!value&&r.label.startsWith('Notes for '))continue;
    if(i===5&&r.label==='Customer signature')add(group,'p',{},acknowledgment);
    if(i===5&&r.label==='Employee signature')add(group,'p',{},certification);
    const row=add(group,'dl',{class:'review entry'});add(row,'dt',{},r.label);
@@ -151,13 +169,20 @@ function show(i,focus=true){
 }
 $('back').onclick=()=>page===6?$('newDialog').showModal():show(page-1);
 $('next').onclick=()=>{if(page<6)show(page+1);else {renderReport($('report'),true);window.print()}};
-window.addEventListener('beforeprint',()=>{updateCount();renderReport($('report'),true)});
+window.addEventListener('beforeprint',()=>renderReport($('report'),true,$('archive').open?openedInspection:completedInspection));
 $('guideOpen').onclick=()=>$('guide').showModal();$('guideClose').onclick=()=>$('guide').close();
 $('cancelNew').onclick=()=>$('newDialog').close();
 let edited=false;form.addEventListener('input',()=>{edited=true});window.addEventListener('beforeunload',e=>{if(edited){e.preventDefault();e.returnValue=''}});
-$('clearForm').onclick=()=>{form.reset();$('version').value='1.0';$('received').value=localDate(true);for(const detail of form.querySelectorAll('details'))detail.open=false;preview.replaceChildren();$('report').replaceChildren();edited=false;updateCount();$('newDialog').close();show(0)};
+$('clearForm').onclick=()=>{
+ for(const control of form.querySelectorAll('input,textarea'))control.disabled=false;
+ form.reset();$('version').value='1.0';$('received').value=localDate(true);
+ for(const detail of form.querySelectorAll('details'))detail.open=false;
+ preview.replaceChildren();$('report').replaceChildren();
+ completedInspection=null;inspectionId=null;saveButton.disabled=false;saveStatus.replaceChildren();
+ edited=false;updateCount();$('newDialog').close();show(0);
+};
 $('logout').onclick=async()=>{
- if(edited && !window.confirm('Sign out and clear this intake? Print or save a PDF first if you need a copy.'))return;
+ if(edited && !window.confirm('Sign out and discard the unsaved entries in this tab?'))return;
  try {
   const response=await fetch('api.php?route=logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   if(!response.ok)throw new Error();
@@ -167,4 +192,6 @@ $('logout').onclick=async()=>{
 // Recheck the session when a browser restores a previously visited page.
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()});
 form.onsubmit=e=>e.preventDefault();show(0,false);
-</script></body></html>
+</script>
+<script src="inspection-records.js?v=1"></script>
+</body></html>
