@@ -586,6 +586,13 @@ wins.
 
 ### Use the trade-in calculator <a id="trade-in-calculator"></a>
 
+**Console inspections.** On the store tablet, open
+[Trade-in inspection](https://play2wingames.com/trade-in/console-intake.php)
+and enter the usual trade-in staff or manager password. Record the console,
+inspect it before applying power, and work through the tests and sign-off.
+In **Review**, tap **Print / save PDF** to keep the record under store policy.
+Entries stay in the current tab. Tap **Start new intake** for the next console.
+
 **Dead Games tab:** available to staff and managers. Search a game and filter
 by console and classification. **Both Trade-In and Pricing** prominently flag
 confirmed unplayable and unofficial/special-setup editions: **do not buy or

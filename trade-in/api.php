@@ -871,6 +871,9 @@ function clear_cache(): void {
 
 /* ------------------------------------------------------------------ routes */
 
+// Server-rendered staff pages share the authenticated session without dispatching an API route.
+if (defined('P2W_TRADEIN_PAGE') && P2W_TRADEIN_PAGE === true) return;
+
 $method = (string)($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $route = trim((string)($_GET['route'] ?? ''), '/');
 

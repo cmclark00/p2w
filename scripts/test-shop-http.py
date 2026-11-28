@@ -47,6 +47,15 @@ with tempfile.TemporaryDirectory(prefix="p2w-http-test-") as directory:
                       "$p=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH); if(is_file(" + repr(ROOT.as_posix()) + ".$p)) return false; "
                       "if(str_starts_with($p,'/shop')) { require " + repr((ROOT / "shop/index.php").as_posix()) + "; return true; } return false;", encoding="utf-8")
     env = os.environ.copy()
+    intake_data = folder / "intake"
+    intake_data.mkdir()
+    env["P2W_TRADEIN_DATA"] = str(intake_data)
+    staff_hash = subprocess.check_output(
+        [PHP, "-r", "echo password_hash('fixture-staff-only', PASSWORD_DEFAULT);"], text=True)
+    (intake_data / "config.json").write_text(json.dumps({
+        "staffHash": staff_hash, "managerHash": "", "sessionVersion": 1,
+        "secret": "local-test-only"
+    }), encoding="utf-8")
     state = {"created":0,"captured":0,"payments":{}}
     class FakeAPI(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
@@ -111,6 +120,14 @@ with tempfile.TemporaryDirectory(prefix="p2w-http-test-") as directory:
                 global assertions
                 assert value,label
                 assertions+=1
+            intake = "/trade-in/console-intake.php"
+            status, body, headers, _ = request(intake)
+            check(status == 401 and 'id="login"' in body and 'id="pages"' not in body, "inspection requires login")
+            check(request("/trade-in/api.php?route=login", json_body={"password": "fixture-staff-only"})[0] == 200, "staff password accepted")
+            status, body, headers, _ = request(intake)
+            check(status == 200 and 'id="pages"' in body and "no-store" in headers["Cache-Control"], "private inspection available")
+            request("/trade-in/api.php?route=logout", json_body={})
+            check(request(intake)[0] == 401, "inspection locked after logout")
             s,b,h,u=request("/shop")
             check(s==401 and "/shop/login" in u,"preview password required")
             check("noindex" in h.get("X-Robots-Tag",""),"preview search indexing disabled")
